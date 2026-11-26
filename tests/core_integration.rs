@@ -325,3 +325,83 @@ fn part_save_replaces_only_with_complete_valid_data() {
     assert!(cluster::parse_part(&updated).is_ok());
     assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 1);
 }
+
+#[test]
+fn unknown_project_content_is_rejected_without_rewriting_the_original() {
+    use morphlet::persistence::{self, Project};
+    let dir = TempDir(std::env::temp_dir().join(format!(
+        "morphlet-core-unknown-{}", std::process::id()
+    )));
+    fs::create_dir(&dir.0).unwrap();
+    let path = dir.0.join("future.morph");
+    let mut graph = Graph::default();
+    add(&mut graph, NodeKind::Number);
+    let project = Project::new("original", graph);
+    let mut json = serde_json::to_value(&project).unwrap();
+    json["future_metadata"] = serde_json::json!({"important": true});
+    let original = serde_json::to_vec(&json).unwrap();
+    fs::write(&path, &original).unwrap();
+    assert!(persistence::load(&path).is_err());
+    assert_eq!(fs::read(&path).unwrap(), original);
+    json["schema_version"] = 42.into();
+    let future = serde_json::to_vec(&json).unwrap();
+    assert!(persistence::decode_project(&future).unwrap_err().contains("v42"));
+    let mut unknown = serde_json::to_value(&project).unwrap();
+    unknown["graph"]["nodes"][0]["kind"] = "future_geometry".into();
+    let unknown_bytes = serde_json::to_vec(&unknown).unwrap();
+    fs::write(&path, &unknown_bytes).unwrap();
+    assert!(persistence::load(&path).is_err());
+    assert_eq!(fs::read(&path).unwrap(), unknown_bytes);
+}
+
+#[test]
+fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
+    use morphlet::persistence::{self, Project};
+    let dir = TempDir(std::env::temp_dir().join(format!(
+        "morphlet-core-save-limit-{}", std::process::id()
+    )));
+    fs::create_dir(&dir.0).unwrap();
+    let path = dir.0.join("work.morph");
+    let small = Project::new("small", Graph::default());
+    persistence::save(&path, &small).unwrap();
+    let previous = fs::read(&path).unwrap();
+
+    let mut large = Graph::default();
+    // The graph is individually valid, but its total JSON exceeds the 8 MiB file cap.
+    for _ in 0..1_100 {
+        let id = add(&mut large, NodeKind::Script);
+        large.node_mut(id).unwrap().script = "x".repeat(morphlet::script::MAX_SCRIPT_BYTES);
+    }
+    let oversized = Project::new("large", large);
+    oversized.validate().unwrap();
+    let error = persistence::save(&path, &oversized).unwrap_err();
+    assert!(error.contains("8 MB"), "{error}");
+    assert_eq!(fs::read(&path).unwrap(), previous);
+    assert_eq!(persistence::load(&path).unwrap(), small);
+    assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 1);
+}
+
+#[test]
+fn all_checked_in_project_examples_round_trip_without_schema_changes() {
+    use morphlet::persistence;
+    let dir = TempDir(std::env::temp_dir().join(format!(
+        "morphlet-core-roundtrip-{}", std::process::id()
+    )));
+    fs::create_dir(&dir.0).unwrap();
+    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
+    let mut count = 0;
+    for entry in fs::read_dir(examples).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|x| x.to_str()) != Some("morph") {
+            continue;
+        }
+        let before = fs::read(&path).unwrap();
+        let project = persistence::decode_project(&before).unwrap();
+        let destination = dir.0.join(path.file_name().unwrap());
+        persistence::save(&destination, &project).unwrap();
+        assert_eq!(persistence::load(&destination).unwrap(), project);
+        assert_eq!(fs::read(&path).unwrap(), before);
+        count += 1;
+    }
+    assert!(count >= 10);
+}

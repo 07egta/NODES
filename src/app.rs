@@ -1975,11 +1975,17 @@ impl MorphletApp {
         if !self.dirty || self.last_autosave.elapsed() < Duration::from_secs(20) {
             return;
         }
-        if let Some(path) = recovery_path() {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = persistence::save(&path, &self.project);
+        let result = recovery_path()
+            .ok_or_else(|| "自動保存先が見つかりません。".to_string())
+            .and_then(|path| {
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| format!("自動保存先を作成できませんでした: {e}"))?;
+                }
+                persistence::save(&path, &self.project)
+            });
+        if let Err(error) = result {
+            self.notify(format!("自動保存に失敗しました。手動で保存してください: {error}"), true);
         }
         self.last_autosave = Instant::now();
     }

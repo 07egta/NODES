@@ -21,6 +21,7 @@ const WELD_QUANTIZATION: f64 = 1.0e6;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Project {
     pub schema_version: u32,
     pub name: String,
@@ -47,12 +48,7 @@ impl Project {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != SCHEMA_VERSION {
-            return Err(format!(
-                "この作品は形式 v{} です。このアプリで読める形式は v{} です。",
-                self.schema_version, SCHEMA_VERSION
-            ));
-        }
+        check_schema_version(self.schema_version)?;
         if self.name.len() > 1024 || self.name.chars().any(|c| c == '\0') {
             return Err("作品名が長すぎるか、使えない文字が含まれています。".into());
         }
@@ -66,6 +62,25 @@ impl Project {
     }
 }
 
+fn check_schema_version(version: u32) -> Result<(), String> {
+    if version != SCHEMA_VERSION {
+        return Err(format!(
+            "この作品は形式 v{} です。このアプリで読める形式は v{} です。",
+            version, SCHEMA_VERSION
+        ));
+    }
+    Ok(())
+}
+
+fn parse_error(e: serde_json::Error) -> String {
+    let detail: String = e.to_string().chars().take(300).collect();
+    format!(
+        "作品の内容を読み取れませんでした（{} 行目）: {}",
+        e.line(),
+        detail
+    )
+}
+
 /// Read into a separate value. The caller only replaces its open project on success.
 pub fn load(path: &Path) -> Result<Project, String> {
     let file = File::open(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
@@ -73,30 +88,62 @@ pub fn load(path: &Path) -> Result<Project, String> {
     file.take((MAX_PROJECT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .map_err(|e| format!("作品を読み込めませんでした: {e}"))?;
+    decode_project(&bytes)
+}
+
+/// Decode a bounded v1 project without silently discarding unknown fields.
+/// Future versions are reported before interpreting their graph; callers must
+/// leave the original file untouched on error.
+pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
     if bytes.len() > MAX_PROJECT_BYTES {
         return Err("作品ファイルが大きすぎます。上限は 8 MB です。".into());
     }
-    let project: Project = serde_json::from_slice(&bytes).map_err(|e| {
-        let detail: String = e.to_string().chars().take(300).collect();
-        format!(
-            "作品の内容を読み取れませんでした（{} 行目）: {}",
-            e.line(),
-            detail
-        )
-    })?;
+    #[derive(Deserialize)]
+    struct Header {
+        schema_version: u32,
+    }
+    // Read only the envelope first so future schemas get an explicit version error.
+    let header: Header = serde_json::from_slice(bytes).map_err(parse_error)?;
+    check_schema_version(header.schema_version)?;
+    let project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
     project.validate()?;
     Ok(project)
 }
 
+/// Streaming limit: reject a large project while serializing into its temporary
+/// file, rather than building an unbounded pretty-printed byte vector in RAM.
+struct ProjectWriter<W> {
+    inner: W,
+    remaining: usize,
+}
+
+impl<W: Write> Write for ProjectWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() > self.remaining {
+            return Err(std::io::Error::other(
+                "作品ファイルが大きすぎます。上限は 8 MB です。",
+            ));
+        }
+        let written = self.inner.write(bytes)?;
+        self.remaining -= written;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     project.validate()?;
-    let mut bytes = serde_json::to_vec_pretty(project)
-        .map_err(|e| format!("作品を保存形式に変換できませんでした: {e}"))?;
-    bytes.push(b'\n');
-    if bytes.len() > MAX_PROJECT_BYTES {
-        return Err("作品ファイルが大きすぎます。上限は 8 MB です。".into());
-    }
-    atomic_write(path, |file| file.write_all(&bytes))
+    atomic_write(path, |file| {
+        let mut bounded = ProjectWriter {
+            inner: file,
+            remaining: MAX_PROJECT_BYTES,
+        };
+        serde_json::to_writer_pretty(&mut bounded, project).map_err(std::io::Error::other)?;
+        bounded.write_all(b"\n")
+    })
 }
 
 pub(crate) fn atomic_write(
