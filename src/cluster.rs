@@ -166,12 +166,19 @@ impl CacheKeys {
             if self.checked.insert(id) {
                 if let Some(def) = find(&graph.clusters, id) {
                     let signature = definition_signature(def);
-                    if !self.definitions.get(&id).is_some_and(|old| old.signature == signature) {
+                    if !self
+                        .definitions
+                        .get(&id)
+                        .is_some_and(|old| old.signature == signature)
+                    {
                         self.revision = self.revision.wrapping_add(1);
-                        self.definitions.insert(id, DefinitionRevision {
-                            signature,
-                            revision: self.revision,
-                        });
+                        self.definitions.insert(
+                            id,
+                            DefinitionRevision {
+                                signature,
+                                revision: self.revision,
+                            },
+                        );
                     }
                 } else {
                     self.definitions.remove(&id);
@@ -471,9 +478,7 @@ fn def_depth_cached(
     stack: &mut Vec<u64>,
     memo: &mut BTreeMap<u64, usize>,
 ) -> Result<usize, String> {
-    let too_deep = || format!(
-        "まとめノードの入れ子が深すぎます（上限 {MAX_CLUSTER_DEPTH} 段）。"
-    );
+    let too_deep = || format!("まとめノードの入れ子が深すぎます（上限 {MAX_CLUSTER_DEPTH} 段）。");
     if stack.contains(&id) {
         return Err("まとめノードの定義が循環しています。".into());
     }
@@ -491,7 +496,12 @@ fn def_depth_cached(
     stack.push(id);
     let result = (|| -> Result<usize, String> {
         let mut deepest = 0;
-        for node in def.graph.nodes.iter().filter(|n| n.kind == NodeKind::Cluster) {
+        for node in def
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Cluster)
+        {
             let child = node.cluster.ok_or("まとめノードの定義がありません。")?;
             deepest = deepest.max(def_depth_cached(defs, child, stack, memo)?);
         }
@@ -528,7 +538,9 @@ fn closure_ids(defs: &[ClusterDef], root: u64) -> Vec<u64> {
 }
 fn next_def_id(defs: &[ClusterDef]) -> Result<u64, String> {
     match defs.iter().map(|d| d.id).max() {
-        Some(id) => id.checked_add(1).ok_or_else(|| "部品の ID をこれ以上追加できません。".into()),
+        Some(id) => id
+            .checked_add(1)
+            .ok_or_else(|| "部品の ID をこれ以上追加できません。".into()),
         None => Ok(1),
     }
 }
@@ -675,8 +687,14 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
             inner.nodes.push(node);
         }
     }
-    inner.next_id = inner.nodes.iter().map(|n| n.id).max().unwrap_or(0)
-        .checked_add(1).ok_or("ノード ID をこれ以上追加できません。")?;
+    inner.next_id = inner
+        .nodes
+        .iter()
+        .map(|n| n.id)
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or("ノード ID をこれ以上追加できません。")?;
     let def = ClusterDef {
         id: next_def_id(&graph.clusters)?,
         name: name.clone(),

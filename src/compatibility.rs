@@ -16,19 +16,25 @@ fn normalize(graph: &mut Graph, depth: usize) -> Result<(), String> {
         // shared ordinal default, so retain behavior and remove that stale option.
         if crate::node_access::uses_ordinal_matching(node.kind)
             && crate::node_access::uses_list_access(node.kind)
+            && let Some(&value) = node.params.get(crate::data_tree::MATCH_PARAM)
         {
-            if let Some(&value) = node.params.get(crate::data_tree::MATCH_PARAM) {
-                crate::data_tree::MatchMode::from_number(value)?;
-                node.params.remove(crate::data_tree::MATCH_PARAM);
-            }
+            crate::data_tree::MatchMode::from_number(value)?;
+            node.params.remove(crate::data_tree::MATCH_PARAM);
         }
-        let aliases: Vec<_> = node.inputs.keys()
+        let aliases: Vec<_> = node
+            .inputs
+            .keys()
             .filter(|key| node.kind.canonical_input_key(key) != key.as_str())
-            .cloned().collect();
+            .cloned()
+            .collect();
         for alias in aliases {
             let canonical = node.kind.canonical_input_key(&alias).to_owned();
             let source = node.inputs[&alias];
-            if node.inputs.get(&canonical).is_some_and(|&existing| existing != source) {
+            if node
+                .inputs
+                .get(&canonical)
+                .is_some_and(|&existing| existing != source)
+            {
                 return Err(format!(
                     "ノード {} の旧入力「{}」と入力「{}」の接続が競合しています。元のファイルは変更していません。",
                     node.id, alias, canonical
@@ -37,15 +43,31 @@ fn normalize(graph: &mut Graph, depth: usize) -> Result<(), String> {
             node.inputs.remove(&alias);
             node.inputs.insert(canonical, source);
         }
-        let transform_aliases: Vec<_> = node.params.keys().filter_map(|key| {
-            let port = key.strip_prefix(crate::data_tree::PORT_PREFIX)?;
-            let canonical = node.kind.canonical_input_key(port);
-            (canonical != port).then(|| (key.clone(), format!("{}{canonical}", crate::data_tree::PORT_PREFIX)))
-        }).collect();
+        let transform_aliases: Vec<_> = node
+            .params
+            .keys()
+            .filter_map(|key| {
+                let port = key.strip_prefix(crate::data_tree::PORT_PREFIX)?;
+                let canonical = node.kind.canonical_input_key(port);
+                (canonical != port).then(|| {
+                    (
+                        key.clone(),
+                        format!("{}{canonical}", crate::data_tree::PORT_PREFIX),
+                    )
+                })
+            })
+            .collect();
         for (alias, canonical) in transform_aliases {
             let value = node.params[&alias];
-            if node.params.get(&canonical).is_some_and(|&existing| existing != value) {
-                return Err(format!("ノード {} の旧入力と入力のデータツリー設定が競合しています。", node.id));
+            if node
+                .params
+                .get(&canonical)
+                .is_some_and(|&existing| existing != value)
+            {
+                return Err(format!(
+                    "ノード {} の旧入力と入力のデータツリー設定が競合しています。",
+                    node.id
+                ));
             }
             node.params.remove(&alias);
             node.params.insert(canonical, value);

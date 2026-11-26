@@ -1,7 +1,7 @@
 //! Deterministic, bounded graph evaluation and procedural mesh construction.
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
-use crate::model::*;
 use crate::data_tree as dt;
+use crate::model::*;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
@@ -18,7 +18,10 @@ pub struct NodeTiming {
 }
 impl NodeTiming {
     fn since(start: Instant, cached: bool) -> Self {
-        Self { elapsed_ms: start.elapsed().as_secs_f64() * 1000., cached }
+        Self {
+            elapsed_ms: start.elapsed().as_secs_f64() * 1000.,
+            cached,
+        }
     }
 }
 
@@ -72,7 +75,9 @@ impl Evaluator {
             return;
         }
         while self.cache_weight.saturating_add(entry.weight) > MAX_TOTAL_WEIGHT {
-            let Some(&(_, oldest)) = self.cache_order.first() else { return };
+            let Some(&(_, oldest)) = self.cache_order.first() else {
+                return;
+            };
             self.remove_cached(oldest);
         }
         self.cache_weight = self.cache_weight.saturating_add(entry.weight);
@@ -107,8 +112,12 @@ impl Evaluator {
             }
         };
         let existing: BTreeSet<_> = graph.nodes.iter().map(|n| n.id).collect();
-        let removed: Vec<_> = self.cache.keys().copied()
-            .filter(|id| !existing.contains(id)).collect();
+        let removed: Vec<_> = self
+            .cache
+            .keys()
+            .copied()
+            .filter(|id| !existing.contains(id))
+            .collect();
         for id in removed {
             self.remove_cached(id);
         }
@@ -127,13 +136,18 @@ impl Evaluator {
                 self.remove_cached(id);
                 revisions.insert(id, 0);
                 out.outputs.insert(id, Ok(Tree::default()));
-                out.node_timings.insert(id, NodeTiming::since(node_start, false));
+                out.node_timings
+                    .insert(id, NodeTiming::since(node_start, false));
                 continue;
             }
             let key = Key {
                 kind: node.kind,
                 // IEEE bit equality preserves signed-zero-sensitive numeric operations.
-                params: node.params.iter().map(|(k, v)| (k.clone(), v.to_bits())).collect(),
+                params: node
+                    .params
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_bits()))
+                    .collect(),
                 inputs: node
                     .inputs
                     .iter()
@@ -148,7 +162,8 @@ impl Evaluator {
                     let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
                     if stop() {
                         out.cancelled = true;
-                        out.node_timings.insert(id, NodeTiming::since(node_start, false));
+                        out.node_timings
+                            .insert(id, NodeTiming::since(node_start, false));
                         break;
                     }
                     self.revision = self.revision.wrapping_add(1).max(1);
@@ -171,7 +186,8 @@ impl Evaluator {
                             .into(),
                     ),
                 );
-                out.node_timings.insert(id, NodeTiming::since(node_start, is_cached));
+                out.node_timings
+                    .insert(id, NodeTiming::since(node_start, is_cached));
                 continue;
             }
             retained = retained.saturating_add(weight);
@@ -188,7 +204,8 @@ impl Evaluator {
             }
             revisions.insert(id, revision);
             out.outputs.insert(id, result);
-            out.node_timings.insert(id, NodeTiming::since(node_start, is_cached));
+            out.node_timings
+                .insert(id, NodeTiming::since(node_start, is_cached));
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
@@ -221,43 +238,61 @@ pub(crate) fn evaluate_node(
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
-        let tree = if let Some(&mode) = node.params.get(&format!("{}{}", dt::PORT_PREFIX, spec.key)) {
+        let tree = if let Some(&mode) = node.params.get(&format!("{}{}", dt::PORT_PREFIX, spec.key))
+        {
             dt::apply_transform(&tree, dt::PortTransform::from_number(mode)?)?
-        } else { tree };
+        } else {
+            tree
+        };
         for (path, values) in &tree.branches {
-          for (index, value) in values.iter().enumerate() {
-            cancelled(cancel)?;
-            let site = || format!("{}[{}]", dt::path_text(path), index);
-            if !spec.kind.accepts(value.kind()) {
-                return Err(format!(
-                    "「{}」{} には {} が必要です（現在: {}）。",
-                    spec.label, site(),
-                    spec.kind.label(),
-                    value.kind().label()
-                ));
-            }
-            if spec.default.is_some() {
-                let n = value.number()?;
-                if n < spec.min || n > spec.max {
+            for (index, value) in values.iter().enumerate() {
+                cancelled(cancel)?;
+                let site = || format!("{}[{}]", dt::path_text(path), index);
+                if !spec.kind.accepts(value.kind()) {
                     return Err(format!(
-                        "「{}」{} は {} 〜 {} の範囲にしてください。",
-                        spec.label, site(), spec.min, spec.max
+                        "「{}」{} には {} が必要です（現在: {}）。",
+                        spec.label,
+                        site(),
+                        spec.kind.label(),
+                        value.kind().label()
                     ));
                 }
-                if spec.integer && n.fract() != 0.0 {
-                    return Err(format!("「{}」{} は整数にしてください。", spec.label, site()));
+                if spec.default.is_some() {
+                    let n = value.number()?;
+                    if n < spec.min || n > spec.max {
+                        return Err(format!(
+                            "「{}」{} は {} 〜 {} の範囲にしてください。",
+                            spec.label,
+                            site(),
+                            spec.min,
+                            spec.max
+                        ));
+                    }
+                    if spec.integer && n.fract() != 0.0 {
+                        return Err(format!(
+                            "「{}」{} は整数にしてください。",
+                            spec.label,
+                            site()
+                        ));
+                    }
                 }
             }
-          }
         }
         inputs.push(tree);
     }
     if crate::data_tree_nodes::is_tree_kind(node.kind) {
-        return checked_tree(crate::data_tree_nodes::run_tree(node, &inputs, cancel)?, cancel);
+        return checked_tree(
+            crate::data_tree_nodes::run_tree(node, &inputs, cancel)?,
+            cancel,
+        );
     }
     if node.kind == NodeKind::Flatten || node.kind == NodeKind::Graft {
         let t = inputs.first().ok_or("入力がありません。")?;
-        let result = if node.kind == NodeKind::Flatten { dt::flatten(t) } else { dt::graft(t) }?;
+        let result = if node.kind == NodeKind::Flatten {
+            dt::flatten(t)
+        } else {
+            dt::graft(t)
+        }?;
         return checked_tree(result, cancel);
     }
     if node.kind == NodeKind::Output {
@@ -289,8 +324,12 @@ pub(crate) fn evaluate_node(
     };
     let curve_list = crate::curve_nodes::is_list_kind(node.kind);
     let list_kind = crate::node_access::uses_list_access(node.kind);
-    let matching = node.params.get(dt::MATCH_PARAM).copied()
-        .map(dt::MatchMode::from_number).transpose()?;
+    let matching = node
+        .params
+        .get(dt::MATCH_PARAM)
+        .copied()
+        .map(dt::MatchMode::from_number)
+        .transpose()?;
     let item_mode = matching.unwrap_or(dt::MatchMode::Longest);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
@@ -311,25 +350,28 @@ pub(crate) fn evaluate_node(
     let matched = if matching.is_some() || crate::node_access::uses_ordinal_matching(node.kind) {
         dt::match_branches(&inputs)?
     } else {
-      paths.into_iter().map(|path| {
-        let lists: Vec<&[Value]> = inputs
-            .iter()
-            .map(|t| {
-                t.branches
-                    .get(&path)
-                    .or_else(|| {
-                        if t.branches.len() == 1 {
-                            t.branches.values().next()
-                        } else {
-                            None
-                        }
+        paths
+            .into_iter()
+            .map(|path| {
+                let lists: Vec<&[Value]> = inputs
+                    .iter()
+                    .map(|t| {
+                        t.branches
+                            .get(&path)
+                            .or_else(|| {
+                                if t.branches.len() == 1 {
+                                    t.branches.values().next()
+                                } else {
+                                    None
+                                }
+                            })
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[])
                     })
-                    .map(Vec::as_slice)
-                    .unwrap_or(&[])
+                    .collect();
+                dt::BranchMatch { path, lists }
             })
-            .collect();
-        dt::BranchMatch { path, lists }
-      }).collect()
+            .collect()
     };
     let mut result = Tree::default();
     let mut total_items = 0usize;
@@ -342,97 +384,105 @@ pub(crate) fn evaluate_node(
         }
         result.branches.entry(path.clone()).or_default();
         let values = (|| -> Result<Vec<Value>, String> {
-        // Empty lists are data, including non-leading lists such as cut parameters
-        // or edit indices. Only a missing FirstItem scalar setting suppresses a
-        // list adapter. SingleItem adapters must validate their exact cardinality.
-        let skip = if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
-            lists.iter().any(|v| v.is_empty())
-        } else if list_kind {
-            lists.iter().enumerate().any(|(index, values)| {
-                values.is_empty() && crate::node_access::for_input(node.kind, index)
-                    == Some(crate::node_access::InputAccess::FirstItem)
-            })
-        } else {
-            lists.iter().any(|v| v.is_empty())
-        };
-        if skip {
-            return Ok(Vec::new());
-        }
-        let values = if node.kind == NodeKind::Merge {
-            vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
-        } else if node.kind == NodeKind::Loft {
-            let cap = lists
-                .get(1)
-                .and_then(|v| v.first())
-                .ok_or("端面の設定がありません。")?
-                .number()?
-                != 0.;
-            vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
-        } else if crate::data_tree_nodes::is_list_kind(node.kind) {
-            crate::data_tree_nodes::run_list(node.kind, &lists, MAX_ITEMS.saturating_sub(total_items),
-                (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight), cancel)?
-        } else if crate::math_nodes::is_list_kind(node.kind) {
-            crate::math_nodes::run_list(node.kind, &lists, cancel)?
-        } else if crate::generative::is_list(node.kind) {
-            crate::generative::run_list(node.kind, &lists, cancel)?
-        } else if node.kind == NodeKind::MeshConstruct {
-            crate::mesh_fabrication::run_list(&lists, cancel)?
-        } else if curve_list {
-            crate::curve_nodes::run_list(node.kind, &lists, cancel)?
-        } else if list_kind {
-            crate::gh_nodes::run_list(node.kind, &lists, cancel)?
-        } else {
-            let matches = dt::ItemMatches::new(&lists, item_mode, MAX_ITEMS.saturating_sub(total_items))?;
-            let mut values = Vec::new();
-            for args in matches {
-                cancelled(cancel)?;
-                preflight_run(
+            // Empty lists are data, including non-leading lists such as cut parameters
+            // or edit indices. Only a missing FirstItem scalar setting suppresses a
+            // list adapter. SingleItem adapters must validate their exact cardinality.
+            let skip = if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
+                lists.iter().any(|v| v.is_empty())
+            } else if list_kind {
+                lists.iter().enumerate().any(|(index, values)| {
+                    values.is_empty()
+                        && crate::node_access::for_input(node.kind, index)
+                            == Some(crate::node_access::InputAccess::FirstItem)
+                })
+            } else {
+                lists.iter().any(|v| v.is_empty())
+            };
+            if skip {
+                return Ok(Vec::new());
+            }
+            let values = if node.kind == NodeKind::Merge {
+                vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
+            } else if node.kind == NodeKind::Loft {
+                let cap = lists
+                    .get(1)
+                    .and_then(|v| v.first())
+                    .ok_or("端面の設定がありません。")?
+                    .number()?
+                    != 0.;
+                vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+            } else if crate::data_tree_nodes::is_list_kind(node.kind) {
+                crate::data_tree_nodes::run_list(
                     node.kind,
-                    &args,
+                    &lists,
+                    MAX_ITEMS.saturating_sub(total_items),
                     (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
-                    MAX_ITEMS.saturating_sub(total_items.saturating_add(values.len())),
-                )?;
-                let made = match &formula {
-                    Some(f) => vec![Value::Number(f.eval([
-                        num(&args, 0)?,
-                        num(&args, 1)?,
-                        num(&args, 2)?,
-                        num(&args, 3)?,
-                    ])?)],
-                    None => run(node.kind, &args, cancel)?,
-                };
-                if values.len().saturating_add(made.len()) > MAX_ITEMS {
-                    return Err(
-                        "生成データが多すぎます。数列や配列の個数を減らしてください。".into(),
-                    );
-                }
-                for value in &made {
-                    total_weight = total_weight.saturating_add(value.weight());
-                }
-                if total_weight > MAX_TOTAL_WEIGHT / 2 {
-                    return Err(
+                    cancel,
+                )?
+            } else if crate::math_nodes::is_list_kind(node.kind) {
+                crate::math_nodes::run_list(node.kind, &lists, cancel)?
+            } else if crate::generative::is_list(node.kind) {
+                crate::generative::run_list(node.kind, &lists, cancel)?
+            } else if node.kind == NodeKind::MeshConstruct {
+                crate::mesh_fabrication::run_list(&lists, cancel)?
+            } else if curve_list {
+                crate::curve_nodes::run_list(node.kind, &lists, cancel)?
+            } else if list_kind {
+                crate::gh_nodes::run_list(node.kind, &lists, cancel)?
+            } else {
+                let matches =
+                    dt::ItemMatches::new(&lists, item_mode, MAX_ITEMS.saturating_sub(total_items))?;
+                let mut values = Vec::new();
+                for args in matches {
+                    cancelled(cancel)?;
+                    preflight_run(
+                        node.kind,
+                        &args,
+                        (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
+                        MAX_ITEMS.saturating_sub(total_items.saturating_add(values.len())),
+                    )?;
+                    let made = match &formula {
+                        Some(f) => vec![Value::Number(f.eval([
+                            num(&args, 0)?,
+                            num(&args, 1)?,
+                            num(&args, 2)?,
+                            num(&args, 3)?,
+                        ])?)],
+                        None => run(node.kind, &args, cancel)?,
+                    };
+                    if values.len().saturating_add(made.len()) > MAX_ITEMS {
+                        return Err(
+                            "生成データが多すぎます。数列や配列の個数を減らしてください。".into(),
+                        );
+                    }
+                    for value in &made {
+                        total_weight = total_weight.saturating_add(value.weight());
+                    }
+                    if total_weight > MAX_TOTAL_WEIGHT / 2 {
+                        return Err(
                         "1 つのノードの形状が大きすぎます。分割数や配列の個数を減らしてください。"
                             .into(),
                     );
+                    }
+                    values.extend(made);
                 }
-                values.extend(made);
+                values
+            };
+            if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) || list_kind {
+                for value in &values {
+                    total_weight = total_weight.saturating_add(value.weight());
+                }
+                if total_weight > MAX_TOTAL_WEIGHT / 2 {
+                    return Err("生成形状が大きすぎます。断面や分割数を減らしてください。".into());
+                }
             }
-            values
-        };
-        if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) || list_kind {
-            for value in &values {
-                total_weight = total_weight.saturating_add(value.weight());
+            total_items = total_items.saturating_add(values.len());
+            if total_items > MAX_ITEMS {
+                return Err("生成データの個数が上限を超えました。".into());
             }
-            if total_weight > MAX_TOTAL_WEIGHT / 2 {
-                return Err("生成形状が大きすぎます。断面や分割数を減らしてください。".into());
-            }
-        }
-        total_items = total_items.saturating_add(values.len());
-        if total_items > MAX_ITEMS {
-            return Err("生成データの個数が上限を超えました。".into());
-        }
-        Ok(values)
-        })().map_err(|e| format!("枝 {}: {e}", dt::path_text(&path)))?;
+            Ok(values)
+        })()
+        .map_err(|e| format!("枝 {}: {e}", dt::path_text(&path)))?;
         result.branches.insert(path, values);
     }
     checked_tree(result, cancel)
@@ -501,8 +551,15 @@ fn preflight_run(
             let count = num(args, 0)? as usize;
             (count, count)
         }
-        NodeKind::NoiseDeform | NodeKind::MeshFlip | NodeKind::MeshSmooth | NodeKind::MeshOnBed | NodeKind::MeshUnify => (shape(args)?.weight(), 1),
-        NodeKind::CurveDivide => { let count = num(args,1)? as usize + 1; (count,count) },
+        NodeKind::NoiseDeform
+        | NodeKind::MeshFlip
+        | NodeKind::MeshSmooth
+        | NodeKind::MeshOnBed
+        | NodeKind::MeshUnify => (shape(args)?.weight(), 1),
+        NodeKind::CurveDivide => {
+            let count = num(args, 1)? as usize + 1;
+            (count, count)
+        }
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
@@ -550,8 +607,14 @@ fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
-    let geometry = crate::curve_geometry::CurveGeometry::nurbs(crate::curve_geometry::NurbsCurve::polyline(points.clone(), closed)?);
-    Ok(vec![Value::Curve(Arc::new(Curve { points, closed, geometry: Some(geometry) }))])
+    let geometry = crate::curve_geometry::CurveGeometry::nurbs(
+        crate::curve_geometry::NurbsCurve::polyline(points.clone(), closed)?,
+    );
+    Ok(vec![Value::Curve(Arc::new(Curve {
+        points,
+        closed,
+        geometry: Some(geometry),
+    }))])
 }
 
 fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
@@ -652,13 +715,19 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         Circle => {
             let r = num(a, 0)?;
             let n = num(a, 1)? as usize;
-            let geom = crate::curve_geometry::CurveGeometry::circle([0.;3], [0.,0.,1.], r)?;
+            let geom = crate::curve_geometry::CurveGeometry::circle([0.; 3], [0., 0., 1.], r)?;
             // Keep the legacy angular sampling and vertex count for existing lofts/exports.
-            let points = (0..n).map(|i| {
-                let t = TAU * i as f64 / n as f64;
-                [r*t.cos(), r*t.sin(), 0.]
-            }).collect();
-            Ok(vec![Value::Curve(Arc::new(Curve { points, closed: true, geometry: Some(geom) }))])
+            let points = (0..n)
+                .map(|i| {
+                    let t = TAU * i as f64 / n as f64;
+                    [r * t.cos(), r * t.sin(), 0.]
+                })
+                .collect();
+            Ok(vec![Value::Curve(Arc::new(Curve {
+                points,
+                closed: true,
+                geometry: Some(geom),
+            }))])
         }
         Polygon => {
             let r = num(a, 0)?;
@@ -705,13 +774,25 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             let turns = num(a, 2)?;
             let n = num(a, 3)? as usize;
             let geometry = crate::curve_geometry::CurveGeometry::helix(
-                [0.;3], [r,0.,0.], [0.,r,0.], [0.,0.,h], turns, 0.)?;
-            let points = (0..=n).map(|i| {
-                let t = i as f64 / n as f64;
-                let ang = t * turns * TAU;
-                [r * ang.cos(), r * ang.sin(), t * h]
-            }).collect();
-            Ok(vec![Value::Curve(Arc::new(Curve { points, closed: false, geometry: Some(geometry) }))])
+                [0.; 3],
+                [r, 0., 0.],
+                [0., r, 0.],
+                [0., 0., h],
+                turns,
+                0.,
+            )?;
+            let points = (0..=n)
+                .map(|i| {
+                    let t = i as f64 / n as f64;
+                    let ang = t * turns * TAU;
+                    [r * ang.cos(), r * ang.sin(), t * h]
+                })
+                .collect();
+            Ok(vec![Value::Curve(Arc::new(Curve {
+                points,
+                closed: false,
+                geometry: Some(geometry),
+            }))])
         }
         Extrude => as_mesh(
             extrude(curve(a)?.as_ref(), num(a, 1)?, num(a, 2)? as usize, cancel)?,
@@ -863,39 +944,59 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(values)
         }
-        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d | PopulateMesh | CurveArray | NoiseField | LifeGrid => crate::generative::run_item(kind, a, cancel),
+        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d
+        | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray
+        | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d
+        | PopulateMesh | CurveArray | NoiseField | LifeGrid => {
+            crate::generative::run_item(kind, a, cancel)
+        }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
-        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh | NurbsVase | RuledSurface | SurfaceExtrude | BrepUnion | BrepDifference | BrepOffset | SurfaceGaussianCurvature | SurfaceMeanCurvature | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
-        MeshArea
-        | MeshVolume
-        | MeshCenter
-        | MeshDimensions
-        | MeshMass
-        | MeshAudit
-        | MeshVertices
-        | MeshFaces
-        | MeshNormals
-        | MeshEdges
-        | MeshBoundary
-        | MeshClosest
-        | MeshFlip
-        | MeshWeldExact
-        | MeshUnweld
-        | MeshUnify
-        | MeshSmooth
-        | MeshSubdivide
-        | MeshCatmullClark
-        | MeshOnBed
-        | MeshDeleteFace
-        | MeshSelfContact
-        | MeshThicknessSample
-        | MeshCompact
-        | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
-        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
-        | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
-        | Remap | Expression | GraphProfile | ImportMesh
-        | SimplifyTree | TrimTree | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems | InsertItems | MemberIndex | RandomReduce | Jitter => {
+        PlaneSurface
+        | NurbsPanel
+        | BilinearSurface
+        | CylinderSurface
+        | FrustumSurface
+        | SphereSurface
+        | TorusSurface
+        | EvaluateSurface
+        | SurfaceDirection
+        | SurfaceNormalLine
+        | SurfaceArea
+        | SurfaceClosestPoint
+        | SurfaceIsoCurve
+        | DivideSurface
+        | SurfaceMesh
+        | BrepBox
+        | BrepVolume
+        | BrepArea
+        | BrepIntersection
+        | BrepMove
+        | BrepFaces
+        | BrepEdges
+        | BrepVertices
+        | BrepMesh
+        | NurbsVase
+        | RuledSurface
+        | SurfaceExtrude
+        | BrepUnion
+        | BrepDifference
+        | BrepOffset
+        | SurfaceGaussianCurvature
+        | SurfaceMeanCurvature
+        | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
+        MeshArea | MeshVolume | MeshCenter | MeshDimensions | MeshMass | MeshAudit
+        | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
+        | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
+        | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
+        | MeshCompact | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
+        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem
+        | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList
+        | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree
+        | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper
+        | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex
+        | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems
+        | InsertItems | MemberIndex | RandomReduce | Jitter => {
             Err("このノードはリスト評価が必要です。".into())
         }
         other => crate::math_nodes::run_item(other, a, cancel),
@@ -986,15 +1087,21 @@ pub(crate) fn map_shape(
             Ok(Value::Mesh(Arc::new(mesh)))
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
-        Value::Surface(_) | Value::Solid(_) => Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into()),
+        Value::Surface(_) | Value::Solid(_) => {
+            Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into())
+        }
     }
 }
-pub(crate) fn map_affine_shape(v: &Value, f: impl Fn([f64;3]) -> [f64;3], cancel: &dyn Fn() -> bool) -> Result<Value,String> {
+pub(crate) fn map_affine_shape(
+    v: &Value,
+    f: impl Fn([f64; 3]) -> [f64; 3],
+    cancel: &dyn Fn() -> bool,
+) -> Result<Value, String> {
     let mut mapped = map_shape(v, &f, cancel)?;
-    if let (Value::Curve(before), Value::Curve(after)) = (v, &mut mapped) {
-        if let Some(g) = &before.geometry {
-            Arc::make_mut(after).geometry = Some(g.affine(&f)?);
-        }
+    if let (Value::Curve(before), Value::Curve(after)) = (v, &mut mapped)
+        && let Some(g) = &before.geometry
+    {
+        Arc::make_mut(after).geometry = Some(g.affine(&f)?);
     }
     Ok(mapped)
 }
@@ -1805,7 +1912,10 @@ mod tests {
         assert_eq!(engine.cache_order.len(), engine.cache.len());
         for (id, cached) in &engine.cache {
             assert!(engine.cache_order.contains(&(cached.revision, *id)));
-            assert_eq!(cached.weight, cached.result.as_ref().map(Tree::weight).unwrap_or(0));
+            assert_eq!(
+                cached.weight,
+                cached.result.as_ref().map(Tree::weight).unwrap_or(0)
+            );
         }
         assert_eq!(
             engine.cache_weight,

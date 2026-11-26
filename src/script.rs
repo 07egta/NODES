@@ -237,7 +237,10 @@ fn execute(source: &str, inputs: &ScriptInputs, stop: Arc<AtomicBool>) -> Result
     }
     match &inputs.geometry {
         Some(values) => {
-            if values.iter().any(|v| matches!(v, Value::Surface(_) | Value::Solid(_))) {
+            if values
+                .iter()
+                .any(|v| matches!(v, Value::Surface(_) | Value::Solid(_)))
+            {
                 return Err("精密曲面と B-rep はスクリプトで未対応です。先に明示的にメッシュ化してください。".into());
             }
             let items: Vec<Dynamic> = values.iter().map(value_to_dynamic).collect();

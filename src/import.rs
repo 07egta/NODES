@@ -233,7 +233,10 @@ pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String
                     let before = builder.triangles.len();
                     builder.triangle(triangle.map(|index| corners[index]))?;
                     if builder.triangles.len() == before {
-                        return Err(format!("OBJ の {} 行目: 頂点の結合後に退化する面があります。", line_no + 1));
+                        return Err(format!(
+                            "OBJ の {} 行目: 頂点の結合後に退化する面があります。",
+                            line_no + 1
+                        ));
                     }
                 }
             }

@@ -523,10 +523,8 @@ pub fn path_mapper(tree: &Tree, rule: &str) -> Result<Tree, String> {
         for (&index, token) in p.iter().zip(&src) {
             match *token {
                 Token::Literal(v) if v != index => return Ok(p.to_vec()),
-                Token::Variable(v) => {
-                    if vars.insert(v, index).is_some_and(|prev| prev != index) {
-                        return Ok(p.to_vec());
-                    }
+                Token::Variable(v) if vars.insert(v, index).is_some_and(|prev| prev != index) => {
+                    return Ok(p.to_vec());
                 }
                 _ => {}
             }

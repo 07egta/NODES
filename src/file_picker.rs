@@ -27,7 +27,10 @@ pub enum FileTask {
 impl FileTask {
     /// Tasks that pick an existing file (the others name a file to write).
     fn picks_existing(self) -> bool {
-        matches!(self, Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer)
+        matches!(
+            self,
+            Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer
+        )
     }
     fn title(self) -> &'static str {
         match self {
@@ -84,7 +87,11 @@ impl FileTask {
             Self::Save => "保存",
             Self::LoadPart | Self::ImportMesh => "読み込む",
             Self::PickSlicer => "選ぶ",
-            Self::ExportStl | Self::ExportObj | Self::ExportGcode | Self::ExportThreeMf | Self::SavePart => "書き出す",
+            Self::ExportStl
+            | Self::ExportObj
+            | Self::ExportGcode
+            | Self::ExportThreeMf
+            | Self::SavePart => "書き出す",
         }
     }
 }

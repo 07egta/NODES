@@ -3,7 +3,9 @@ use morphlet::engine::{Evaluation, Evaluator};
 use morphlet::model::{Graph, MAX_NODES, NodeId, NodeKind};
 
 fn number(evaluation: &Evaluation, id: NodeId) -> f64 {
-    evaluation.outputs[&id].as_ref().unwrap().branches[&vec![0]][0].number().unwrap()
+    evaluation.outputs[&id].as_ref().unwrap().branches[&vec![0]][0]
+        .number()
+        .unwrap()
 }
 fn scalar_chain(count: usize) -> Graph {
     assert!(count >= 2);
@@ -14,12 +16,20 @@ fn scalar_chain(count: usize) -> Graph {
     let mut add = graph.nodes[1].clone();
     add.params.insert("b".into(), 1.);
     // Construct once and validate once. Per-wire validation is not evaluation.
-    graph.nodes = (0..count).map(|index| {
-        let mut node = if index == 0 { number.clone() } else { add.clone() };
-        node.id = index as NodeId;
-        if index > 0 { node.inputs.insert("a".into(), (index - 1) as NodeId); }
-        node
-    }).collect();
+    graph.nodes = (0..count)
+        .map(|index| {
+            let mut node = if index == 0 {
+                number.clone()
+            } else {
+                add.clone()
+            };
+            node.id = index as NodeId;
+            if index > 0 {
+                node.inputs.insert("a".into(), (index - 1) as NodeId);
+            }
+            node
+        })
+        .collect();
     graph.next_id = count as NodeId;
     graph.validate().unwrap();
     graph
@@ -47,11 +57,17 @@ fn ten_thousand_scalar_nodes_evaluate_cache_and_recompute_only_the_edited_suffix
     assert_eq!(number(&warm, last), COUNT as f64);
     let warm_ms = warm.elapsed_ms;
     drop(warm);
-    graph.node_mut(MIDDLE as NodeId).unwrap().params.insert("b".into(), 2.);
+    graph
+        .node_mut(MIDDLE as NodeId)
+        .unwrap()
+        .params
+        .insert("b".into(), 2.);
     let edited = evaluator.evaluate(&graph, &|| false);
     assert_eq!((edited.computed, edited.cached), (COUNT - MIDDLE, MIDDLE));
     assert_eq!(number(&edited, last), (COUNT + 1) as f64);
-    for id in 0..COUNT { assert_eq!(edited.node_timings[&(id as NodeId)].cached, id < MIDDLE); }
+    for id in 0..COUNT {
+        assert_eq!(edited.node_timings[&(id as NodeId)].cached, id < MIDDLE);
+    }
     let edited_ms = edited.elapsed_ms;
     drop(edited);
     let bytes = serde_json::to_vec(&graph).unwrap();
@@ -61,5 +77,8 @@ fn ten_thousand_scalar_nodes_evaluate_cache_and_recompute_only_the_edited_suffix
     let reopened = evaluator.evaluate(&loaded, &|| false);
     assert_eq!((reopened.computed, reopened.cached), (0, COUNT));
     assert_eq!(number(&reopened, last), (COUNT + 1) as f64);
-    println!("nodes={COUNT} cold_ms={cold_ms:.3} warm_ms={warm_ms:.3} middle_edit_ms={edited_ms:.3} serialized_bytes={}", bytes.len());
+    println!(
+        "nodes={COUNT} cold_ms={cold_ms:.3} warm_ms={warm_ms:.3} middle_edit_ms={edited_ms:.3} serialized_bytes={}",
+        bytes.len()
+    );
 }

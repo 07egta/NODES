@@ -43,8 +43,26 @@ impl DataType {
             || self == source
             || (self == Self::Geometry && matches!(source, Self::Point | Self::Curve | Self::Mesh))
             || (source == Self::Geometry && matches!(self, Self::Point | Self::Curve | Self::Mesh))
-            || (self == Self::DisplayGeometry && matches!(source, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
-            || (source == Self::DisplayGeometry && matches!(self, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
+            || (self == Self::DisplayGeometry
+                && matches!(
+                    source,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
+            || (source == Self::DisplayGeometry
+                && matches!(
+                    self,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
     }
 }
 
@@ -1356,7 +1374,9 @@ impl NodeKind {
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
             other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
-            other if crate::surface_nodes::KINDS.contains(&other) => crate::surface_nodes::spec(other),
+            other if crate::surface_nodes::KINDS.contains(&other) => {
+                crate::surface_nodes::spec(other)
+            }
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1385,7 +1405,9 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
-                .or_else(|| crate::generative::is_kind(other).then(|| crate::generative::spec(other)))
+                .or_else(|| {
+                    crate::generative::is_kind(other).then(|| crate::generative::spec(other))
+                })
                 .unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }
     }
@@ -1657,7 +1679,11 @@ impl Value {
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
-            Self::Curve(c) => c.points.len().max(1).saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
+            Self::Curve(c) => c
+                .points
+                .len()
+                .max(1)
+                .saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
             Self::Mesh(m) => m
                 .vertices
                 .len()

@@ -1,0 +1,68 @@
+{
+  "architecture": "x86_64",
+  "max_nodes": 16384,
+  "measurement": "headless evaluator only; not frame, GUI, process startup or memory",
+  "platform": "linux",
+  "samples": [
+    {
+      "cold_evaluate_ms": 0.061093999999999996,
+      "fixture_ms": 0.05849,
+      "requested_nodes": 10,
+      "slider_max_ms": 0.060904,
+      "slider_p50_ms": 0.02116,
+      "slider_p95_ms": 0.031098,
+      "slider_samples": 50,
+      "status": "MEASURED",
+      "warm_cache_hits": 10,
+      "warm_evaluate_ms": 0.013014
+    },
+    {
+      "cold_evaluate_ms": 0.37450100000000003,
+      "fixture_ms": 0.12609599999999999,
+      "requested_nodes": 100,
+      "slider_max_ms": 0.287409,
+      "slider_p50_ms": 0.21380100000000002,
+      "slider_p95_ms": 0.28013499999999997,
+      "slider_samples": 50,
+      "status": "MEASURED",
+      "warm_cache_hits": 100,
+      "warm_evaluate_ms": 0.183834
+    },
+    {
+      "cold_evaluate_ms": 3.5652719999999998,
+      "fixture_ms": 1.924116,
+      "requested_nodes": 1000,
+      "slider_max_ms": 3.365367,
+      "slider_p50_ms": 2.854589,
+      "slider_p95_ms": 3.157397,
+      "slider_samples": 50,
+      "status": "MEASURED",
+      "warm_cache_hits": 1000,
+      "warm_evaluate_ms": 1.941328
+    },
+    {
+      "cold_evaluate_ms": 67.47141900000001,
+      "fixture_ms": 500.794751,
+      "requested_nodes": 16384,
+      "slider_max_ms": 97.3163,
+      "slider_p50_ms": 85.64967399999999,
+      "slider_p95_ms": 94.01828900000001,
+      "slider_samples": 50,
+      "status": "MEASURED",
+      "warm_cache_hits": 16384,
+      "warm_evaluate_ms": 39.593066
+    },
+    {
+      "cold_evaluate_ms": 24.616346,
+      "fixture_ms": 204.010075,
+      "requested_nodes": 10000,
+      "slider_max_ms": 42.952702,
+      "slider_p50_ms": 38.261801,
+      "slider_p95_ms": 41.780916000000005,
+      "slider_samples": 50,
+      "status": "MEASURED",
+      "warm_cache_hits": 10000,
+      "warm_evaluate_ms": 16.926223
+    }
+  ]
+}

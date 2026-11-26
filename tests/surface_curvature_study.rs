@@ -10,9 +10,9 @@ fn near(actual: f64, expected: f64) {
 
 #[test]
 fn torus_study_has_nine_curvature_branches_and_roundtrips() {
-    let mut project = persistence::decode_project(include_bytes!(
-        "../examples/surface-curvature-study.morph"
-    )).unwrap();
+    let mut project =
+        persistence::decode_project(include_bytes!("../examples/surface-curvature-study.morph"))
+            .unwrap();
     project.validate().unwrap();
     let encoded = serde_json::to_vec(&project).unwrap();
     let reread = persistence::decode_project(&encoded).unwrap();
@@ -50,9 +50,20 @@ fn torus_study_has_nine_curvature_branches_and_roundtrips() {
         near(values[1].number().unwrap(), expected[1]);
     }
     assert_eq!(evaluator.evaluate(&project.graph, &|| false).computed, 0);
-    project.graph.node_mut(0).unwrap().params.insert("major".into(), 42.);
+    project
+        .graph
+        .node_mut(0)
+        .unwrap()
+        .params
+        .insert("major".into(), 42.);
     let changed = evaluator.evaluate(&project.graph, &|| false);
     assert!(changed.computed > 0);
-    let first = changed.outputs[&4].as_ref().unwrap().branches.values().next().unwrap();
+    let first = changed.outputs[&4]
+        .as_ref()
+        .unwrap()
+        .branches
+        .values()
+        .next()
+        .unwrap();
     near(first[0].number().unwrap(), 1. / (8. * (42. + 8.)));
 }

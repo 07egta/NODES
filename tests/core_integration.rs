@@ -68,7 +68,11 @@ fn sparse_slider_edit_does_not_recompute_unrelated_nodes_at_supported_scales() {
         assert!(cold.outputs.values().all(Result::is_ok));
         let warm = evaluator.evaluate(&graph, &|| false);
         assert_eq!((warm.computed, warm.cached), (0, count));
-        graph.node_mut(source).unwrap().params.insert("value".into(), 7.);
+        graph
+            .node_mut(source)
+            .unwrap()
+            .params
+            .insert("value".into(), 7.);
         let edited = evaluator.evaluate(&graph, &|| false);
         assert_eq!((edited.computed, edited.cached), (2, count - 2));
         assert_eq!(number(&edited, child), 17.);
@@ -88,7 +92,12 @@ fn graphs_above_the_resource_limit_are_rejected() {
         })
         .collect();
     graph.next_id = (MAX_NODES + 1) as u64;
-    assert!(graph.topological_order().unwrap_err().contains(&MAX_NODES.to_string()));
+    assert!(
+        graph
+            .topological_order()
+            .unwrap_err()
+            .contains(&MAX_NODES.to_string())
+    );
     let ev = Evaluator::default().evaluate(&graph, &|| false);
     assert_eq!(ev.computed, 0);
     assert!(ev.outputs.values().all(Result::is_err));
@@ -146,10 +155,8 @@ impl Drop for TempDir {
 
 #[test]
 fn nested_import_recomputes_when_missing_file_appears_and_is_removed() {
-    let directory = TempDir(std::env::temp_dir().join(format!(
-        "morphlet-core-import-{}",
-        std::process::id()
-    )));
+    let directory =
+        TempDir(std::env::temp_dir().join(format!("morphlet-core-import-{}", std::process::id())));
     fs::create_dir(&directory.0).unwrap();
     let path = directory.0.join("mesh.obj");
 
@@ -225,12 +232,19 @@ fn benchmark_sparse_slider_edit() {
             let warm_ms = start.elapsed().as_secs_f64() * 1_000.;
             assert_eq!(warm.cached, count);
             drop(warm);
-            graph.node_mut(source).unwrap().params.insert("value".into(), 2. + iteration as f64);
+            graph
+                .node_mut(source)
+                .unwrap()
+                .params
+                .insert("value".into(), 2. + iteration as f64);
             let start = Instant::now();
             let edited = evaluator.evaluate(&graph, &|| false);
             let edit_ms = start.elapsed().as_secs_f64() * 1_000.;
             assert_eq!((edited.computed, edited.cached), (2, count - 2));
-            println!("{count},{cold_ms:.3},{warm_ms:.3},{edit_ms:.3},{},{}", edited.computed, edited.cached);
+            println!(
+                "{count},{cold_ms:.3},{warm_ms:.3},{edit_ms:.3},{},{}",
+                edited.computed, edited.cached
+            );
         }
     }
 }
@@ -246,7 +260,12 @@ fn shared_definition_edits_recompute_only_dependent_instances() {
     let mut evaluator = Evaluator::default();
     assert_eq!(evaluator.evaluate(&graph, &|| false).computed, 4);
     assert_eq!(evaluator.evaluate(&graph, &|| false).cached, 4);
-    graph.clusters[0].graph.node_mut(output).unwrap().params.insert("value".into(), 9.);
+    graph.clusters[0]
+        .graph
+        .node_mut(output)
+        .unwrap()
+        .params
+        .insert("value".into(), 9.);
     let changed = evaluator.evaluate(&graph, &|| false);
     assert_eq!((changed.computed, changed.cached), (3, 1));
     for id in [instance, second, third] {
@@ -255,7 +274,12 @@ fn shared_definition_edits_recompute_only_dependent_instances() {
     assert_eq!(number(&changed, independent), 1.);
     // A new work may reuse every definition ID. Compare the actual content.
     let mut next = graph.clone();
-    next.clusters[0].graph.node_mut(output).unwrap().params.insert("value".into(), 3.);
+    next.clusters[0]
+        .graph
+        .node_mut(output)
+        .unwrap()
+        .params
+        .insert("value".into(), 3.);
     assert_eq!(number(&evaluator.evaluate(&next, &|| false), instance), 3.);
 }
 
@@ -272,13 +296,20 @@ fn overdeep_definition_graph_is_rejected_before_exponential_expansion() {
             }
         }
         graph.clusters.push(ClusterDef {
-            id, name: format!("definition {id}"), graph: inner, inputs: vec![], output,
+            id,
+            name: format!("definition {id}"),
+            graph: inner,
+            inputs: vec![],
+            output,
         });
     }
     assert!(graph.validate().unwrap_err().contains("深すぎ"));
     let mut stack = Vec::new();
     assert!(cluster::def_depth(&graph.clusters, 1, &mut stack).is_err());
-    assert!(stack.is_empty(), "failed depth checks must unwind their stack");
+    assert!(
+        stack.is_empty(),
+        "failed depth checks must unwind their stack"
+    );
 }
 
 #[test]
@@ -289,7 +320,11 @@ fn cluster_id_exhaustion_is_an_error_and_preserves_the_target() {
     let bytes = cluster::export_part(&source, 2).unwrap();
     let mut target = Graph::default();
     target.clusters.push(ClusterDef {
-        id: u64::MAX - 1, name: "existing".into(), graph: inner, inputs: vec![], output,
+        id: u64::MAX - 1,
+        name: "existing".into(),
+        graph: inner,
+        inputs: vec![],
+        output,
     });
     target.validate().unwrap();
     let before = target.clone();
@@ -304,9 +339,8 @@ fn cluster_id_exhaustion_is_an_error_and_preserves_the_target() {
 
 #[test]
 fn part_save_replaces_only_with_complete_valid_data() {
-    let directory = TempDir(std::env::temp_dir().join(format!(
-        "morphlet-core-part-{}", std::process::id()
-    )));
+    let directory =
+        TempDir(std::env::temp_dir().join(format!("morphlet-core-part-{}", std::process::id())));
     fs::create_dir(&directory.0).unwrap();
     let path = directory.0.join("part.morphpart");
     let mut inner = Graph::default();
@@ -329,9 +363,8 @@ fn part_save_replaces_only_with_complete_valid_data() {
 #[test]
 fn unknown_project_content_is_rejected_without_rewriting_the_original() {
     use morphlet::persistence::{self, Project};
-    let dir = TempDir(std::env::temp_dir().join(format!(
-        "morphlet-core-unknown-{}", std::process::id()
-    )));
+    let dir =
+        TempDir(std::env::temp_dir().join(format!("morphlet-core-unknown-{}", std::process::id())));
     fs::create_dir(&dir.0).unwrap();
     let path = dir.0.join("future.morph");
     let mut graph = Graph::default();
@@ -345,7 +378,11 @@ fn unknown_project_content_is_rejected_without_rewriting_the_original() {
     assert_eq!(fs::read(&path).unwrap(), original);
     json["schema_version"] = 42.into();
     let future = serde_json::to_vec(&json).unwrap();
-    assert!(persistence::decode_project(&future).unwrap_err().contains("v42"));
+    assert!(
+        persistence::decode_project(&future)
+            .unwrap_err()
+            .contains("v42")
+    );
     let mut unknown = serde_json::to_value(&project).unwrap();
     unknown["graph"]["nodes"][0]["kind"] = "future_geometry".into();
     let unknown_bytes = serde_json::to_vec(&unknown).unwrap();
@@ -357,9 +394,9 @@ fn unknown_project_content_is_rejected_without_rewriting_the_original() {
 #[test]
 fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
     use morphlet::persistence::{self, Project};
-    let dir = TempDir(std::env::temp_dir().join(format!(
-        "morphlet-core-save-limit-{}", std::process::id()
-    )));
+    let dir = TempDir(
+        std::env::temp_dir().join(format!("morphlet-core-save-limit-{}", std::process::id())),
+    );
     fs::create_dir(&dir.0).unwrap();
     let path = dir.0.join("work.morph");
     let small = Project::new("small", Graph::default());
@@ -384,9 +421,9 @@ fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
 #[test]
 fn all_checked_in_project_examples_round_trip_without_schema_changes() {
     use morphlet::persistence;
-    let dir = TempDir(std::env::temp_dir().join(format!(
-        "morphlet-core-roundtrip-{}", std::process::id()
-    )));
+    let dir = TempDir(
+        std::env::temp_dir().join(format!("morphlet-core-roundtrip-{}", std::process::id())),
+    );
     fs::create_dir(&dir.0).unwrap();
     let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
     let mut count = 0;
@@ -426,11 +463,19 @@ fn cache_preserves_the_sign_of_zero_and_invalidates_after_node_removal() {
     let mut graph = Graph::default();
     let id = add(&mut graph, NodeKind::Number);
     let unrelated = add(&mut graph, NodeKind::Number);
-    graph.node_mut(id).unwrap().params.insert("value".into(), 0.);
+    graph
+        .node_mut(id)
+        .unwrap()
+        .params
+        .insert("value".into(), 0.);
     let mut evaluator = Evaluator::default();
     let first = evaluator.evaluate(&graph, &|| false);
     assert_eq!(number(&first, id).to_bits(), 0f64.to_bits());
-    graph.node_mut(id).unwrap().params.insert("value".into(), -0.);
+    graph
+        .node_mut(id)
+        .unwrap()
+        .params
+        .insert("value".into(), -0.);
     let changed = evaluator.evaluate(&graph, &|| false);
     assert_eq!((changed.computed, changed.cached), (1, 1));
     assert_eq!(number(&changed, id).to_bits(), (-0f64).to_bits());

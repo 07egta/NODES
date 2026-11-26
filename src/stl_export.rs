@@ -239,13 +239,22 @@ impl RepairReport {
     pub fn lines(&self) -> Vec<String> {
         let mut lines = Vec::new();
         if self.merged_vertices > 0 {
-            lines.push(format!("ほぼ同じ位置の頂点を {} 個まとめました", self.merged_vertices));
+            lines.push(format!(
+                "ほぼ同じ位置の頂点を {} 個まとめました",
+                self.merged_vertices
+            ));
         }
         if self.removed_degenerate > 0 {
-            lines.push(format!("つぶれた面を {} 枚取り除きました", self.removed_degenerate));
+            lines.push(format!(
+                "つぶれた面を {} 枚取り除きました",
+                self.removed_degenerate
+            ));
         }
         if self.removed_duplicate > 0 {
-            lines.push(format!("重なった面を {} 枚取り除きました", self.removed_duplicate));
+            lines.push(format!(
+                "重なった面を {} 枚取り除きました",
+                self.removed_duplicate
+            ));
         }
         if self.flipped_faces > 0 {
             lines.push(format!(
@@ -296,7 +305,11 @@ fn repair_one(
     report: &mut RepairReport,
     allow_global_flip: bool,
 ) -> Result<Mesh, String> {
-    if mesh.vertices.iter().any(|p| p.iter().any(|v| !v.is_finite())) {
+    if mesh
+        .vertices
+        .iter()
+        .any(|p| p.iter().any(|v| !v.is_finite()))
+    {
         return Err("無限大または非数の座標があるため、自動修復できません。".into());
     }
     // 1. Weld near-identical vertices onto one representative each.
@@ -331,7 +344,8 @@ fn repair_one(
             report.removed_degenerate += 1;
             continue;
         }
-        let (Some(&pa), Some(&pb), Some(&pc)) = (points.get(a), points.get(b), points.get(c)) else {
+        let (Some(&pa), Some(&pb), Some(&pc)) = (points.get(a), points.get(b), points.get(c))
+        else {
             report.removed_degenerate += 1;
             continue;
         };
@@ -353,10 +367,7 @@ fn repair_one(
     orient_faces(&mut tris, &points, report, allow_global_flip);
     // 4. Triangulate only simple planar holes, preserving existing vertices.
     fill_small_holes(&points, &mut tris, report);
-    let triangles: Vec<[u32; 3]> = tris
-        .iter()
-        .map(|&t| t.map(|i| i as u32))
-        .collect();
+    let triangles: Vec<[u32; 3]> = tris.iter().map(|&t| t.map(|i| i as u32)).collect();
     Ok(Mesh {
         vertices: points,
         triangles,
@@ -372,7 +383,10 @@ fn orient_faces(
     let mut faces_of_edge: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
     for (index, &tri) in tris.iter().enumerate() {
         for (a, b) in edges_of(tri) {
-            faces_of_edge.entry(undirected(a, b)).or_default().push(index);
+            faces_of_edge
+                .entry(undirected(a, b))
+                .or_default()
+                .push(index);
         }
     }
     let mut visited = vec![false; tris.len()];
@@ -439,11 +453,7 @@ fn orient_faces(
     }
 }
 
-fn fill_small_holes(
-    points: &[[f64; 3]],
-    tris: &mut Vec<[usize; 3]>,
-    report: &mut RepairReport,
-) {
+fn fill_small_holes(points: &[[f64; 3]], tris: &mut Vec<[usize; 3]>, report: &mut RepairReport) {
     let mut count_of_edge: HashMap<(usize, usize), usize> = HashMap::new();
     for &tri in tris.iter() {
         for (a, b) in edges_of(tri) {
@@ -468,12 +478,16 @@ fn fill_small_holes(
     let mut overflow = 0;
     let mut incomplete_boundary = false;
     for start in starts {
-        if done.contains(&start) { continue; }
+        if done.contains(&start) {
+            continue;
+        }
         let mut ring = vec![start];
         let mut current = start;
         let mut closed = false;
         loop {
-            if hole_in.get(&current) != Some(&1) { break; }
+            if hole_in.get(&current) != Some(&1) {
+                break;
+            }
             let to = match hole_out.get(&current).map(Vec::as_slice) {
                 Some([only]) => *only,
                 _ => break,
@@ -505,23 +519,27 @@ fn fill_small_holes(
         report.kept_open_holes += rings.len() + overflow;
         return;
     }
-    let boxes: Vec<([f64; 3], [f64; 3])> = rings.iter().map(|ring| {
-        let mut lo = [f64::INFINITY; 3];
-        let mut hi = [f64::NEG_INFINITY; 3];
-        for &v in ring {
-            for axis in 0..3 {
-                lo[axis] = lo[axis].min(points[v][axis]);
-                hi[axis] = hi[axis].max(points[v][axis]);
+    let boxes: Vec<([f64; 3], [f64; 3])> = rings
+        .iter()
+        .map(|ring| {
+            let mut lo = [f64::INFINITY; 3];
+            let mut hi = [f64::NEG_INFINITY; 3];
+            for &v in ring {
+                for axis in 0..3 {
+                    lo[axis] = lo[axis].min(points[v][axis]);
+                    hi[axis] = hi[axis].max(points[v][axis]);
+                }
             }
-        }
-        (lo, hi)
-    }).collect();
+            (lo, hi)
+        })
+        .collect();
     let mut ambiguous = vec![false; rings.len()];
     for i in 0..boxes.len() {
         for j in i + 1..boxes.len() {
             let (a, b) = boxes[i];
             let (c, d) = boxes[j];
-            let scale = (0..3).map(|axis| (b[axis] - a[axis]).max(d[axis] - c[axis]))
+            let scale = (0..3)
+                .map(|axis| (b[axis] - a[axis]).max(d[axis] - c[axis]))
                 .fold(0., f64::max);
             let tolerance = 1.0e-9 * scale + 1.0e-12;
             if (0..3).all(|axis| a[axis] <= d[axis] + tolerance && c[axis] <= b[axis] + tolerance) {
@@ -661,8 +679,16 @@ pub fn prepare_bodies(meshes: &[Mesh], options: &ExportOptions) -> Result<Vec<Me
         && let Some((lo, hi)) = bounds(&bodies)
     {
         let shift = [
-            if options.center_xy { -(lo[0] + hi[0]) / 2.0 } else { 0.0 },
-            if options.center_xy { -(lo[1] + hi[1]) / 2.0 } else { 0.0 },
+            if options.center_xy {
+                -(lo[0] + hi[0]) / 2.0
+            } else {
+                0.0
+            },
+            if options.center_xy {
+                -(lo[1] + hi[1]) / 2.0
+            } else {
+                0.0
+            },
             -lo[2],
         ];
         for body in &mut bodies {
@@ -718,7 +744,11 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
         size_mm: [0.0; 3],
     };
     if triangles == 0 {
-        let none = check(Level::Error, "書き出せる面", "面がありません。「出力」ノードに立体をつないでください。");
+        let none = check(
+            Level::Error,
+            "書き出せる面",
+            "面がありません。「出力」ノードに立体をつないでください。",
+        );
         return Ok((vec![none], stats));
     }
     let report = persistence::mesh_stats(&to_trees(bodies))?;
@@ -751,21 +781,35 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
         check(Level::Ok, "面の向きがそろっている", "隣接面の向きは一貫しています。殻の内外・入れ子・自己交差は未検査です。")
     });
     checks.push(if report.non_manifold_edges == 0 {
-        check(Level::Ok, "3つ以上の面が共有する辺がない", "辺ごとの面の数は正常です。")
+        check(
+            Level::Ok,
+            "3つ以上の面が共有する辺がない",
+            "辺ごとの面の数は正常です。",
+        )
     } else {
         check(
             Level::Error,
             "3つ以上の面が共有する辺がない",
-            format!("3枚以上の面が共有する辺が {} 本あります。", report.non_manifold_edges),
+            format!(
+                "3枚以上の面が共有する辺が {} 本あります。",
+                report.non_manifold_edges
+            ),
         )
     });
     checks.push(if report.degenerate_triangles == 0 {
-        check(Level::Ok, "つぶれた三角形がない", "面積 0 の面はありません。")
+        check(
+            Level::Ok,
+            "つぶれた三角形がない",
+            "面積 0 の面はありません。",
+        )
     } else {
         check(
             Level::Error,
             "つぶれた三角形がない",
-            format!("面積 0 の三角形が {} 枚あります。「自動修復」で取り除けます。", report.degenerate_triangles),
+            format!(
+                "面積 0 の三角形が {} 枚あります。「自動修復」で取り除けます。",
+                report.degenerate_triangles
+            ),
         )
     });
     if let Some([lo, hi]) = report.bounds {
@@ -846,7 +890,9 @@ pub fn write_bodies(
 
 fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usize, String> {
     match format {
-        OutputFormat::StlBinary => persistence::export_stl(path, &to_trees(bodies)).map(|r| r.triangles),
+        OutputFormat::StlBinary => {
+            persistence::export_stl(path, &to_trees(bodies)).map(|r| r.triangles)
+        }
         OutputFormat::Obj => persistence::export_obj(path, &to_trees(bodies)).map(|r| r.triangles),
         OutputFormat::StlAscii => {
             let triangles = ensure_writable(bodies)?;
@@ -896,7 +942,7 @@ pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
         return Err("3MFに書き出せるモデルがありません。".into());
     }
     let mut model = String::from(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"millimeter\" xml:lang=\"ja-JP\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n <resources>\n"
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"millimeter\" xml:lang=\"ja-JP\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n <resources>\n",
     );
     for (index, body) in bodies.iter().enumerate() {
         let id = index + 1;
@@ -906,9 +952,13 @@ pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
         let volume = crate::mesh_fabrication::signed_volume(body, &|| false)
             .map_err(|e| format!("3MF オブジェクト {id}: {e}"))?;
         if volume <= 0. {
-            return Err(format!("3MF オブジェクト {id} の体積が正ではありません。内側の殻を別オブジェクトにせず、面方向を確認してください。"));
+            return Err(format!(
+                "3MF オブジェクト {id} の体積が正ではありません。内側の殻を別オブジェクトにせず、面方向を確認してください。"
+            ));
         }
-        model.push_str(&format!("  <object id=\"{id}\" type=\"model\">\n   <mesh>\n    <vertices>\n"));
+        model.push_str(&format!(
+            "  <object id=\"{id}\" type=\"model\">\n   <mesh>\n    <vertices>\n"
+        ));
         // Rust's shortest round-trip representation avoids 6-decimal rounding
         // that could collapse close vertices. Coordinates are checked beforehand.
         for p in &body.vertices {

@@ -2,12 +2,18 @@
 use morphlet::engine::{Evaluation, Evaluator};
 use morphlet::model::{Graph, NodeId, NodeKind};
 use std::cell::Cell;
-fn node(g: &mut Graph, k: NodeKind) -> NodeId { g.add(k, [0.; 2]).unwrap() }
+fn node(g: &mut Graph, k: NodeKind) -> NodeId {
+    g.add(k, [0.; 2]).unwrap()
+}
 fn valid_times(e: &Evaluation) {
-    let total: f64 = e.node_timings.values().map(|t| {
-        assert!(t.elapsed_ms.is_finite() && t.elapsed_ms >= 0.);
-        t.elapsed_ms
-    }).sum();
+    let total: f64 = e
+        .node_timings
+        .values()
+        .map(|t| {
+            assert!(t.elapsed_ms.is_finite() && t.elapsed_ms >= 0.);
+            t.elapsed_ms
+        })
+        .sum();
     assert!(total <= e.elapsed_ms + 1e-6);
 }
 #[test]
@@ -30,13 +36,21 @@ fn timings_distinguish_cache_hits_and_downstream_edits() {
     assert!(warm.node_timings.values().all(|t| t.cached));
     valid_times(&warm);
     let previous = g.node(middle).unwrap().params["b"];
-    g.node_mut(middle).unwrap().params.insert("b".into(), previous + 1.);
+    g.node_mut(middle)
+        .unwrap()
+        .params
+        .insert("b".into(), previous + 1.);
     assert_ne!(g.node(middle).unwrap().params["b"], previous);
     let edit = engine.evaluate(&g, &|| false);
     assert_eq!((edit.computed, edit.cached), (2, 2));
     assert_ne!(edit.outputs[&middle], warm.outputs[&middle]);
     assert_ne!(edit.outputs[&end], warm.outputs[&end]);
-    for (id, hit) in [(source, true), (unrelated, true), (middle, false), (end, false)] {
+    for (id, hit) in [
+        (source, true),
+        (unrelated, true),
+        (middle, false),
+        (end, false),
+    ] {
         assert_eq!(edit.node_timings[&id].cached, hit);
     }
     valid_times(&edit);
@@ -92,7 +106,10 @@ fn interrupted_node_has_partial_time_but_no_partial_output_or_cache() {
     g.node_mut(id).unwrap().params.insert("count".into(), 512.);
     let calls = Cell::new(0);
     let mut engine = Evaluator::default();
-    let stopped = engine.evaluate(&g, &|| { calls.set(calls.get() + 1); calls.get() == 20 });
+    let stopped = engine.evaluate(&g, &|| {
+        calls.set(calls.get() + 1);
+        calls.get() == 20
+    });
     assert!(stopped.cancelled);
     assert!(stopped.outputs.is_empty());
     assert_eq!((stopped.computed, stopped.cached), (0, 0));

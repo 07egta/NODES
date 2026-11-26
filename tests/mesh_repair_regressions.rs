@@ -67,7 +67,7 @@ fn repair_preserves_the_inner_shell_of_a_hollow_cube() {
     let hollow = append(cube(3., [0.; 3]), inner);
     // Material occupies the outer cube minus the inner cube: 3³ - 1³ = 26.
     near(signed_volume(&hollow, &|| false).unwrap(), 26.);
-    let (repaired, report) = repair_meshes(&[hollow.clone()]).unwrap();
+    let (repaired, report) = repair_meshes(std::slice::from_ref(&hollow)).unwrap();
     near(signed_volume(&repaired[0], &|| false).unwrap(), 26.);
     assert_eq!(repaired[0], hollow);
     assert_eq!(report.flipped_bodies, 0);
@@ -97,7 +97,7 @@ fn repair_and_orientation_check_are_translation_invariant() {
     // The former world-origin integral evaluates to -66,666,666.666... for
     // this outward unit cube; its analytic volume is still exactly +1.
     let translated = cube(1., [-100_000_000.; 3]);
-    let (repaired, report) = repair_meshes(&[translated.clone()]).unwrap();
+    let (repaired, report) = repair_meshes(std::slice::from_ref(&translated)).unwrap();
     assert_eq!(repaired[0], translated);
     assert_eq!(report.flipped_bodies, 0);
     near(signed_volume(&repaired[0], &|| false).unwrap(), 1.);

@@ -38,11 +38,20 @@ fn clear_spans_and_exact_endpoints_remain_available() {
     let surface = crease(false);
     for u in [0., 0.06, 0.08, 1.] {
         assert!(
-            surface.derivatives2(u, 0.4, &|| false).unwrap().curvature().is_ok(),
+            surface
+                .derivatives2(u, 0.4, &|| false)
+                .unwrap()
+                .curvature()
+                .is_ok(),
             "regular parameter {u}"
         );
     }
-    assert!(surface.derivatives2(0.06, 0.4, &|| true).unwrap_err().contains("停止"));
+    assert!(
+        surface
+            .derivatives2(0.06, 0.4, &|| true)
+            .unwrap_err()
+            .contains("停止")
+    );
 }
 
 #[test]
@@ -50,12 +59,18 @@ fn nearby_distinct_simple_cubic_knots_keep_their_true_multiplicity() {
     let a = 0.7_f64;
     let b = f64::from_bits(a.to_bits() + 1);
     let surface = NurbsSurface::new(
-        6, 2, 3, 1,
+        6,
+        2,
+        3,
+        1,
         vec![0., 0., 0., 0., a, b, 10., 10., 10., 10.],
         vec![0., 0., 1., 1.],
-        (0..6).flat_map(|i| [[i as f64, 0., 0.], [i as f64, 1., 0.]]).collect(),
+        (0..6)
+            .flat_map(|i| [[i as f64, 0., 0.], [i as f64, 1., 0.]])
+            .collect(),
         vec![1.; 12],
-    ).unwrap();
+    )
+    .unwrap();
     // Both native knots are simple (C2), even though both lie inside the
     // proximity band. Summing nearby entries would incorrectly make C1.
     assert!(surface.derivatives2(0.07, 0.4, &|| false).is_ok());

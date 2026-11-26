@@ -1,8 +1,8 @@
 //! Opt-in, headless performance measurement (not a GUI/startup benchmark).
 //! cargo run --release --locked --example coverage_perf
 use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeKind, NodeId, MAX_NODES};
-use serde_json::{json, Value};
+use morphlet::model::{Graph, MAX_NODES, NodeId, NodeKind};
+use serde_json::{Value, json};
 use std::time::Instant;
 
 fn make_chain(n: usize) -> Result<(Graph, NodeId), String> {
@@ -13,7 +13,11 @@ fn make_chain(n: usize) -> Result<(Graph, NodeId), String> {
         let next = graph.add(NodeKind::Add, [0., 0.])?;
         graph.node_mut(next).unwrap().params.insert("b".into(), 1.);
         // No per-wire full graph scan while constructing the benchmark fixture.
-        graph.node_mut(next).unwrap().inputs.insert("a".into(), previous);
+        graph
+            .node_mut(next)
+            .unwrap()
+            .inputs
+            .insert("a".into(), previous);
         previous = next;
     }
     graph.validate()?;
@@ -26,7 +30,7 @@ fn sample(n: usize) -> Value {
         Ok(fixture) => fixture,
         Err(e) => return json!({"requested_nodes":n,"status":"REJECTED","reason":e}),
     };
-    let fixture_ms = build_started.elapsed().as_secs_f64()*1000.;
+    let fixture_ms = build_started.elapsed().as_secs_f64() * 1000.;
     let last = graph.nodes.last().unwrap().id;
     let mut engine = Evaluator::default();
     let cold = engine.evaluate(&graph, &|| false);
@@ -37,13 +41,25 @@ fn sample(n: usize) -> Value {
     let mut times = Vec::new();
     for step in 0..50 {
         let number = step as f64 + 2.;
-        graph.node_mut(slider).unwrap().params.insert("value".into(), number);
+        graph
+            .node_mut(slider)
+            .unwrap()
+            .params
+            .insert("value".into(), number);
         let start = Instant::now();
         let result = engine.evaluate(&graph, &|| false);
-        let elapsed = start.elapsed().as_secs_f64()*1000.;
+        let elapsed = start.elapsed().as_secs_f64() * 1000.;
         assert!(!result.cancelled && result.outputs.values().all(Result::is_ok));
-        let final_value = result.outputs[&last].as_ref().unwrap()
-            .branches.values().flatten().next().unwrap().number().unwrap();
+        let final_value = result.outputs[&last]
+            .as_ref()
+            .unwrap()
+            .branches
+            .values()
+            .flatten()
+            .next()
+            .unwrap()
+            .number()
+            .unwrap();
         assert_eq!(final_value, number + n as f64 - 1.);
         times.push(elapsed);
     }
@@ -57,9 +73,13 @@ fn sample(n: usize) -> Value {
 fn main() {
     let counts = [10, 100, 1_000, MAX_NODES, 10_000];
     let samples: Vec<_> = counts.into_iter().map(sample).collect();
-    println!("{}", serde_json::to_string_pretty(&json!({
-        "measurement":"headless evaluator only; not frame, GUI, process startup or memory",
-        "platform":std::env::consts::OS,"architecture":std::env::consts::ARCH,
-        "max_nodes":MAX_NODES,"samples":samples
-    })).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "measurement":"headless evaluator only; not frame, GUI, process startup or memory",
+            "platform":std::env::consts::OS,"architecture":std::env::consts::ARCH,
+            "max_nodes":MAX_NODES,"samples":samples
+        }))
+        .unwrap()
+    );
 }

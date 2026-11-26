@@ -16,10 +16,8 @@ struct TempDir(PathBuf);
 impl TempDir {
     fn new() -> Self {
         let number = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "morphlet-stl-test-{}-{number}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("morphlet-stl-test-{}-{number}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }
@@ -91,7 +89,10 @@ fn binary_stl_has_correct_header_count_and_size() {
     assert_eq!(summary.triangles, 12);
     let bytes = fs::read(&path).unwrap();
     assert_eq!(bytes.len(), 84 + 50 * 12);
-    assert_eq!(u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]), 12);
+    assert_eq!(
+        u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]),
+        12
+    );
     assert!(bytes[..80].starts_with(b"Morphlet binary STL"));
 }
 
@@ -143,7 +144,10 @@ fn repair_fixes_a_flipped_face() {
     let after = stats_of(&repaired[0]);
     assert_eq!(after.inconsistent_edges, 0);
     assert_eq!(after.open_edges, 0);
-    assert!(after.signed_volume_mm3 > 0.9, "outward orientation expected");
+    assert!(
+        after.signed_volume_mm3 > 0.9,
+        "outward orientation expected"
+    );
 }
 
 #[test]
@@ -154,7 +158,11 @@ fn repair_fills_a_missing_triangle_hole() {
     let (repaired, report) = repair_meshes(&[mesh]).unwrap();
     assert_eq!(report.filled_holes, 1);
     assert_eq!(repaired[0].triangles.len(), 12);
-    assert_eq!(repaired[0].vertices.len(), 8, "repair must preserve the original vertices");
+    assert_eq!(
+        repaired[0].vertices.len(),
+        8,
+        "repair must preserve the original vertices"
+    );
     assert_eq!(report.added_triangles, 1);
     let after = stats_of(&repaired[0]);
     assert_eq!(after.open_edges, 0);
@@ -170,8 +178,11 @@ fn split_bodies_counts_disconnected_parts() {
         p[0] += 10.0;
     }
     two.vertices.extend(far.vertices.iter().copied());
-    two.triangles
-        .extend(far.triangles.iter().map(|t| [t[0] + offset, t[1] + offset, t[2] + offset]));
+    two.triangles.extend(
+        far.triangles
+            .iter()
+            .map(|t| [t[0] + offset, t[1] + offset, t[2] + offset]),
+    );
     let parts = split_bodies(&two);
     assert_eq!(parts.len(), 2);
     assert!(parts.iter().all(|p| p.triangles.len() == 12));
@@ -182,7 +193,11 @@ fn split_bodies_counts_disconnected_parts() {
 #[test]
 fn check_flags_oversize_and_tiny_models() {
     let (checks, _) = check_bodies(&[cube()], 0.5).unwrap();
-    assert!(checks.iter().any(|c| c.level == morphlet::stl_export::Level::Error));
+    assert!(
+        checks
+            .iter()
+            .any(|c| c.level == morphlet::stl_export::Level::Error)
+    );
     let mut tiny = cube();
     for p in &mut tiny.vertices {
         for v in p.iter_mut() {
@@ -190,15 +205,16 @@ fn check_flags_oversize_and_tiny_models() {
         }
     }
     let (checks, _) = check_bodies(&[tiny], 256.0).unwrap();
-    assert!(checks.iter().any(|c| c.level == morphlet::stl_export::Level::Warn));
+    assert!(
+        checks
+            .iter()
+            .any(|c| c.level == morphlet::stl_export::Level::Warn)
+    );
 }
 
 #[test]
 fn gather_counts_non_mesh_values_as_skipped() {
-    let trees = vec![
-        tree(cube()),
-        Tree::single(Value::Number(3.0)),
-    ];
+    let trees = vec![tree(cube()), Tree::single(Value::Number(3.0))];
     let (meshes, skipped) = gather_meshes(&trees).unwrap();
     assert_eq!(meshes.len(), 1);
     assert_eq!(skipped, 1);
@@ -211,7 +227,10 @@ fn file_names_and_split_numbering() {
         numbered_path(Path::new("out/vase.stl"), 2, 3),
         PathBuf::from("out/vase_02.stl")
     );
-    assert_eq!(numbered_path(Path::new("out/vase.stl"), 1, 1), PathBuf::from("out/vase.stl"));
+    assert_eq!(
+        numbered_path(Path::new("out/vase.stl"), 1, 1),
+        PathBuf::from("out/vase.stl")
+    );
 }
 
 #[test]
@@ -250,11 +269,17 @@ fn threemf_zip_has_valid_local_headers_and_mm_units() {
         names.push(name);
         at = data_start + size;
     }
-    assert_eq!(names, vec!["[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"]);
+    assert_eq!(
+        names,
+        vec!["[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"]
+    );
     let xml = String::from_utf8(model_xml).unwrap();
     assert!(xml.contains("unit=\"millimeter\""));
     assert_eq!(xml.matches("<object ").count(), 1, "single object expected");
-    assert!(read_u32(&bytes, at) == 0x0201_4b50, "central directory follows");
+    assert!(
+        read_u32(&bytes, at) == 0x0201_4b50,
+        "central directory follows"
+    );
 }
 
 #[test]

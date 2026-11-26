@@ -175,7 +175,11 @@ impl StlExportUi {
             options: self.options.clone(),
             repaired: self.repair_for(sources).is_some(),
         };
-        if self.analysis.as_ref().is_some_and(|(cached, _)| *cached == key) {
+        if self
+            .analysis
+            .as_ref()
+            .is_some_and(|(cached, _)| *cached == key)
+        {
             return;
         }
         let max = self.options.max_size_mm;
@@ -205,7 +209,10 @@ impl StlExportUi {
                 });
                 self.analysis = None;
                 if changed {
-                    self.say("自動修復しました。内容を確認してから書き出してください。", false);
+                    self.say(
+                        "自動修復しました。内容を確認してから書き出してください。",
+                        false,
+                    );
                 } else {
                     self.say("直す箇所は見つかりませんでした。", false);
                 }
@@ -229,7 +236,11 @@ impl StlExportUi {
         UiRequest::Pick {
             task,
             directory,
-            file_name: default_file_name(&sources.base_name, self.options.format, SystemTime::now()),
+            file_name: default_file_name(
+                &sources.base_name,
+                self.options.format,
+                SystemTime::now(),
+            ),
         }
     }
 
@@ -403,7 +414,11 @@ impl StlExportUi {
         );
         ui.horizontal(|ui| {
             ui.label("置き方");
-            ui.radio_value(&mut self.options.place_on_bed, true, "ベッドに置く（一番低い所を Z=0）");
+            ui.radio_value(
+                &mut self.options.place_on_bed,
+                true,
+                "ベッドに置く（一番低い所を Z=0）",
+            );
             ui.radio_value(&mut self.options.place_on_bed, false, "作った位置のまま");
         });
         ui.add_enabled(
@@ -474,7 +489,10 @@ impl StlExportUi {
                 }
                 has_error = analysis.checks.iter().any(|c| c.level == Level::Error);
                 let (verdict, color) = if has_error {
-                    ("印刷には向かない箇所があります。「自動修復」を試してから書き出してください。", theme::ERROR)
+                    (
+                        "印刷には向かない箇所があります。「自動修復」を試してから書き出してください。",
+                        theme::ERROR,
+                    )
                 } else if analysis.checks.iter().any(|c| c.level == Level::Warn) {
                     ("注意があります。内容を確認してください。", WARN)
                 } else {
@@ -490,7 +508,9 @@ impl StlExportUi {
             }
             Some(Err(error)) => {
                 ui.colored_label(theme::ERROR, error);
-                ui.label(theme::small("立体を作り、「出力」ノードにつないでください。"));
+                ui.label(theme::small(
+                    "立体を作り、「出力」ノードにつないでください。",
+                ));
             }
             None => {
                 ui.label("形状を確認しています…");
@@ -549,7 +569,10 @@ impl StlExportUi {
                 .unwrap_or_else(|| "未設定（開くときに自動で探します）".into());
             ui.label(theme::small(format!("スライサー: {slicer}")));
             if ui
-                .add_enabled(!self.last_files.is_empty(), egui::Button::new("スライサーで開く"))
+                .add_enabled(
+                    !self.last_files.is_empty(),
+                    egui::Button::new("スライサーで開く"),
+                )
                 .clicked()
             {
                 action = Some(Action::OpenSlicer);

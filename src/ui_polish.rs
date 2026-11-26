@@ -47,11 +47,19 @@ fn alias(token: &str) -> &str {
 fn intent(query: &str) -> Option<&'static [NodeKind]> {
     use NodeKind::*;
     match query {
-        "円を作る" | "円をつくる" | "まるを作る" | "まるをつくる" => Some(&[Circle]),
-        "花瓶を作る" | "花瓶をつくる" | "花器を作る" | "かびんをつくる" |
-        "はなびんをつくる" | "vase" => Some(&[Vase]),
+        "円を作る" | "円をつくる" | "まるを作る" | "まるをつくる" => {
+            Some(&[Circle])
+        }
+        "花瓶を作る"
+        | "花瓶をつくる"
+        | "花器を作る"
+        | "かびんをつくる"
+        | "はなびんをつくる"
+        | "vase" => Some(&[Vase]),
         "点を作る" | "点をつくる" | "点を置く" | "constructpoint" => Some(&[Point]),
-        "点を並べる" | "点をならべる" | "点の配列" => Some(&[LinearArray, RadialArray, Populate]),
+        "点を並べる" | "点をならべる" | "点の配列" => {
+            Some(&[LinearArray, RadialArray, Populate])
+        }
         "面を作る" | "面をつくる" => Some(&[Plane, Loft]),
         "曲面を作る" | "曲面をつくる" => Some(&[Loft, Revolve]),
         "ねじる" | "捻る" => Some(&[Twist]),
@@ -106,7 +114,10 @@ pub fn query_score(kind: NodeKind, query: &str) -> Option<i32> {
     let normalized = normalize(query);
     let compact: String = normalized.chars().filter(|c| !c.is_whitespace()).collect();
     if let Some(kinds) = intent(&compact) {
-        return kinds.iter().position(|k| *k == kind).map(|i| 400 - i as i32 * 50);
+        return kinds
+            .iter()
+            .position(|k| *k == kind)
+            .map(|i| 400 - i as i32 * 50);
     }
     // A simple object + "make" phrase also works for nodes outside the dictionary.
     let query = ["を作りたい", "をつくりたい", "を作る", "をつくる"]
@@ -396,13 +407,24 @@ mod tests {
             ("Construct Point", NodeKind::Point),
             ("Number Slider", NodeKind::Number),
         ] {
-            assert_eq!(rank(&all(), query, &Recent::default(), None).first(), Some(&expected), "{query}");
+            assert_eq!(
+                rank(&all(), query, &Recent::default(), None).first(),
+                Some(&expected),
+                "{query}"
+            );
         }
     }
 
     #[test]
     fn wire_search_never_suggests_an_incompatible_node() {
-        for source in [DataType::Number, DataType::Point, DataType::Curve, DataType::Mesh, DataType::Geometry, DataType::Any] {
+        for source in [
+            DataType::Number,
+            DataType::Point,
+            DataType::Curve,
+            DataType::Mesh,
+            DataType::Geometry,
+            DataType::Any,
+        ] {
             let ranked = rank(&all(), "", &Recent::default(), Some(source));
             assert!(!ranked.is_empty());
             assert!(ranked.iter().all(|kind| accepts_from(*kind, source)));
