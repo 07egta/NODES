@@ -5,6 +5,8 @@ mod data_view;
 mod file_picker;
 mod gcode_ui;
 mod help;
+mod node_icons;
+mod node_shelf;
 mod script_ui;
 mod stl_export_ui;
 mod theme;

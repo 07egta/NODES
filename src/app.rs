@@ -5,6 +5,7 @@ use crate::{
     data_view,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
+    node_icons, node_shelf::{self, ShelfAction},
     theme,
     ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
@@ -139,6 +140,10 @@ pub struct MorphletApp {
     shortcuts_open: bool,
     /// Dark theme is on (saved in the settings file).
     dark: bool,
+    /// Node shelf: tabs, favourites, and the drag / Space state.
+    shelf: node_shelf::Shelf,
+    /// Favourites and recent nodes as last written to the settings file.
+    saved_lists: (Vec<NodeKind>, Vec<NodeKind>),
 }
 
 impl MorphletApp {
@@ -176,6 +181,8 @@ impl MorphletApp {
         } else {
             None
         };
+        let (favorites, saved_recent) = node_shelf::load_lists();
+        let recent = node_shelf::recent_from_saved(&saved_recent);
         let mut app = Self {
             project,
             history: History::default(),
@@ -217,10 +224,12 @@ impl MorphletApp {
             values_open: false,
             import_target: None,
             wire_source: None,
-            recent: Recent::default(),
+            recent,
             palette_cursor: 0,
             shortcuts_open: false,
             dark,
+            shelf: node_shelf::Shelf::new(favorites.clone()),
+            saved_lists: (favorites, saved_recent),
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -604,6 +613,74 @@ impl MorphletApp {
             Err(e) => self.notify(e, true),
         }
     }
+    /// Node shelf strip above the canvas (see `node_shelf.rs`).
+    fn shelf_panel(&mut self, ctx: &egui::Context) {
+        let selected = if self.canvas.selected.len() == 1 {
+            self.canvas.selected.iter().next().copied()
+        } else {
+            None
+        };
+        let selected =
+            selected.and_then(|id| self.project.graph.node(id).map(|n| (id, n.kind.spec().output)));
+        let Some(action) = self
+            .shelf
+            .show(ctx, self.recent.kinds(), selected, self.canvas.last_rect)
+        else {
+            return;
+        };
+        match action {
+            ShelfAction::Add(kind) => match selected {
+                Some((source, output)) if node_shelf::first_input_accepts(kind, output) => {
+                    self.add_suggestion(source, kind)
+                }
+                _ => self.add_node(kind, None),
+            },
+            ShelfAction::Suggest(source, kind) => self.add_suggestion(source, kind),
+            ShelfAction::Place(kind, pos) => {
+                if let Some(at) = self.canvas.world_at(&self.project, pos) {
+                    self.add_node_at(kind, at);
+                }
+            }
+        }
+    }
+    /// Adds a node after `source` and connects it to the first input (shelf and suggestions).
+    fn add_suggestion(&mut self, source: NodeId, kind: NodeKind) {
+        match node_shelf::add_suggested(&mut self.project.graph, source, kind) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(format!("「{}」を追加して線をつなぎました", kind.spec().label), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Adds a dropped node exactly where it was released, without connecting it.
+    fn add_node_at(&mut self, kind: NodeKind, at: [f32; 2]) {
+        match self.project.graph.add(kind, at) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(format!("「{}」を配置しました", kind.spec().label), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Where a keyboard-opened search puts its node: under the pointer on the canvas, else the centre.
+    fn palette_anchor(&self, ctx: &egui::Context) -> [f32; 2] {
+        node_shelf::pointer_in(ctx, self.canvas.last_rect)
+            .and_then(|p| self.canvas.world_at(&self.project, p))
+            .unwrap_or_else(|| self.canvas.center_for_add(&self.project))
+    }
+    /// Writes favourites and recent nodes to the settings file when they change.
+    fn persist_shelf_lists(&mut self) {
+        let now = (self.shelf.favorites().to_vec(), self.recent.kinds().to_vec());
+        if now != self.saved_lists {
+            if let Err(e) = node_shelf::save_lists(&now.0, &now.1) {
+                self.notify(e, true);
+            }
+            self.saved_lists = now;
+        }
+    }
     fn group_selected(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         let name = format!("部品 {}", self.project.graph.clusters.len() + 1);
@@ -868,8 +945,16 @@ impl MorphletApp {
             {
                 self.palette_open = true;
                 self.palette_focus = true;
-                self.palette_position = self.canvas.center_for_add(&self.project);
+                self.palette_position = self.palette_anchor(ctx);
                 self.search.clear();
+            }
+            // Space tapped over the canvas (Space + drag still pans; see node_shelf.rs).
+            if self.shelf.space_opens_search(ctx, self.canvas.last_rect) {
+                self.palette_open = true;
+                self.palette_focus = true;
+                self.palette_position = self.palette_anchor(ctx);
+                self.search.clear();
+                self.palette_cursor = 0;
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
@@ -1031,16 +1116,7 @@ impl MorphletApp {
                     .selected_text(&self.category)
                     .width(156.)
                     .show_ui(ui, |ui| {
-                        for category in [
-                            "すべて",
-                            "数値",
-                            "曲線",
-                            "立体",
-                            "変形",
-                            "配列",
-                            "データ",
-                            "出力",
-                        ] {
+                        for category in std::iter::once("すべて").chain(node_shelf::categories()) {
                             ui.selectable_value(&mut self.category, category.into(), category);
                         }
                     });
@@ -1552,6 +1628,8 @@ impl MorphletApp {
         }
         let mut open = true;
         let mut add = None;
+        // Right-click on a row toggles its favourite (applied after the window closes).
+        let mut star: Option<NodeKind> = None;
         let ordered = ordered_kinds();
         let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
         let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
@@ -1625,11 +1703,27 @@ impl MorphletApp {
                             if active {
                                 response.scroll_to_me(None);
                             }
+                            let favorite = self.shelf.is_favorite(*kind);
                             let painter = ui.painter();
+                            node_icons::paint(
+                                painter,
+                                egui::Rect::from_min_size(
+                                    rect.left_top() + egui::vec2(10., 7.),
+                                    egui::vec2(26., 26.),
+                                ),
+                                *kind,
+                                spec.category,
+                                theme::category_color(spec.category),
+                            );
+                            let title = if favorite {
+                                format!("★ {}", spec.label)
+                            } else {
+                                spec.label.to_owned()
+                            };
                             painter.text(
-                                rect.left_top() + egui::vec2(12., 11.),
+                                rect.left_top() + egui::vec2(46., 11.),
                                 egui::Align2::LEFT_CENTER,
-                                spec.label,
+                                title,
                                 FontId::proportional(13.),
                                 theme::ink(),
                             );
@@ -1641,12 +1735,23 @@ impl MorphletApp {
                                 theme::category_color(spec.category),
                             );
                             painter.text(
-                                rect.left_top() + egui::vec2(12., 29.),
+                                rect.left_top() + egui::vec2(46., 29.),
                                 egui::Align2::LEFT_CENTER,
                                 ui_polish::one_line(spec.description, 46),
                                 FontId::proportional(10.5),
                                 theme::muted(),
                             );
+                            response.context_menu(|ui| {
+                                let text = if favorite {
+                                    "★ お気に入りから外す"
+                                } else {
+                                    "★ お気に入りに追加"
+                                };
+                                if ui.button(text).clicked() {
+                                    star = Some(*kind);
+                                    ui.close();
+                                }
+                            });
                             if response.clicked() {
                                 add = Some(*kind);
                             }
@@ -1662,6 +1767,9 @@ impl MorphletApp {
                     "↑ ↓ で選ぶ  ·  Enter かクリックで追加  ·  Esc で閉じる",
                 ));
             });
+        if let Some(kind) = star {
+            self.shelf.toggle(kind);
+        }
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
@@ -1999,11 +2107,13 @@ impl eframe::App for MorphletApp {
             self.keyboard(ctx);
         }
         self.topbar(ctx);
+        self.shelf_panel(ctx);
         self.statusbar(ctx);
         self.library(ctx);
         self.right_panel(ctx);
         self.center_panel(ctx);
         self.palette(ctx);
+        self.persist_shelf_lists();
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
         self.gcode_dialog(ctx);
