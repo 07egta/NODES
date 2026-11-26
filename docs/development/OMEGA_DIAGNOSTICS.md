@@ -218,3 +218,61 @@ local worktree and is not yet published as another competing PR. Its owner and
 the independent reviewer have switched to overlap/contract comparison. PR #16
 continues to own curve/surface and legacy data-tree corrections; those files
 remain outside this workstream.
+
+## Functional checkpoint 4: vector precision and actual desktop recovery
+
+Checkpoint 3 is remotely preserved at
+`e0fe2ef87075987fbf98fccc27087ae21cfe715e`.
+
+The numerical review continued with vector inputs inside the existing `1e9`
+coordinate bound. `dot([1e9,1,1e9], [1e9,1,-1e9])` incorrectly returned zero
+instead of one. The cross product of `[n,n-1,0]` and `[n-1,n-2,0]`, `n=1e9`,
+also returned zero instead of `[0,0,-1]` because the two separately rounded
+products lost their difference. The two public math nodes now recover product
+residuals with strict `f64::mul_add` before the existing compensated sum. Zero
+signs are preserved when both old and corrected results are zero. Other geometry
+kernel helpers are unchanged; ordinary underflow and finite precision still apply.
+
+Public references: Rust's [strict fused multiply-add contract](https://doc.rust-lang.org/stable/std/primitive.f64.html#method.mul_add)
+and Ogita, Rump and Oishi's [Accurate Sum and Dot Product, Algorithm 3.5](https://www.tuhh.de/ti3/paper/rump/OgRuOi05.pdf).
+The residual arithmetic was independently reviewed, with accepted input bounds
+keeping intermediate products finite. No new library or copied commercial code
+was introduced.
+
+Six vector regression tests passed, including exact integer reference cases,
+orientation/permutations, signed zeros, subnormal boundaries, validation,
+cancellation and real grafted-tree/broadcast/cache behavior. The focused suite
+passed **24 tests** across vectors, linear algebra and existing math/precision
+regressions. Strict all-target Clippy also passed with the completed vector code.
+A final all-target suite is running; its result is not yet claimed here.
+
+The native GUI recovery check is now complete: two cause candidates -> select and
+repair the first Divide input -> one cause -> select and repair the second ->
+zero errors. The timings view showed three computed nodes, then all five enabled
+nodes when cached visits were included. See the reproducible fixture and exact
+steps in [the GUI check record](DIAGNOSTICS_GUI_CHECK.md). Keyboard editing and
+cross-platform GUI behavior remain unverified.
+
+### Measurement audit: invalid first comparison
+
+The first release before/after experiment reused one Cargo target directory
+between worktrees. A schema-marker audit showed that the supposed after binary
+still linked the baseline library: neither executable contained the new
+`message_truncated` serialization field, and report sizes omitted its expected
+per-failure bytes. Distinct executable hashes and accurate environment source
+labels were insufficient to establish linked-library identity. The initial
+comparison is **invalid for before/after claims**, not evidence of no improvement.
+Raw results and an explicit invalidation record are retained. The after revision
+is rebuilding in a fresh isolated target directory, followed by a real serialized
+schema probe and a new matched measurement. No speedup is claimed until then.
+
+### Held native project-diff work
+
+To retain useful work without opening a competing PR, the native project-diff
+prototype and its handoff were saved to the archival branch
+`wip/omega-native-project-diff-20261127` at
+`c6bb2c3d434c91986f93c8cfda7b9279f2b498cb`. Its exact tree/ref was verified.
+That checkpoint is explicitly WIP and must not be merged; its independent fresh
+target test build is pending. [The parallel review](OMEGA_PARALLEL_REVIEW.md)
+records the native/Python comparison contracts and the PR #20 diagnostic command
+collision so the next developer can make an explicit integration decision.

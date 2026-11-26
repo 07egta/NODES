@@ -1277,6 +1277,41 @@ use crate::engine::{cross, dot, sub};
 fn norm(v: [f64; 3]) -> f64 {
     v[0].hypot(v[1]).hypot(v[2])
 }
+// The vector-node boundary limits coordinates to 1e9, keeping these products and
+// residual sums finite. Recover low product bits before compensated summation so
+// large cancelling terms do not erase a representable small dot/determinant.
+// Ordinary floating-point underflow remains; this is not exact arithmetic.
+fn compensated_dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    let products = [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
+    let result = stable_sum(&[
+        products[0],
+        products[1],
+        products[2],
+        a[0].mul_add(b[0], -products[0]),
+        a[1].mul_add(b[1], -products[1]),
+        a[2].mul_add(b[2], -products[2]),
+    ]);
+    preserve_zero_sign(result, products[0] + products[1] + products[2])
+}
+fn difference_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    let (p, q) = (a * b, c * d);
+    let result = stable_sum(&[p, -q, a.mul_add(b, -p), -c.mul_add(d, -q)]);
+    preserve_zero_sign(result, p - q)
+}
+fn compensated_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        difference_of_products(a[1], b[2], a[2], b[1]),
+        difference_of_products(a[2], b[0], a[0], b[2]),
+        difference_of_products(a[0], b[1], a[1], b[0]),
+    ]
+}
+fn preserve_zero_sign(result: f64, original: f64) -> f64 {
+    if result == 0.0 && original == 0.0 {
+        original
+    } else {
+        result
+    }
+}
 fn unit(v: [f64; 3]) -> Result<[f64; 3], String> {
     // Scaling first prevents a reciprocal overflow for subnormal inputs.
     let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
@@ -2007,8 +2042,8 @@ pub fn run_item(
         VectorLength => norm(v()?),
         Unitize => return point(unit(v()?)?),
         ReverseVector => return point(scale(v()?, -1.0)),
-        DotProduct => dot(v()?, w()?),
-        CrossProduct => return point(cross(v()?, w()?)),
+        DotProduct => compensated_dot(v()?, w()?),
+        CrossProduct => return point(compensated_cross(v()?, w()?)),
         VectorAngle => {
             let (u, v) = (unit(v()?)?, unit(w()?)?);
             norm(cross(u, v)).atan2(dot(u, v))
