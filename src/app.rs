@@ -1381,13 +1381,15 @@ impl MorphletApp {
                     ui.label(theme::small("更新を待っています…"));
                     return;
                 }
-                match evaluation.and_then(|e| e.outputs.get(&id)) {
-                    Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
-                    Some(Err(e)) => {
-                        ui.colored_label(theme::error(), e);
+                for port in node.output_ports() {
+                    if outputs.len() > 1 {
+                        ui.label(RichText::new(&port.label).strong().color(theme::port_color(port.kind)));
                     }
-                    None => {
-                        ui.label(theme::small("未計算"));
+                    let salt = format!("inspector-{id}-{}", port.id);
+                    match evaluation.and_then(|e| e.output(PortRef { node: id, port: port.id })) {
+                        Some(Ok(tree)) => data_view::show_tree(ui, tree, &salt, 200.),
+                        Some(Err(e)) => { ui.colored_label(theme::error(), e); }
+                        None => { ui.label(theme::small("未計算")); }
                     }
                 }
             });
@@ -1934,18 +1936,23 @@ impl MorphletApp {
                 };
                 if self.stale() {
                     ui.label(theme::small("更新を待っています…"));
+                    return;
                 }
-                match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
-                    Some(Ok(tree)) => {
-                        let h = (ui.available_height() - 30.).max(160.);
-                        data_view::show_tree(ui, tree, "window", h);
-                    }
-                    Some(Err(e)) => {
-                        ui.colored_label(theme::error(), e);
-                    }
-                    None => {
-                        ui.label(theme::small("未計算"));
-                    }
+                if let Some(node) = self.project.graph.node(id) {
+                    let ports = node.output_ports();
+                    let h = (ui.available_height() - 30.).max(160.);
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for port in &ports {
+                            if ports.len() > 1 {
+                                ui.label(RichText::new(&port.label).strong().color(theme::port_color(port.kind)));
+                            }
+                            match self.evaluation.as_ref().and_then(|e| e.output(PortRef { node: id, port: port.id })) {
+                                Some(Ok(tree)) => data_view::show_tree(ui, tree, &format!("window-{id}-{}", port.id), h.min(260.)),
+                                Some(Err(e)) => { ui.colored_label(theme::error(), e); }
+                                None => { ui.label(theme::small("未計算")); }
+                            }
+                        }
+                    });
                 }
                 ui.label(theme::small(format!(
                     "数値は小数 4 桁、最大 {} 行まで表示します。",
@@ -2291,6 +2298,44 @@ mod tests {
         assert_eq!(graph.node(duplicates[0]).unwrap().inputs["a"], a);
         assert_eq!(graph.node(duplicates[1]).unwrap().inputs["a"], duplicates[0]);
         graph.validate().unwrap();
+    }
+
+    #[test]
+    fn copy_paste_keeps_secondary_endpoint_and_dynamic_layout() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let gate = graph.add(NodeKind::StreamGate, [300., 0.]).unwrap();
+        let sink = graph.add(NodeKind::Add, [600., 0.]).unwrap();
+        graph.connect(a, gate, "stream").unwrap();
+        let port = graph.add_variable_output(gate).unwrap();
+        graph.reorder_outputs(gate, vec![port, 0, 1]).unwrap();
+        graph.rename_output(gate, port, "保持する名前".into()).unwrap();
+        graph.connect_port(PortRef { node: gate, port }, sink, "a", false).unwrap();
+        let nodes = vec![graph.node(gate).unwrap().clone(), graph.node(sink).unwrap().clone()];
+        let ids: Vec<_> = insert_nodes(&mut graph, &nodes, [0., 300.], false).unwrap().into_iter().collect();
+        assert_eq!(graph.node(ids[0]).unwrap().port_layout, graph.node(gate).unwrap().port_layout);
+        assert!(graph.node(ids[0]).unwrap().sources("stream").is_empty());
+        assert_eq!(graph.node(ids[1]).unwrap().sources("a"), vec![PortRef { node: ids[0], port }]);
+        let duplicate: Vec<_> = insert_nodes(&mut graph, &nodes, [0., 600.], true).unwrap().into_iter().collect();
+        assert_eq!(graph.node(duplicate[0]).unwrap().sources("stream"), vec![PortRef::primary(a)]);
+        assert_eq!(graph.node(duplicate[1]).unwrap().sources("a"), vec![PortRef { node: duplicate[0], port }]);
+    }
+
+    #[test]
+    fn changing_source_port_or_output_order_invalidates_calculation() {
+        let mut graph = Graph::default();
+        let gate = graph.add(NodeKind::StreamGate, [0., 0.]).unwrap();
+        let sink = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        graph.connect(gate, sink, "a").unwrap();
+        let before = graph.clone();
+        graph.connect_port(PortRef { node: gate, port: 1 }, sink, "a", false).unwrap();
+        assert!(!same_calculation(&before, &graph));
+        let before = graph.clone();
+        graph.reorder_outputs(gate, vec![1,0]).unwrap();
+        assert!(!same_calculation(&before, &graph));
+        let before = graph.clone();
+        graph.rename_output(gate, 1, "表示名のみ".into()).unwrap();
+        assert!(same_calculation(&before, &graph));
     }
 
     #[test]
