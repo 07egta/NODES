@@ -612,15 +612,19 @@ impl GraphCanvas {
                     && let Some(m) = p.graph.node_mut(n.id)
                 {
                     // The first numeric inputs of a card are drawn as small sliders.
-                    let value = m.params.entry(spec.key.into()).or_insert(default);
+                    let before = m.params.get(spec.key).copied().unwrap_or(default);
+                    let mut value = before;
                     let (low, high) =
-                        crate::app::friendly_range(spec.key, spec.min, spec.max, *value);
+                        crate::app::friendly_range(spec.key, spec.min, spec.max, before);
                     let track = Rect::from_min_size(
                         ip + egui::vec2(88., -9.) * p.zoom,
                         egui::vec2(60., 18.) * p.zoom,
                     );
                     let width = 60. * p.zoom;
-                    let slider = egui::Slider::new(&mut *value, low..=high)
+                    // SliderClamping::Always also rounds an existing value on paint,
+                    // even if the user never touches the control.
+                    let slider = egui::Slider::new(&mut value, low..=high)
+                        .clamping(egui::SliderClamping::Edits)
                         .show_value(false)
                         .trailing_fill(true)
                         .step_by(spec.step);
@@ -630,13 +634,23 @@ impl GraphCanvas {
                             ui.put(track, slider)
                         })
                         .inner;
-                    if response.changed() && spec.integer {
-                        *value = value.round();
+                    #[cfg(test)]
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(
+                            egui::Id::new(("canvas_number", n.id, spec.key)),
+                            response.rect,
+                        )
+                    });
+                    if response.changed() {
+                        value = if spec.integer { value.round() } else { value };
+                        if value != before {
+                            m.params.insert(spec.key.into(), value);
+                        }
                     }
                     let shown = if spec.integer {
-                        format!("{:.0}", *value)
+                        format!("{value:.0}")
                     } else {
-                        format!("{:.2}", *value)
+                        format!("{value:.2}")
                     };
                     painter.text(
                         ip + egui::vec2(153., 0.) * p.zoom,
@@ -684,13 +698,18 @@ impl GraphCanvas {
                             theme::TEAL,
                         );
                     } else if let Some(m) = p.graph.node_mut(n.id) {
-                        let value = m.params.entry(spec.key.into()).or_insert(default);
-                        let drag = egui::DragValue::new(value)
+                        let before = m.params.get(spec.key).copied().unwrap_or(default);
+                        let mut value = before;
+                        let drag = egui::DragValue::new(&mut value)
                             .speed(spec.step)
                             .range(spec.min..=spec.max)
+                            .clamp_existing_to_range(false)
                             .max_decimals(if spec.integer { 0 } else { 3 });
-                        if ui.put(vr, drag).changed() && spec.integer {
-                            *value = value.round();
+                        if ui.put(vr, drag).changed() {
+                            let edited = if spec.integer { value.round() } else { value };
+                            if edited != before {
+                                m.params.insert(spec.key.into(), edited);
+                            }
                         }
                     }
                 }

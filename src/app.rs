@@ -147,8 +147,16 @@ impl MorphletApp {
         open_file: Option<PathBuf>,
         screenshot: Option<PathBuf>,
     ) -> Self {
+        Self::with_context(&cc.egui_ctx, open_file, screenshot)
+    }
+
+    fn with_context(
+        ctx: &egui::Context,
+        open_file: Option<PathBuf>,
+        screenshot: Option<PathBuf>,
+    ) -> Self {
         let dark = ui_polish::load_dark();
-        theme::configure(&cc.egui_ctx, dark);
+        theme::configure(ctx, dark);
         let mut project = templates::create(0);
         let mut file_path = None;
         let mut initial_error = None;
@@ -181,7 +189,7 @@ impl MorphletApp {
             history: History::default(),
             canvas,
             viewport: Viewport::default(),
-            worker: Worker::new(cc.egui_ctx.clone()),
+            worker: Worker::new(ctx.clone()),
             evaluation: None,
             revision: 0,
             result_revision: u64::MAX,
@@ -1262,13 +1270,26 @@ impl MorphletApp {
                     }
                 } else if let (Some(default), false) = (input.default, needs_link) {
                     if let Some(n) = self.project.graph.node_mut(id) {
-                        let value = n.params.entry(input.key.into()).or_insert(default);
-                        let (low, high) = friendly_range(input.key, input.min, input.max, *value);
-                        let slider = egui::Slider::new(value, low..=high)
+                        let before = n.params.get(input.key).copied().unwrap_or(default);
+                        let mut value = before;
+                        let (low, high) = friendly_range(input.key, input.min, input.max, before);
+                        let slider = egui::Slider::new(&mut value, low..=high)
+                            .clamping(egui::SliderClamping::Edits)
                             .step_by(input.step)
                             .max_decimals(if input.integer { 0 } else { 3 });
-                        if ui.add(slider).changed() && input.integer {
-                            *value = value.round();
+                        let response = ui.add(slider);
+                        #[cfg(test)]
+                        ui.ctx().data_mut(|d| {
+                            d.insert_temp(
+                                egui::Id::new(("inspector_number", id, input.key)),
+                                (response.rect, response.id),
+                            )
+                        });
+                        if response.changed() {
+                            let edited = if input.integer { value.round() } else { value };
+                            if edited != before {
+                                n.params.insert(input.key.into(), edited);
+                            }
                         }
                     }
                 } else if optional {
@@ -1981,6 +2002,12 @@ impl MorphletApp {
 
 impl eframe::App for MorphletApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.frame(ctx);
+    }
+}
+
+impl MorphletApp {
+    fn frame(&mut self, ctx: &egui::Context) {
         self.compute_tick(ctx);
         let before = self.project.clone();
         self.suppress_history = false;
@@ -2224,6 +2251,205 @@ pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn opening_numeric_controls_preserves_exact_project_until_real_pointer_and_keyboard_edits() {
+        let mut graph = Graph::default();
+        let block = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+        let vase = graph.add(NodeKind::Vase, [300., 20.]).unwrap();
+        let node = graph.node_mut(block).unwrap();
+        node.params.insert("width".into(), 5.);
+        node.params.insert("depth".into(), 16.375);
+        node.params.remove("height"); // An omitted default stays omitted until actually edited.
+        graph.node_mut(vase).unwrap().params.remove("segments"); // A canvas DragValue, not an inline slider.
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        struct Temp(PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let file = Temp(
+            std::env::temp_dir().join(format!("nodes-idle-{}-{time}.morph", std::process::id())),
+        );
+        persistence::save(&file.0, &Project::new("数値の保存テスト", graph.clone())).unwrap();
+        let original_bytes = std::fs::read(&file.0).unwrap();
+
+        struct Frames {
+            app: MorphletApp,
+            ctx: egui::Context,
+            time: f64,
+        }
+        impl Frames {
+            fn run(&mut self, events: Vec<egui::Event>, modifiers: egui::Modifiers) {
+                self.time += 1. / 60.;
+                let raw = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1480., 1040.),
+                    )),
+                    focused: true,
+                    time: Some(self.time),
+                    events,
+                    modifiers,
+                    ..Default::default()
+                };
+                let _ = self.ctx.run(raw, |ctx| self.app.frame(ctx));
+            }
+            fn idle(&mut self) {
+                self.run(Vec::new(), egui::Modifiers::NONE);
+            }
+            fn key(&mut self, key: egui::Key, modifiers: egui::Modifiers) {
+                for pressed in [true, false] {
+                    self.run(
+                        vec![egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed,
+                            repeat: false,
+                            modifiers,
+                        }],
+                        modifiers,
+                    );
+                }
+            }
+            fn pointer(&mut self, pos: egui::Pos2, pressed: bool) {
+                self.run(
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                            button: egui::PointerButton::Primary,
+                        },
+                    ],
+                    egui::Modifiers::NONE,
+                );
+            }
+        }
+        let ctx = egui::Context::default();
+        let app = MorphletApp::with_context(&ctx, Some(file.0.clone()), None);
+        assert_eq!(app.project.graph, graph);
+        let mut frames = Frames { app, ctx, time: 0. };
+        frames.app.canvas.select_only(block);
+        let until = Instant::now() + Duration::from_secs(5);
+        while frames.app.stale() && Instant::now() < until {
+            frames.idle();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(!frames.app.stale());
+        for _ in 0..8 {
+            frames.idle();
+        }
+        assert_eq!(
+            frames.app.project.graph, graph,
+            "idle canvas and inspector must not snap values or materialize absent defaults"
+        );
+        assert_eq!(
+            frames.app.revision, 0,
+            "painting is not an evaluation or Undo edit"
+        );
+        assert!(!frames.app.dirty);
+        assert!(!frames.app.history.can_undo());
+        assert_eq!(std::fs::read(&file.0).unwrap(), original_bytes);
+        let bounds = match &frames.app.evaluation.as_ref().unwrap().outputs[&block]
+            .as_ref()
+            .unwrap()
+            .branches[&vec![0]][0]
+        {
+            morphlet::model::Value::Mesh(mesh) => mesh
+                .vertices
+                .iter()
+                .map(|p| p[0])
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), x| {
+                    (min.min(x), max.max(x))
+                }),
+            _ => panic!("box did not produce a mesh"),
+        };
+        assert_eq!(bounds, (-2.5, 2.5));
+
+        let rect = frames
+            .ctx
+            .data_mut(|d| {
+                d.get_temp::<egui::Rect>(egui::Id::new(("canvas_number", block, "width")))
+            })
+            .expect("real canvas slider");
+        let at = egui::pos2(egui::lerp(rect.x_range(), 0.72), rect.center().y);
+        frames.pointer(at, true);
+        frames.pointer(at, false);
+        frames.idle();
+        let width = frames.app.project.graph.node(block).unwrap().params["width"];
+        assert!(
+            width > 5.,
+            "actual canvas pointer interaction must write the edited width: {width}"
+        );
+        assert!(
+            ((width - 0.1) - (width - 0.1).round()).abs() < 1e-8,
+            "preserve normal slider quantization when editing"
+        );
+        assert!(frames.app.dirty);
+        assert!(frames.app.history.can_undo());
+
+        let (_, depth_slider) = frames
+            .ctx
+            .data_mut(|d| {
+                d.get_temp::<(egui::Rect, egui::Id)>(egui::Id::new((
+                    "inspector_number",
+                    block,
+                    "depth",
+                )))
+            })
+            .expect("real inspector slider");
+        frames
+            .ctx
+            .memory_mut(|memory| memory.request_focus(depth_slider));
+        frames.key(egui::Key::ArrowRight, egui::Modifiers::NONE);
+        frames.idle();
+        let depth = frames.app.project.graph.node(block).unwrap().params["depth"];
+        assert!(
+            depth > 16.375,
+            "actual ArrowRight edit must change the inspector value: {depth}"
+        );
+        assert!(((depth - 0.1) - (depth - 0.1).round()).abs() < 1e-8);
+        assert!(
+            !frames
+                .app
+                .project
+                .graph
+                .node(block)
+                .unwrap()
+                .params
+                .contains_key("height")
+        );
+        assert!(
+            !frames
+                .app
+                .project
+                .graph
+                .node(vase)
+                .unwrap()
+                .params
+                .contains_key("segments")
+        );
+
+        frames.key(
+            egui::Key::S,
+            egui::Modifiers {
+                ctrl: true,
+                command: true,
+                ..Default::default()
+            },
+        );
+        let saved = persistence::load(&file.0).unwrap();
+        assert!(!frames.app.dirty);
+        assert_eq!(saved.graph, frames.app.project.graph);
+        assert_eq!(saved.graph.node(block).unwrap().params["width"], width);
+        assert_eq!(saved.graph.node(block).unwrap().params["depth"], depth);
+    }
+
     #[test]
     fn japanese_and_english_search_find_real_nodes() {
         assert!(matches_search(NodeKind::Circle, "円"));
