@@ -317,3 +317,71 @@ The held native project-diff prototype also passed its fresh isolated build and
 all **10 tests**, including two real CLI processes. Its test record is preserved
 at archival commit `fa56fb1b66c7f249a0972899cb61742327c4ea6f`. It remains outside
 this active PR and held for PR #21 contract coordination.
+
+## Functional checkpoint 6: compact causes and direction-preserving angles
+
+Checkpoint 5, including the verified prefix experiment, is preserved at
+`545bcd4208cc6bf7069a75c7e4aadd6d2e915910`.
+
+The heap follow-up now has its own [paired benchmark record](DIAGNOSTICS_HEAP_BENCHMARK_RESULTS.md).
+Two byte-exact diagnostic snapshots were compiled into the same disposable crate,
+using the same real evaluations, independent analytic fixtures and byte-identical
+complete JSON outputs. All 12 processes passed. The 8,973-node interleaved case
+fell from 469.484 to 96.023 ms median (4.89x). This has a measured tradeoff:
+the 4,095-node prefix control rose from 17.516 to 19.335 ms (+10.39%) in this
+small sample; the successful 10,000-node and 1,023-node prefix controls changed
+by +1.6% and +0.3%. Preserve those observations; the change is not a universal
+speedup. Snapshot hashes, raw calls, validation and reproduction files are kept
+with the report. Later compact-ordinal work is outside that measured comparison.
+
+### Compact root membership
+
+Root sets now index only actual failure roots, collected in sorted-ID order,
+instead of using indices among every node in the graph. A local prepass uses the
+same consumed-input and enabled-failure predicates as the topological propagation
+pass. Independent review confirmed the equivalence, including disabled/successful
+cuts, ignored cluster sockets and roots discovered out of ID order. The public
+schema, exact counts and sorted IDs are unchanged. A no-failure fast return runs
+only after topology validation and all visit/timing summaries are complete.
+
+For two high-ID roots and 16,382 independent joins, the **derived bitset word
+payload** drops from 33,550,336 to 131,056 bytes. This is not a measured RSS
+claim and excludes maps, allocation overhead, error text and report arrays.
+A separate fresh-process memory comparison is being prepared. Two new public
+behavior regressions cover high-ID roots and a new local failure after a successful
+chain break. They passed alongside the existing independent BFS/interleaved cases.
+
+### Tiny VectorAngle values
+
+Unit-length normalization could make the representable directions
+`[1e9,1e9-1,0]` and `[1e9-1,1e9-2,0]` identical, incorrectly returning zero
+instead of approximately `5.00000001e-19` radians. The angle node now scales each
+direction by exact powers of two, then uses the compensated cross/dot products
+inside `atan2`. The first scale lifts even the least subnormal component; the
+second places the maximum in `[2^256,2^257)`, keeping accepted inputs and ensuing
+products finite without normalizing away their differences.
+
+An earlier `[1,2)` scaling proposal was rejected before publication because it
+lost a representable minimum-subnormal angle. The final method includes that
+counterexample in its tests. Four new tests use exact `i128` determinant/dot
+references, permutations, independent and subnormal scales, angular quadrants,
+invalid/cancelled input and real grafted-tree/cache execution. Unitize, projection
+and other geometry kernels are unchanged; universal correctly rounded angles are
+not claimed. Both implementations received independent code review.
+
+All **31 focused tests** for the completed angle/ordinal edits passed, covering
+linear algebra, vector products, angles and four diagnostic suites. Formatting
+and strict all-target Clippy passed. A final whole-tree run after these changes
+and the pending documentation-only upstream merge remains to be recorded.
+
+### Upstream refresh
+
+PR #23 was merged into `develop/nodes-ultimate` as `7e32c91`; its ten changed
+documents establish the owner's Rust-first language policy. The new `AGENTS.md`
+and policy were reviewed; all application, diagnostic, numerical and native
+comparison code in this workstream is Rust. Measurement orchestration is confined
+to development, with no new application runtime or dependency. These verified
+upstream documents will be merged into this branch without importing other
+unfinished feature branches. PR #16 now also touches `math_nodes.rs`, but its
+change is confined to Summation/Mean aggregation and does not replace this
+workstream's matrix/vector/angle sections. Preserve both during future integration.

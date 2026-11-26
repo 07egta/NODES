@@ -1,0 +1,21 @@
+{
+  "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "bytes": 17955
+    },
+    {
+      "label": "after",
+      "revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+      "bytes": 19342
+    }
+  ]
+}

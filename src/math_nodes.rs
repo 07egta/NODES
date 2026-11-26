@@ -1277,9 +1277,10 @@ use crate::engine::{cross, dot, sub};
 fn norm(v: [f64; 3]) -> f64 {
     v[0].hypot(v[1]).hypot(v[2])
 }
-// The vector-node boundary limits coordinates to 1e9, keeping these products and
-// residual sums finite. Recover low product bits before compensated summation so
-// large cancelling terms do not erase a representable small dot/determinant.
+// Public vector nodes use coordinates bounded by 1e9; the angle helper rescales
+// internal directions below 2^257. Both keep these products and residual sums
+// finite. Recover low product bits before compensated summation so large
+// cancelling terms do not erase a representable small dot/determinant.
 // Ordinary floating-point underflow remains; this is not exact arithmetic.
 fn compensated_dot(a: [f64; 3], b: [f64; 3]) -> f64 {
     let products = [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
@@ -1311,6 +1312,22 @@ fn preserve_zero_sign(result: f64, original: f64) -> f64 {
     } else {
         result
     }
+}
+fn angle_direction(v: [f64; 3]) -> Result<[f64; 3], String> {
+    let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
+    if m == 0.0 || !m.is_finite() {
+        return Err("ゼロまたは無効なベクトルです。".into());
+    }
+    // Inputs have passed xyz's 1e9 bound. Lifting by 2^512 makes even the least
+    // subnormal component normal without overflowing the largest component.
+    // The second exact power-of-two scale puts the largest in [2^256, 2^257).
+    // Retaining this headroom prevents rounding away tiny direction differences
+    // while products, compensated sums and hypot results remain finite.
+    const LIFT: f64 = f64::from_bits((1023_u64 + 512) << 52);
+    let lifted_max = m * LIFT;
+    let exponent = ((lifted_max.to_bits() >> 52) & 0x7ff) as i32 - 1023;
+    let adjust = f64::from_bits(((1023 + 256 - exponent) as u64) << 52);
+    Ok(v.map(|x| (x * LIFT) * adjust))
 }
 fn unit(v: [f64; 3]) -> Result<[f64; 3], String> {
     // Scaling first prevents a reciprocal overflow for subnormal inputs.
@@ -2045,8 +2062,8 @@ pub fn run_item(
         DotProduct => compensated_dot(v()?, w()?),
         CrossProduct => return point(compensated_cross(v()?, w()?)),
         VectorAngle => {
-            let (u, v) = (unit(v()?)?, unit(w()?)?);
-            norm(cross(u, v)).atan2(dot(u, v))
+            let (u, v) = (angle_direction(v()?)?, angle_direction(w()?)?);
+            norm(compensated_cross(u, v)).atan2(compensated_dot(u, v))
         }
         VectorAddition => return point(plus(v()?, w()?)),
         VectorSubtraction => return point(sub(v()?, w()?)),

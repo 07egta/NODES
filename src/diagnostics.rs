@@ -114,8 +114,9 @@ pub struct NodeHotspot {
 }
 
 // Single roots require no allocation. Multi-root sets share their immutable words
-// along chains/fanout; joins only copy if they introduce a new root. The largest
-// possible dense matrix is bounded by the graph's existing MAX_NODES limit.
+// along chains/fanout; joins only copy if they introduce a new root. Bits address
+// dense root ordinals, not all graph nodes, so unrelated nodes or high root IDs do
+// not widen every set. The graph's MAX_NODES limit bounds the largest matrix.
 #[derive(Clone)]
 enum Roots {
     One(usize),
@@ -295,14 +296,54 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     };
     report.summary.complete =
         !evaluation.cancelled && report.summary.completed_count == report.summary.node_count;
+    if report.summary.failed_count == 0 {
+        // Validation and visit/timing summaries still apply to successful,
+        // disabled or interrupted graphs; no failure relationships need indexing.
+        return report;
+    }
     let indices: BTreeMap<_, _> = nodes
         .iter()
         .enumerate()
         .map(|(index, node)| (node.id, index))
         .collect();
+    let failed: Vec<_> = nodes
+        .iter()
+        .map(|node| !node.off && evaluation.outputs.get(&node.id).is_some_and(Result::is_err))
+        .collect();
+    // In a valid DAG every consumed parent precedes its child. The propagation
+    // pass therefore creates a root exactly when this local test finds no enabled
+    // failed parent. Successful, disabled and unevaluated parents all break the
+    // failure chain, just as they do in the propagation pass below.
+    let mut root_node_ids = Vec::new();
+    for (index, node) in nodes.iter().enumerate() {
+        if !failed[index] {
+            continue;
+        }
+        let has_failed_parent = node
+            .kind
+            .spec()
+            .inputs
+            .iter()
+            .take(crate::cluster::real_input_count(graph, node))
+            .any(|spec| {
+                node.inputs
+                    .get(spec.key)
+                    .is_some_and(|source| failed[indices[source]])
+            });
+        if !has_failed_parent {
+            root_node_ids.push(node.id);
+        }
+    }
+    // `nodes` is ID-sorted, so bit iteration still emits root IDs in sorted order
+    // even when their topological discovery order is different.
+    let root_ordinals: BTreeMap<_, _> = root_node_ids
+        .iter()
+        .enumerate()
+        .map(|(ordinal, &id)| (id, ordinal))
+        .collect();
     let mut failures: BTreeMap<NodeId, FailureRoots> = BTreeMap::new();
     for node in order {
-        if node.off || !evaluation.outputs.get(&node.id).is_some_and(Result::is_err) {
+        if !failed[indices[&node.id]] {
             continue;
         }
         let mut upstream: Option<Roots> = None;
@@ -328,13 +369,13 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             node.id,
             FailureRoots {
                 is_root: upstream.is_none(),
-                roots: upstream.unwrap_or_else(|| Roots::One(indices[&node.id])),
+                roots: upstream.unwrap_or_else(|| Roots::One(root_ordinals[&node.id])),
             },
         );
     }
-    // Only indices set by actual root failures are ever read from this vector.
+    // Only ordinals set by actual root failures are ever read from this vector.
     // Direct indexing avoids a map lookup for each root/group membership.
-    let mut root_positions = vec![0; nodes.len()];
+    let mut root_positions = vec![0; root_node_ids.len()];
     let mut previews = Vec::new();
     let mut groups: BTreeMap<(bool, usize), AffectedGroup> = BTreeMap::new();
     for (id, failure) in failures {
@@ -355,7 +396,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             affected_nodes_truncated: false,
         };
         if failure.is_root {
-            root_positions[indices[&id]] = report.root_failures.len();
+            root_positions[root_ordinals[&id]] = report.root_failures.len();
             report.root_failures.push(entry);
             previews.push(AffectedPreview::default());
         } else {
@@ -365,7 +406,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
                 failure.roots.for_each(|index| {
                     root_count += 1;
                     if root_ids.len() < MAX_REPORTED_ROOTS {
-                        root_ids.push(nodes[index].id);
+                        root_ids.push(root_node_ids[index]);
                     }
                 });
                 AffectedGroup {
