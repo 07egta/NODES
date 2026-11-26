@@ -8,9 +8,26 @@ use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// Wall-clock time spent processing one top-level node during this evaluation.
+/// Includes input/cache preparation, evaluation or retrieval, resource checks and
+/// output insertion. Cluster internals are included; graph validation is excluded.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct NodeTiming {
+    pub elapsed_ms: f64,
+    pub cached: bool,
+}
+impl NodeTiming {
+    fn since(start: Instant, cached: bool) -> Self {
+        Self { elapsed_ms: start.elapsed().as_secs_f64() * 1000., cached }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Evaluation {
     pub outputs: BTreeMap<NodeId, Result<Tree, String>>,
+    /// Only visited nodes have timings. Interrupted nodes have partial timings
+    /// without cached outputs; disabled nodes have non-cached bookkeeping time.
+    pub node_timings: BTreeMap<NodeId, NodeTiming>,
     pub computed: usize,
     pub cached: usize,
     pub elapsed_ms: f64,
@@ -104,11 +121,13 @@ impl Evaluator {
                 break;
             }
             let id = node.id;
+            let node_start = Instant::now();
             // Disabled node: empty output, never cached; revision 0 marks "off" for children.
             if node.off {
                 self.remove_cached(id);
                 revisions.insert(id, 0);
                 out.outputs.insert(id, Ok(Tree::default()));
+                out.node_timings.insert(id, NodeTiming::since(node_start, false));
                 continue;
             }
             let key = Key {
@@ -129,6 +148,7 @@ impl Evaluator {
                     let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
                     if stop() {
                         out.cancelled = true;
+                        out.node_timings.insert(id, NodeTiming::since(node_start, false));
                         break;
                     }
                     self.revision = self.revision.wrapping_add(1).max(1);
@@ -151,6 +171,7 @@ impl Evaluator {
                             .into(),
                     ),
                 );
+                out.node_timings.insert(id, NodeTiming::since(node_start, is_cached));
                 continue;
             }
             retained = retained.saturating_add(weight);
@@ -167,6 +188,7 @@ impl Evaluator {
             }
             revisions.insert(id, revision);
             out.outputs.insert(id, result);
+            out.node_timings.insert(id, NodeTiming::since(node_start, is_cached));
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out

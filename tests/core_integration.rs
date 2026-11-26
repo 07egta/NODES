@@ -76,18 +76,18 @@ fn sparse_slider_edit_does_not_recompute_unrelated_nodes_at_supported_scales() {
 }
 
 #[test]
-fn ten_thousand_nodes_are_rejected_at_current_resource_limit() {
+fn graphs_above_the_resource_limit_are_rejected() {
     let mut graph = Graph::default();
     let id = add(&mut graph, NodeKind::Number);
     let prototype = graph.node(id).unwrap().clone();
-    graph.nodes = (0..10_000)
+    graph.nodes = (0..(MAX_NODES + 1) as u64)
         .map(|id| {
             let mut node = prototype.clone();
             node.id = id;
             node
         })
         .collect();
-    graph.next_id = 10_000;
+    graph.next_id = (MAX_NODES + 1) as u64;
     assert!(graph.topological_order().unwrap_err().contains(&MAX_NODES.to_string()));
     let ev = Evaluator::default().evaluate(&graph, &|| false);
     assert_eq!(ev.computed, 0);

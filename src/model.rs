@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 
 pub type NodeId = u64;
-pub const MAX_NODES: usize = 2_048;
+pub const MAX_NODES: usize = 16_384;
 pub const MAX_ITEMS: usize = 16_384;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;

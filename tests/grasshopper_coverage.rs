@@ -295,7 +295,7 @@ fn node_budget_is_a_rejection_not_a_false_large_graph_success() {
     // Hostile deserialized input that bypassed Graph::add is also rejected.
     let mut oversized = graph;
     let template = oversized.nodes[0].clone();
-    while oversized.nodes.len() < 10_000 {
+    while oversized.nodes.len() <= MAX_NODES {
         let mut node = template.clone();
         node.id = oversized.next_id;
         oversized.next_id += 1;

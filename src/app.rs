@@ -1176,6 +1176,14 @@ impl MorphletApp {
         });
         ui.add_space(3.);
         ui.label(theme::small(spec.description));
+        if let Some(timing) = self.evaluation.as_ref().and_then(|e| e.node_timings.get(&id)) {
+            let state = if self.stale() { "前回の評価" }
+                else if node.off { "無効" }
+                else if timing.cached { "キャッシュ" }
+                else { "計算" };
+            ui.label(theme::small(format!("{state} · {:.3} ms", timing.elapsed_ms)))
+                .on_hover_text("このノードの入力準備・計算またはキャッシュ取得・出力検査にかかった時間です。クラスターは内部の処理を含みます。");
+        }
         if node.off {
             ui.colored_label(
                 theme::error(),
