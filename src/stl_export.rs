@@ -752,14 +752,14 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
         return Ok((vec![none], stats));
     }
     let report = persistence::mesh_stats(&to_trees(bodies))?;
-    let mut checks = Vec::with_capacity(7);
-    checks.push(if report.open_edges == 0 && report.non_manifold_edges == 0 {
-        check(Level::Ok, "閉じている（水密）", "座標の結合後、すべての辺が 2 枚の面で囲まれています。頂点の多様体性と自己交差は未検査です。")
+    let mut checks = Vec::with_capacity(9);
+    checks.push(if report.is_closed() {
+        check(Level::Ok, "閉じている（水密）", "座標の結合後、辺・頂点が閉じた多様体を構成し、面方向は一貫しています。自己交差・殻の内外・肉厚は未検査です。")
     } else {
         check(
             Level::Error,
             "閉じている（水密）",
-            format!("境界辺 {} 本、3 枚以上の面が共有する辺 {} 本があります。水密な多様体メッシュとは判定できません。", report.open_edges, report.non_manifold_edges),
+            format!("境界辺 {} 本、非多様体の辺 {} 本・頂点 {} 個、向きの不整合辺 {} 本、重複面 {} 枚、退化面 {} 枚。閉じた多様体の条件を満たしません。", report.open_edges, report.non_manifold_edges, report.non_manifold_vertices, report.inconsistent_edges, report.duplicate_faces, report.degenerate_triangles),
         )
     });
     let inside_out = bodies.iter().filter(|b| signed_volume(b) < 0.0).count();
@@ -769,7 +769,7 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
             "面の向きがそろっている",
             format!("向きが食い違う辺が {} 本あります。「自動修復」で直せます。", report.inconsistent_edges),
         )
-    } else if report.open_edges > 0 || report.non_manifold_edges > 0 || report.degenerate_triangles > 0 {
+    } else if !report.is_closed() {
         check(Level::Warn, "面の向きがそろっている", "閉じた有効な面構成ではないため、体積の符号による内外の判定は行いません。")
     } else if inside_out > 0 {
         check(
@@ -793,6 +793,35 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
             format!(
                 "3枚以上の面が共有する辺が {} 本あります。",
                 report.non_manifold_edges
+            ),
+        )
+    });
+    checks.push(if report.non_manifold_vertices == 0 {
+        check(
+            Level::Ok,
+            "頂点で面が枝分かれしていない",
+            "頂点まわりの面は一続きです。自己交差の検査とは異なります。",
+        )
+    } else {
+        check(
+            Level::Error,
+            "頂点で面が枝分かれしていない",
+            format!("非多様体の頂点が {} 個あります。点だけで接触する形状や、頂点まわりの面の分岐を確認してください。", report.non_manifold_vertices),
+        )
+    });
+    checks.push(if report.duplicate_faces == 0 {
+        check(
+            Level::Ok,
+            "重複する面がない",
+            "同じ頂点を使う重複面はありません。",
+        )
+    } else {
+        check(
+            Level::Error,
+            "重複する面がない",
+            format!(
+                "頂点の結合後に重複する面が {} 枚あります。表裏を逆にした重複も含みます。",
+                report.duplicate_faces
             ),
         )
     });

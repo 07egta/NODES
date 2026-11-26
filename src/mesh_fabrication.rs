@@ -74,11 +74,8 @@ fn union(parent: &mut [usize], a: usize, b: usize) {
         parent[b] = a;
     }
 }
-fn corner(m: &Mesh, f: usize, v: u32) -> Option<usize> {
-    m.triangles[f]
-        .iter()
-        .position(|&x| x == v)
-        .map(|k| 3 * f + k)
+fn corner(triangles: &[[u32; 3]], f: usize, v: u32) -> Option<usize> {
+    triangles[f].iter().position(|&x| x == v).map(|k| 3 * f + k)
 }
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Audit {
@@ -103,8 +100,8 @@ impl Audit {
     }
 }
 pub fn audit(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<Audit, String> {
-    let edges = topology(m, stop)?;
-    let mut r = Audit::default();
+    raw_check(m, stop)?;
+    let mut r = audit_topology(m.vertices.len(), &m.triangles, stop)?;
     let mut coords = HashSet::new();
     for (i, &p) in m.vertices.iter().enumerate() {
         tick(i, stop)?;
@@ -112,52 +109,110 @@ pub fn audit(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<Audit, String> {
             r.duplicate_vertices += 1;
         }
     }
-    let mut faces = HashSet::new();
-    let mut used = vec![false; m.vertices.len()];
     for (f, t) in m.triangles.iter().enumerate() {
         tick(f, stop)?;
+        let [a, b, c] = t.map(|v| m.vertices[v as usize]);
+        if length(cross(sub(b, a), sub(c, a))) < 1e-12 {
+            r.degenerate_faces += 1;
+        }
+    }
+    Ok(r)
+}
+
+// Auditing only needs the first two incident faces, unlike editing operations
+// that need every face in `Uses`. Avoid one heap allocation for every edge.
+struct AuditEdge {
+    first: usize,
+    second: usize,
+    count: u32,
+    direction: i32,
+}
+
+/// Shared indexed topology analysis for engine meshes and welded export data.
+/// Callers enforce their own vertex/face budgets and validate coordinates. This
+/// function checks all indices, but deliberately imposes no engine-specific cap:
+/// an export may aggregate several individually valid meshes. Geometry-related
+/// fields (`duplicate_vertices`, `degenerate_faces`) remain the caller's job.
+pub(crate) fn audit_topology(
+    vertex_count: usize,
+    triangles: &[[u32; 3]],
+    stop: &dyn Fn() -> bool,
+) -> Result<Audit, String> {
+    cancelled(stop)?;
+    let corner_count = triangles
+        .len()
+        .checked_mul(3)
+        .ok_or("面の頂点数が大きすぎます。")?;
+    let mut r = Audit::default();
+    let mut edges: HashMap<Edge, AuditEdge> = HashMap::new();
+    let mut faces = HashSet::new();
+    let mut used = vec![false; vertex_count];
+    for (f, t) in triangles.iter().enumerate() {
+        tick(f, stop)?;
         for &v in t {
-            used[v as usize] = true;
+            let Some(slot) = used.get_mut(v as usize) else {
+                return Err("面の頂点番号が範囲外です。".into());
+            };
+            *slot = true;
         }
         let mut key = *t;
         key.sort_unstable();
         if !faces.insert(key) {
             r.duplicate_faces += 1;
         }
-        let [a, b, c] = t.map(|v| m.vertices[v as usize]);
-        if length(cross(sub(b, a), sub(c, a))) < 1e-12 {
-            r.degenerate_faces += 1;
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            let entry = edges.entry(edge(a, b)).or_insert(AuditEdge {
+                first: f,
+                second: f,
+                count: 0,
+                direction: 0,
+            });
+            if entry.count == 1 {
+                entry.second = f;
+            }
+            entry.count = entry.count.saturating_add(1);
+            entry.direction = entry.direction.saturating_add(if a < b { 1 } else { -1 });
         }
     }
     r.isolated_vertices = used.iter().filter(|&&v| !v).count();
+    drop(used);
+    drop(faces);
     // Union face corners across each two-sided edge. A disconnected fan at one
     // vertex is non-manifold even when every incident edge has at most two faces.
-    let mut parent: Vec<usize> = (0..3 * m.triangles.len()).collect();
-    let mut boundary_degree = vec![0u32; m.vertices.len()];
-    for (i, (&(a, b), us)) in edges.iter().enumerate() {
+    let mut parent: Vec<usize> = (0..corner_count).collect();
+    let mut boundary_degree = vec![0u32; vertex_count];
+    let mut bad = vec![false; vertex_count];
+    for (i, (&(a, b), uses)) in edges.iter().enumerate() {
         tick(i, stop)?;
-        match us.as_slice() {
-            [_] => {
+        match uses.count {
+            1 => {
                 r.boundary_edges += 1;
                 boundary_degree[a as usize] += 1;
                 boundary_degree[b as usize] += 1;
             }
-            [(f, d), (g, e)] => {
-                if d == e {
+            2 => {
+                if uses.direction != 0 {
                     r.orientation_conflicts += 1;
                 }
                 for v in [a, b] {
-                    if let (Some(x), Some(y)) = (corner(m, *f, v), corner(m, *g, v)) {
+                    if let (Some(x), Some(y)) = (
+                        corner(triangles, uses.first, v),
+                        corner(triangles, uses.second, v),
+                    ) {
                         union(&mut parent, x, y);
                     }
                 }
             }
-            _ => r.non_manifold_edges += 1,
+            _ => {
+                r.non_manifold_edges += 1;
+                bad[a as usize] = true;
+                bad[b as usize] = true;
+            }
         }
     }
-    let mut first = vec![usize::MAX; m.vertices.len()];
-    let mut bad = vec![false; m.vertices.len()];
-    for (f, t) in m.triangles.iter().enumerate() {
+    let mut first = vec![usize::MAX; vertex_count];
+    for (f, t) in triangles.iter().enumerate() {
         tick(f, stop)?;
         for (k, &v) in t.iter().enumerate() {
             let v = v as usize;
@@ -172,12 +227,6 @@ pub fn audit(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<Audit, String> {
     for (i, &d) in boundary_degree.iter().enumerate() {
         if d != 0 && d != 2 {
             bad[i] = true;
-        }
-    }
-    for (&(a, b), uses) in &edges {
-        if uses.len() > 2 {
-            bad[a as usize] = true;
-            bad[b as usize] = true;
         }
     }
     r.non_manifold_vertices = bad.iter().filter(|&&x| x).count();
