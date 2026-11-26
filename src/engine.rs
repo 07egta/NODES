@@ -445,7 +445,7 @@ fn preflight_run(
             let count = num(args, 0)? as usize;
             (count, count)
         }
-        NodeKind::NoiseDeform => (shape(args)?.weight(), 1),
+        NodeKind::NoiseDeform | NodeKind::MeshFlip | NodeKind::MeshSmooth | NodeKind::MeshOnBed | NodeKind::MeshUnify => (shape(args)?.weight(), 1),
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
         _ => (0, 1),
@@ -816,7 +816,11 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshSubdivide
         | MeshCatmullClark
         | MeshOnBed
-        | MeshDeleteFace => crate::mesh_fabrication::run_item(kind, a, cancel),
+        | MeshDeleteFace
+        | MeshSelfContact
+        | MeshThicknessSample
+        | MeshCompact
+        | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
         MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
         | Remap | Expression | GraphProfile | ImportMesh => {
