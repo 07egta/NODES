@@ -2,6 +2,7 @@ use crate::file_picker::{FilePicker, FileTask, PickerEvent};
 use crate::{
     canvas::GraphCanvas,
     data_view,
+    gcode_ui::GcodeDialog,
     help::HelpWindow,
     theme,
     viewport::{PreviewItem, Viewport},
@@ -10,6 +11,7 @@ use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke
 use morphlet::{
     annotations, cluster,
     engine::{Evaluation, Evaluator},
+    gcode,
     model::{Graph, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
@@ -103,6 +105,8 @@ pub struct MorphletApp {
     template_open: bool,
     help_open: bool,
     export_open: bool,
+    /// Advanced: G-code (vase mode) from the その他の書き出し menu.
+    gcode: GcodeDialog,
     export_stats: Option<Result<persistence::ExportReport, String>>,
     toast: Option<(String, bool, Instant)>,
     confirm_action: Option<PendingAction>,
@@ -181,6 +185,7 @@ impl MorphletApp {
             template_open: false,
             help_open: false,
             export_open: false,
+            gcode: GcodeDialog::default(),
             export_stats: None,
             toast: None,
             confirm_action: None,
@@ -443,6 +448,23 @@ impl MorphletApp {
                                     Err(e) => self.notify(e, true),
                                 }
                             }
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
+                    FileTask::ExportGcode => {
+                        let settings = self.gcode.settings().clone();
+                        let result = self
+                            .result_trees()
+                            .and_then(|trees| gcode::export(&path, &trees, &settings));
+                        match result {
+                            Ok(r) => self.notify(
+                                format!(
+                                    "G-code を書き出しました（約 {:.0} 分・{:.1} m）",
+                                    r.print_seconds / 60.0,
+                                    r.filament_mm / 1000.0
+                                ),
+                                false,
+                            ),
                             Err(e) => self.notify(e, true),
                         }
                     }
@@ -824,6 +846,12 @@ impl MorphletApp {
                             );
                             self.export_open = true;
                         }
+                        ui.menu_button("その他の書き出し", |ui| {
+                            if ui.button("G-code（花瓶モード・未検証）").clicked() {
+                                self.gcode.open();
+                                ui.close();
+                            }
+                        });
                         if ui.button("保存").on_hover_text("Ctrl+S").clicked() {
                             self.save(false);
                         }
@@ -1508,6 +1536,19 @@ impl MorphletApp {
             self.export_open = false;
         }
     }
+    fn gcode_dialog(&mut self, ctx: &egui::Context) {
+        if !self.gcode.is_open() {
+            return;
+        }
+        let trees = self.result_trees();
+        if self.gcode.show(ctx, &trees) {
+            self.file_picker = Some(FilePicker::new(
+                FileTask::ExportGcode,
+                self.start_directory(),
+                format!("{}.gcode", safe_name(&self.project.name)),
+            ));
+        }
+    }
     fn help_dialog(&mut self, ctx: &egui::Context) {
         if !self.help_open {
             return;
@@ -1678,6 +1719,7 @@ impl eframe::App for MorphletApp {
             && !self.template_open
             && !self.help_open
             && !self.export_open
+            && !self.gcode.is_open()
             && self.file_picker.is_none()
         {
             self.keyboard(ctx);
@@ -1690,6 +1732,7 @@ impl eframe::App for MorphletApp {
         self.palette(ctx);
         self.template_dialog(ctx);
         self.export_dialog(ctx);
+        self.gcode_dialog(ctx);
         self.help_dialog(ctx);
         if let Some(kind) = self.help_window.show(ctx) {
             self.add_node(kind, None);
