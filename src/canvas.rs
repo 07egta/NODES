@@ -631,7 +631,7 @@ impl GraphCanvas {
                 );
                 painter.circle_stroke(ip, 5. * p.zoom, Stroke::new(1.6_f32, port_col));
                 if can == Some(true) {
-                    painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4, theme::teal()));
+                    painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4_f32, theme::teal()));
                 }
                 let pr = ui.interact(
                     Rect::from_center_size(ip, egui::vec2((22. * p.zoom).max(12.), (24. * p.zoom).max(12.))),
@@ -913,7 +913,7 @@ impl GraphCanvas {
             ui.ctx().request_repaint();
         }
         painter.rect_filled(map, 7, theme::panel_bg());
-        painter.rect_stroke(map, 7, Stroke::new(1., theme::card_border()), egui::StrokeKind::Inside);
+        painter.rect_stroke(map, 7, Stroke::new(1_f32, theme::card_border()), egui::StrokeKind::Inside);
         let mini = painter.with_clip_rect(inner);
         for node in &p.graph.nodes {
             let start = project(Pos2::new(node.position[0], node.position[1]));
@@ -925,7 +925,7 @@ impl GraphCanvas {
         let b = to_world(canvas.max, canvas, p.pan, p.zoom);
         let view = Rect::from_two_pos(project(Pos2::new(a[0], a[1])), project(Pos2::new(b[0], b[1])));
         if view.intersects(inner) {
-            mini.rect_stroke(view.intersect(inner), 2, Stroke::new(1.5, theme::teal()), egui::StrokeKind::Inside);
+            mini.rect_stroke(view.intersect(inner), 2, Stroke::new(1.5_f32, theme::teal()), egui::StrokeKind::Inside);
         }
     }
 }

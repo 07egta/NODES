@@ -925,7 +925,7 @@ impl MorphletApp {
                     let b = r.center_top() + egui::vec2(0., 4.);
                     let c = r.right_bottom() - egui::vec2(3., 4.);
                     for pair in [[a, b], [b, c], [a, c]] {
-                        ui.painter().line_segment(pair, Stroke::new(1.8, theme::teal()));
+                        ui.painter().line_segment(pair, Stroke::new(1.8_f32, theme::teal()));
                     }
                     for p in [a, b, c] { ui.painter().circle_filled(p, 2.6, theme::teal()); }
                     ui.label(RichText::new("NODES").strong().size(18.).color(theme::ink()));
@@ -2158,6 +2158,7 @@ fn same_calculation(a: &Graph, b: &Graph) -> bool {
                 && x.off == y.off
         })
 }
+#[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
     ui_polish::query_score(kind, query).is_some()
 }

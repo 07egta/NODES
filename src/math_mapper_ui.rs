@@ -37,8 +37,8 @@ pub fn show(ui: &mut egui::Ui, node: &mut Node) {
     let grid = ui.visuals().weak_text_color().gamma_multiply(0.35);
     for j in 0..=4 {
         let t = j as f64 / 4.0;
-        painter.line_segment([position(rect,t,0.0),position(rect,t,1.0)],Stroke::new(1.0,grid));
-        painter.line_segment([position(rect,0.0,t),position(rect,1.0,t)],Stroke::new(1.0,grid));
+        painter.line_segment([position(rect,t,0.0),position(rect,t,1.0)],Stroke::new(1.0_f32,grid));
+        painter.line_segment([position(rect,0.0,t),position(rect,1.0,t)],Stroke::new(1.0_f32,grid));
     }
     if connected {
         ui.small("接続中の曲線設定は上流で変更してください。ここには未接続時の設定を表示します。");
@@ -64,7 +64,7 @@ pub fn show(ui: &mut egui::Ui, node: &mut Node) {
         for k in 0..2 {
             let p=position(rect,c[k*2],c[k*2+1]);
             let endpoint=if k==0 {position(rect,0.0,0.0)} else {position(rect,1.0,1.0)};
-            painter.line_segment([endpoint,p],Stroke::new(1.0,fg.gamma_multiply(0.5)));
+            painter.line_segment([endpoint,p],Stroke::new(1.0_f32,fg.gamma_multiply(0.5)));
             painter.circle_filled(p,5.0,Color32::from_rgb(235,176,92));
         }
         if !connected && ui.small_button("制御点をリセット").clicked() {
@@ -79,12 +79,12 @@ pub fn show(ui: &mut egui::Ui, node: &mut Node) {
         let x=j as f64/128.0;
         if let Ok(y)=mapper(x,mode,c) {points.push(position(rect,x,y));}
     }
-    if points.len()>1 {painter.add(egui::Shape::line(points,Stroke::new(2.0,color)));}
+    if points.len()>1 {painter.add(egui::Shape::line(points,Stroke::new(2.0_f32,color)));}
     if !node.inputs.contains_key("x") && !connected {
         let x=read(node,"x",0.5);
         if let Ok(y)=mapper(x,mode,c) {
             let p=position(rect,x,y);
-            painter.line_segment([position(rect,x,0.0),p],Stroke::new(1.0,color));
+            painter.line_segment([position(rect,x,0.0),p],Stroke::new(1.0_f32,color));
             painter.circle_filled(p,4.0,color);
             ui.small(format!("x = {x:.3} → y = {y:.3}"));
         }
