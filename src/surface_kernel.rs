@@ -143,15 +143,27 @@ fn check_knots(n: usize, p: usize, k: &[f64]) -> R<()> {
     Ok(())
 }
 
+/// The same one-sided span selects basis values and their local support.
+fn knot_span(k: &[f64], n: usize, p: usize, t: f64) -> usize {
+    if t == k[n] {
+        n - 1
+    } else {
+        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
+    }
+}
+
+fn support_window(k: &[f64], n: usize, p: usize, t: f64) -> std::ops::Range<usize> {
+    let span = knot_span(k, n, p, t);
+    // Keep the whole p+1 window: at endpoints and repeated knots a zero basis
+    // value can still have nonzero first or second derivatives.
+    span - p..span + 1
+}
+
 /// Cox-de Boor basis and analytical first derivative. At the right endpoint use
 /// the interval on its left. At an interior knot choose the right-hand derivative.
 fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
     let mut b = vec![0.; k.len() - 1];
-    let span = if t == k[n] {
-        n - 1
-    } else {
-        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
-    };
+    let span = knot_span(k, n, p, t);
     b[span] = 1.;
     let mut lower = Vec::new();
     for d in 1..=p {
@@ -191,11 +203,7 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
 /// p*N_(i+1,p-1)/(k[i+p+1]-k[i+1]); differentiate once more for N''.
 fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
     let mut b = vec![0.; k.len() - 1];
-    let span = if t == k[n] {
-        n - 1
-    } else {
-        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
-    };
+    let span = knot_span(k, n, p, t);
     b[span] = 1.;
     let mut d = vec![0.; b.len()];
     let mut dd = d.clone();
@@ -522,13 +530,19 @@ impl NurbsSurface {
     /// Work near the most influential control point. Rational derivatives are
     /// translation invariant; subtracting a large world offset only after
     /// homogeneous accumulation can otherwise erase the whole derivative.
-    fn evaluation_origin(&self, bu: &[f64], bv: &[f64]) -> Point3 {
+    fn evaluation_origin(
+        &self,
+        bu: &[f64],
+        bv: &[f64],
+        us: std::ops::Range<usize>,
+        vs: std::ops::Range<usize>,
+    ) -> Point3 {
         let mut largest = 0.;
         let mut origin = self.points[0];
-        for (i, &u) in bu.iter().enumerate() {
-            for (j, &v) in bv.iter().enumerate() {
+        for i in us {
+            for j in vs.clone() {
                 let k = i * self.nv + j;
-                let influence = u * v * self.weights[k];
+                let influence = bu[i] * bv[j] * self.weights[k];
                 if influence > largest {
                     largest = influence;
                     origin = self.points[k];
@@ -549,14 +563,21 @@ impl NurbsSurface {
         require_second_order_continuity(&self.kv, self.nv, self.pv, tv)?;
         let [bu, du, duu] = basis_second(&self.ku, self.nu, self.pu, tu);
         let [bv, dv, dvv] = basis_second(&self.kv, self.nv, self.pv, tv);
-        let origin = self.evaluation_origin(&bu, &bv);
+        let us = support_window(&self.ku, self.nu, self.pu, tu);
+        let vs = support_window(&self.kv, self.nv, self.pv, tv);
+        let origin = self.evaluation_origin(&bu, &bv, us.clone(), vs.clone());
         let su = b - a;
         let sv = d - c;
         let max_weight = self.weights.iter().copied().fold(0., f64::max);
         let mut h = [[0.; 4]; 6];
         for i in 0..self.nu {
             check_cancel(stop)?;
-            for j in 0..self.nv {
+            // Preserve the existing cancellation checkpoints even for rows
+            // whose basis and derivatives vanish on this knot span.
+            if !us.contains(&i) {
+                continue;
+            }
+            for j in vs.clone() {
                 let k = i * self.nv + j;
                 let w = self.weights[k] / max_weight;
                 let p = sub(self.points[k], origin);
@@ -627,10 +648,12 @@ impl NurbsSurface {
     fn evaluate_native(&self, tu: f64, tv: f64) -> R<Sample> {
         let (bu, du) = basis(&self.ku, self.nu, self.pu, tu);
         let (bv, dv) = basis(&self.kv, self.nv, self.pv, tv);
-        let origin = self.evaluation_origin(&bu, &bv);
+        let us = support_window(&self.ku, self.nu, self.pu, tu);
+        let vs = support_window(&self.kv, self.nv, self.pv, tv);
+        let origin = self.evaluation_origin(&bu, &bv, us.clone(), vs.clone());
         let (mut h, mut hu, mut hv) = ([0.; 4], [0.; 4], [0.; 4]);
-        for i in 0..self.nu {
-            for j in 0..self.nv {
+        for i in us {
+            for j in vs.clone() {
                 let k = i * self.nv + j;
                 let w = self.weights[k];
                 let p = sub(self.points[k], origin);

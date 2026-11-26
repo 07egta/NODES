@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:37:34.593491+00:00",
+  "updated_at_utc": "2026-11-26T23:39:44.592229+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -185,6 +185,25 @@
         "Coordinates near 1e8 mixed with sub-nanometer offsets retain represented binary64 values"
       ],
       "limits": "Preserves writer text round-trip; does not establish an external OBJ consumer tolerance or physical printability."
+    },
+    {
+      "name": "NURBS local-support evaluation after measured area regression",
+      "files": [
+        "src/surface_kernel.rs",
+        "tests/surface_support_regressions.rs"
+      ],
+      "after": {
+        "passed": 5,
+        "failed": 0
+      },
+      "related_total_passed": 41,
+      "command": "cargo test --locked --offline --test surface_support_regressions --test surface_numeric_regressions --test surface_kernel_tests --test surface_curvature_tests --test surface_knot_roundoff --test surface_curvature_study --test curve_surface_integration",
+      "review": "multiport_audit independently checked endpoint/repeated-knot support, lower-degree derivative support, rational degree-one jets, degree-eight nine-control windows, anchor order, cancellation and global weight scaling; root reviewed diff and analytical test expectations.",
+      "reason": "Initial required native knot-cell coverage exposed approximately 25x cost on the 32x32-control planar benchmark due to scanning every control for every sample.",
+      "method": "Limit homogeneous evaluation and local-origin selection to the full span-degree..span window; include zero basis values whose derivatives can be nonzero.",
+      "source_sha256": "738c300bf23d09df5e93802300075b29fbdefdffaf35e82141078a96fb4835fd",
+      "performance_status": "Initial benchmark preserved; optimized performance remeasurement pending.",
+      "new_expected_values": "Independent cubic polynomial blossom, rational quotient derivatives, two Bezier spans, degree-eight Greville bilinear image and cancellation."
     }
   ],
   "environment_events": [
