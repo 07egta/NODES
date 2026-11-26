@@ -20,3 +20,5 @@
 元の作品例を残すには、編集後の`.morph`を別名で保存してください。
 
 追加機能に対応したソース版では [`tree-branches.morph`](tree-branches.morph) で、枝のパスを保った合流・抽出、指定番号の削除と配置を確認できます。
+
+[`curve-basics.morph`](curve-basics.morph) では直線・折れ線・長さ・曲線の等分割を確認できます。

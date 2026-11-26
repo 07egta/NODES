@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub type NodeId = u64;
 pub const MAX_NODES: usize = 2_048;
 pub const MAX_ITEMS: usize = 8_192;
+pub(crate) const MAX_CURVE_DIVISIONS: usize = 1_024;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;
 pub const MAX_TOTAL_WEIGHT: usize = 3_000_000;
@@ -187,6 +188,10 @@ pub enum NodeKind {
     CullIndex,
     MergeTrees,
     TreeBranch,
+    Line,
+    Polyline,
+    CurveLength,
+    DivideCurve,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -259,6 +264,10 @@ impl NodeKind {
             Self::CullIndex,
             Self::MergeTrees,
             Self::TreeBranch,
+            Self::Line,
+            Self::Polyline,
+            Self::CurveLength,
+            Self::DivideCurve,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -528,6 +537,59 @@ impl NodeKind {
                         i("segments", "分割数", 192., 16., 1024.),
                     ],
                     output: DataType::Curve,
+                };
+                &SPEC
+            }
+            Self::Line => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "2点から直線",
+                    category: "曲線",
+                    description: "異なる始点と終点を結ぶ線分を作ります。",
+                    keywords: "line line from points 直線 線分 2点",
+                    inputs: &[
+                        g("start", "始点", DataType::Point),
+                        g("end", "終点", DataType::Point),
+                    ],
+                    output: DataType::Curve,
+                };
+                &SPEC
+            }
+            Self::Polyline => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "点列から折れ線",
+                    category: "曲線",
+                    description: "1 ブランチの点を順に結びます。閉じる場合は異なる点が 3 個以上必要です。",
+                    keywords: "polyline points 折れ線 ポリライン 輪郭 閉じる 点列",
+                    inputs: &[
+                        g("points", "点のリスト", DataType::Point),
+                        i("closed", "閉じる (0: 開く / 1: 閉じる)", 0., 0., 1.),
+                    ],
+                    output: DataType::Curve,
+                };
+                &SPEC
+            }
+            Self::CurveLength => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "曲線の長さ",
+                    category: "曲線",
+                    description: "折れ線の区間長を合計します。閉曲線は最後の点から始点までを含みます。",
+                    keywords: "curve length perimeter 周長 弧長 計測 長さ",
+                    inputs: &[g("curve", "曲線", DataType::Curve)],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::DivideCurve => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "曲線を等間隔に分割",
+                    category: "曲線",
+                    description: "折れ線の弧長を等分して点を出力します。開曲線は両端を含み、閉曲線は始点を重複しません。",
+                    keywords: "divide curve arc length sample 分割 等分 等弧長 等間隔 点",
+                    inputs: &[
+                        g("curve", "曲線", DataType::Curve),
+                        i("count", "分割数", 8., 1., MAX_CURVE_DIVISIONS as f64),
+                    ],
+                    output: DataType::Point,
                 };
                 &SPEC
             }

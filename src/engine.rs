@@ -7,6 +7,9 @@ use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 use std::time::Instant;
 
+#[path = "curve_nodes.rs"]
+mod curve_nodes;
+
 #[derive(Clone, Debug, Default)]
 pub struct Evaluation {
     pub outputs: BTreeMap<NodeId, Result<Tree, String>>,
@@ -219,6 +222,12 @@ pub(crate) fn evaluate_node(
     }
     if let Some(result) = crate::tree_nodes::evaluate(node.kind, &inputs, cancel) {
         return checked_tree(result?, cancel);
+    }
+    if node.kind == NodeKind::Polyline {
+        let [points, closures] = inputs.as_slice() else {
+            return Err("折れ線の入力がありません。".into());
+        };
+        return curve_nodes::polyline_tree(points, closures, cancel);
     }
     if node.kind == NodeKind::Flatten {
         let t = inputs.first().ok_or("入力がありません。")?;
@@ -442,6 +451,11 @@ fn preflight_run(
             let count = num(args, 2)? as usize;
             (count, count)
         }
+        NodeKind::DivideCurve => {
+            let count =
+                curve_nodes::division_count(num(args, 1)?)? + usize::from(!curve(args)?.closed);
+            (count, count)
+        }
         NodeKind::Random | NodeKind::Populate => {
             let count = num(args, 0)? as usize;
             (count, count)
@@ -590,6 +604,19 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 .collect())
         }
         Point => Ok(vec![Value::Point([num(a, 0)?, num(a, 1)?, num(a, 2)?])]),
+        Line => Ok(vec![curve_nodes::two_point(
+            shape(a)?,
+            a.get(1).ok_or("終点を接続してください。")?,
+        )?]),
+        CurveLength => Ok(vec![Value::Number(curve_nodes::length(
+            curve(a)?.as_ref(),
+            cancel,
+        )?)]),
+        DivideCurve => curve_nodes::divide(
+            curve(a)?.as_ref(),
+            curve_nodes::division_count(num(a, 1)?)?,
+            cancel,
+        ),
         Circle | Polygon => {
             let r = num(a, 0)?;
             let n = num(a, 1)? as usize;
@@ -799,9 +826,8 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
-        | Remap | Expression | GraphProfile | ImportMesh | CullIndex | MergeTrees | TreeBranch => {
-            Err("このノードはリスト評価が必要です。".into())
-        }
+        | Remap | Expression | GraphProfile | ImportMesh | CullIndex | MergeTrees | TreeBranch
+        | Polyline => Err("このノードはリスト評価が必要です。".into()),
     }
 }
 

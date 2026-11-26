@@ -66,3 +66,41 @@ fn graft_no_longer_erases_a_value_when_a_new_path_matches_a_former_empty_branch(
     assert_eq!(grafted.len(), 1);
     assert_eq!(grafted[&vec![0, 0]], [Value::Number(42.)]);
 }
+
+#[test]
+fn edited_tree_drives_curve_sampling_and_keeps_its_path() {
+    let mut g = Graph::default();
+    let mut add = |k| g.add(k, [0., 0.]).unwrap();
+    let series = add(NodeKind::Series);
+    let points = add(NodeKind::Point);
+    let polyline = add(NodeKind::Polyline);
+    let length = add(NodeKind::CurveLength);
+    let segments = add(NodeKind::DivideCurve);
+    let cull = add(NodeKind::CullIndex);
+    g.node_mut(series).unwrap().params.insert("step".into(), 5.);
+    g.node_mut(series)
+        .unwrap()
+        .params
+        .insert("count".into(), 3.);
+    g.node_mut(segments)
+        .unwrap()
+        .params
+        .insert("count".into(), 4.);
+    g.node_mut(cull).unwrap().params.insert("index".into(), 1.);
+    g.connect(series, points, "x").unwrap();
+    g.connect(points, polyline, "points").unwrap();
+    g.connect(polyline, length, "curve").unwrap();
+    g.connect(polyline, segments, "curve").unwrap();
+    g.connect(segments, cull, "list").unwrap();
+    let evaluated = Evaluator::default().evaluate(&g, &|| false);
+    let branch = |id| &evaluated.outputs[&id].as_ref().unwrap().branches[&vec![0]];
+    assert_eq!(branch(length), &[Value::Number(10.)]);
+    assert_eq!(
+        branch(segments),
+        &[0., 2.5, 5., 7.5, 10.].map(|x| Value::Point([x, 0., 0.]))
+    );
+    assert_eq!(
+        branch(cull),
+        &[0., 5., 7.5, 10.].map(|x| Value::Point([x, 0., 0.]))
+    );
+}

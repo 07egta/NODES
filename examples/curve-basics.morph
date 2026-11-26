@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "name": "直線の長さと折れ線",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "point",
+        "name": "線分の始点",
+        "position": [
+          20,
+          48
+        ],
+        "params": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "point",
+        "name": "線分の終点",
+        "position": [
+          20,
+          200
+        ],
+        "params": {
+          "x": 3.0,
+          "y": 4.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "line",
+        "name": "2点から直線",
+        "position": [
+          265,
+          48
+        ],
+        "params": {},
+        "inputs": {
+          "start": 0,
+          "end": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "curve_length",
+        "name": "長さ: 5 mm",
+        "position": [
+          515,
+          48
+        ],
+        "params": {},
+        "inputs": {
+          "curve": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "divide_curve",
+        "name": "直線を4等分",
+        "position": [
+          515,
+          165
+        ],
+        "params": {
+          "count": 4.0
+        },
+        "inputs": {
+          "curve": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "output",
+        "name": "直線の分割点 (5個)",
+        "position": [
+          760,
+          165
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": true
+      },
+      {
+        "id": 6,
+        "kind": "point",
+        "name": "四角形の最初の点",
+        "position": [
+          20,
+          390
+        ],
+        "params": {
+          "x": 18.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "radial_array",
+        "name": "4点を円形配置",
+        "position": [
+          266,
+          390
+        ],
+        "params": {
+          "count": 4.0,
+          "angle": 360.0
+        },
+        "inputs": {
+          "geometry": 6
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "polyline",
+        "name": "4点を結んで閉じる",
+        "position": [
+          510,
+          390
+        ],
+        "params": {
+          "closed": 1.0
+        },
+        "inputs": {
+          "points": 7
+        },
+        "preview": false
+      },
+      {
+        "id": 9,
+        "kind": "output",
+        "name": "閉じた折れ線",
+        "position": [
+          760,
+          390
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 8
+        },
+        "preview": true
+      },
+      {
+        "id": 10,
+        "kind": "curve_length",
+        "name": "輪郭の周長",
+        "position": [
+          760,
+          500
+        ],
+        "params": {},
+        "inputs": {
+          "curve": 8
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 11
+  },
+  "pan": [
+    30.0,
+    33.0
+  ],
+  "zoom": 0.7
+}
