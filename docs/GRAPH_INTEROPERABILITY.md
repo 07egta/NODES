@@ -40,6 +40,8 @@ Existing Rhai engine has no_module, disabled eval, operation/call/expression/arr
 
 ## Extension roadmap
 
+The [implementation-language policy](LANGUAGE_POLICY.md) keeps the host, standard nodes, graph API and CLI in Rust. Existing bounded Rhai user scripts and optional external clients remain supported uses; they do not make another language a required application runtime. Any future foreign-language adapter must stay small and document its purpose, Rust alternative and distribution cost. A future Wasm host is an optional design proposal, not an adopted dependency or permission to move the core out of Rust.
+
 Use declarative node packs first, backed by existing .morphpart definitions; versioned manifests, explicit enable/disable, validate all nested parts and reject script/import nodes for untrusted packs. Do not grant DLL loading or arbitrary process access. Wasm is a later optional runtime (separate feature, pinned permissively licensed runtime; no WASI by default, limited linear memory/table/instances, fuel and epoch interrupts, output validation, no native host IO, isolate traps). Measure Windows build size and performance before choosing a runtime. Neither a plugin registry nor a Wasm host is shipped by this change.
 
 ## Sources (public behavior/structure only)
