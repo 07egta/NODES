@@ -2,7 +2,20 @@
 
 更新: 2026-11-27 JST。成功は実行したコードに限定する。作業環境停止後に復旧・再実装したコードは、追加CIの結果で確定する。
 
-## 確定した全体チェックポイント
+## 最新の確定結果
+
+最新ソース **`c44a897a22072c6694d1dbf2233ae9557955f49e`** の [Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) は Linux・Windows ともに成功した。
+
+| 環境・job | Rust 全ターゲット | その他の成功した検証 |
+|---|---|---|
+| Linux `140038666343` | **437 passed / 0 failed / 2 ignored、35 suites** | fmt / check / strict Clippy (`-D warnings`)、Python 17件（GH2 3 + exporter 6 + dependency audit 8）、依存監査、`cargo build --release --locked --bins`、artifact upload |
+| Windows `140041049976` | **436 passed / 0 failed / 2 ignored、35 suites** | `cargo build --release --locked --bins`、artifact upload |
+
+新規 `numeric_editor_tests` 4件は両OSで成功し、上表の合計に含まれる。LinuxとWindowsの差1件はUnix専用FIFO回帰である。PRで実際に検証した merge revision `92e70be85c4b34311a27036a18d7a97f37f879c1` とsource headは、tree `2285ea77c81898e6c43924bb09ab749355a8b612` が一致することを確認した。Linux artifactは `15137335621`、Windows artifactは `15135989980`。根拠は [CI_NUMERIC_VALIDATION.json](docs/development/CI_NUMERIC_VALIDATION.json) に保存した。
+
+このLinux配布バイナリでは、数値入力の精度保持、新規Sphere作成、保存・終了・再起動・再編集・STL出力まで実操作で確認した。操作列とメッシュの独立測定は後述する。Windows GUI、Intel Arc、実機造形の検証は引き続き未完了である。
+
+## 初期の確定チェックポイント
 
 | コード | 環境 | 実行 | 結果 |
 |---|---|---|---|
@@ -54,7 +67,7 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 
 実CLIでwriterのないFIFOを渡すと2秒のtimeoutで停止を再現した。`eefc9c1` に事前通常ファイル検査と回帰を保存したが、その [Check 45851162593](https://github.com/07egta/NODES/actions/runs/45851162593) はGHXの1箇所のfmt差分で停止した。差分をそのとおり修正し、GUIで発見した行間修正とともに2f94df4へ保存した。失敗したgateを成功へ読み替えていない。
 
-**最新ソース `2f94df459533774f83593835ba1e22d4924a3c42`** の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` も **432 passed / 0 failed / 2 ignored、35 suites**、両バイナリrelease build・artifact uploadに成功した。Linuxとの差1件はUnix専用FIFO回帰である。
+前回ソース `2f94df459533774f83593835ba1e22d4924a3c42` の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` も **432 passed / 0 failed / 2 ignored、35 suites**、両バイナリrelease build・artifact uploadに成功した。Linuxとの差1件はUnix専用FIFO回帰である。
 
 配布用Linux ZIP artifact `15134610988` のSHA-256と展開バイナリを照合した上で、FIFO拒否を4入口で実行した。`nodes-cli validate` / `evaluate`、`Morphlet --build-graph` / `--inspect-ghx` は全てexit 1で通常ファイルを要求し、各1.3〜2.3msで終了、既存出力のbytesを保持した。修正前の2秒timeout、各コマンド・時刻・バイナリの根拠は [FIFO_VALIDATION.json](docs/development/FIFO_VALIDATION.json)。敵対的なファイル差し替え競合の完全防止を主張しない。
 
@@ -63,6 +76,8 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 上記2f94df4の配布用CLIで再実行し、`scripts/validate_cli_vase.py` で作成→validate/evaluate→STL→半径変更→validate/evaluate→STLの **8コマンドが成功**。半径以外の全projectフィールドの保持、元ファイルのbytes不変、半径32→36を検査した。
 
 STLをPythonの独立したparserで読み、両方とも5,906個の一意な頂点座標、11,808三角形、590,484 bytes、高さ104 mm、全座標・法線の有限性、全三角形の非ゼロ面積を確認。f32座標から行列式で求めた体積は52,430.418306→59,967.823772 mm³となり、CLI報告との差はそれぞれ0.000751846 / 0.000629314 mm³。相対公差1e-5・絶対公差1e-3 mm³に収まった。生データは [CLI_VASE_VALIDATION.json](docs/development/CLI_VASE_VALIDATION.json)。自己交差や実機造形の独立検証を意味しない。
+
+c44a897のLinux artifactに含まれる `nodes-cli` は、この検証に使った2f94df4版とbyte単位で一致する。SHA-256は `752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434`。花器ワークフローの記録は元の実行日時・source revisionを保持し、最新artifactとの対応は同一バイナリのハッシュを根拠にする。
 
 ## その後のローカル検証
 
@@ -155,9 +170,40 @@ GUIはフォーカスを保持し、測定コマンドだけを別のbound termi
 
 2f94df4で空の作品を作り、日本語「円を作りたい」が円1件に絞られること、英語sphere検索、ノード追加・移動、Outputの自動接続、明示切断、手動ワイヤー接続、接続のUndo/Redo、保存を確認した。
 
-一方、Sphereの登録既定値25が表示だけで25.1になり、半径へ30と入力して保存すると30.1になった。保存済みfixtureと操作列は [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json)。原因は便宜スライダーの最小値0.1を起点とするstep0.5の丸めと、表示時にもsetterが呼ばれる設定である。入力精度を3桁に限定する経路も併せて修正する。
+一方、Sphereの登録既定値25が表示だけで25.1になり、半径へ30と入力して保存すると30.1になった。保存済みfixtureと操作列は [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json)。原因は便宜スライダーの最小値0.1を起点とするstep0.5の丸めと、表示時にもsetterが呼ばれる設定である。入力精度を3桁に限定する経路も併せて修正対象とした。
 
-共通の数値widgetで読み取りを無変更にし、手入力とスライダーの便宜範囲を分離し、本来のmetadata上限・有限値・整数制約を編集時に適用する修正を追加した。全登録既定値の受動描画、30 / 30.123456 / 500の実キーイベント、上下限・NaN・Infinity・整数、編集せずfocusを外した際の精度保持をheadless eguiで検査する。**この追加修正のCIと配布バイナリでのGUI確認は未完了**。先の433/432件成功を新しいソースの結果として流用しない。521742bの [Check 45856676411](https://github.com/07egta/NODES/actions/runs/45856676411) はassert! 2箇所のfmt差分で停止し、後続gateは未実行。その実diffだけを適用して次のCheckへ進める。
+共通の数値widgetで読み取りを無変更にし、手入力とスライダーの便宜範囲を分離し、本来のmetadata上限・有限値・整数制約を編集時に適用する修正を追加した。全登録既定値の受動描画、30 / 30.123456 / 500の実キーイベント、上下限・NaN・Infinity・整数、編集せずfocusを外した際の精度保持をheadless eguiで検査する4件は、**c44a897のLinux・Windows CIで全件成功**した。
+
+521742bの [Check 45856676411](https://github.com/07egta/NODES/actions/runs/45856676411) はassert! 2箇所のfmt差分で停止し、後続gateは未実行だった。その実diffだけを適用し、試験の意味を変更せずに進めたc44a897のCheckで、冒頭の437 / 436件の成功結果を得た。以前の失敗や433 / 432件の結果を、新しいソースの成功として読み替えていない。
+
+### 数値入力修正後の実GUI・保存・STL検証
+
+ハッシュを照合したc44a897のLinux配布GUIで、新規Sphereの次の操作を確認した。
+
+- 登録既定値 **25** が表示後も25のままで、寸法は50×50×50 mm。
+- **30** と入力すると30を保持し、寸法は60×60×60 mm。
+- **30.123456** は入力後にfocusを外しても6桁の小数部を保持。
+- **500** は便宜スライダーの表示範囲を超えてもmetadataの許容範囲内の値として保持され、寸法は1000×1000×1000 mm。
+- Undoで **500→30.123456→30** を正確に復元。
+- SphereをOutputへ接続し、GUIから保存してアプリを終了。再起動すると2ノード、接続、半径30、寸法60×60×60 mmとダークテーマを保持。
+- 再起動後に31へ編集して寸法62×62×62 mmを確認し、30へ戻して再保存。scale 1、bed Z=0、XY中央配置でバイナリSTLの書き出しが成功。
+
+修正前に保存された半径30.1の作品は、読み込んでも30.1のまま保持した。過去の保存値を推測で変更していない。修正後の編集可能な[作品](docs/development/gui-sphere-exact.morph)と、再起動後の[実画面](docs/development/screenshots/linux-exact-radius-reopened.png)を保存した。PNGはclient領域1364×920である。
+
+保存されたJSONとSTLのbytesをPython標準ライブラリで独立に読み、次を確認した。幾何の測定にNODESのカーネルは使用せず、STLのf32頂点から面積と行列式を計算し、体積は `math.fsum` で集計した。
+
+| 項目 | 独立測定結果 |
+|---|---:|
+| 保存済み半径 / ノード数 | **30 / 2**（Sphere → Output） |
+| 一意な頂点座標 / 三角形数 | **1,106 / 2,208** |
+| STLサイズ | **110,484 bytes**（84 + 50×2,208） |
+| bounds | **[-30, -30, 0] ～ [30, 30, 60] mm** |
+| 座標・法線の有限性 / 退化面 | 全件有限 / **0** |
+| STLメッシュの符号付き体積 | **112,292.23168992388 mm³** |
+| 半径30の解析球の体積（4πr³/3） | **113,097.33552923256 mm³** |
+| 解析球に対する体積の相対差 | **0.0071186808737910634（約0.712%）** |
+
+このSphere出力は三角形で近似したメッシュであり、解析球より約0.712%小さい体積となる。厳密球・B-repの体積検証や実機造形成功の証明には用いない。STLのSHA-256は `9a177aeac2a0c49200f0c9fcd3d58a03ca7be170429611f9463c7f647e377031`。バイナリSTLはGitへ追加せず、生成グラフとファイルハッシュ・件数・寸法・操作列を [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json) に記録した。
 
 ## 次の必須ゲート
 
@@ -169,4 +215,4 @@ cargo test --all-targets --locked
 cargo build --release --locked --bins
 ```
 
-2f94df4についてLinuxで上記、Windowsで全ターゲットtestとrelease buildが成功した。以後のsource変更でも同じgateを再実行する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。
+c44a897についてLinuxで上記、Windowsで全ターゲットtestと両バイナリのrelease buildが成功した。数値入力修正のCIとLinux配布GUIの確認は完了している。以後のsource変更でも同じgateを再実行する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、Intel Arc、3Dプリンター実機は未検証。

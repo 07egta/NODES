@@ -6,15 +6,15 @@
 
 Rust / egui の独立デスクトップ基盤へ、既存の core・Data Tree・数学・生成デザイン・メッシュ・UI・GHX/API・精密曲線・精密曲面ブランチを統合した。298種類をノード選択欄に登録し、Cluster は定義から作成する。登録数を完成率やGrasshopper互換率として扱わない。
 
-`6349577` はLinux/Windowsそれぞれ350テストを通過。その後の2f94df4は通常Linux CIで433テスト・厳格Clippy・GUI/CLI release buildを通過した。実GUIの編集/保存/再起動/STL、Inspector配置とエラー入力の修正、実CLIの花器作成/編集/書出し、4入口のFIFO拒否を確認した。同じsourceのWindows432テストと両バイナリrelease buildも成功した。作業環境停止に備え、専用ブランチへ意味のある単位で保存する運用を継続する。
+最新の検証済みソースは `c44a897a22072c6694d1dbf2233ae9557955f49e`。[Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) でLinux437件・Windows436件が成功し、両OSのGUI/CLI release buildも通過した。Linuxではfmt/check/strict Clippy・Python17件・依存監査も成功。件数差はUnix限定FIFO回帰1件である。4件の数値UI回帰は両OSで成功し、Linux実GUIでもSphereの既定値25、直接入力30・30.123456・500、Undo、保存・終了・再起動・再編集・STL出力を確認した。Inspector配置・エラー入力・花器CLI・FIFOの以前の結果も保持している。後続の証拠文書コミットと検証対象ソースを区別し、専用ブランチへの逐次保存を続ける。出典は [CI_NUMERIC_VALIDATION.json](docs/development/CI_NUMERIC_VALIDATION.json) と [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json)。
 
 | 優先 | 開発項目 | 現状 | 完了条件 |
 |---|---|---|---|
 | P0 | 成果保全・統合 | 開発ブランチとDraft PR #11を作成、逐次保存、復旧ブランチを保全 | 最終SHAと実装・試験・再開手順をSTATUSに一致させる |
-| P1 | 品質ゲート | Linux/Windows回帰基盤あり。全復旧コードの検証中 | fmt/check/clippy/test/releaseの同じコードに対する成功 |
+| P1 | 品質ゲート | c44a897aのLinux437件・Windows436件と両release buildが成功。Linux fmt/check/strict Clippyも成功 | 次の変更も同じソースのCI・実操作を通し、証拠を保存する |
 | P2 | データフロー | 型検査、循環検出、キャッシュ、キャンセル、枝照合、List/Tree実装 | 複数出力ポート、Null、一般の混合アクセス、完全な空データ規則 |
 | P3 | 精密幾何 | NURBS曲線/曲面、解析primitive、曲率、箱限定ソリッド | トリム曲面、一般B-rep位相、頑健な交差・Boolean、許容誤差の公開 |
-| P4 | 実操作品質 | 日本語検索、Light/Dark、キャンバス、プレビュー、Undo/Redo | Windows/Intel Arc・高DPI・より小さい画面・大グラフ実操作（Linux 1116×758と1364px幅は確認） |
+| P4 | 実操作品質 | 日本語検索、Light/Dark、キャンバス、プレビュー、Undo/Redo、精度を保持する数値入力をLinux実GUIで確認 | Windows/Intel Arc・高DPI・より小さい画面・大グラフ実操作（Linux 1116×758と1364px幅は確認） |
 | P5 | 製造品質 | STL/OBJ/3MF、メッシュ診断、限定修復 | 殻包含、自己交差、肉厚の誤差評価、凹開口/穴/非平面の安全な扱い |
 | P6 | 互換性 | GHXの限定読込と未対応archive、独立ノードAPI | 未知nativeノードの無損失保持、GH/GHX公開fixtures、STEP/IGES/3DM等 |
 | P7 | 拡張 | 制限付きRhai、式、クラスター、オフラインJSON API/CLI | 版付きplugin ABI、型登録、複数出力・外部連携の能力境界 |
@@ -23,13 +23,13 @@ Rust / egui の独立デスクトップ基盤へ、既存の core・Data Tree・
 
 ## 次の具体的な実装
 
-1. 復旧済みコードのCIを通し、対応表・測定値・配布artifactの根拠を揃える。
-2. v1 readerを維持した複数出力ポートのスキーマ設計と移行fixtureを先に作る。
-3. `Value` のNull・Boolean・Vector・Domain等を導入し、既存Number/Point表現との明示変換を定める。
-4. Item/List/Treeの混合アクセスを枝ごとに処理する共通schedulerを導入する。既存FirstItem制限を黙って変えない。
-5. 未知のnativeノードを元JSON・port・接続ごと保存する無損失モデルを導入する。
+1. [MULTI_OUTPUT_MIGRATION.md](docs/development/MULTI_OUTPUT_MIGRATION.md) に従い、v1 readerを維持した出力endpointとv2保存envelopeを設計する。既存37作例・旧port alias・Clusterの値と接続を比較する移行fixtureを先に作る。
+2. 評価・キャッシュ・Canvas・Cluster・Graph APIを同じ出力keyへ移行し、Dispatch A/Bを別の下流へ接続する最初の実用グラフで、保存再読込・Undo・キャンセル・容量上限を検証する。
+3. 未知nativeノードの元JSON・port・接続を保持し、実行しないplaceholderを導入する。文書保存の可否と評価の可否を分離する。
+4. `Value::Null` を追加し、未接続・枝なし・空枝・Null項目・評価エラーを区別する。Boolean/Vector/Domainの専用型はNullの一貫した評価・表示・保存を確認してから別単位で進める。
+5. Item/List/Treeの混合アクセスを枝ごとに処理する共通schedulerを導入する。既存FirstItem制限を黙って変えない。
 6. 精密kernelの例外・退化・公差を整備し、一般B-repを検討する。メッシュ結合をBooleanと呼ばない。
-7. WindowsノートPCでGUI/性能/印刷準備を検証し、実測から目標を定める。
+7. WindowsノートPCでGUI/性能/印刷準備を検証し、実測から目標を定める。各実装単位でCI・実操作の結果を保存し、検証済みソースSHAを更新する。
 
 ## 互換性の完了基準
 

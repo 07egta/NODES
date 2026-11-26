@@ -130,7 +130,9 @@ cargo test --all-targets --locked
 cargo clippy --all-targets --locked -- -D warnings
 ```
 
-`tests/cli_workflows.rs` は `CARGO_BIN_EXE_nodes-cli` を使って実際の実行ファイルを起動し、JSON と終了コード、作成→編集→保存→再読込→再評価、作品情報の保持、禁止機能、要求サイズ上限、失敗時の既存保存先の保持、STL の書き出しと再取込を検証します。2f94df4のLinux通常CIで、Unix FIFO拒否回帰を含む8件が成功しました。validate/evaluate、GUIバイナリのbuild-graph/inspect-ghx入口も、配布バイナリでFIFOを即座に拒否し保存先を保持することを確認しています。
+`tests/cli_workflows.rs` は `CARGO_BIN_EXE_nodes-cli` を使って実際の実行ファイルを起動し、JSON と終了コード、作成→編集→保存→再読込→再評価、作品情報の保持、禁止機能、要求サイズ上限、失敗時の既存保存先の保持、STL の書き出しと再取込を検証します。検証済みソース `c44a897a22072c6694d1dbf2233ae9557955f49e` の [Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) で、LinuxはUnix FIFO拒否回帰を含む8件、Windowsは共通の7件が成功しました。全体ではLinux437件・Windows436件が成功し、両OSのGUI/CLI release buildも通過しています。source/tree/artifactの記録は [CI_NUMERIC_VALIDATION.json](development/CI_NUMERIC_VALIDATION.json) を参照してください。
+
+validate/evaluate、GUIバイナリのbuild-graph/inspect-ghx入口がFIFOを即座に拒否し、保存先を保持することは2f94df4の配布バイナリでも実測しています。詳細は [FIFO_VALIDATION.json](development/FIFO_VALIDATION.json)。
 
 リポジトリに含まれる実用サンプルはPythonの標準ライブラリだけで再検証できます。出力ディレクトリは新規または空にしてください。
 
@@ -141,6 +143,6 @@ python3 -B scripts/validate_cli_vase.py \
   --output-dir /tmp/nodes-vase-validation
 ```
 
-この検証は2f94df4の配布用CLIで再実行済みです。8コマンドと保存内容、STLの各面・寸法・独立体積計算を確認し、`cli-vase-report.json` に実行したバイナリと入力のハッシュ、公差、結果を記録します。WindowsでもPythonから利用できますが、上記実行結果はLinuxです。実機造形の保証には使いません。
+この花器ワークフローの実行記録は2f94df4のLinux配布用CLIによるものです。8コマンドと半径以外の保存内容の保持、STLの各面・寸法・独立体積計算を確認し、`cli-vase-report.json` に実行したバイナリと入力のハッシュ、公差、結果を記録します。[CLI_VASE_VALIDATION.json](development/CLI_VASE_VALIDATION.json) に保存した証拠を参照できます。c44a897aのLinux artifact内のCLIも、実測したCLIとSHA-256 `752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434` が一致しています。WindowsでもPythonから利用できますが、このワークフロー実測はLinuxです。実機造形の保証には使いません。
 
 Cargo の一次資料: [バイナリ自動検出](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#target-auto-discovery)、[実行ファイルを使う統合テスト](https://doc.rust-lang.org/cargo/commands/cargo-test.html)。

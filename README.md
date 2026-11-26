@@ -8,9 +8,11 @@
 
 ## 入手する
 
-- **開発版:** 成功した `Check` のWindowsジョブから、コミットSHA付きの `NODES-windows-x64-…` アーティファクトを取得できます。CI成果物はGUI・実機造形を保証する安定リリースではありません。
+- **検証済み開発版:** ソース `c44a897a22072c6694d1dbf2233ae9557955f49e` の [Windows ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15135989980) / [Linux ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15137335621) を取得できます。CI成果物は安定リリースではありません。最新Windowsの実画面操作と実機造形は未検証です。
 - **旧公開版:** [Morphlet 0.1.0 Windows ZIP](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip)。この旧版には現在の開発ブランチで追加した機能は含まれません。
 - **ソースから:** 下記のビルド手順を使います。実行ファイル名は互換性のため `Morphlet.exe` を維持しています。
+
+[Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) はLinux **437 passed**、Windows **436 passed**、各0 failed / 2 ignoredで成功しました。両OSのGUI/CLI release buildと、Linuxのfmt/check/strict Clippy・Python17件・依存監査も成功しています。件数差はUnix限定FIFO回帰1件です。この結果はc44a897aのソースに対するもので、後続の証拠文書更新とは区別します。[ソース・配布物の検証記録](docs/development/CI_NUMERIC_VALIDATION.json)
 
 ## 最初のモデルを編集する
 
@@ -22,9 +24,9 @@
 
 3D画面はドラッグで回転、ホイールでズームします。全体表示は `F`、操作を戻すには `Ctrl+Z`、やり直すには `Ctrl+Y`。ノードごとの表示切り替え、値・データツリーの確認、エラー表示、辞典も利用できます。詳細は [日本語操作ガイド](docs/USER_GUIDE_JA.md) を参照してください。
 
-![2f94df4のLinux実画面: 編集可能な花器、3Dプレビュー、修正後のInspector](docs/development/screenshots/linux-after-inspector-layout.png)
+![c44a897aのLinux実画面: 半径30のSphereを保存して再起動し、数値と接続を確認](docs/development/screenshots/linux-exact-radius-reopened.png)
 
-上の画像は2f94df4のLinuxバイナリを実行して撮影しました。数値変更、エラーからの復帰、Undo/Redo、保存・終了・再起動、STL出力を確認し、Inspectorのフォーカスと過大な余白を修正・再検証しました。最新Windowsの画面操作と広いDPIの検証は残っています。撮影条件と実行記録は [検証結果](TEST_RESULTS.md) にあります。
+上の画像はc44a897aのLinuxバイナリを実行して撮影しました。新規Sphereの半径25、直接入力30で寸法60 × 60 × 60 mm、30.123456のフォーカス離脱後の保持、半径500、Undo、保存・終了・再起動・再編集・STL出力を確認しています。表示だけで25を25.1へ変えてしまう不具合を修正し、実画面と4件のheadless egui回帰で再検証しました。以前のInspectorフォーカス・行間修正の実画面も [保存](docs/development/screenshots/linux-after-inspector-layout.png) しています。最新Windowsの画面操作と広いDPIの検証は残っています。[数値入力の実操作記録](docs/development/NUMERIC_INPUT_VALIDATION.json) / [検証結果](TEST_RESULTS.md)
 
 ## 現在の実装範囲
 

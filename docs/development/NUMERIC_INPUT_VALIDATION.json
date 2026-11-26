@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "observed_at_utc": "2026-11-26T16:06:34.214641+00:00",
   "source_head": "2f94df459533774f83593835ba1e22d4924a3c42",
   "gui_binary_sha256": "010046c4274e761ed6d3a3889fa867e61f5eec683df8a64c0a7d8e78f18eaf21",
@@ -22,14 +22,14 @@
     "saved_value": 30.1,
     "spec_min": 0.1,
     "spec_step": 0.5,
-    "status": "source fix and four headless egui regression tests added; CI and corrected GUI run pending"
+    "status": "resolved at c44a897: all four headless widget regressions passed on Linux and Windows; corrected Linux release artifact passed actual native GUI workflow"
   },
   "saved_fixture": {
     "path": "docs/development/gui-sphere-before-numeric-fix.morph",
     "bytes": 717,
     "sha256": "1a238cd22d42e4275a2230702ccf8486df22c18209c3673d021d172b480501de"
   },
-  "known_limit": "This is evidence of an actual UI bug, not a valid exact-radius-30 model or a passing precision check.",
+  "known_limit": "The original before-fix fixture intentionally retains radius 30.1 as evidence. Existing saved values are never guessed or automatically changed. The corrected GUI fixture is separately preserved.",
   "source_fix": {
     "files": [
       "src/app.rs",
@@ -43,7 +43,7 @@
       "Convenience slider track range is independent of allowed text-input range.",
       "Round-trip formatting prevents precision loss on focus exit."
     ],
-    "tests": "four new headless egui tests; not yet executed locally (Rust unavailable)"
+    "tests": "Four headless egui tests passed on both operating systems; see CI_NUMERIC_VALIDATION.json. No local Cargo claim: Rust is absent in the recovered container."
   },
   "ci_attempts": [
     {
@@ -52,6 +52,105 @@
       "linux_job_id": 140036796232,
       "result": "fmt failed at two multiline assert formatting differences; remaining gates and Windows skipped",
       "correction": "Applied exact rustfmt diff in numeric_editor_tests.rs; no test removed or changed semantically."
+    },
+    {
+      "source_head": "c44a897a22072c6694d1dbf2233ae9557955f49e",
+      "run_id": 45857217255,
+      "linux_job_id": 140038666343,
+      "windows_job_id": 140041049976,
+      "result": "success",
+      "linux_tests": {
+        "passed": 437,
+        "failed": 0,
+        "ignored": 2,
+        "suites": 35
+      },
+      "windows_tests": {
+        "passed": 436,
+        "failed": 0,
+        "ignored": 2,
+        "suites": 35
+      },
+      "evidence": "docs/development/CI_NUMERIC_VALIDATION.json"
     }
-  ]
+  ],
+  "metadata_audit": {
+    "source_inventory": "docs/compatibility/nodes_inventory.json",
+    "registered_kinds": 299,
+    "numeric_defaults": 410,
+    "out_of_range_defaults": 0,
+    "fractional_integer_defaults": 0,
+    "scope": "Static inventory check while reviewing the UI change; not a substitute for executed widget tests or full component verification."
+  },
+  "corrected_native_validation": {
+    "recorded_at_utc": "2026-11-26T16:28:54.817072+00:00",
+    "source_head": "c44a897a22072c6694d1dbf2233ae9557955f49e",
+    "gui_binary_sha256": "d5d67bfdbc8a1db684093ab51f7f68ad370b79d67b24cedeec487ec8dadcc99c",
+    "artifact_id": 15137335621,
+    "platform": "Linux x86_64 virtual desktop, 1364 x 1024; saved app screenshot 1364 x 920",
+    "workflow": [
+      "Opened the old radius-30.1 fixture; the actual stored value remained unchanged.",
+      "Created a new empty graph through File > New; searched sphere and added Sphere. Registered default 25 remained 25; preview bounds were 50 x 50 x 50.",
+      "Typed 30 and Return: field 30 and preview bounds 60 x 60 x 60.",
+      "Pasted 30.123456 and Return; focus exit retained all six fractional digits in the Inspector.",
+      "Pasted 500 and Return; focus exit retained 500 and preview bounds were 1000 x 1000 x 1000, above the convenience slider track but within metadata range.",
+      "Ctrl+Z restored exactly 30.123456, then 30.",
+      "Dragged the Sphere, searched Output, added Output and observed the compatible connection.",
+      "Saved gui-sphere-exact.morph through the native application picker, then closed the application.",
+      "Restarted the same binary with the saved graph: both nodes, the wire, radius 30, 60 x 60 x 60 dimensions and dark theme were retained.",
+      "Edited radius 31 to obtain 62 x 62 x 62; restored 30 and saved again.",
+      "Exported binary STL at scale 1 with bed Z=0 and XY centering; dialog and completion message reported 2208 triangles.",
+      "Independently parsed the actual saved JSON and STL bytes and verified exact radius, dimensions, counts, finite values and nonzero triangle areas."
+    ],
+    "saved_graph_path": "docs/development/gui-sphere-exact.morph",
+    "screenshot_path": "docs/development/screenshots/linux-exact-radius-reopened.png",
+    "independent_file_check": {
+      "files": {
+        "gui-sphere-exact.morph": {
+          "bytes": 729,
+          "sha256": "24f1cc45d1367298420ed3e6e47d997a16f0b4a3aa1b8719d59f94723e53f36a"
+        },
+        "gui-sphere-exact.stl": {
+          "bytes": 110484,
+          "sha256": "9a177aeac2a0c49200f0c9fcd3d58a03ca7be170429611f9463c7f647e377031"
+        },
+        "gui-sphere-exact.png": {
+          "bytes": 435885,
+          "sha256": "bdfb0ad6ce527253c71cbe7864dd1f9e109fa72cd32877bad457ccbdf4f1cde0"
+        }
+      },
+      "stl": {
+        "triangles": 2208,
+        "unique_positions": 1106,
+        "bounds_mm": [
+          [
+            -30.0,
+            -30.0,
+            0.0
+          ],
+          [
+            30.0,
+            30.0,
+            60.0
+          ]
+        ],
+        "dimensions_mm": [
+          60.0,
+          60.0,
+          60.0
+        ],
+        "finite_coordinates_and_normals": true,
+        "degenerate_triangles": 0,
+        "signed_volume_mm3": 112292.23168992388,
+        "analytic_sphere_volume_mm3": 113097.33552923256,
+        "relative_tessellation_volume_error": 0.0071186808737910634
+      },
+      "png_dimensions": [
+        1364,
+        920
+      ]
+    },
+    "independent_parser_method": "Python standard-library struct unpacking of binary STL, f64 cross products for nonzero areas and f64 signed determinant summation with math.fsum. No NODES geometry code is used.",
+    "scope": "Sphere is a tessellated mesh. Its volume differs from an analytic radius-30 sphere by about 0.711868%; this is a disclosed tessellation difference, not exact B-rep or physical-print evidence. STL binary is omitted from Git; its hash, counts, bounds and the editable generating graph are retained."
+  }
 }

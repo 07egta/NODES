@@ -9,7 +9,7 @@
 | ノード選択欄の登録 | 実行したGUIで298種類を確認 |
 | Cluster | 選択欄に含めず、定義から生成する1種類 |
 | 完全実装済みノード数 | 未集計。登録には限定・近似の演算を含むため、298を完全実装数としない |
-| 機能検証 | 2f94df4の通常Linux CIで433件成功（fmt/check/strict Clippy/releaseも通過）。同じsourceのWindows432件と両バイナリreleaseも成功。旧Windows350件成功は別checkpoint。個別ノードの完全検証数とは異なる |
+| 機能検証 | c44a897aの通常CIでLinux437件・Windows436件、各0 failed / 2 ignored / 35 suites。両OSのGUI/CLI release build、Linux fmt/check/strict Clippyも成功。差1件はUnix限定FIFO回帰。4件の数値UI回帰は両OSで成功。個別ノードの完全検証数とは異なる |
 | GH期待値でVERIFIED | 0。Rhino/GHから採取した版付きoracle fixtureとの比較は未実施 |
 | GH2公式index | 取得時1419件。build 9.3.26329.6001 / export 2026-11-25T15:23:50Z。詳細未調査はUNKNOWN |
 
@@ -20,6 +20,8 @@
 - `docs/compatibility/nodes_inventory.json`: compiled registryから再生成する出力先。ID、分類、入力/出力型、既定値、範囲、アクセス規則、metadata fingerprintを記録する。生成器は [coverage_inventory.rs](examples/coverage_inventory.rs)。
 - `docs/compatibility/gh2_official_inventory.json`: 公式indexの全件出力先。生成器は [update_gh2_inventory.py](scripts/update_gh2_inventory.py)。入力portや数学的意味を名称から推測しない。
 - [TEST_RESULTS.md](TEST_RESULTS.md): 実際のコマンドと成功/失敗/未実施を記録する。
+- [CI_NUMERIC_VALIDATION.json](docs/development/CI_NUMERIC_VALIDATION.json): c44a897aの通常CIとsource/tree/artifactの記録。後続の証拠文書コミットを検証対象ソースと混同しない。
+- [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json): 実GUIで発見した数値の0.1ずれ、修正後の既定値・直接入力・保存再起動・STLの検証記録。
 
 生成器の出力にある `NOT_INFERRED` は、登録metadataから実装・互換性の合格を導いていないことを表す。GH catalog の状態とは別の欄である。
 
@@ -56,3 +58,5 @@
 - [McNeel NURBS geometry overview](https://developer.rhino3d.com/guides/opennurbs/nurbs-geometry-overview/)
 
 GH2 indexはcomponentとparameterを含む。1419をGH1の標準ノード数やNODESとの直接の互換率の分母へ転用しない。
+
+次の対応基盤は [複数出力・未知nativeノード・Nullの移行計画](docs/development/MULTI_OUTPUT_MIGRATION.md)。現在は設計段階であり、ここに挙げた機能を実装済みへ数えない。
