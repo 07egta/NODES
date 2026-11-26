@@ -151,6 +151,14 @@ Linuxネイティブ版を起動し、1364px幅のデスクトップ上で確認
 
 GUIはフォーカスを保持し、測定コマンドだけを別のbound terminalへ送った。単一の短い標本であり、起動時間・frame時間・Intel Arc・Windows性能へ一般化しない。生データと手法は [GUI_IDLE_VALIDATION.json](docs/development/GUI_IDLE_VALIDATION.json)。
 
+### 新規グラフで発見した数値入力の回帰
+
+2f94df4で空の作品を作り、日本語「円を作りたい」が円1件に絞られること、英語sphere検索、ノード追加・移動、Outputの自動接続、明示切断、手動ワイヤー接続、接続のUndo/Redo、保存を確認した。
+
+一方、Sphereの登録既定値25が表示だけで25.1になり、半径へ30と入力して保存すると30.1になった。保存済みfixtureと操作列は [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json)。原因は便宜スライダーの最小値0.1を起点とするstep0.5の丸めと、表示時にもsetterが呼ばれる設定である。入力精度を3桁に限定する経路も併せて修正する。
+
+共通の数値widgetで読み取りを無変更にし、手入力とスライダーの便宜範囲を分離し、本来のmetadata上限・有限値・整数制約を編集時に適用する修正を追加した。全登録既定値の受動描画、30 / 30.123456 / 500の実キーイベント、上下限・NaN・Infinity・整数、編集せずfocusを外した際の精度保持をheadless eguiで検査する。**この追加修正のCIと配布バイナリでのGUI確認は未完了**。先の433/432件成功を新しいソースの結果として流用しない。
+
 ## 次の必須ゲート
 
 ```sh

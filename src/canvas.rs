@@ -741,26 +741,18 @@ impl GraphCanvas {
                 {
                     // The first numeric inputs of a card are drawn as small sliders.
                     let value = m.params.entry(spec.key.into()).or_insert(default);
-                    let (low, high) =
-                        crate::app::friendly_range(spec.key, spec.min, spec.max, *value);
                     let track = Rect::from_min_size(
                         ip + egui::vec2(88., -9.) * p.zoom,
                         egui::vec2(60., 18.) * p.zoom,
                     );
                     let width = 60. * p.zoom;
-                    let slider = egui::Slider::new(&mut *value, low..=high)
+                    let slider = crate::app::parameter_slider(value, spec)
                         .show_value(false)
-                        .trailing_fill(true)
-                        .step_by(spec.step);
-                    let response = ui
-                        .scope(|ui| {
-                            ui.spacing_mut().slider_width = width;
-                            ui.put(track, slider)
-                        })
-                        .inner;
-                    if response.changed() && spec.integer {
-                        *value = value.round();
-                    }
+                        .trailing_fill(true);
+                    ui.scope(|ui| {
+                        ui.spacing_mut().slider_width = width;
+                        ui.put(track, slider)
+                    });
                     let shown = if spec.integer {
                         format!("{:.0}", *value)
                     } else {
@@ -813,13 +805,7 @@ impl GraphCanvas {
                         );
                     } else if let Some(m) = p.graph.node_mut(n.id) {
                         let value = m.params.entry(spec.key.into()).or_insert(default);
-                        let drag = egui::DragValue::new(value)
-                            .speed(spec.step)
-                            .range(spec.min..=spec.max)
-                            .max_decimals(if spec.integer { 0 } else { 3 });
-                        if ui.put(vr, drag).changed() && spec.integer {
-                            *value = value.round();
-                        }
+                        ui.put(vr, crate::app::parameter_drag_value(value, spec));
                     }
                 }
             }

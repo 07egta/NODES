@@ -15,7 +15,7 @@ use morphlet::{
     engine::{Evaluation, Evaluator},
     gcode,
     latest_channel::{self, LatestReceiver, LatestSender},
-    model::{DataType, Graph, Node, NodeId, NodeKind, Tree},
+    model::{DataType, Graph, InputSpec, Node, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
@@ -1457,14 +1457,7 @@ impl MorphletApp {
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
                                 let value = n.params.entry(input.key.into()).or_insert(default);
-                                let (low, high) =
-                                    friendly_range(input.key, input.min, input.max, *value);
-                                let slider = egui::Slider::new(value, low..=high)
-                                    .step_by(input.step)
-                                    .max_decimals(if input.integer { 0 } else { 3 });
-                                if ui.add(slider).changed() && input.integer {
-                                    *value = value.round();
-                                }
+                                ui.add(parameter_slider(value, input));
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -2546,6 +2539,58 @@ fn recovery_path() -> Option<PathBuf> {
             .map(|p| p.join("morphlet/recovery.morph"))
     }
 }
+// Reading a parameter must not quantize it or change a loaded document. The
+// metadata step is interaction speed, not an origin-offset grid of valid values.
+fn parameter_binding<'a>(
+    value: &'a mut f64,
+    spec: InputSpec,
+) -> impl FnMut(Option<f64>) -> f64 + 'a {
+    let (min, max, integer) = (spec.min, spec.max, spec.integer);
+    move |edited| {
+        if let Some(edited) = edited.filter(|number| number.is_finite()) {
+            let edited = if integer { edited.round() } else { edited };
+            *value = edited.clamp(min, max);
+        }
+        *value
+    }
+}
+
+fn parse_parameter_number(text: &str) -> Option<f64> {
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| if c == '−' { '-' } else { c })
+        .collect();
+    text.parse::<f64>().ok().filter(|number| number.is_finite())
+}
+
+pub(crate) fn parameter_slider<'a>(value: &'a mut f64, spec: &InputSpec) -> egui::Slider<'a> {
+    let (low, high) = friendly_range(spec.key, spec.min, spec.max, *value);
+    egui::Slider::from_get_set(low..=high, parameter_binding(value, *spec))
+        // The track uses a convenient range. Text entry uses the full metadata
+        // range enforced by the setter, including values beyond the track ends.
+        .clamping(egui::SliderClamping::Never)
+        .drag_value_speed(spec.step)
+        .max_decimals_opt(spec.integer.then_some(0))
+        // DragValue parses its displayed text on focus loss; a shortened decimal
+        // display would silently round a precise value even without an edit.
+        .custom_formatter(|number, _| number.to_string())
+        .custom_parser(parse_parameter_number)
+}
+
+pub(crate) fn parameter_drag_value<'a>(
+    value: &'a mut f64,
+    spec: &InputSpec,
+) -> egui::DragValue<'a> {
+    egui::DragValue::from_get_set(parameter_binding(value, *spec))
+        .speed(spec.step)
+        .range(spec.min..=spec.max)
+        .clamp_existing_to_range(false)
+        .max_decimals_opt(spec.integer.then_some(0))
+        .custom_formatter(|number, _| number.to_string())
+        .custom_parser(parse_parameter_number)
+}
+
 pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
         "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
@@ -2564,6 +2609,10 @@ pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64,
     };
     (lo.min(value).max(min), hi.max(value).min(max))
 }
+
+#[cfg(test)]
+#[path = "numeric_editor_tests.rs"]
+mod numeric_editor_tests;
 
 #[cfg(test)]
 mod tests {

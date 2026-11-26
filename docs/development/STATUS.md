@@ -1,6 +1,6 @@
 # NODES development checkpoint
 
-- Updated: 2026-11-27 01:01 JST / 2026-11-26 16:01 UTC.
+- Updated: 2026-11-27 01:11 JST / 2026-11-26 16:11 UTC.
 - Development branch: `develop/nodes-ultimate`.
 - Original base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`.
 - Main initially inspected: `79f32745923adfa9e3de05ef4683b6e3b5f4948f`. No direct main push, force push or release promotion.
@@ -66,9 +66,9 @@ A separate 12-second settled native-GUI sample on this Linux virtual desktop obs
 
 ## Current work
 
-- New-graph manual testing found a numerical UI bug at 2f94df4: a Sphere default radius 25 becomes 25.1 on display, and typing 30 saves 30.1. The slider step is anchored to its 0.1 minimum and is applied during passive rendering. A focused fix and headless egui regression are in progress in app.rs/canvas.rs; do not call this precision issue resolved until source and actual GUI checks pass. See NUMERIC_INPUT_VALIDATION.json.
+- New-graph manual testing found a numerical UI bug at 2f94df4: a Sphere default radius 25 becomes 25.1 on display, and typing 30 saves 30.1. The slider step is anchored to its 0.1 minimum and is applied during passive rendering. A focused shared numeric-widget fix and four headless egui regressions have been added in app.rs/canvas.rs/numeric_editor_tests.rs; CI and corrected-artifact GUI verification are pending; do not call this precision issue resolved until source and actual GUI checks pass. See NUMERIC_INPUT_VALIDATION.json.
 
-- Preserve final CI/GUI/CLI evidence and update Draft PR #11. Current source is 2f94df4; subsequent evidence-only commits must not be described as separately tested source unless their own Check has finished.
+- The last fully checked source is 2f94df4 (Linux433/Windows432). This checkpoint also contains a new numeric-widget source fix, which needs its own Check and actual GUI re-test. Earlier evidence-only commits are preserved at 908c668 and 38337b6.
 - Linux artifact 15134610988 was downloaded, its ZIP digest checked, and both executable hashes recorded. The repaired binaries rejected FIFO input through four entry points in 1.3–2.3 ms with preserved destination bytes. The older binary's bounded two-second blocking reproduction is retained in FIFO_VALIDATION.json.
 - `examples/interop/ai-vase.json` and `scripts/validate_cli_vase.py` passed eight commands again with the 2f94df4 console binary. An independent STL parser checked 5,906 unique positions, 11,808 nonzero triangles, 590,484 bytes and 104 mm height, plus determinant volume against the CLI within the documented tolerance. See CLI_VASE_VALIDATION.json.
 - GUI layout/focus correction is actually retested, not pending. Windows all-target tests/build/artifact also passed. Additional new-graph GUI testing then exposed the separate numeric input issue below.

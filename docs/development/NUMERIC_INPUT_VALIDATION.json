@@ -22,12 +22,27 @@
     "saved_value": 30.1,
     "spec_min": 0.1,
     "spec_step": 0.5,
-    "status": "source fix and regression tests in progress"
+    "status": "source fix and four headless egui regression tests added; CI and corrected GUI run pending"
   },
   "saved_fixture": {
     "path": "docs/development/gui-sphere-before-numeric-fix.morph",
     "bytes": 717,
     "sha256": "1a238cd22d42e4275a2230702ccf8486df22c18209c3673d021d172b480501de"
   },
-  "known_limit": "This is evidence of an actual UI bug, not a valid exact-radius-30 model or a passing precision check."
+  "known_limit": "This is evidence of an actual UI bug, not a valid exact-radius-30 model or a passing precision check.",
+  "source_fix": {
+    "files": [
+      "src/app.rs",
+      "src/canvas.rs",
+      "src/numeric_editor_tests.rs"
+    ],
+    "approach": [
+      "Getter never clamps or quantizes existing values.",
+      "Setter applies metadata bounds, finite-value check and integer rounding only to edits.",
+      "Float step becomes drag speed rather than an offset quantization grid.",
+      "Convenience slider track range is independent of allowed text-input range.",
+      "Round-trip formatting prevents precision loss on focus exit."
+    ],
+    "tests": "four new headless egui tests; not yet executed locally (Rust unavailable)"
+  }
 }

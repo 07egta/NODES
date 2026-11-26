@@ -103,6 +103,8 @@ canvasにはzoom/pan、可視nodeの描画抑制、wireの索引、minimap、検
 
 Inspectorの入力行はnode IDとport keyに基づく明示UI scopeを持ち、その内部に通常のhorizontal行を置く。上に評価エラーが追加されても入力focusを保ち、残り縦領域を行の高さとして消費しない。ドラッグは1回の履歴にまとまるが、複数フレームの文字入力は各変更をUndoする。
 
+数値widgetは共通bindingを使う。getterは保存値を変更せず、setterのみ本来のInputSpec範囲・有限値・整数制約を適用する。操作しやすいslider trackの範囲は手入力可能範囲と分け、実数stepは入力操作の速度として使う。表示を再解析して小数を失わないよう、編集表示は往復可能な文字列表現を用いる。
+
 ## ライセンスと拡張
 
 projectのMIT OR Apache-2.0方針を維持する。GPL/LGPL/AGPL依存を新規採用しない。依存宣言と実際の配布本文・対象platformの照合は [DEPENDENCIES](DEPENDENCIES.md) で範囲と未調査を記す。既存の他ライセンス宣言を隠さない。
