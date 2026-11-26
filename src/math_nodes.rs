@@ -1556,6 +1556,10 @@ fn matrix_shape(data: &[f64], rows: usize, cols: usize) -> Result<(), String> {
 }
 /// Scaled partial-pivot Gauss-Jordan elimination on an augmented system.
 /// Returns the right block in row-major order. Rejects numerically tiny pivots.
+/// Large rows are normalized before elimination to avoid overflowing subtraction
+/// in otherwise well-conditioned systems. Small rows are not scaled up: doing so
+/// can overflow a right-hand side whose final solution is still representable.
+/// This is finite-precision arithmetic, not universal overflow immunity.
 fn eliminate(
     a: &[f64],
     rhs: &[f64],
@@ -1567,18 +1571,38 @@ fn eliminate(
     matrix_shape(rhs, size, cols)?;
     let w = size + cols;
     let mut aug = vec![0.0; size * w];
-    let mut scales = vec![0.0_f64; size];
+    let mut scales = vec![0.0; size];
     for i in 0..size {
         cancelled(stop)?;
-        for j in 0..size {
-            let v = a[i * size + j];
-            aug[i * w + j] = v;
-            scales[i] = scales[i].max(v.abs());
-        }
-        if scales[i] == 0.0 {
+        let scale = a[i * size..(i + 1) * size]
+            .iter()
+            .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+        if scale == 0.0 {
             return Err("行列が特異です。".into());
         }
-        aug[i * w + size..(i + 1) * w].copy_from_slice(&rhs[i * cols..(i + 1) * cols]);
+        let proposed = scale.max(1.0);
+        // A nonzero subnormal quotient can still lose significant precision,
+        // e.g. 1e-15 / 1e308 rounding to 1e-323. Keep the original row when a
+        // division/multiplication round-trip loses meaningful relative precision.
+        // This local range check is not a condition estimate for the whole solve.
+        let safe_to_normalize = a[i * size..(i + 1) * size]
+            .iter()
+            .chain(&rhs[i * cols..(i + 1) * cols])
+            .all(|value| {
+                if *value == 0.0 {
+                    return true;
+                }
+                let restored = (*value / proposed) * proposed;
+                restored.is_finite() && ((restored - *value) / *value).abs() <= 16.0 * f64::EPSILON
+            });
+        let normalizer = if safe_to_normalize { proposed } else { 1.0 };
+        scales[i] = scale / normalizer;
+        for j in 0..size {
+            aug[i * w + j] = a[i * size + j] / normalizer;
+        }
+        for j in 0..cols {
+            aug[i * w + size + j] = rhs[i * cols + j] / normalizer;
+        }
     }
     for k in 0..size {
         cancelled(stop)?;
@@ -1588,6 +1612,8 @@ fn eliminate(
                 pivot = i;
             }
         }
+        // Use actual post-normalization scales, retaining the relative threshold
+        // for small rows without comparing large rows against obsolete maxima.
         if aug[pivot * w + k].abs() / scales[pivot] <= 1e-12 {
             return Err("行列が特異、または数値的に不安定です。".into());
         }

@@ -183,7 +183,9 @@ fn fixture(case: Case) -> Result<Graph, String> {
                 .collect::<Result<Vec<_>, _>>()?;
             while level.len() > 1 {
                 level = level
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|pair| append(&mut graph, &add, &[("a", pair[0]), ("b", pair[1])]))
                     .collect::<Result<Vec<_>, _>>()?;
             }

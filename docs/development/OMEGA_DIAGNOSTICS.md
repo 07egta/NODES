@@ -154,3 +154,67 @@ The native desktop is available through Xfce, although the ordinary command shel
 has no display variables. GUI launch and interaction will use that desktop after
 the rebuilt binary is ready. Additional diagnostic-list navigation and an
 independent BFS oracle are being developed in the same workstream.
+
+## Functional checkpoint 3: searchable diagnosis and extreme-scale matrices
+
+The optimized diagnostic core and benchmark protocol are remotely preserved at
+`7c1a0956adb8edcc29945717a6eb32e0d6335be3`.
+
+- Diagnostic lists now offer independent 100-row pages and a name or exact `#ID`
+  filter. Japanese kana/width normalization follows the existing search rules.
+  Filtering uses live renamed nodes without re-evaluation, resets/clamps pages,
+  and keeps exact filtered/total counts. The 101st failure remains reachable.
+- A separate breadth-first oracle verifies diagnostic roots and affected IDs on
+  four deterministic real-evaluator DAGs, including reordered storage, shuffled
+  IDs, disabled nodes and successful nodes that interrupt a failure chain.
+- Fixed `LinearSolve` and `MatrixInverse` rejecting a finite well-conditioned
+  system when raw row subtraction overflowed. For example, `1e308 * [[1,1],
+  [1,-1]]` with RHS `[1e308,0]` now returns `[0.5,0.5]`; its inverse is finite.
+  Large rows are downscaled only when every coefficient and RHS survives a
+  division/multiplication round trip within 16 machine epsilons. Small rows are
+  left unchanged. This preserves meaningful subnormal answers and the existing
+  relative pivot rejection rule. It does not solve arbitrary conditioning or
+  eliminate every possible intermediate overflow.
+- The initial normalization audit caught a second issue: merely rejecting zero
+  underflow still allowed a nonzero subnormal RHS to lose about 1.2% precision.
+  The round-trip guard and an analytic regression protect that case as well.
+- Local all-target tests with compact debug settings completed: **460 passed,
+  0 failed, 2 ignored, 38 suites**. That run includes the new UI/oracle tests but
+  preceded the last numerical guard. A subsequent focused run on the final
+  numerical edit passed all **18 tests** across linear algebra, math nodes and
+  existing precision regressions. A final whole-tree run remains to be done.
+- Remote Check run `45911036122` on `7c1a095` passed formatting and all-target
+  compilation, then failed strict Clippy on the new benchmark's fixed-size
+  `chunks_exact(2)`. The harness now uses `as_chunks::<2>()`; no lint suppression
+  or CI weakening was added. Windows was skipped after the Linux lint failure.
+- Native NODES launched and rendered the six-node diagnostic fixture in Xfce.
+  Four runtime failures, one success and one disabled node were visible. Mouse
+  interaction has not yet been verified; launching a window alone is not a
+  completed GUI workflow test.
+
+### Numerical references and design decision
+
+LAPACK's public [DGEEQU documentation](https://netlib.org/lapack/explore-html/d5/d8a/group__geequ_ga7238812c5c26fc2fbe8bbbc22b6ee885.html)
+describes row/column equilibration and its range bounds. The
+[DGESVX documentation](https://netlib.org/lapack/explore-html/d5/dbe/group__gesvx_ga82173a93234afc15d70b64233b3e5bc8.html)
+explains consistent scaling of coefficients and right-hand sides. NODES uses
+these public numerical principles with its existing small dense Rust solver;
+it does not add LAPACK, copy its implementation or claim its full condition
+estimation/refinement guarantees. Direct division avoids an overflowing
+reciprocal, while a local precision guard preserves the existing range where
+normalization would be lossy. Six new tests include analytic solutions, inverse
+identities, pivot swaps, mixed `1e±300` rows, smallest subnormals, singular and
+nonfinite inputs, cooperative cancellation and actual evaluator/cache reuse.
+
+### Parallel development refresh
+
+A subsequent GitHub refresh found new PR #20 (`feat/omega-graph-diagnostics`) and
+PR #21 (`feat/omega-semantic-project-diff`) created by other workstreams after
+this branch's first checkpoint. PR #20 currently adds a separate
+`graph_diagnostics` module and CLI command on the modeling branch; PR #21 adds a
+Python project-diff script on main. They must be compared before integrating
+either branch. Our exploratory Rust project-diff work is isolated in a separate
+local worktree and is not yet published as another competing PR. Its owner and
+the independent reviewer have switched to overlap/contract comparison. PR #16
+continues to own curve/surface and legacy data-tree corrections; those files
+remain outside this workstream.

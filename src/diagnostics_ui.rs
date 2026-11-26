@@ -17,6 +17,9 @@ pub struct DiagnosticsWindow {
     pub open: bool,
     timings: bool,
     show_cached: bool,
+    query: String,
+    /// Root, blocked, disabled, unevaluated and hotspot pages are independent.
+    pages: [usize; 5],
     node_index: BTreeMap<NodeId, usize>,
     index_revision: Option<u64>,
 }
@@ -42,6 +45,7 @@ impl DiagnosticsWindow {
                 .map(|(index, node)| (node.id, index))
                 .collect();
             self.index_revision = Some(revision);
+            self.pages = [0; 5];
         }
         let nodes = IndexedNodes {
             graph,
@@ -101,6 +105,25 @@ impl DiagnosticsWindow {
                     ui.selectable_value(&mut self.timings, false, "入力とエラー");
                     ui.selectable_value(&mut self.timings, true, "処理時間");
                 });
+                ui.horizontal(|ui| {
+                    let changed = ui
+                        .add(
+                            egui::TextEdit::singleline(&mut self.query)
+                                .id(egui::Id::new("diagnostics_query"))
+                                .hint_text("名前で絞り込む / #123 で ID")
+                                .char_limit(160)
+                                .desired_width((ui.available_width() - 55.).max(120.)),
+                        )
+                        .changed();
+                    let cleared = !self.query.is_empty() && ui.small_button("クリア").clicked();
+                    if cleared {
+                        self.query.clear();
+                    }
+                    if changed || cleared {
+                        self.pages = [0; 5];
+                    }
+                });
+                let filter = NodeFilter::new(&self.query);
                 ui.separator();
                 egui::ScrollArea::vertical()
                     .id_salt("diagnostics_scroll")
@@ -108,10 +131,18 @@ impl DiagnosticsWindow {
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         if self.timings {
-                            selected =
-                                show_timings(ui, report, &nodes, stale, &mut self.show_cached);
+                            selected = show_timings(
+                                ui,
+                                report,
+                                &nodes,
+                                stale,
+                                &mut self.show_cached,
+                                &filter,
+                                &mut self.pages[4],
+                            );
                         } else {
-                            selected = show_errors(ui, report, &nodes, stale);
+                            selected =
+                                show_errors(ui, report, &nodes, stale, &filter, &mut self.pages);
                         }
                     });
             });
@@ -136,12 +167,101 @@ impl IndexedNodes<'_> {
     }
 }
 
+enum NodeFilter {
+    All,
+    Id(Option<NodeId>),
+    Name(String),
+}
+
+impl NodeFilter {
+    fn new(query: &str) -> Self {
+        let query = ui_polish::normalize(query.trim());
+        if query.is_empty() {
+            Self::All
+        } else if let Some(id) = query.strip_prefix('#') {
+            Self::Id(id.trim().parse().ok())
+        } else {
+            Self::Name(query)
+        }
+    }
+
+    fn matches(&self, node: &NodeRef, nodes: &IndexedNodes<'_>) -> bool {
+        match self {
+            Self::All => true,
+            Self::Id(id) => *id == Some(node.id),
+            Self::Name(query) => {
+                let name = nodes
+                    .node(node.id)
+                    .map_or(node.name.as_str(), |node| node.name.as_str());
+                ui_polish::normalize(name).contains(query)
+            }
+        }
+    }
+}
+
+fn matching_indices<T>(
+    items: &[T],
+    node: impl Fn(&T) -> &NodeRef,
+    nodes: &IndexedNodes<'_>,
+    filter: &NodeFilter,
+) -> Vec<usize> {
+    items
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| filter.matches(node(item), nodes).then_some(index))
+        .collect()
+}
+
+fn page_range(count: usize, page: &mut usize) -> std::ops::Range<usize> {
+    *page = (*page).min(count.saturating_sub(1) / MAX_VISIBLE_ROWS);
+    let start = *page * MAX_VISIBLE_ROWS;
+    start..(start + MAX_VISIBLE_ROWS).min(count)
+}
+
+fn page_controls(
+    ui: &mut egui::Ui,
+    id: &'static str,
+    page: &mut usize,
+    matched: usize,
+    total: usize,
+) -> std::ops::Range<usize> {
+    let range = page_range(matched, page);
+    ui.push_id(id, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(theme::small(format!("該当 {matched} 件 / 全 {total} 件")));
+            if matched > MAX_VISIBLE_ROWS {
+                if ui
+                    .add_enabled(*page > 0, egui::Button::new("前の100件").small())
+                    .clicked()
+                {
+                    *page -= 1;
+                }
+                if ui
+                    .add_enabled(range.end < matched, egui::Button::new("次の100件").small())
+                    .clicked()
+                {
+                    *page += 1;
+                }
+                let current = page_range(matched, page);
+                ui.label(theme::small(format!(
+                    "{}–{} 件目",
+                    current.start + 1,
+                    current.end
+                )));
+            }
+        });
+    });
+    page_range(matched, page)
+}
+
 fn show_timings(
     ui: &mut egui::Ui,
     report: &DiagnosticReport,
     nodes: &IndexedNodes<'_>,
     stale: bool,
     show_cached: &mut bool,
+    filter: &NodeFilter,
+    page: &mut usize,
 ) -> Option<NodeId> {
     ui.label(RichText::new("時間のかかったノード").strong());
     ui.label(theme::small(
@@ -150,19 +270,32 @@ fn show_timings(
     ui.label(theme::small(
         "割合は測定できた有効ノードの時間合計に対する値です。CPU 使用率ではありません。",
     ));
-    ui.checkbox(show_cached, "キャッシュから再利用したノードも表示");
+    if ui
+        .checkbox(show_cached, "キャッシュから再利用したノードも表示")
+        .changed()
+    {
+        *page = 0;
+    }
     ui.add_space(5.);
     let mut selected = None;
-    let mut matching = 0;
-    for hotspot in report
+    let matching: Vec<_> = report
         .hotspots
         .iter()
-        .filter(|hotspot| *show_cached || !hotspot.cached)
-    {
-        matching += 1;
-        if matching > MAX_VISIBLE_ROWS {
-            continue;
-        }
+        .enumerate()
+        .filter_map(|(index, hotspot)| {
+            ((*show_cached || !hotspot.cached) && filter.matches(&hotspot.node, nodes))
+                .then_some(index)
+        })
+        .collect();
+    let range = page_controls(
+        ui,
+        "hotspot_pages",
+        page,
+        matching.len(),
+        report.hotspots.len(),
+    );
+    for &index in &matching[range] {
+        let hotspot = &report.hotspots[index];
         ui.push_id(("hotspot", hotspot.node.id), |ui| {
             ui.horizontal_wrapped(|ui| {
                 if node_link(ui, nodes, &hotspot.node, stale) {
@@ -180,14 +313,15 @@ fn show_timings(
             });
         });
     }
-    if matching == 0 {
+    if matching.is_empty() {
         ui.label(theme::small(if report.hotspots.is_empty() {
             "表示できるノードの計測結果はありません。"
-        } else {
+        } else if !*show_cached && report.hotspots.iter().all(|hotspot| hotspot.cached) {
             "すべて再利用されました。チェックを付けると取得時間を確認できます。"
+        } else {
+            "絞り込みに一致するノードはありません。"
         }));
     }
-    hidden_rows(ui, matching);
     selected
 }
 
@@ -210,6 +344,8 @@ fn show_errors(
     report: &DiagnosticReport,
     nodes: &IndexedNodes<'_>,
     stale: bool,
+    filter: &NodeFilter,
+    pages: &mut [usize; 5],
 ) -> Option<NodeId> {
     let mut selected = None;
     if let Some(error) = &report.graph_error {
@@ -228,7 +364,21 @@ fn show_errors(
         ui.label(theme::small(
             "接続関係から上流の候補を絞っています。下流ノードにも別の入力問題がある場合があります。",
         ));
-        for failure in report.root_failures.iter().take(MAX_VISIBLE_ROWS) {
+        let matching = matching_indices(
+            &report.root_failures,
+            |failure| &failure.node,
+            nodes,
+            filter,
+        );
+        let range = page_controls(
+            ui,
+            "root_pages",
+            &mut pages[0],
+            matching.len(),
+            report.root_failures.len(),
+        );
+        for &index in &matching[range] {
+            let failure = &report.root_failures[index];
             ui.push_id(("root_error", failure.node.id), |ui| {
                 egui::Frame::new()
                     .fill(theme::error_fill())
@@ -245,11 +395,16 @@ fn show_errors(
                             )));
                         });
                         ui.label(RichText::new(&failure.message).color(theme::error()));
+                        if failure.message_truncated {
+                            ui.label(theme::small("長いメッセージの一部を省略しています。"));
+                        }
                     });
                 ui.add_space(5.);
             });
         }
-        hidden_rows(ui, report.root_failures.len());
+        if matching.is_empty() {
+            ui.label(theme::small("絞り込みに一致する原因候補はありません。"));
+        }
     } else if report.summary.failed_count == 0
         && report.summary.complete
         && !report.summary.cancelled
@@ -262,36 +417,62 @@ fn show_errors(
 
     if !report.blocked_nodes.is_empty() {
         ui.add_space(8.);
+        let matching = matching_indices(
+            &report.blocked_nodes,
+            |failure| &failure.node,
+            nodes,
+            filter,
+        );
         egui::CollapsingHeader::new(format!(
-            "上流にエラーがあるノード · {} 件",
+            "上流にエラーがあるノード · 該当 {} / 全 {} 件",
+            matching.len(),
             report.blocked_nodes.len()
         ))
         .id_salt("diagnostics_blocked")
         .show(ui, |ui| {
-            for failure in report.blocked_nodes.iter().take(MAX_VISIBLE_ROWS) {
+            let range = page_controls(
+                ui,
+                "blocked_pages",
+                &mut pages[1],
+                matching.len(),
+                report.blocked_nodes.len(),
+            );
+            for &index in &matching[range] {
+                let failure = &report.blocked_nodes[index];
                 if let Some(id) = blocked_failure(ui, report, failure, nodes, stale) {
                     selected = Some(id);
                 }
             }
-            hidden_rows(ui, report.blocked_nodes.len());
+            if matching.is_empty() {
+                ui.label(theme::small("絞り込みに一致するノードはありません。"));
+            }
         });
     }
 
-    for (label, group) in [
-        ("無効なノード", &report.disabled_nodes),
-        ("未計算のノード", &report.unevaluated_nodes),
+    for (label, group, page) in [
+        ("無効なノード", &report.disabled_nodes, 2),
+        ("未計算のノード", &report.unevaluated_nodes, 3),
     ] {
         if !group.is_empty() {
-            egui::CollapsingHeader::new(format!("{label} · {} 件", group.len()))
-                .id_salt(("diagnostics_state", label))
-                .show(ui, |ui| {
-                    for node in group.iter().take(MAX_VISIBLE_ROWS) {
-                        if node_link(ui, nodes, node, stale) {
-                            selected = Some(node.id);
-                        }
+            let matching = matching_indices(group, |node| node, nodes, filter);
+            egui::CollapsingHeader::new(format!(
+                "{label} · 該当 {} / 全 {} 件",
+                matching.len(),
+                group.len()
+            ))
+            .id_salt(("diagnostics_state", label))
+            .show(ui, |ui| {
+                let range = page_controls(ui, label, &mut pages[page], matching.len(), group.len());
+                for &index in &matching[range] {
+                    let node = &group[index];
+                    if node_link(ui, nodes, node, stale) {
+                        selected = Some(node.id);
                     }
-                    hidden_rows(ui, group.len());
-                });
+                }
+                if matching.is_empty() {
+                    ui.label(theme::small("絞り込みに一致するノードはありません。"));
+                }
+            });
         }
     }
     selected
@@ -310,6 +491,9 @@ fn blocked_failure(
             selected = Some(failure.node.id);
         }
         ui.label(theme::small(&failure.message));
+        if failure.message_truncated {
+            ui.label(theme::small("長いメッセージの一部を省略しています。"));
+        }
         ui.horizontal_wrapped(|ui| {
             ui.label(theme::small("上流の原因候補:"));
             for id in failure.upstream_roots.iter().take(8) {
@@ -324,7 +508,7 @@ fn blocked_failure(
         });
         if failure.upstream_root_count > failure.upstream_roots.len().min(8) {
             ui.label(theme::small(format!(
-                "ほか {} 件の上流候補があります。候補一覧で確認できます。",
+                "ほか {} 件の上流候補があります。",
                 failure.upstream_root_count - failure.upstream_roots.len().min(8)
             )));
         }
@@ -347,15 +531,6 @@ fn node_link(ui: &mut egui::Ui, nodes: &IndexedNodes<'_>, node: &NodeRef, stale:
         node.kind.spec().label
     ))
     .clicked()
-}
-
-fn hidden_rows(ui: &mut egui::Ui, count: usize) {
-    if count > MAX_VISIBLE_ROWS {
-        ui.label(theme::small(format!(
-            "先頭 {MAX_VISIBLE_ROWS} 件を表示（ほか {} 件）",
-            count - MAX_VISIBLE_ROWS
-        )));
-    }
 }
 
 #[cfg(test)]
@@ -410,5 +585,75 @@ mod tests {
             .node(first)
             .is_none()
         );
+    }
+
+    #[test]
+    fn the_101st_root_is_reachable_by_page_and_exact_id_filter() {
+        let mut graph = Graph::default();
+        for _ in 0..101 {
+            let id = graph.add(NodeKind::Divide, [0.; 2]).unwrap();
+            graph.node_mut(id).unwrap().params.insert("b".into(), 0.);
+        }
+        let evaluation = Evaluator::default().evaluate(&graph, &|| false);
+        let report = diagnose(&graph, &evaluation);
+        assert_eq!(report.root_failures.len(), 101);
+        let indices = graph
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| (node.id, index))
+            .collect();
+        let nodes = IndexedNodes {
+            graph: &graph,
+            indices: &indices,
+        };
+        let matching = matching_indices(
+            &report.root_failures,
+            |failure| &failure.node,
+            &nodes,
+            &NodeFilter::All,
+        );
+        let mut page = 1;
+        let range = page_range(matching.len(), &mut page);
+        assert_eq!(range, 100..101);
+        assert_eq!(report.root_failures[matching[range.start]].node.id, 100);
+        let filtered = matching_indices(
+            &report.root_failures,
+            |failure| &failure.node,
+            &nodes,
+            &NodeFilter::new("＃１００"),
+        );
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(report.root_failures[filtered[0]].node.id, 100);
+        assert_eq!(page_range(filtered.len(), &mut page), 0..1);
+        assert_eq!(page, 0);
+        assert_eq!(page_range(0, &mut page), 0..0);
+    }
+
+    #[test]
+    fn name_filter_uses_live_renames_without_new_diagnosis() {
+        let mut graph = Graph::default();
+        let id = graph.add(NodeKind::Divide, [0.; 2]).unwrap();
+        graph.nodes[0].params.insert("b".into(), 0.);
+        graph.nodes[0].name = "Before Rename".into();
+        let evaluation = Evaluator::default().evaluate(&graph, &|| false);
+        let report = diagnose(&graph, &evaluation);
+        let indices = BTreeMap::from([(id, 0)]);
+        graph.nodes[0].name = "After カナ".into();
+        let nodes = IndexedNodes {
+            graph: &graph,
+            indices: &indices,
+        };
+        let find = |query: &str| {
+            matching_indices(
+                &report.root_failures,
+                |failure| &failure.node,
+                &nodes,
+                &NodeFilter::new(query),
+            )
+        };
+        assert!(find("Before").is_empty());
+        assert_eq!(find("AFTER かな"), vec![0]);
+        assert!(find("#invalid").is_empty());
     }
 }
