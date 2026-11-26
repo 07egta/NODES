@@ -1,7 +1,7 @@
 use crate::file_picker::{FilePicker, FileTask, PickerEvent};
 use crate::stl_export_ui::{self, StlExportUi, StlSources, UiRequest};
 use crate::{
-    canvas::GraphCanvas,
+    canvas::{GraphCanvas, WireLink},
     data_view,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
@@ -139,6 +139,7 @@ pub struct MorphletApp {
     import_target: Option<NodeId>,
     /// Node whose output wire was dropped on empty canvas; the search connects to it.
     wire_source: Option<NodeId>,
+    wire_insert: Option<WireLink>,
     /// Nodes added recently, shown first in the search popup.
     recent: Recent,
     /// Highlighted row of the search popup (↑ ↓ move it, Enter adds it).
@@ -232,6 +233,7 @@ impl MorphletApp {
             values_open: false,
             import_target: None,
             wire_source: None,
+            wire_insert: None,
             recent: Recent::default(),
             palette_cursor: 0,
             shortcuts_open: false,
@@ -395,6 +397,7 @@ impl MorphletApp {
             self.project = project;
             self.clipboard.clear();
             self.wire_source = None;
+            self.wire_insert = None;
             self.palette_open = false;
             self.file_path = path;
             self.dirty = false;
@@ -570,6 +573,7 @@ impl MorphletApp {
     fn add_node(&mut self, kind: NodeKind, position: Option<[f32; 2]>) {
         // A wire dropped on the canvas takes precedence over the selection.
         let wire = self.wire_source.take();
+        let insert = self.wire_insert.take();
         let selected = self.canvas.selected.iter().next_back().copied();
         let at = position.unwrap_or_else(|| {
             selected
@@ -577,45 +581,23 @@ impl MorphletApp {
                 .map(|n| [n.position[0] + 280., n.position[1] + 40.])
                 .unwrap_or_else(|| self.canvas.center_for_add(&self.project))
         });
-        match self.project.graph.add(kind, at) {
-            Ok(id) => {
-                if let Some(source) = wire {
-                    let output = self
-                        .project
-                        .graph
-                        .node(source)
-                        .map(|n| n.kind.spec().output);
-                    match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
-                        Some(key) => {
-                            if let Err(e) = self.project.graph.connect(source, id, key) {
-                                // Keep a wire-drop operation transactional: never leave a half-added node.
-                                self.project.graph.remove(id);
-                                self.notify(e, true);
-                                self.palette_open = false;
-                                return;
-                            }
-                        }
-                        None => {
-                            self.project.graph.remove(id);
-                            self.notify("接続できる入力がありません。別のノードを選んでください。", true);
-                            self.palette_open = false;
-                            return;
-                        }
-                    }
-                } else if let Some(source) = selected {
-                    let output = self
-                        .project
-                        .graph
-                        .node(source)
-                        .map(|n| n.kind.spec().output);
-                    if let Some(port) =
-                        kind.spec().inputs.iter().find(|s| {
-                            s.default.is_none() && output.is_some_and(|t| s.kind.accepts(t))
-                        })
+        let result = if let Some(source) = wire {
+            add_on_wire(&mut self.project.graph, source, insert.as_ref(), kind, at)
+        } else {
+            self.project.graph.add(kind, at).map(|id| {
+                if let Some(source) = selected {
+                    let output = self.project.graph.node(source).map(|n| n.kind.spec().output);
+                    if let Some(port) = kind.spec().inputs.iter().find(|s|
+                        s.default.is_none() && output.is_some_and(|t| s.kind.accepts(t)))
                     {
                         let _ = self.project.graph.connect(source, id, port.key);
                     }
                 }
+                id
+            })
+        };
+        match result {
+            Ok(id) => {
                 self.recent.push(kind);
                 self.canvas.select_only(id);
                 self.palette_open = false;
@@ -715,6 +697,7 @@ impl MorphletApp {
     }
     fn open_palette(&mut self, at: [f32; 2], source: Option<NodeId>) {
         self.wire_source = source;
+        self.wire_insert = None;
         self.palette_open = true;
         self.palette_focus = true;
         self.palette_position = at;
@@ -1454,6 +1437,10 @@ impl MorphletApp {
                 if let Some(at) = outcome.add_at {
                     self.open_palette(at, None);
                 }
+                if let Some((link, at)) = outcome.insert_wire {
+                    self.open_palette(at, Some(link.from));
+                    self.wire_insert = Some(link);
+                }
                 if let Some((from, at)) = outcome.drop_wire {
                     // Released on empty canvas: search, then connect the chosen node to `from`.
                     self.open_palette(at, Some(from));
@@ -1465,6 +1452,7 @@ impl MorphletApp {
     fn palette(&mut self, ctx: &egui::Context) {
         if !self.palette_open {
             self.wire_source = None;
+            self.wire_insert = None;
             self.palette_ime = false;
             return;
         }
@@ -1474,6 +1462,9 @@ impl MorphletApp {
         let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
         let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
         let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
+        let target_type = self.wire_insert.as_ref().and_then(|link|
+            self.project.graph.node(link.to).and_then(|n|
+                n.kind.spec().inputs.iter().find(|p| p.key == link.input).map(|p| p.kind)));
         let mut ime_event = false;
         ctx.input(|i| {
             for event in &i.events {
@@ -1511,7 +1502,13 @@ impl MorphletApp {
                 if let Some(name) = &wire_name {
                     ui.label(theme::small(format!("{} · {} と接続できる候補のみ", name, wire_type.map(DataType::label).unwrap_or("データ"))));
                 }
-                let matches = ui_polish::rank(&ordered, &self.palette_query, &self.recent, wire_type);
+                if self.wire_insert.is_some() {
+                    ui.label(theme::small(format!("ワイヤーに挿入 · 接続先: {}", target_type.map(DataType::label).unwrap_or("不明"))));
+                }
+                let mut matches = ui_polish::rank(&ordered, &self.palette_query, &self.recent, wire_type);
+                if self.wire_insert.is_some() {
+                    matches.retain(|kind| target_type.is_some_and(|t| t.accepts(kind.spec().output)));
+                }
                 let last = matches.len().saturating_sub(1);
                 if down && !r.changed() { self.palette_cursor = (self.palette_cursor + 1).min(last); }
                 if up && !r.changed() { self.palette_cursor = self.palette_cursor.saturating_sub(1); }
@@ -1991,6 +1988,28 @@ impl eframe::App for MorphletApp {
 /// Copies the chosen subgraph atomically. A duplicate retains upstream links;
 /// a paste only retains links inside the copied selection. Cluster definitions remain
 /// document-local, so a stale/missing definition causes validation to fail.
+/// Insert a node into a specific existing edge, or append one to a source.
+//// Work on a candidate graph so failures also leave the ID counter unchanged.
+fn add_on_wire(graph: &mut Graph, source: NodeId, insert: Option<&WireLink>, kind: NodeKind, at: [f32; 2]) -> Result<NodeId, String> {
+    let source_type = graph.node(source).ok_or("接続元が見つかりません。")?.kind.spec().output;
+    let port = ui_polish::first_compatible_input(kind, source_type)
+        .ok_or("このノードに接続できる入力がありません。")?;
+    if let Some(link) = insert {
+        if source != link.from || graph.node(link.to).and_then(|n| n.inputs.get(&link.input)) != Some(&source) {
+            return Err("挿入先のワイヤーが変更されています。".into());
+        }
+    }
+    let mut candidate = graph.clone();
+    let id = candidate.add(kind, at)?;
+    candidate.connect(source, id, port)?;
+    if let Some(link) = insert {
+        candidate.connect(id, link.to, &link.input)?;
+    }
+    candidate.validate()?;
+    *graph = candidate;
+    Ok(id)
+}
+
 fn insert_nodes(graph: &mut Graph, nodes: &[Node], offset: [f32; 2], retain_external: bool) -> Result<BTreeSet<NodeId>, String> {
     if nodes.len() > morphlet::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
         return Err("ノード数の上限を超えるため追加できません。".into());
@@ -2205,5 +2224,26 @@ mod tests {
         assert!(evaluation.outputs[&id].is_err());
         let trees = collect_export_trees(&p.graph, &evaluation, &Default::default()).unwrap();
         assert_eq!(persistence::mesh_stats(&trees).unwrap().mesh_count, 1);
+    }
+}
+
+#[cfg(test)]
+mod wire_insert_tests {
+    use super::*;
+    #[test]
+    fn insertion_keeps_both_edges_and_rejects_incompatible_nodes() {
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let target = graph.add(NodeKind::Add, [600., 0.]).unwrap();
+        let key = NodeKind::Add.spec().inputs[0].key;
+        graph.connect(source, target, key).unwrap();
+        let link = WireLink { from: source, to: target, input: key.into() };
+        let before = graph.clone();
+        assert!(add_on_wire(&mut graph, source, Some(&link), NodeKind::Circle, [300., 0.]).is_err());
+        assert_eq!(graph.next_id, before.next_id);
+        assert_eq!(graph.node(target).unwrap().inputs.get(key), Some(&source));
+        let id = add_on_wire(&mut graph, source, Some(&link), NodeKind::Add, [300., 0.]).unwrap();
+        assert_eq!(graph.node(id).unwrap().inputs.get(key), Some(&source));
+        assert_eq!(graph.node(target).unwrap().inputs.get(key), Some(&id));
     }
 }
