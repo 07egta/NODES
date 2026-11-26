@@ -498,16 +498,28 @@ mod tests {
         crate::annotations::add_group(&mut graph, &[0, 1], "sources").unwrap();
         crate::annotations::add_group(&mut graph, &[1], "second").unwrap();
         let original_next_id = graph.next_id;
-        let default = NodeKind::Number.spec().inputs.iter()
-            .find(|p| p.key == "value").unwrap().default.unwrap();
-        let request = parse_request(br#"{"api_version":1,"edits":[
+        let default = NodeKind::Number
+            .spec()
+            .inputs
+            .iter()
+            .find(|p| p.key == "value")
+            .unwrap()
+            .default
+            .unwrap();
+        let request = parse_request(
+            br#"{"api_version":1,"edits":[
             {"op":"disconnect","to":"2","input":"a"},
             {"op":"reset","node":"0","input":"value"},
             {"op":"move","node":"0","position":[125,-50]},
             {"op":"remove","node":"1"}
-        ]}"#).unwrap();
+        ]}"#,
+        )
+        .unwrap();
         let aliases = apply(&mut graph, &request).unwrap();
-        assert_eq!(aliases.keys().map(String::as_str).collect::<Vec<_>>(), vec!["0", "2"]);
+        assert_eq!(
+            aliases.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["0", "2"]
+        );
         assert_eq!(graph.node(0).unwrap().params["value"], default);
         assert_eq!(graph.node(0).unwrap().position, [125., -50.]);
         assert!(graph.node(1).is_none());
@@ -523,13 +535,13 @@ mod tests {
         let mut graph = build(&parse_request(SAMPLE).unwrap()).unwrap().graph;
         let before = graph.clone();
         for bytes in [
-            br#"{"api_version":1,"edits":[{"op":"remove","node":"0"},{"op":"move","node":"0","position":[0,0]}]}"#.as_slice(),
-            br#"{"api_version":1,"edits":[{"op":"remove","node":"1"},{"op":"disconnect","to":"2","input":"b"}]}"#.as_slice(),
-            br#"{"api_version":1,"edits":[{"op":"reset","node":"0","input":"no_such_port"}]}"#.as_slice(),
-            br#"{"api_version":1,"edits":[{"op":"move","node":"0","position":[1000001,0]}]}"#.as_slice(),
-            br#"{"api_version":1,"edits":[{"op":"add","alias":"new","kind":"number","position":[0,0]},{"op":"remove","node":"new"},{"op":"add","alias":"new","kind":"number","position":[0,0]}]}"#.as_slice(),
+            r#"{"api_version":1,"edits":[{"op":"remove","node":"0"},{"op":"move","node":"0","position":[0,0]}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"remove","node":"1"},{"op":"disconnect","to":"2","input":"b"}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"reset","node":"0","input":"no_such_port"}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"move","node":"0","position":[1000001,0]}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"add","alias":"new","kind":"number","position":[0,0]},{"op":"remove","node":"new"},{"op":"add","alias":"new","kind":"number","position":[0,0]}]}"#,
         ] {
-            assert!(apply(&mut graph, &parse_request(bytes).unwrap()).is_err());
+            assert!(apply(&mut graph, &parse_request(bytes.as_bytes()).unwrap()).is_err());
             assert_eq!(graph, before);
         }
     }
@@ -538,10 +550,13 @@ mod tests {
     fn duplicate_wire_edits_are_rejected() {
         let mut graph = build(&parse_request(SAMPLE).unwrap()).unwrap().graph;
         let before = graph.clone();
-        let request = parse_request(br#"{"api_version":1,"edits":[
+        let request = parse_request(
+            br#"{"api_version":1,"edits":[
             {"op":"disconnect","to":"2","input":"a"},
             {"op":"connect","from":"1","to":"2","input":"a"}
-        ]}"#).unwrap();
+        ]}"#,
+        )
+        .unwrap();
         assert!(apply(&mut graph, &request).is_err());
         assert_eq!(graph, before);
     }
