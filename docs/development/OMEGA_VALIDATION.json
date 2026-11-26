@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:22:15.389990+00:00",
+  "updated_at_utc": "2026-11-26T23:25:39.985060+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -38,6 +38,68 @@
       "command": "cargo test --locked --offline --test aggregate_numeric_regressions --test data_tree_contracts --test math_precision_regressions",
       "review": "Independent read-only kernel_research agent; existing branch/empty/finite/count/weight/cancel contracts retained.",
       "known_remaining": "Scaled Summation/Average can lose extremely small terms before cancellation; separate exact-accumulator work is planned."
+    },
+    {
+      "name": "curve endpoint closest point and geometric closure",
+      "files": [
+        "src/curve_geometry.rs",
+        "tests/curve_closest_regressions.rs"
+      ],
+      "before": {
+        "passed": 2,
+        "failed": 7,
+        "method": "actual rustc harness using the same std-only curve source"
+      },
+      "after": {
+        "passed": 9,
+        "failed": 0
+      },
+      "related_suites": {
+        "curve_geometry_tests": 11
+      },
+      "command": "cargo test --locked --test curve_closest_regressions --test curve_geometry_tests",
+      "review": "Root inspected endpoint retention, bounded one-sided brackets, active-interval closure and tests.",
+      "limits": "Sampled global search is not a global minimum proof; closure uses a bounded geometric tolerance estimate.",
+      "performance_probe": {
+        "method": "local rustc -O, 100 repetitions per size, one sample; closed() only, not whole application",
+        "controls_8192_old_incorrect_us": 0.46,
+        "controls_8192_initial_unbounded_fix_us": 841.0,
+        "controls_8192_final_bounded_fix_us": 2.95,
+        "probe_cap": 19
+      }
+    },
+    {
+      "name": "signed-zero numeric edits and history",
+      "files": [
+        "src/app.rs",
+        "src/persistence.rs",
+        "src/numeric_editor_tests.rs",
+        "src/signed_zero_tests.rs"
+      ],
+      "before": {
+        "passed": 0,
+        "failed": 5
+      },
+      "after": {
+        "passed": 5,
+        "failed": 0
+      },
+      "related_suites": {
+        "gui_passed": 41,
+        "gui_ignored": 1,
+        "persistence_passed": 44
+      },
+      "command": "cargo test --locked --bin Morphlet --test persistence_tests",
+      "review": "Root inspected bit comparison alongside structural equality and direct DragValue binding; preserves existing four numeric editor regressions.",
+      "independent_expected_value": "Atan2(y=+0,x=-1)=+pi; Atan2(y=-0,x=-1)=-pi. Includes undo/redo, cluster definition, JSON and actual key events.",
+      "native_gui_status": "pending combined native GUI check"
+    }
+  ],
+  "environment_events": [
+    {
+      "event": "20GB workspace filesystem exhausted during additional tests",
+      "impact": "sum-rounding baseline failed to link and a new surface regression failed to compile; neither counts as an executed test",
+      "mitigation": "Removed only this checkout target directory via cargo clean (4.1GiB), retained sources, rebuilt with CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0"
     }
   ]
 }

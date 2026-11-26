@@ -226,6 +226,29 @@ pub(crate) fn atomic_write(
     Ok(())
 }
 
+/// Compare parameter representations as well as their numeric values.
+///
+/// Graph/Project retain ordinary structural PartialEq. Editor and history checks
+/// supplement it with this comparison because +0 and -0 are equal numerically
+/// but produce different branch-cut results and evaluator cache identities.
+/// This also checks parameters inside saved cluster definitions, without
+/// allocating or serializing the graph. Use it alongside the structural checks.
+pub fn same_parameter_bits(a: &Graph, b: &Graph) -> bool {
+    a.nodes.len() == b.nodes.len()
+        && a.clusters.len() == b.clusters.len()
+        && a.nodes.iter().zip(&b.nodes).all(|(a, b)| {
+            a.params.len() == b.params.len()
+                && a.params
+                    .iter()
+                    .zip(&b.params)
+                    .all(|((ak, av), (bk, bv))| ak == bk && av.to_bits() == bv.to_bits())
+        })
+        && a.clusters
+            .iter()
+            .zip(&b.clusters)
+            .all(|(a, b)| same_parameter_bits(&a.graph, &b.graph))
+}
+
 /// Call checkpoint immediately before an actual document edit.
 #[derive(Default)]
 pub struct History {
@@ -244,7 +267,9 @@ impl History {
     }
 
     fn store_checkpoint(&mut self, project: Cow<'_, Project>) {
-        if self.undo.last() != Some(project.as_ref()) {
+        if self.undo.last().is_none_or(|previous| {
+            previous != project.as_ref() || !same_parameter_bits(&previous.graph, &project.graph)
+        }) {
             self.undo.push(project.into_owned());
             if self.undo.len() > HISTORY_LIMIT {
                 self.undo.remove(0);

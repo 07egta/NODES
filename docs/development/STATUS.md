@@ -10,7 +10,10 @@
 - Confirmed issue to reproduce: exact curve closest-point search omits endpoint sample cells; line [0,1], query 0.001 can return parameter 0.
 - Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
 - First implementation: legacy MassAddition/MassMultiplication share the bounded numerical math aggregation path. Six new regressions went from 1 pass / 5 fail to 6 pass / 0 fail; 17 existing tree/precision regressions also passed. See OMEGA_VALIDATION.json.
-- Other independent curve/surface/UI fixes are in progress; only explicitly staged and reviewed units are committed. Full combined gates remain pending.
+- Curve endpoint/closure fixes: 9 new + 11 existing regressions pass. Bounded closure probes avoid an initial O(knot-count) performance regression.
+- Signed-zero UI/history fixes: 5 new regressions pass, related GUI41/persistence44 pass. Native GUI and full combined gates are pending.
+- Surface numerical fixes are undergoing independent review, which found additional cross-product and translated rational-derivative cancellation cases.
+- Disk-full interruption: this checkout target was cleaned, source retained; use CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 locally to bound build artifacts.
 - Next commands: `cargo test --locked --offline --lib`, focused curve regressions, then full fmt/check/clippy/test gates.
 - Next files: `src/curve_geometry.rs` and independent curve regressions; additional non-overlapping modules after audit.
 - Draft PR: https://github.com/07egta/NODES/pull/16 (targets PR #15 branch, avoiding duplicate review scope).

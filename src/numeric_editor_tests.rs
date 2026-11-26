@@ -1,5 +1,5 @@
 //! Headless regression coverage for the actual numeric widgets used by both editors.
-use super::{InputSpec, NodeKind, parameter_drag_value, parameter_slider};
+use super::{InputSpec, NodeKind, parameter_drag_value, parameter_editor, parameter_slider};
 use eframe::egui;
 
 #[derive(Clone, Copy, Debug)]
@@ -30,7 +30,7 @@ fn frame(
             ui.spacing_mut().slider_width = 120.0;
             ui.spacing_mut().item_spacing.x = 8.0;
             response = Some(match editor {
-                Editor::Inspector => ui.add(parameter_slider(value, spec)),
+                Editor::Inspector => parameter_editor(ui, value, spec),
                 Editor::CanvasTrack => ui.add(parameter_slider(value, spec).show_value(false)),
                 Editor::CanvasNumber => ui.add(parameter_drag_value(value, spec)),
             });
@@ -189,6 +189,21 @@ fn focus_and_enter_without_editing_preserve_loaded_precision() {
             focus(&context, editor, radius, &mut value);
             confirm(&context, editor, radius, &mut value);
             assert_eq!(value.to_bits(), original.to_bits(), "{editor:?}");
+        }
+    }
+}
+
+#[test]
+fn typed_signed_zero_survives_both_numeric_editors() {
+    let spec = &NodeKind::Number.spec().inputs[0];
+    for editor in [Editor::Inspector, Editor::CanvasNumber] {
+        for (initial, text, expected) in [
+            (0.0_f64, "-0", -0.0_f64),
+            (0.0_f64, "−0", -0.0_f64),
+            (-0.0_f64, "0", 0.0_f64),
+        ] {
+            let value = type_value(editor, spec, initial, text);
+            assert_eq!(value.to_bits(), expected.to_bits(), "{editor:?}: {text}");
         }
     }
 }

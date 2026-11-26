@@ -1454,7 +1454,7 @@ impl MorphletApp {
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
                                 let value = n.params.entry(input.key.into()).or_insert(default);
-                                ui.add(parameter_slider(value, input));
+                                parameter_editor(ui, value, input);
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -2536,21 +2536,25 @@ impl EditTracker {
 }
 
 fn document_changed(a: &Project, b: &Project) -> bool {
-    a.name != b.name || a.graph != b.graph
+    a.name != b.name || a.graph != b.graph || !persistence::same_parameter_bits(&a.graph, &b.graph)
 }
 fn same_calculation(a: &Graph, b: &Graph) -> bool {
     a.nodes.len() == b.nodes.len()
         && a.clusters == b.clusters
+        && persistence::same_parameter_bits(a, b)
         && a.nodes.iter().zip(&b.nodes).all(|(x, y)| {
             x.id == y.id
                 && x.kind == y.kind
-                && x.params == y.params
                 && x.inputs == y.inputs
                 && x.script == y.script
                 && x.cluster == y.cluster
                 && x.off == y.off
         })
 }
+#[cfg(test)]
+#[path = "signed_zero_tests.rs"]
+mod signed_zero_tests;
+
 #[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
     ui_polish::query_score(kind, query).is_some()
@@ -2649,6 +2653,27 @@ pub(crate) fn parameter_drag_value<'a>(
         .max_decimals_opt(spec.integer.then_some(0))
         .custom_formatter(|number, _| number.to_string())
         .custom_parser(parse_parameter_number)
+}
+
+/// Keep the text field bound directly to the parameter. Slider's built-in value
+/// editor copies through ordinary f64 equality, which discards a +0 -> -0 edit.
+pub(crate) fn parameter_editor(
+    ui: &mut egui::Ui,
+    value: &mut f64,
+    spec: &InputSpec,
+) -> egui::Response {
+    let before = value.to_bits();
+    let mut response = ui
+        .horizontal(|ui| {
+            let track = ui.add(parameter_slider(value, spec).show_value(false));
+            let number = ui.add(parameter_drag_value(value, spec));
+            track.union(number)
+        })
+        .inner;
+    if value.to_bits() != before {
+        response.mark_changed();
+    }
+    response
 }
 
 pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
