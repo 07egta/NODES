@@ -1,0 +1,39 @@
+{
+  "format": "morphlet-part",
+  "version": 1,
+  "root": 1,
+  "clusters": [
+    {
+      "id": 1,
+      "name": "Add 5",
+      "graph": {
+        "nodes": [
+          {
+            "id": 0,
+            "kind": "add",
+            "name": "Add 5",
+            "position": [
+              0,
+              0
+            ],
+            "params": {
+              "a": 7,
+              "b": 5
+            },
+            "inputs": {},
+            "preview": true
+          }
+        ],
+        "next_id": 1
+      },
+      "inputs": [
+        {
+          "node": 0,
+          "key": "a",
+          "label": "A"
+        }
+      ],
+      "output": 0
+    }
+  ]
+}

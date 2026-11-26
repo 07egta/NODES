@@ -89,7 +89,7 @@ pub fn parse_request(bytes: &[u8]) -> Result<Request, String> {
     Ok(request)
 }
 
-fn validate_numeric(kind: NodeKind, key: &str, value: f64) -> Result<(), String> {
+pub(crate) fn validate_numeric(kind: NodeKind, key: &str, value: f64) -> Result<(), String> {
     let spec = kind.spec().inputs.iter().find(|p| p.key == key && p.default.is_some())
         .ok_or("unknown numeric input")?;
     if !value.is_finite() || value < spec.min || value > spec.max ||

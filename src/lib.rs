@@ -6,6 +6,7 @@ pub mod gcode;
 pub mod gh_nodes;
 pub mod ghx;
 pub mod graph_api;
+pub mod node_packs;
 pub mod import;
 pub mod model;
 pub mod persistence;

@@ -1,0 +1,1 @@
+{"api_version":1,"id":"nodes.example.offset","version":[1,0,0],"name":"Add 5","description":"Adds 5 to a scalar input.","description_ja":"数値に5を加算する部品。","icon":"plus"}

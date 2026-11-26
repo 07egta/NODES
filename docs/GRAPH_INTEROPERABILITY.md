@@ -18,12 +18,13 @@ Unknown components and source references stay in the report; conversion refuses 
 
 ## Commands
 
-From the project root (Linux/macOS CLI; Windows GUI-subsystem binaries may not display stdout, so prefer library APIs or CI until a console tool is provided):
+From the project root (dedicated console binary for Windows and other platforms):
 
-    cargo run --bin Morphlet -- --inspect-ghx examples/interop/scalar-point.ghx report.json
-    cargo run --bin Morphlet -- --convert-ghx examples/interop/scalar-point.ghx sample.morph
-    cargo run --bin Morphlet -- --node-catalog
-    cargo run --bin Morphlet -- --build-graph examples/interop/ai-add.json sum.morph
+    cargo run --bin nodes-interop -- inspect-ghx examples/interop/scalar-point.ghx report.json
+    cargo run --bin nodes-interop -- convert-ghx examples/interop/scalar-point.ghx sample.morph
+    cargo run --bin nodes-interop -- catalog
+    cargo run --bin nodes-interop -- build-graph examples/interop/ai-add.json sum.morph
+    cargo run --bin nodes-interop -- instantiate-pack examples/interop/offset-pack.json examples/interop/offset-pack.morphpart offset.morph
     cargo run --bin Morphlet -- --validate sum.morph
 
 The GHX fixture is synthetic (no McNeel code or third-party archive copied). Expected point: (7,2,3); graph API fixture: 7+5=12. These are analytically derived test expectations; not Grasshopper runtime recordings.
@@ -40,7 +41,7 @@ Existing Rhai engine has no_module, disabled eval, operation/call/expression/arr
 
 ## Extension roadmap
 
-Use declarative node packs first, backed by existing .morphpart definitions; versioned manifests, explicit enable/disable, validate all nested parts and reject script/import nodes for untrusted packs. Do not grant DLL loading or arbitrary process access. Wasm is a later optional runtime (separate feature, pinned permissively licensed runtime; no WASI by default, limited linear memory/table/instances, fuel and epoch interrupts, output validation, no native host IO, isolate traps). Measure Windows build size and performance before choosing a runtime. Neither a plugin registry nor a Wasm host is shipped by this change.
+Implemented declarative node packs backed by existing .morphpart definitions: versioned manifests, Japanese descriptions, icon identifiers, derived typed port metadata/defaults, deterministic listing, explicit enable/disable and strictly increasing version upgrades. All packs are disabled by default. Nested definitions are preflighted for recursion, depth and expansion budgets; scripts, expressions, file import and unknown node kinds are forbidden. Placement copies a validated native snapshot; disabling prevents new placement, does not invalidate existing projects. The registry is in-memory and exposed through the Rust API and a one-shot console import. There is no persistent registry or GUI management yet. Do not grant DLL loading or arbitrary process access. Wasm is a later optional runtime (separate feature, pinned permissively licensed runtime; no WASI by default, limited linear memory/table/instances, fuel and epoch interrupts, output validation, no native host IO, isolate traps). Measure Windows build size and performance before choosing a runtime. No Wasm host is shipped by this change.
 
 ## Sources (public behavior/structure only)
 
@@ -54,4 +55,4 @@ Use declarative node packs first, backed by existing .morphpart definitions; ver
 
 ## Verification
 
-Added Rust tests for synthetic scalar conversion and evaluation, unsupported IDs, retained ordered wires, dangling references, cycles, corrupt/oversized XML, XXE/DTD, deep nesting, NaN, non-default tree settings, multi-source refusal, API arithmetic, forbidden capability and version rejection, bounds, and atomic rollback. This authoring environment has no Rust toolchain or direct git/network access; these tests have **not** been executed locally. Run cargo fmt, cargo test --locked, and Windows integration checks before merge. Real GHX import/evaluation equivalence must be tested with Rhino-generated fixtures. Do not treat this draft as production-ready.
+Added Rust tests for synthetic scalar conversion and evaluation, unsupported IDs, retained ordered wires, dangling references, cycles, corrupt/oversized XML, XXE/DTD, deep nesting, NaN, non-default tree settings, multi-source refusal, API arithmetic, forbidden capability and version rejection, bounds, atomic rollback, disabled-by-default packs, nested cycles, invalid/oversized pack updates and existing snapshot evaluation. This authoring environment has no Rust toolchain or direct git/network access; these tests have **not** been executed locally. Run cargo fmt, cargo test --locked, and Windows integration checks before merge. Real GHX import/evaluation equivalence must be tested with Rhino-generated fixtures. Do not treat this draft as production-ready.
