@@ -1059,6 +1059,11 @@ impl Graph {
                 after.entry(p).or_default().push(node.id);
             }
         }
+        // Stable sibling ordering makes independent output admission deterministic,
+        // even when the document stores the same nodes in a different order.
+        for children in after.values_mut() {
+            children.sort_unstable();
+        }
         let mut queue: VecDeque<_> = indegree
             .iter()
             .filter(|(_, v)| **v == 0)

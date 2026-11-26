@@ -405,3 +405,40 @@ fn all_checked_in_project_examples_round_trip_without_schema_changes() {
     }
     assert!(count >= 10);
 }
+
+#[test]
+fn graph_storage_order_does_not_change_sibling_evaluation_order() {
+    let mut graph = Graph::default();
+    let root = add(&mut graph, NodeKind::Number);
+    let children: Vec<_> = (0..12).map(|_| add(&mut graph, NodeKind::Add)).collect();
+    for id in &children {
+        graph.connect(root, *id, "a").unwrap();
+    }
+    let mut expected = vec![root];
+    expected.extend(children);
+    assert_eq!(graph.topological_order().unwrap(), expected);
+    graph.nodes.reverse();
+    assert_eq!(graph.topological_order().unwrap(), expected);
+}
+
+#[test]
+fn cache_preserves_the_sign_of_zero_and_invalidates_after_node_removal() {
+    let mut graph = Graph::default();
+    let id = add(&mut graph, NodeKind::Number);
+    let unrelated = add(&mut graph, NodeKind::Number);
+    graph.node_mut(id).unwrap().params.insert("value".into(), 0.);
+    let mut evaluator = Evaluator::default();
+    let first = evaluator.evaluate(&graph, &|| false);
+    assert_eq!(number(&first, id).to_bits(), 0f64.to_bits());
+    graph.node_mut(id).unwrap().params.insert("value".into(), -0.);
+    let changed = evaluator.evaluate(&graph, &|| false);
+    assert_eq!((changed.computed, changed.cached), (1, 1));
+    assert_eq!(number(&changed, id).to_bits(), (-0f64).to_bits());
+
+    let old_node = graph.node(unrelated).unwrap().clone();
+    graph.remove(unrelated);
+    assert_eq!(evaluator.evaluate(&graph, &|| false).outputs.len(), 1);
+    graph.nodes.push(old_node);
+    let restored = evaluator.evaluate(&graph, &|| false);
+    assert_eq!((restored.computed, restored.cached), (1, 1));
+}
