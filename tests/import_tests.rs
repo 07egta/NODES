@@ -257,3 +257,40 @@ fn import_node_keeps_its_serde_name_and_is_listed() {
     );
     assert!(NodeKind::all().contains(&NodeKind::ImportMesh));
 }
+
+
+#[test]
+fn ascii_stl_requires_complete_facet_and_solid_structure() {
+    let valid = ascii_stl(&cube());
+    for missing in ["endfacet", "endloop", "endsolid cube", "outer loop"] {
+        let broken = valid.replacen(missing, "", 1);
+        assert!(parse_stl(broken.as_bytes(), &no_cancel).is_err(), "{missing}");
+    }
+    let vertices_only = b"solid x\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid x\n";
+    assert!(parse_stl(vertices_only, &no_cancel).is_err());
+    let bad_coordinate = valid.replacen("vertex 0 0 0", "vertex 0 0 0 1", 1);
+    assert!(parse_stl(bad_coordinate.as_bytes(), &no_cancel).is_err());
+}
+
+#[test]
+fn ascii_stl_accepts_bom_leading_whitespace_and_multiple_solids() {
+    let valid = ascii_stl(&cube());
+    let multiple = format!("\u{feff} \r\n{valid}{valid}");
+    let mesh = parse_stl(multiple.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 24);
+    assert_eq!(mesh.vertices.len(), 8);
+}
+
+#[test]
+fn obj_accepts_bom_and_inline_comments() {
+    let obj = "\u{feff}v 0 0 0 # first\nv 1 0 0\nv 0 1 0\nf 1 2 3 # triangle\n";
+    let mesh = parse_obj(obj.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 1);
+    assert_eq!(mesh.vertices.len(), 3);
+}
+
+#[test]
+fn direct_import_apis_honor_cancellation_before_parsing() {
+    assert!(parse_obj(b"", &|| true).unwrap_err().contains("停止"));
+    assert!(parse_stl(b"", &|| true).unwrap_err().contains("停止"));
+}

@@ -92,11 +92,13 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
 /// Parses binary or ASCII STL. A file is binary when its size equals 84 + 50 × count
 /// (whatever its header says); otherwise a file that starts with "solid" is read as ASCII.
 pub fn parse_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    check_input_size(bytes, cancel)?;
     if let Some(count) = binary_stl_count(bytes) {
         return parse_binary_stl(bytes, count, cancel);
     }
-    if bytes.starts_with(b"solid") {
-        return parse_ascii_stl(bytes, cancel);
+    let ascii = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes).trim_ascii_start();
+    if ascii.starts_with(b"solid") {
+        return parse_ascii_stl(ascii, cancel);
     }
     Err(BAD_FORMAT.into())
 }
@@ -148,36 +150,75 @@ fn read_point(bytes: &[u8], offset: usize) -> Result<[f64; 3], String> {
     Ok(point)
 }
 
+/// Accept only complete facets inside solid blocks. Multiple solid blocks are
+/// legal for this geometry-only importer; labels are not interpreted.
 fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
-    let text = String::from_utf8_lossy(bytes);
+    let text = std::str::from_utf8(bytes).map_err(|_| BAD_FORMAT)?;
     let mut builder = Builder::default();
-    let mut corners = [[0.0f64; 3]; 3];
-    let mut filled = 0usize;
+    let mut corners = [[0.0; 3]; 3];
+    // 0: outside solid; 1: between facets; 2: outer loop; 3..5: corners;
+    // 6: endloop; 7: endfacet.
+    let mut state = 0;
+    let mut facets = 0usize;
     for (line_no, line) in text.lines().enumerate() {
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
         let mut words = line.split_whitespace();
-        if words.next() != Some("vertex") {
+        let Some(keyword) = words.next() else {
             continue;
-        }
-        let point = parse_xyz(words)?;
-        if let Some(slot) = corners.get_mut(filled) {
-            *slot = point;
-        }
-        filled += 1;
-        if filled == 3 {
-            builder.triangle(corners)?;
-            filled = 0;
+        };
+        let bad = || format!("STL の {} 行目: 面または solid の構造が不正です。", line_no + 1);
+        match (state, keyword) {
+            (0, "solid") => state = 1,
+            (1, "endsolid") => state = 0,
+            (1, "facet") => {
+                if words.next() != Some("normal") {
+                    return Err(bad());
+                }
+                parse_exact_xyz(words)?;
+                facets += 1;
+                if facets > MAX_TRIANGLES {
+                    return Err(TOO_MANY_TRIANGLES.into());
+                }
+                state = 2;
+            }
+            (2, "outer") if words.next() == Some("loop") && words.next().is_none() => {
+                state = 3;
+            }
+            (3..=5, "vertex") => {
+                corners[state - 3] = parse_exact_xyz(words)?;
+                state += 1;
+            }
+            (6, "endloop") if words.next().is_none() => state = 7,
+            (7, "endfacet") if words.next().is_none() => {
+                builder.triangle(corners)?;
+                state = 1;
+            }
+            _ => return Err(bad()),
         }
     }
-    if filled != 0 {
-        return Err(
-            "STL の頂点の数が三角形になりません。ファイルが途中で切れていないか確認してください。"
-                .into(),
-        );
+    cancelled(cancel)?;
+    if state != 0 {
+        return Err("STL の facet または solid が途中で切れています。".into());
     }
     builder.finish()
+}
+
+fn parse_exact_xyz<'a>(mut words: impl Iterator<Item = &'a str>) -> Result<[f64; 3], String> {
+    let point = parse_xyz(&mut words)?;
+    if words.next().is_some() {
+        return Err(BAD_FORMAT.into());
+    }
+    Ok(point)
+}
+
+fn check_input_size(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<(), String> {
+    cancelled(cancel)?;
+    if bytes.len() as u64 > MAX_IMPORT_BYTES {
+        return Err("ファイルが大きすぎます（上限 64 MiB）。".into());
+    }
+    Ok(())
 }
 
 /// Parses OBJ `v` and `f` lines only. Simple planar polygons are ear-clipped with
@@ -185,14 +226,18 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
 /// Negative indices count back from the last vertex defined so far. Other lines
 /// (vt, vn, g, usemtl...) are ignored. Holes in a single face are unsupported.
 pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    check_input_size(bytes, cancel)?;
+    // Preserve lossy decoding for non-ASCII OBJ comments and object labels.
     let text = String::from_utf8_lossy(bytes);
+    let text = text.trim_start_matches('\u{feff}');
     let mut raw: Vec<[f64; 3]> = Vec::new();
     let mut builder = Builder::default();
     for (line_no, line) in text.lines().enumerate() {
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
-        let mut words = line.split_whitespace();
+        // OBJ permits inline comments after the geometry record.
+        let mut words = line.split('#').next().unwrap_or("").split_whitespace();
         match words.next() {
             Some("v") => {
                 if raw.len() >= MAX_VERTICES {
