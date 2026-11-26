@@ -795,7 +795,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(values)
         }
-        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap => crate::generative::run_item(kind, a, cancel),
+        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d | PopulateMesh | CurveArray | NoiseField | LifeGrid => crate::generative::run_item(kind, a, cancel),
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength

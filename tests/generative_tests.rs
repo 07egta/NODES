@@ -61,3 +61,38 @@ fn new_nodes_have_registered_search_and_unique_input_keys() {
         assert_eq!(keys.len(),spec.inputs.len(),"{kind:?}");
     }
 }
+
+#[test]
+fn generative_kinds_have_stable_serialized_names_and_registry_entries() {
+    let pairs = [
+        (NodeKind::RectGrid, "rect_grid"),
+        (NodeKind::TriangularGrid, "triangular_grid"),
+        (NodeKind::HexGrid, "hex_grid"),
+        (NodeKind::RadialGrid, "radial_grid"),
+        (NodeKind::HexPanels, "hex_panels"),
+        (NodeKind::TriPanels, "tri_panels"),
+        (NodeKind::Voronoi2d, "voronoi2d"),
+        (NodeKind::ConvexHull2d, "convex_hull2d"),
+        (NodeKind::ClosestPoint, "closest_point"),
+        (NodeKind::MultiAttractor, "multi_attractor"),
+        (NodeKind::CurveAttractor, "curve_attractor"),
+        (NodeKind::GridArray, "grid_array"),
+        (NodeKind::PointArray, "point_array"),
+        (NodeKind::Rotate3d, "rotate3d"),
+        (NodeKind::Shear, "shear"),
+        (NodeKind::Taper, "taper"),
+        (NodeKind::FractalTree, "fractal_tree"),
+        (NodeKind::CylinderWrap, "cylinder_wrap"),
+        (NodeKind::Delaunay2d, "delaunay2d"),
+        (NodeKind::PopulateMesh, "populate_mesh"),
+        (NodeKind::CurveArray, "curve_array"),
+        (NodeKind::NoiseField, "noise_field"),
+        (NodeKind::LifeGrid, "life_grid"),
+    ];
+    for (kind,name) in pairs {
+        assert!(NodeKind::all().contains(&kind));
+        let json=serde_json::to_string(&kind).unwrap();
+        assert_eq!(json,format!("\"{name}\""));
+        assert_eq!(serde_json::from_str::<NodeKind>(&json).unwrap(),kind);
+    }
+}

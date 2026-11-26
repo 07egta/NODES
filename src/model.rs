@@ -203,6 +203,11 @@ pub enum NodeKind {
     Taper,
     FractalTree,
     CylinderWrap,
+    Delaunay2d,
+    PopulateMesh,
+    CurveArray,
+    NoiseField,
+    LifeGrid,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -290,6 +295,11 @@ impl NodeKind {
             Self::Taper,
             Self::FractalTree,
             Self::CylinderWrap,
+            Self::Delaunay2d,
+            Self::PopulateMesh,
+            Self::CurveArray,
+            Self::NoiseField,
+            Self::LifeGrid,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

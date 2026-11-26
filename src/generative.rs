@@ -160,6 +160,48 @@ static CYLINDERWRAP: NodeSpec = NodeSpec {
     output: DataType::Curve,
 };
 
+
+static DELAUNAY: NodeSpec = NodeSpec {
+    label: "ドロネー三角形分割 2D",
+    category: "立体",
+    description: "XY 点群をドロネー三角形分割し、平らな開いたメッシュを生成します。最大 256 点、重複点統合。ほぼ共線な点群は不可。",
+    keywords: "delaunay triangulation mesh ドロネー 三角 点群",
+    inputs: &[POINTS],
+    output: DataType::Mesh,
+};
+static POPULATE_MESH: NodeSpec = NodeSpec {
+    label: "メッシュ表面に点を配置",
+    category: "曲線",
+    description: "メッシュの三角形面積に比例した確率で表面上に点をばらまきます。内部の体積には配置しません。同じシードで再現できます。",
+    keywords: "populate geometry mesh surface random points seed 表面 点 ランダム",
+    inputs: &[g("mesh", "メッシュ", DataType::Mesh), i("count", "個数", 50., 1., 2048.), i("seed", "シード", 1., 0., 100000.)],
+    output: DataType::Point,
+};
+static CURVE_ARRAY: NodeSpec = NodeSpec {
+    label: "曲線に沿った配列",
+    category: "配列",
+    description: "折れ線の弧長に沿って等間隔に形状を平行移動します。閉曲線の終点重複はありません。方向は変えません。",
+    keywords: "curve array length arc distribute 配列 曲線 等間隔",
+    inputs: &[GEOMETRY, g("curve", "配置する曲線", DataType::Curve), i("count", "個数", 12., 1., 128.)],
+    output: DataType::Geometry,
+};
+static NOISE_FIELD: NodeSpec = NodeSpec {
+    label: "ノイズ方向場",
+    category: "曲線",
+    description: "点ごとに決定的な Perlin 系ノイズを角度へ変換し、XY 平面の短い方向線を生成します。流線や物理的な力ではありません。",
+    keywords: "noise field vector direction perlin ノイズ 方向 場",
+    inputs: &[g("point", "点", DataType::Point), n("size", "模様の大きさ", 30., 0.1, 10000., 1.), n("length", "方向線の長さ", 6., 0.01, 1000., 0.5), i("seed", "シード", 1., 0., 100000.)],
+    output: DataType::Curve,
+};
+static LIFE_GRID: NodeSpec = NodeSpec {
+    label: "セルオートマトン（Life）",
+    category: "曲線",
+    description: "決まったシードで初期化した格子を Conway の Life 規則で反復し、生き残ったセルの中心点を返します。境界外は死セル。",
+    keywords: "cellular automaton conway game of life iteration セル オートマトン 反復",
+    inputs: &[i("nx", "列", 32., 1., 64.), i("ny", "行", 32., 1., 64.), n("size", "格子間隔", 4., 0.01, 1000., 0.5), n("density", "初期密度", 0.35, 0., 1., 0.05), i("steps", "反復回数", 12., 0., 100.), i("seed", "シード", 1., 0., 100000.)],
+    output: DataType::Point,
+};
+
 pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
     use NodeKind::*;
     match kind {
@@ -181,14 +223,19 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         Taper => &TAPER,
         FractalTree => &FRACTALTREE,
         CylinderWrap => &CYLINDERWRAP,
+        Delaunay2d => &DELAUNAY,
+        PopulateMesh => &POPULATE_MESH,
+        CurveArray => &CURVE_ARRAY,
+        NoiseField => &NOISE_FIELD,
+        LifeGrid => &LIFE_GRID,
         _ => unreachable!("not a generative node"),
     }
 }
 pub(crate) fn is_kind(kind: NodeKind) -> bool {
-    matches!(kind, NodeKind::RectGrid | NodeKind::TriangularGrid | NodeKind::HexGrid | NodeKind::RadialGrid | NodeKind::HexPanels | NodeKind::TriPanels | NodeKind::Voronoi2d | NodeKind::ConvexHull2d | NodeKind::ClosestPoint | NodeKind::MultiAttractor | NodeKind::CurveAttractor | NodeKind::GridArray | NodeKind::PointArray | NodeKind::Rotate3d | NodeKind::Shear | NodeKind::Taper | NodeKind::FractalTree | NodeKind::CylinderWrap)
+    matches!(kind, NodeKind::RectGrid | NodeKind::TriangularGrid | NodeKind::HexGrid | NodeKind::RadialGrid | NodeKind::HexPanels | NodeKind::TriPanels | NodeKind::Voronoi2d | NodeKind::ConvexHull2d | NodeKind::ClosestPoint | NodeKind::MultiAttractor | NodeKind::CurveAttractor | NodeKind::GridArray | NodeKind::PointArray | NodeKind::Rotate3d | NodeKind::Shear | NodeKind::Taper | NodeKind::FractalTree | NodeKind::CylinderWrap | NodeKind::Delaunay2d | NodeKind::PopulateMesh | NodeKind::CurveArray | NodeKind::NoiseField | NodeKind::LifeGrid)
 }
 pub(crate) fn is_list(kind: NodeKind) -> bool {
-    matches!(kind, NodeKind::Voronoi2d | NodeKind::ConvexHull2d | NodeKind::ClosestPoint | NodeKind::MultiAttractor | NodeKind::PointArray)
+    matches!(kind, NodeKind::Voronoi2d | NodeKind::ConvexHull2d | NodeKind::ClosestPoint | NodeKind::MultiAttractor | NodeKind::PointArray | NodeKind::Delaunay2d)
 }
 
 fn count(a: &[&Value], k: usize, limit: usize) -> Result<usize, String> {
@@ -215,7 +262,7 @@ fn setting(lists: &[&[Value]], k: usize) -> Result<f64, String> {
     list(lists, k)?.first().ok_or("設定値がありません。")?.number()
 }
 fn curve(p: Vec<[f64; 3]>, closed: bool) -> Result<Value, String> {
-    if p.len() < if closed { 3 } else { 2 } || p.len() > MAX_VERTICES ||
+    if p.len() < (if closed { 3 } else { 2 }) || p.len() > MAX_VERTICES ||
         p.iter().any(|q| !finite_point(*q)) {
         return Err("曲線の座標または点数が無効です。".into());
     }
@@ -237,11 +284,15 @@ pub(crate) fn estimate(kind:NodeKind,a:&[&Value])->Result<(usize,usize),String> 
         TriPanels => 2*count(a,0,32)?*count(a,1,32)?,
         RadialGrid => 1+count(a,0,32)?*count(a,1,128)?,
         FractalTree => (1usize << count(a,3,10)?)-1,
+        PopulateMesh => count(a,1,2048)?,
+        CurveArray => count(a,2,128)?,
+        LifeGrid => count(a,0,64)?*count(a,1,64)?,
         _=>1,
     };
     let weight = match kind {
         HexPanels=>6*n, TriPanels=>3*n, FractalTree=>2*n,
-        GridArray=>shape(a)?.weight().saturating_mul(n),
+        GridArray|CurveArray=>shape(a)?.weight().saturating_mul(n),
+        NoiseField=>2,
         Rotate3d|Shear|Taper=>shape(a)?.weight(),
         _=>n,
     };
@@ -377,7 +428,7 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
             let Some(Value::Curve(c))=a.get(1) else {return Err("曲線が必要です。".into())};
             if c.points.is_empty(){return Err("曲線に点がありません。".into());}
             let mut best=dist2(p,c.points[0]);
-            let edges=c.points.len().saturating_sub(1)+usize::from(c.closed);
+            let edges=c.points.len().saturating_sub(1)+(if c.closed { 1 } else { 0 });
             for k in 0..edges {
                 if k%128==0 {cancelled(cancel)?;}
                 let (x,y)=(c.points[k],c.points[(k+1)%c.points.len()]);
@@ -415,7 +466,7 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
                 let t=TAU*p[0]/width;
                 [(r+p[2])*t.cos(),(r+p[2])*t.sin(),p[1]]
             };
-            let edges=c.points.len()-1+usize::from(c.closed);
+            let edges=c.points.len()-1+(if c.closed { 1 } else { 0 });
             let mut out=Vec::new();
             for k in 0..edges {
                 cancelled(cancel)?;
@@ -430,6 +481,37 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
             if !c.closed {out.push(wrap(*c.points.last().ok_or("点がありません。")?));}
             Ok(vec![curve(out,c.closed)?])
         }
+        PopulateMesh=>{
+            let Value::Mesh(mesh)=shape(a)? else{return Err("メッシュが必要です。".into());};
+            populate_mesh(mesh,count(a,1,2048)?,num(a,2)? as u64,cancel)
+        }
+        CurveArray=>{
+            let source=shape(a)?;
+            let Some(Value::Curve(c))=a.get(1) else{return Err("配置する曲線が必要です。".into());};
+            curve_array(source,c,count(a,2,128)?,cancel)
+        }
+        NoiseField=>{
+            let p=point(shape(a)?)?;
+            let size=num(a,1)?;
+            let len=num(a,2)?;
+            let t=PI*crate::gh_nodes::perlin(p.map(|v|v/size),num(a,3)? as u64)?;
+            Ok(vec![curve(vec![p,add(p,[len*t.cos(),len*t.sin(),0.])],false)?])
+        }
+        LifeGrid=>{
+            let nx=count(a,0,64)?;
+            let ny=count(a,1,64)?;
+            let size=num(a,2)?;
+            let density=num(a,3)?;
+            let steps=num(a,4)? as usize;
+            let mut rng=crate::gh_nodes::Rng::new(num(a,5)? as u64);
+            let mut cells=(0..nx*ny).map(|_|rng.next_f64()<density).collect::<Vec<_>>();
+            for _ in 0..steps{
+                cancelled(cancel)?;
+                cells=life_step(&cells,nx,ny);
+            }
+            Ok(cells.into_iter().enumerate().filter(|(_,alive)|*alive).map(|(k,_)|
+                Value::Point([(k%nx) as f64*size,(k/nx) as f64*size,0.])).collect())
+        }
         _=>Err("このノードにはリスト評価が必要です。".into()),
     }
 }
@@ -442,6 +524,7 @@ pub(crate) fn run_list(kind:NodeKind,lists:&[&[Value]],cancel:&dyn Fn()->bool)->
     match kind{
         Voronoi2d=>voronoi(&input,setting(lists,1)?,setting(lists,2)?,cancel),
         ConvexHull2d=>hull(&input,cancel),
+        Delaunay2d=>delaunay(&input,cancel),
         ClosestPoint|MultiAttractor=>{
             let targets=points(list(lists,1)?)?;
             // ClosestPoint: candidates first, queries second. MultiAttractor: queries first.
@@ -559,6 +642,157 @@ fn hull(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
     Ok(vec![curve(lo.into_iter().map(|p|[p[0],p[1],0.]).collect(),true)?])
 }
 
+
+fn life_step(cells:&[bool],nx:usize,ny:usize)->Vec<bool>{
+    let mut next=vec![false;nx*ny];
+    for y in 0..ny{
+        for x in 0..nx{
+            let mut neighbors=0;
+            for dy in -1isize..=1 {
+                for dx in -1isize..=1 {
+                    if dx==0&&dy==0{continue;}
+                    let (u,v)=(x as isize+dx,y as isize+dy);
+                    if u>=0&&v>=0&&u<nx as isize&&v<ny as isize&&cells[v as usize*nx+u as usize]{
+                        neighbors+=1;
+                    }
+                }
+            }
+            next[y*nx+x]=neighbors==3||(cells[y*nx+x]&&neighbors==2);
+        }
+    }
+    next
+}
+fn populate_mesh(mesh:&Mesh,n:usize,seed:u64,cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
+    let mut weights=Vec::with_capacity(mesh.triangles.len());
+    let mut total=0.;
+    for (i,t) in mesh.triangles.iter().enumerate(){
+        if i%256==0{cancelled(cancel)?;}
+        let [Some(a),Some(b),Some(c)]=t.map(|j|mesh.vertices.get(j as usize)) else{
+            return Err("無効なメッシュの頂点番号です。".into());
+        };
+        total+=length(cross(sub(*b,*a),sub(*c,*a)))*0.5;
+        weights.push(total);
+    }
+    if !total.is_finite()||total<=0.{return Err("面積のあるメッシュが必要です。".into());}
+    let mut rng=crate::gh_nodes::Rng::new(seed);
+    let mut out=Vec::with_capacity(n);
+    for _ in 0..n{
+        cancelled(cancel)?;
+        let pick=rng.next_f64()*total;
+        let index=weights.partition_point(|w|*w<=pick).min(weights.len()-1);
+        let t=mesh.triangles[index];
+        let [a,b,c]=t.map(|i|mesh.vertices[i as usize]);
+        // sqrt correction gives uniform area density, not uniform barycentric coordinates.
+        let r=rng.next_f64().sqrt();
+        let s=rng.next_f64();
+        out.push(Value::Point(add(add(mul(a,1.-r),mul(b,r*(1.-s))),mul(c,r*s))));
+    }
+    Ok(out)
+}
+fn curve_array(source:&Value,c:&Curve,n:usize,cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
+    array_budget(source,n)?;
+    if c.points.len()<2{return Err("曲線に点が足りません。".into());}
+    let edges=c.points.len()-1+(if c.closed{1}else{0});
+    let mut end=Vec::with_capacity(edges);
+    let mut total=0.;
+    for k in 0..edges{
+        if k%256==0{cancelled(cancel)?;}
+        total+=length(sub(c.points[(k+1)%c.points.len()],c.points[k]));
+        end.push(total);
+    }
+    if total<=1e-12||!total.is_finite(){return Err("曲線の長さがありません。".into());}
+    let divisor=if c.closed{n}else{n.saturating_sub(1).max(1)};
+    let mut out=Vec::with_capacity(n);
+    for i in 0..n{
+        cancelled(cancel)?;
+        let d=total*i as f64/divisor as f64;
+        let k=end.partition_point(|x|*x<=d).min(edges-1);
+        let start=if k==0{0.}else{end[k-1]};
+        let t=if end[k]>start{((d-start)/(end[k]-start)).clamp(0.,1.)}else{0.};
+        let p=add(c.points[k],mul(sub(c.points[(k+1)%c.points.len()],c.points[k]),t));
+        out.push(translated(source,p,cancel)?);
+    }
+    Ok(out)
+}
+fn incircle(a:P2,b:P2,c:P2,p:P2)->f64{
+    let (ax,ay)=(a[0]-p[0],a[1]-p[1]);
+    let (bx,by)=(b[0]-p[0],b[1]-p[1]);
+    let (cx,cy)=(c[0]-p[0],c[1]-p[1]);
+    (ax*ax+ay*ay)*(bx*cy-by*cx)
+    -(bx*bx+by*by)*(ax*cy-ay*cx)
+    +(cx*cx+cy*cy)*(ax*by-ay*bx)
+}
+/// Incremental Bowyer-Watson on normalized planar coordinates. Reject ambiguous
+/// degeneracies rather than return a mesh with missing sites or invalid triangles.
+fn delaunay(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
+    if input.len()>MAX_SITES{return Err("ドロネー分割は 256 点までです。".into());}
+    if input.len()<3{return Err("異なる 3 点以上が必要です。".into());}
+    let mut lo=[f64::INFINITY;2];let mut hi=[f64::NEG_INFINITY;2];
+    for p in input {for k in 0..2 {lo[k]=lo[k].min(p[k]);hi[k]=hi[k].max(p[k]);}}
+    let scale=(hi[0]-lo[0]).max(hi[1]-lo[1]);
+    if scale<=0.||!scale.is_finite(){return Err("点が重なっています。".into());}
+    let center=[(lo[0]+hi[0])*0.5,(lo[1]+hi[1])*0.5];
+    let mut p:Vec<P2>=Vec::new();
+    let mut vertices=Vec::new();
+    // Stable insertion order also makes co-circular tie selection deterministic.
+    for q in input{
+        cancelled(cancel)?;
+        let r=[(q[0]-center[0])/scale,(q[1]-center[1])/scale];
+        if !p.iter().any(|s|d2(*s,r)<=1e-18){p.push(r);vertices.push([q[0],q[1],0.]);}
+    }
+    let n=p.len();
+    if n<3{return Err("異なる 3 点以上が必要です。".into());}
+    p.extend([[-32.,-16.],[32.,-16.],[0.,32.]]);
+    let mut tris=vec![[n,n+1,n+2]];
+    for i in 0..n{
+        cancelled(cancel)?;
+        let mut keep=Vec::new();
+        let mut boundary=std::collections::BTreeMap::<(usize,usize),usize>::new();
+        for t in tris{
+            let det=incircle(p[t[0]],p[t[1]],p[t[2]],p[i]);
+            if det>0. {
+                for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
+                    *boundary.entry((a.min(b),a.max(b))).or_default()+=1;
+                }
+            }else{keep.push(t);}
+        }
+        if boundary.is_empty(){return Err("数値的に不安定な点配置です。".into());}
+        for ((a,b),count) in boundary{
+            if count>2{return Err("分割の境界が不正です。".into());}
+            if count!=1{continue;}
+            let sign=side(p[a],p[b],p[i]);
+            if sign>1e-14{keep.push([a,b,i]);}
+            else if sign < -1e-14{keep.push([b,a,i]);}
+        }
+        if keep.len()>MAX_SITES*8{return Err("三角形数が上限を超えました。".into());}
+        tris=keep;
+    }
+    tris.retain(|t|t.iter().all(|&i|i<n));
+    if tris.is_empty(){return Err("点がほぼ同一直線上にあります。".into());}
+    let mut used=vec![false;n];
+    let mut edges=std::collections::BTreeMap::<(usize,usize),usize>::new();
+    let mut unique=std::collections::BTreeSet::new();
+    for t in &tris{
+        cancelled(cancel)?;
+        let mut key=*t;key.sort_unstable();
+        if !unique.insert(key){return Err("重複した三角形ができました。".into());}
+        for &i in t{used[i]=true;}
+        for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
+            *edges.entry((a.min(b),a.max(b))).or_default()+=1;
+        }
+        // Check empty circumcircle on normalized positions, with a small roundoff allowance.
+        for (k,&q) in p[..n].iter().enumerate(){
+            if !t.contains(&k)&&incircle(p[t[0]],p[t[1]],p[t[2]],q)>1e-12{
+                return Err("ドロネー条件を満たせません。点の間隔を調整してください。".into());
+            }
+        }
+    }
+    if used.iter().any(|v|!*v)||edges.values().any(|&v|v>2)||n+tris.len()!=edges.len()+1{
+        return Err("退化した分割です。点の間隔を広げてください。".into());
+    }
+    crate::engine::as_mesh(Mesh{vertices,triangles:tris.into_iter().map(|t|t.map(|i|i as u32)).collect()},cancel)
+}
+
 #[cfg(test)]
 mod tests{
     use super::*;
@@ -639,5 +873,45 @@ mod tests{
         assert!(Arc::ptr_eq(a,b));
         assert_eq!(c(&out[1]).points[0],[3.,0.,0.]);
         assert!(run_list(NodeKind::PointArray,&[&points,&[s.clone(),s]],&||false).is_err());
+    }
+}
+
+#[cfg(test)]
+mod extra_tests{
+    use super::*;
+    #[test]
+    fn delaunay_square_duplicate_and_interior_point(){
+        let p=[[0.,0.,0.],[4.,0.,0.],[4.,4.,0.],[0.,4.,0.],[2.,2.,0.],[0.,0.,5.]];
+        let v=delaunay(&p,&||false).unwrap();
+        let Value::Mesh(m)=&v[0]else{panic!("mesh");};
+        assert_eq!(m.vertices.len(),5);
+        assert_eq!(m.triangles.len(),4);
+        let total=m.triangles.iter().map(|t|{
+            let [a,b,c]=t.map(|i|m.vertices[i as usize]);
+            length(cross(sub(b,a),sub(c,a)))*0.5
+        }).sum::<f64>();
+        assert!((total-16.).abs()<1e-9);
+        assert!(delaunay(&[[0.;3],[1.,0.,0.],[2.,0.,0.]],&||false).is_err());
+    }
+    #[test]
+    fn mesh_population_reproducible_and_inside_triangle(){
+        let m=Mesh{vertices:vec![[0.;3],[2.,0.,0.],[0.,2.,0.]],triangles:vec![[0,1,2]]};
+        let a=populate_mesh(&m,100,12,&||false).unwrap();
+        assert_eq!(a,populate_mesh(&m,100,12,&||false).unwrap());
+        for v in a {let p=point(&v).unwrap();assert!(p[0]>=0.&&p[1]>=0.&&p[0]+p[1]<=2.+1e-12&&p[2]==0.);}
+    }
+    #[test]
+    fn curve_array_spacing_uses_arc_length_and_not_vertex_indices(){
+        let c=Curve{points:vec![[0.;3],[1.,0.,0.],[5.,0.,0.]],closed:false};
+        let a=curve_array(&Value::Point([0.;3]),&c,3,&||false).unwrap();
+        assert_eq!(a,vec![Value::Point([0.;3]),Value::Point([2.5,0.,0.]),Value::Point([5.,0.,0.])]);
+    }
+    #[test]
+    fn life_blinker_returns_after_two_steps(){
+        let mut cells=vec![false;25];cells[11]=true;cells[12]=true;cells[13]=true;
+        let one=life_step(&cells,5,5);
+        assert!(one[7]&&one[12]&&one[17]);
+        assert_eq!(one.iter().filter(|v|**v).count(),3);
+        assert_eq!(life_step(&one,5,5),cells);
     }
 }

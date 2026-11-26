@@ -17,10 +17,13 @@ Public interface research (not copied code): [Grasshopper 1 component index](htt
 | Random Points, Populate 2D/3D, Perlin-like Noise | existing | seeded rectangular box and sampled displacement |
 | Fractal Tree | new | bounded binary recurrence, XZ plane |
 | Cylindrical wrapping | new, independent subset | curve only, 10-degree maximum angular sampling interval; not arbitrary Surface Morph |
-| Orient, plane-to-plane, curve and surface arrays, bend, flow, Box/Surface Morph | missing | need frame, exact curves and/or surface API |
-| Delaunay, Concave Hull, generic polygon partition | missing | robust predicate implementation needed |
-| Populate Geometry, arbitrary surface panelization, field visualization and vector field, simplex | missing | mesh/curve/surface adapters needed |
-| General L-system, cellular automata, constrained optimization, design exploration | missing | bounded algorithms and UI needed |
+| Orient, plane-to-plane, surface arrays, bend, flow, Box/Surface Morph | missing | need frame, exact curves and/or surface API |
+| Delaunay | new | bounded XY Bowyer-Watson; floating-point predicate and topology checks, reject degeneracy |
+| Concave Hull, generic polygon partition | missing | robust predicates needed |
+| Populate Mesh, noise direction field, curve array | new | triangle area sampling (surface only), direction segments, arc-length translation only |
+| Arbitrary surface panelization, general vector field and simplex | missing | mesh/curve/surface adapters needed |
+| Cellular automata | new | Conway Life, finite grid, 100 steps maximum |
+| General L-system, constrained optimization, design exploration | missing | bounded algorithms and UI needed |
 
 ## Contracts
 
