@@ -101,6 +101,15 @@ fn signature(defs: &[ClusterDef], root: u64) -> String {
         if let Some(def) = defs.iter().find(|d| d.id == id) {
             out.push_str(&serde_json::to_string(def).unwrap_or_default());
             out.push('\n');
+            // Definition JSON contains paths, not external file state. Include the
+            // same metadata key as a top-level import, including in nested definitions.
+            for node in &def.graph.nodes {
+                if node.kind == NodeKind::ImportMesh && !node.off {
+                    let source = crate::import::source_key(&node.script);
+                    out.push_str(&serde_json::to_string(&source).unwrap_or_default());
+                    out.push('\n');
+                }
+            }
         }
     }
     out
@@ -203,14 +212,14 @@ fn run_def(
     budget: &Cell<usize>,
     cancel: &dyn Fn() -> bool,
 ) -> Result<Tree, String> {
-    let order = def.graph.topological_order()?;
+    let order = def.graph.topological_nodes()?;
     // Exposed inputs are fed through "virtual" source ids so lists/trees keep working.
     let mut local: BTreeMap<NodeId, Result<Tree, String>> = BTreeMap::new();
     for (k, tree) in slots.into_iter().enumerate() {
         local.insert(VIRTUAL_BASE + k as u64, Ok(tree));
     }
     let mut weight = 0usize;
-    for id in order {
+    for original in order {
         if cancel() {
             return Err("計算を停止しました。".into());
         }
@@ -221,9 +230,13 @@ fn run_def(
             ));
         }
         budget.set(left - 1);
-        let Some(original) = def.graph.node(id) else {
+        let id = original.id;
+        // Match the top-level evaluator: disabled nodes produce an empty tree
+        // without evaluating scripts, geometry, or nested clusters.
+        if original.off {
+            local.insert(id, Ok(Tree::default()));
             continue;
-        };
+        }
         let mut node = original.clone();
         for (k, port) in def.inputs.iter().enumerate() {
             if port.node == id {

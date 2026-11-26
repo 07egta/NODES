@@ -77,7 +77,7 @@ impl Evaluator {
             out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
             return out;
         }
-        let order = match graph.topological_order() {
+        let order = match graph.topological_nodes() {
             Ok(o) => o,
             Err(e) => {
                 for n in &graph.nodes {
@@ -94,12 +94,12 @@ impl Evaluator {
         });
         let mut revisions = BTreeMap::new();
         let mut retained = 0usize;
-        for id in order {
+        for node in order {
             if stop() {
                 out.cancelled = true;
                 break;
             }
-            let Some(node) = graph.node(id) else { continue };
+            let id = node.id;
             // Disabled node: empty output, never cached; revision 0 marks "off" for children.
             if node.off {
                 self.remove_cached(id);
