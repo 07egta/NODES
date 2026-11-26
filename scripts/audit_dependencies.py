@@ -19,7 +19,6 @@ import sys
 import tempfile
 import tomllib
 import unittest
-from urllib.parse import urlsplit
 
 MAX_INPUT = 64 * 1024 * 1024
 MAX_TEXT = 2 * 1024 * 1024
@@ -81,27 +80,18 @@ def source_evidence(raw: str | None) -> dict:
     if raw is None:
         return {"kind": "path", "value": None, "status": "path_not_disclosed"}
     text_field(raw, "package source")
-    # Source IDs are opaque in Cargo. Retain only public URL-shaped IDs without
-    # credentials, local file paths, or secret-looking query parameters.
-    kind, separator, address = raw.partition("+")
-    try:
-        parsed = urlsplit(address)
-        safe_query = all(
-            item.partition("=")[0] in {"rev", "branch", "tag"}
-            for item in parsed.query.split("&") if item
-        )
-        public = (separator and kind in {"registry", "sparse", "git"}
-                  and parsed.scheme in {"http", "https"}
-                  and bool(parsed.hostname) and parsed.username is None
-                  and parsed.password is None and safe_query)
-    except ValueError:
-        public = False
-    if public:
-        return {"kind": kind, "value": raw, "status": "cargo_source_id"}
+    # URL shape cannot establish publicity or absence of secrets. Only these
+    # exact crates.io source IDs are retained, without query or fragment data.
+    public_crates_sources = {
+        "registry+https://github.com/rust-lang/crates.io-index",
+        "sparse+https://index.crates.io/",
+    }
+    if raw in public_crates_sources:
+        return {"kind": raw.split("+", 1)[0], "value": raw,
+                "status": "cargo_source_id"}
     return {"kind": "other", "value": None,
-            "status": "unrecognized_or_private_source_redacted",
+            "status": "non_crates_io_source_redacted",
             "identifier_sha256": hashlib.sha256(raw.encode()).hexdigest()}
-
 
 def license_file_evidence(value: object, manifest: object) -> dict:
     if value is None:
@@ -155,13 +145,17 @@ def license_evidence(value: object, file_declared: bool) -> dict:
                     "invalid SPDX parentheses")
             cursor += 1
             return result
-        require(token not in {"AND", "OR", "WITH", ")"}, "invalid SPDX identifier")
+        require(token not in {"AND", "OR", "WITH", ")"}
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*\+?", token) is not None,
+                "invalid license token structure")
         licenses.add(token)
         result = GNU.match(token) is None
         if cursor < len(tokens) and tokens[cursor] == "WITH":
             cursor += 1
             require(cursor < len(tokens) and tokens[cursor] not in
                     {"AND", "OR", "WITH", "(", ")"}, "invalid SPDX exception")
+            require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", tokens[cursor])
+                    is not None, "invalid exception token structure")
             exceptions.add(tokens[cursor])
             cursor += 1
         return result
@@ -208,7 +202,7 @@ def license_evidence(value: object, file_declared: bool) -> dict:
         review.append("custom_license_reference_requires_text_review")
     return {
         "expression": expression,
-        "syntax": "spdx_expression_grammar_only" if valid else "ambiguous",
+        "syntax": "spdx_operator_structure_only" if valid else "ambiguous",
         "license_tokens": sorted(licenses) if valid else [],
         "exception_tokens": sorted(exceptions) if valid else [],
         "gnu_family_tokens": gnu,
@@ -405,7 +399,7 @@ def build_inventory(metadata: dict, lock_data: bytes,
         licensing = license_evidence(package.get("license"), file_evidence["declared"])
         sources = source_evidence(raw_source)
         review = list(licensing["review_reasons"])
-        if sources["status"] == "unrecognized_or_private_source_redacted":
+        if sources["status"] == "non_crates_io_source_redacted":
             review.append("source_identifier_requires_review")
         notices = checked.get(identity, [])
         if not notices:
@@ -437,7 +431,9 @@ def build_inventory(metadata: dict, lock_data: bytes,
                 and all(isinstance(item, str) and len(item) <= 512 for item in features),
                 "invalid resolved feature list")
         by_id[raw_id]["resolved_features"] = sorted(set(features))
-    require(nodes_seen == ids, "metadata packages and resolution nodes differ")
+    require(nodes_seen == ids,
+            "metadata packages and resolution nodes differ; "
+            "full metadata without --filter-platform is required")
     rows.sort(key=lambda row: (row["name"], row["version"],
                               json.dumps(row["source"], sort_keys=True)))
     missing = [
@@ -575,7 +571,11 @@ class SelfTests(unittest.TestCase):
         self.assertTrue(license_evidence(
             "(MIT OR GPL-2.0-only WITH Classpath-exception-2.0) AND Apache-2.0",
             False)["has_declared_alternative_without_gnu_tokens"])
-        self.assertEqual(license_evidence("MIT/Apache-2.0", False)["syntax"], "ambiguous")
+        for expression in ["MIT/Apache-2.0", "MIT++", "MIT+Apache-2.0",
+                           "GPL-2.0-only WITH Classpath-exception-2.0+"]:
+            self.assertEqual(license_evidence(expression, False)["syntax"], "ambiguous")
+        self.assertEqual(license_evidence("GPL-2.0+", False)["syntax"],
+                         "spdx_operator_structure_only")
         self.assertIsNone(license_evidence("MIT OR", False)[
             "has_declared_alternative_without_gnu_tokens"])
 
@@ -587,8 +587,17 @@ class SelfTests(unittest.TestCase):
             self.assertIsNone(license_file_evidence(
                 value, "/private/cache/dep/Cargo.toml")["path"])
         for source in ["git+file:///private/repo", "git+https://token@example.com/repo",
-                       "registry+https://example.com/repo?token=secret"]:
+                       "registry+https://example.com/repo?token=secret",
+                       "git+https://localhost/private#deadbeef",
+                       "git+https://example.com/private#token=secret",
+                       "registry+https://github.com/rust-lang/crates.io-index#secret",
+                       "registry+https://github.com/rust-lang/crates.io-index?token=secret"]:
             self.assertIsNone(source_evidence(source)["value"])
+            self.assertEqual(source_evidence(source)["status"],
+                             "non_crates_io_source_redacted")
+        for source in ["registry+https://github.com/rust-lang/crates.io-index",
+                       "sparse+https://index.crates.io/"]:
+            self.assertEqual(source_evidence(source)["value"], source)
 
     def test_checked_text_integrity_and_traversal_rejected(self) -> None:
         metadata, lock = self.fixture()
@@ -631,7 +640,7 @@ class SelfTests(unittest.TestCase):
             build_inventory(metadata, lock)
         metadata, lock = self.fixture()
         metadata["resolve"]["nodes"].pop()
-        with self.assertRaises(AuditError):
+        with self.assertRaisesRegex(AuditError, "without --filter-platform"):
             build_inventory(metadata, lock)
 
 
@@ -656,7 +665,8 @@ def main() -> int:
         require(args.metadata.stat().st_size <= MAX_INPUT, "metadata exceeds size limit")
         require(args.output.resolve() != args.metadata.resolve(),
                 "output must not replace metadata input")
-        metadata = parse_json(args.metadata.read_bytes())
+        with args.metadata.open("rb") as handle:
+            metadata = parse_json(handle.read(MAX_INPUT + 1))
         tracked = tracked_paths(root)
         lock_data = repository_bytes(root, "Cargo.lock", tracked)
         locks = lock_inventory(lock_data)
