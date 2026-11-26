@@ -1,6 +1,7 @@
 //! Deterministic, bounded graph evaluation and procedural mesh construction.
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
 use crate::model::*;
+use crate::data_tree as dt;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
@@ -193,11 +194,17 @@ pub(crate) fn evaluate_node(
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
-        for value in tree.branches.values().flatten() {
+        let tree = if let Some(&mode) = node.params.get(&format!("{}{}", dt::PORT_PREFIX, spec.key)) {
+            dt::apply_transform(&tree, dt::PortTransform::from_number(mode)?)?
+        } else { tree };
+        for (path, values) in &tree.branches {
+          for (index, value) in values.iter().enumerate() {
+            cancelled(cancel)?;
+            let site = || format!("{}[{}]", dt::path_text(path), index);
             if !spec.kind.accepts(value.kind()) {
                 return Err(format!(
-                    "「{}」には {} が必要です（現在: {}）。",
-                    spec.label,
+                    "「{}」{} には {} が必要です（現在: {}）。",
+                    spec.label, site(),
                     spec.kind.label(),
                     value.kind().label()
                 ));
@@ -214,35 +221,17 @@ pub(crate) fn evaluate_node(
                     return Err(format!("「{}」は整数にしてください。", spec.label));
                 }
             }
+          }
         }
         inputs.push(tree);
     }
-    if node.kind == NodeKind::Flatten {
-        let t = inputs.first().ok_or("入力がありません。")?;
-        return checked_tree(
-            Tree {
-                branches: BTreeMap::from([(
-                    vec![0],
-                    t.branches.values().flatten().cloned().collect(),
-                )]),
-            },
-            cancel,
-        );
+    if crate::data_tree_nodes::is_tree_kind(node.kind) {
+        return checked_tree(crate::data_tree_nodes::run_tree(node, &inputs, cancel)?, cancel);
     }
-    if node.kind == NodeKind::Graft {
-        let mut tree = Tree::default();
-        for (path, items) in &inputs.first().ok_or("入力がありません。")?.branches {
-            cancelled(cancel)?;
-            if items.is_empty() {
-                tree.branches.insert(path.clone(), Vec::new());
-            }
-            for (index, v) in items.iter().enumerate() {
-                let mut p = path.clone();
-                p.push(index as u32);
-                tree.branches.insert(p, vec![v.clone()]);
-            }
-        }
-        return checked_tree(tree, cancel);
+    if node.kind == NodeKind::Flatten || node.kind == NodeKind::Graft {
+        let t = inputs.first().ok_or("入力がありません。")?;
+        let result = if node.kind == NodeKind::Flatten { dt::flatten(t) } else { dt::graft(t) }?;
+        return checked_tree(result, cancel);
     }
     if node.kind == NodeKind::Output {
         return checked_tree(
@@ -271,7 +260,10 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let list_kind = crate::gh_nodes::is_list_kind(node.kind) || crate::data_tree_nodes::is_list_kind(node.kind);
+    let matching = node.params.get(dt::MATCH_PARAM).copied()
+        .map(dt::MatchMode::from_number).transpose()?;
+    let item_mode = matching.unwrap_or(dt::MatchMode::Longest);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -286,11 +278,12 @@ pub(crate) fn evaluate_node(
             paths.extend(tree.branches.keys().cloned());
         }
     }
-    let mut result = Tree::default();
-    let mut total_items = 0usize;
-    let mut total_weight = 0usize;
-    for path in paths {
-        cancelled(cancel)?;
+    // Old .morph files omit MATCH_PARAM and keep the original exact-path behaviour.
+    // When a matching mode is selected, use ordinal branch matching instead.
+    let matched = if matching.is_some() {
+        dt::match_branches(&inputs)?
+    } else {
+      paths.into_iter().map(|path| {
         let lists: Vec<&[Value]> = inputs
             .iter()
             .map(|t| {
@@ -307,7 +300,20 @@ pub(crate) fn evaluate_node(
                     .unwrap_or(&[])
             })
             .collect();
+        dt::BranchMatch { path, lists }
+      }).collect()
+    };
+    let mut result = Tree::default();
+    let mut total_items = 0usize;
+    let mut total_weight = 0usize;
+    for dt::BranchMatch { path, lists } in matched {
+        cancelled(cancel)?;
+        total_weight = total_weight.saturating_add(path.len() + 1);
+        if total_weight > MAX_TOTAL_WEIGHT / 2 || result.branches.len() >= MAX_ITEMS {
+            return Err("データツリーの枝数または容量が上限を超えました。".into());
+        }
         result.branches.entry(path.clone()).or_default();
+        let values = (|| -> Result<Vec<Value>, String> {
         // List nodes see their whole first list (an empty one is a valid input, e.g. for
         // リスト長 or 連結); their setting inputs still need at least one value.
         let skip = if list_kind {
@@ -316,7 +322,7 @@ pub(crate) fn evaluate_node(
             lists.iter().any(|v| v.is_empty())
         };
         if skip {
-            continue;
+            return Ok(Vec::new());
         }
         let values = if node.kind == NodeKind::Merge {
             vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
@@ -328,17 +334,16 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if crate::data_tree_nodes::is_list_kind(node.kind) {
+            crate::data_tree_nodes::run_list(node.kind, &lists, MAX_ITEMS.saturating_sub(total_items),
+                (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight), cancel)?
         } else if list_kind {
             crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
-            let count = lists.iter().map(|v| v.len()).max().unwrap_or(0);
+            let matches = dt::ItemMatches::new(&lists, item_mode, MAX_ITEMS.saturating_sub(total_items))?;
             let mut values = Vec::new();
-            for index in 0..count {
+            for args in matches {
                 cancelled(cancel)?;
-                let args: Vec<&Value> = lists
-                    .iter()
-                    .filter_map(|v| v.get(index.min(v.len().saturating_sub(1))))
-                    .collect();
                 preflight_run(
                     node.kind,
                     &args,
@@ -384,6 +389,8 @@ pub(crate) fn evaluate_node(
         if total_items > MAX_ITEMS {
             return Err("生成データの個数が上限を超えました。".into());
         }
+        Ok(values)
+        })().map_err(|e| format!("枝 {}: {e}", dt::path_text(&path)))?;
         result.branches.insert(path, values);
     }
     checked_tree(result, cancel)
@@ -796,7 +803,8 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
-        | Remap | Expression | GraphProfile | ImportMesh => {
+        | Remap | Expression | GraphProfile | ImportMesh
+        | SimplifyTree | TrimTree | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems | InsertItems | MemberIndex | RandomReduce | Jitter => {
             Err("このノードはリスト評価が必要です。".into())
         }
     }
