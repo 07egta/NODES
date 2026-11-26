@@ -494,7 +494,8 @@ fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
-    Ok(vec![Value::Curve(Arc::new(Curve { points, closed, geometry: None }))])
+    let geometry = crate::curve_geometry::CurveGeometry::nurbs(crate::curve_geometry::NurbsCurve::polyline(points.clone(), closed)?);
+    Ok(vec![Value::Curve(Arc::new(Curve { points, closed, geometry: Some(geometry) }))])
 }
 
 fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {

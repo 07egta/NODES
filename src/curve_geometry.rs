@@ -395,7 +395,12 @@ impl CurveGeometry {
         let k=norm(cross(unit(d)?,scale(dd,1./speed)))/speed;
         if k.is_finite(){Ok(k)}else{Err("曲率が有限ではありません。".into())}
     }
-    pub fn closed(&self)->R<bool> {Ok(norm(sub(self.point(0.)?,self.point(1.)?))<=1e-8)}
+    pub fn closed(&self)->R<bool> {
+        let a=self.point(0.)?;let b=self.point(1.)?;
+        if a==b {return Ok(true);}
+        let scale=norm(self.derivatives(0.)?[1]).max(norm(self.derivatives(1.)?[1]));
+        Ok(scale.is_finite() && scale>0. && norm(sub(a,b))<=1e-12*scale)
+    }
     pub fn subcurve(&self,start:f64,end:f64)->R<Self> {
         let a=self.native(start)?; let b=self.native(end)?;
         if a==b {return Err("切り出し区間の長さがゼロです。".into());}

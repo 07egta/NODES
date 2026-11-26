@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "name": "精密円の等弧長分割",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "circle",
+        "name": "円",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "radius": 30,
+          "segments": 32
+        },
+        "inputs": {},
+        "preview": true
+      },
+      {
+        "id": 1,
+        "kind": "curve_divide",
+        "name": "分割点",
+        "position": [
+          285,
+          40
+        ],
+        "params": {
+          "count": 12
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": true
+      },
+      {
+        "id": 2,
+        "kind": "curve_length",
+        "name": "円周",
+        "position": [
+          550,
+          40
+        ],
+        "params": {},
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

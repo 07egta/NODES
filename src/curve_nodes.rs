@@ -59,7 +59,7 @@ pub fn spec(k:NodeKind)->&'static NodeSpec {
         CurveTangent=>spec!("曲線の単位接線","curve tangent","指定パラメータの単位接線をXYZとして返す。",Point,[C,T]),
         CurveCurvature=>spec!("曲率","curve curvature","解析導関数から曲率の大きさを求める。角は片側微分。",Number,[C,T]),
         CurveDomain=>spec!("曲線の元の区間","curve domain","基底の向き付きパラメータ区間の2端を返す。評価ノードの入力は正規化0〜1。",Number,[C]),
-        CurveClosed=>spec!("閉曲線判定","closed curve","両端の距離が1e-8以下なら1、それ以外は0。",Number,[C]),
+        CurveClosed=>spec!("閉曲線判定","closed curve","両端が一致するか、曲線の接線スケールに対する相対許容差1e-12以内なら1。",Number,[C]),
         CurveDivide=>spec!("曲線を等弧長分割","divide curve","弧長で等分し点を返す。閉曲線の終端は重複させない。",Point,[C,i("count","分割数",10.,1.,512.)]),
         CurveDivideLength=>spec!("曲線を長さで分割","divide length","指定弧長ごとの点と開曲線の終点。最大512区間。",Point,[C,n("step","間隔",10.,0.000001,1000000000.,0.1)]),
         CurveSubcurve=>spec!("部分曲線","sub curve trim split","正規化区間を切り出す。基底形状を保持する。",Curve,[C,n("start","開始",0.,0.,1.,0.01),n("end","終了",0.5,0.,1.,0.01),SEG]),
@@ -86,7 +86,7 @@ fn cv(v:&Value)->R<&Curve>{match v{Value::Curve(c)=>Ok(c.as_ref()),_=>Err("曲�
 pub fn geometry(c:&Curve)->R<CurveGeometry>{
     match &c.geometry {Some(g)=>Ok(g.clone()),None=>Ok(CurveGeometry::nurbs(NurbsCurve::polyline(c.points.clone(),c.closed)?))}
 }
-fn curve(a:&[&Value],k:usize)->R<&Curve>{
+fn curve<'a>(a:&[&'a Value],k:usize)->R<&'a Curve>{
     cv(a.get(k).copied().ok_or("曲線の入力がありません。")?)
 }
 fn preview(g:CurveGeometry,seg:usize,cancel:&dyn Fn()->bool)->R<Value>{
@@ -96,10 +96,13 @@ fn preview(g:CurveGeometry,seg:usize,cancel:&dyn Fn()->bool)->R<Value>{
     Ok(Value::Curve(Arc::new(Curve{points,closed,geometry:Some(g)})))
 }
 fn polyline(points:Vec<Point3>,closed:bool)->R<Value>{
+    if points.len()<2 || points.windows(2).any(|p|p[0]==p[1]) {
+        return Err("曲線には異なる隣接点が必要です。".into());
+    }
     let geom=CurveGeometry::nurbs(NurbsCurve::polyline(points.clone(),closed)?);
     let mut points=points;
     if closed && points.first()==points.last(){points.pop();}
-    if points.len()<2{return Err("曲線には異なる2点以上が必要です。".into());}
+    if points.len()<2 || closed&&points.len()<3 {return Err("閉じたポリラインには3点以上、開いたものには2点以上必要です。".into());}
     Ok(Value::Curve(Arc::new(Curve{points,closed,geometry:Some(geom)})))
 }
 fn setting(l:&[&[Value]],k:usize)->R<f64>{l.get(k).and_then(|l|l.first()).ok_or("設定がありません。")?.number()}
@@ -123,7 +126,7 @@ pub fn run_list(k:NodeKind,l:&[&[Value]],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
         CurveShatter=>{
             let mut t=numbers(l[1])?;
             if t.iter().any(|v|*v<0.||*v>1.) {return Err("分割パラメータは0〜1にしてください。".into());}
-            t.extend([0.,1.]); t.sort_by(f64::total_cmp);t.dedup_by(|a,b|(*a-*b).abs()<1e-12);
+            t.extend([0.,1.]); t.sort_by(f64::total_cmp);t.dedup();
             if t.len()>513 || first.len().saturating_mul(t.len()-1)>MAX_ITEMS {return Err("分割結果が多すぎます。".into());}
             let seg=setting(l,2)? as usize;
             let mut out=Vec::new();let mut weight=0usize;

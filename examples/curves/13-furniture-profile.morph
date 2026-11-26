@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "name": "家具の補間輪郭",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "range",
+        "name": "X",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "start": 0,
+          "end": 100,
+          "count": 9
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "range",
+        "name": "形状パラメータ",
+        "position": [
+          285,
+          40
+        ],
+        "params": {
+          "start": 0,
+          "end": 0.5,
+          "count": 9
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "sine",
+        "name": "輪郭のふくらみ",
+        "position": [
+          550,
+          40
+        ],
+        "params": {
+          "amplitude": 20,
+          "frequency": 1,
+          "phase": 0
+        },
+        "inputs": {
+          "x": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "point",
+        "name": "輪郭通過点",
+        "position": [
+          815,
+          40
+        ],
+        "params": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "x": 0,
+          "y": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "curve_interpolate",
+        "name": "補間輪郭",
+        "position": [
+          20,
+          225
+        ],
+        "params": {
+          "degree": 3,
+          "segments": 96
+        },
+        "inputs": {
+          "points": 3
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}
