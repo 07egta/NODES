@@ -276,3 +276,44 @@ That checkpoint is explicitly WIP and must not be merged; its independent fresh
 target test build is pending. [The parallel review](OMEGA_PARALLEL_REVIEW.md)
 records the native/Python comparison contracts and the PR #20 diagnostic command
 collision so the next developer can make an explicit integration decision.
+
+## Functional checkpoint 5: verified performance and interleaved-ID previews
+
+Checkpoint 4 is preserved at
+`eb256af16e6db50917018da9dbe1776a6e9d20ee`. Its final local whole-tree run passed
+**472 tests, 0 failures, 2 ignored, 40 suites**, with strict all-target Clippy.
+
+The corrected, independently built release comparison is complete. All 13
+processes and 19 case executions passed their independent invariants. At frozen
+revisions `78eac24` -> `7c1a095`, median diagnosis time on incremental root joins
+was 42.111 -> 2.146 ms (1,023 nodes), 201.041 -> 5.848 ms (2,047 nodes), and
+961.544 -> 18.206 ms (4,095 nodes). The largest optimized case, 16,383 nodes with
+8,192 root failures, took 295.698 ms median. These are diagnostic API timings,
+not application-wide or geometry-kernel speed claims. The complete report,
+per-process samples/resources, exact source/binary fingerprints, linked-schema
+probes and excluded invalid first experiment are in
+[the verified benchmark report](DIAGNOSTICS_BENCHMARK_RESULTS.md).
+
+Independent follow-up review identified a different ID arrangement that the
+prefix benchmark did not cover. One shared group can contain a small first ID
+and many large IDs, followed by singleton groups with intervening IDs. The old
+bounded merge still copied a full 256-ID vector for each smaller replacement.
+The new accumulator retains its sorted append/skip path and lazily converts only
+overlapping previews to a max-heap. It reuses the existing allocation, replaces
+the largest retained ID and returns sorted output. Exact counts and the schema
+are unchanged. Group previews are disjoint because each blocked node belongs to
+one group; truncating each group's own largest IDs cannot hide a global smallest
+ID. A separate implementation reviewer checked this invariant and the code.
+
+The independent real-evaluator regression has 845 nodes and 287 roots. Each core
+root has exactly 532 affected descendants and must retain precisely IDs 0..255,
+including after reversing storage order. All **13 focused diagnostic tests**
+passed (11 existing, one BFS oracle, one new interleaved regression). Timing this
+additional heap change is pending; the earlier measured speed ratios apply to
+the frozen earlier revisions only. Dense root-set memory and cancellation remain
+separate follow-up questions.
+
+The held native project-diff prototype also passed its fresh isolated build and
+all **10 tests**, including two real CLI processes. Its test record is preserved
+at archival commit `fa56fb1b66c7f249a0972899cb61742327c4ea6f`. It remains outside
+this active PR and held for PR #21 contract coordination.

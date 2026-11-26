@@ -1,0 +1,100 @@
+{
+  "experiment_schema_version": 1,
+  "purpose": "Matched before/after graph diagnostics benchmark",
+  "started_at_utc": "2026-11-26T23:40:27.612347+00:00",
+  "compiler": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cargo": "cargo 1.100.0 (3acc79c0c 2026-11-05)",
+  "host": {
+    "system": "Linux",
+    "kernel": "6.18.57",
+    "architecture": "x86_64",
+    "cpu_count": 9,
+    "cpu_affinity_count": 9,
+    "cpu_models": [
+      "AMD EPYC 9V74 80-Core Processor"
+    ],
+    "memory_before_builds": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6366760 kB"
+    }
+  },
+  "build_isolation": "Before uses its originally empty target. After is rebuilt in a different initially absent target. No library reuse across versions.",
+  "builds": [
+    {
+      "label": "before",
+      "commit": "78eac24ac730ff3a9d882df55a991923e25ad7c2",
+      "worktree_status": "?? examples/diagnostics_perf.rs",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "cargo_toml_sha256": "7981c5c016bee195cd0f909bfa42778db0302b66bf04ac4c5c7a50d7db685e5f",
+      "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "diagnostics_perf"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 124.34550947399975,
+      "completed_at_utc": "2026-11-26T23:33:15.895145+00:00",
+      "build_log": "invalid-shared-target/build-before.log",
+      "free_disk_bytes_after_build": 8166961152,
+      "copied_binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "binary_size_bytes": 5127168,
+      "target_directory": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+      "linked_library_schema_marker_present": false,
+      "linked_library_schema_marker_expected": false
+    },
+    {
+      "label": "after",
+      "commit": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+      "worktree_status": "",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "cargo_toml_sha256": "7981c5c016bee195cd0f909bfa42778db0302b66bf04ac4c5c7a50d7db685e5f",
+      "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "diagnostics_perf"
+      ],
+      "target_directory": "/workspace/scratch/74d3da15ab33/diagnostics-after-isolated-target",
+      "build_environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 129.10199696000018,
+      "completed_at_utc": "2026-11-26T23:42:36.730454+00:00",
+      "build_log": "build-after-isolated.log",
+      "free_disk_bytes_after_build": 7156809728,
+      "copied_binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "binary_size_bytes": 5144224,
+      "linked_library_schema_marker_present": true,
+      "linked_library_schema_marker_expected": true
+    }
+  ],
+  "supersedes_invalid_experiment": "invalid-shared-target/INVALIDATION.json",
+  "matched_harness": true,
+  "matched_dependencies": true,
+  "linked_library_markers_verified": true,
+  "completed_at_utc": "2026-11-26T23:42:36.745459+00:00",
+  "release_profile": {
+    "opt-level": 3,
+    "lto": "thin",
+    "strip": true,
+    "codegen-units": 16
+  },
+  "actual_library_rustflags": [],
+  "actual_library_profile_fingerprint": 1692222358841669167,
+  "linked_schema_probes": "linked-library-probes.json"
+}

@@ -11,7 +11,7 @@
 use crate::engine::Evaluation;
 use crate::model::{Graph, Node, NodeId, NodeKind};
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
 pub const DIAGNOSTIC_SCHEMA_VERSION: u32 = 1;
@@ -335,6 +335,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     // Only indices set by actual root failures are ever read from this vector.
     // Direct indexing avoids a map lookup for each root/group membership.
     let mut root_positions = vec![0; nodes.len()];
+    let mut previews = Vec::new();
     let mut groups: BTreeMap<(bool, usize), AffectedGroup> = BTreeMap::new();
     for (id, failure) in failures {
         let node = nodes[indices[&id]];
@@ -356,6 +357,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
         if failure.is_root {
             root_positions[indices[&id]] = report.root_failures.len();
             report.root_failures.push(entry);
+            previews.push(AffectedPreview::default());
         } else {
             let group = groups.entry(failure.roots.key()).or_insert_with(|| {
                 let mut root_ids = Vec::new();
@@ -388,17 +390,21 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     // by a long chain therefore does not visit every root for every descendant.
     // Process groups by their smallest affected ID. Prefix-merge graphs can have
     // many distinct root sets; filling the smallest previews first lets later
-    // groups update exact counts without repeatedly copying already-full lists.
+    // groups update exact counts without updating already-full lists. Interleaved
+    // IDs switch the affected root to a bounded heap, avoiding a full vector copy
+    // for each newly admitted smaller ID.
     let mut groups: Vec<_> = groups.values().collect();
     groups.sort_unstable_by_key(|group| group.preview.first().copied());
     for group in groups {
         group.roots.for_each(|index| {
-            let root = &mut report.root_failures[root_positions[index]];
+            let position = root_positions[index];
+            let root = &mut report.root_failures[position];
             root.affected_count += group.count;
-            merge_preview(&mut root.affected_nodes, &group.preview);
+            previews[position].extend(&group.preview);
         });
     }
-    for root in &mut report.root_failures {
+    for (root, preview) in report.root_failures.iter_mut().zip(previews) {
+        root.affected_nodes = preview.finish();
         root.affected_nodes_truncated = root.affected_count > root.affected_nodes.len();
     }
     report.summary.root_failure_count = report.root_failures.len();
@@ -421,43 +427,71 @@ fn bounded_message(message: &str) -> (String, bool) {
     (format!("{}…", &message[..end]), true)
 }
 
-/// Keep the smallest IDs across groups, independently of their allocation order.
-fn merge_preview(current: &mut Vec<NodeId>, incoming: &[NodeId]) {
-    if incoming.is_empty()
-        || (current.len() == MAX_REPORTED_AFFECTED
-            && incoming
-                .first()
-                .zip(current.last())
-                .is_some_and(|(first, last)| first >= last))
-    {
-        return;
+/// Keep the smallest IDs across groups. Group previews are sorted and disjoint:
+/// each blocked node belongs to exactly one group. A node omitted from its own
+/// group's first K entries cannot enter any root's global first K entries.
+enum AffectedPreview {
+    Sorted(Vec<NodeId>),
+    Heap(BinaryHeap<NodeId>),
+}
+
+impl Default for AffectedPreview {
+    fn default() -> Self {
+        Self::Sorted(Vec::new())
     }
-    if current.is_empty() {
-        current.extend(incoming.iter().take(MAX_REPORTED_AFFECTED));
-        return;
-    }
-    if current
-        .last()
-        .zip(incoming.first())
-        .is_some_and(|(last, first)| last < first)
-    {
-        current.extend(incoming.iter().take(MAX_REPORTED_AFFECTED - current.len()));
-        return;
-    }
-    let mut merged = Vec::with_capacity(MAX_REPORTED_AFFECTED.min(current.len() + incoming.len()));
-    let (mut a, mut b) = (0, 0);
-    while merged.len() < MAX_REPORTED_AFFECTED && (a < current.len() || b < incoming.len()) {
-        if b == incoming.len() || (a < current.len() && current[a] < incoming[b]) {
-            merged.push(current[a]);
-            a += 1;
-        } else if a == current.len() || incoming[b] < current[a] {
-            merged.push(incoming[b]);
-            b += 1;
-        } else {
-            merged.push(current[a]);
-            a += 1;
-            b += 1;
+}
+
+impl AffectedPreview {
+    fn extend(&mut self, incoming: &[NodeId]) {
+        let Some(&first) = incoming.first() else {
+            return;
+        };
+        match self {
+            Self::Sorted(current) => {
+                if current.len() == MAX_REPORTED_AFFECTED
+                    && current.last().is_some_and(|last| first >= *last)
+                {
+                    return;
+                }
+                if current.last().is_none_or(|last| *last < first) {
+                    current.extend(
+                        incoming
+                            .iter()
+                            .take(MAX_REPORTED_AFFECTED - current.len())
+                            .copied(),
+                    );
+                    return;
+                }
+                // Reuse the existing allocation and heapify once. A succession of
+                // interleaving singleton groups then needs O(log K) replacements,
+                // instead of allocating/copying K entries for every singleton.
+                let mut heap = BinaryHeap::from(std::mem::take(current));
+                Self::extend_heap(&mut heap, incoming);
+                *self = Self::Heap(heap);
+            }
+            Self::Heap(heap) => Self::extend_heap(heap, incoming),
         }
     }
-    *current = merged;
+
+    fn extend_heap(heap: &mut BinaryHeap<NodeId>, incoming: &[NodeId]) {
+        for &id in incoming {
+            if heap.len() < MAX_REPORTED_AFFECTED {
+                heap.push(id);
+            } else {
+                match heap.peek_mut() {
+                    Some(mut largest) if id < *largest => *largest = id,
+                    // Incoming IDs are ascending; every later one also misses
+                    // the bounded preview once the current ID is too large.
+                    _ => break,
+                }
+            }
+        }
+    }
+
+    fn finish(self) -> Vec<NodeId> {
+        match self {
+            Self::Sorted(ids) => ids,
+            Self::Heap(heap) => heap.into_sorted_vec(),
+        }
+    }
 }

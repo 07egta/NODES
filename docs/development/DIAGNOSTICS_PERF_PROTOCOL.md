@@ -103,7 +103,17 @@ The measured module's own graph-validation cost remains inside each diagnosis.
 ## Comparing an optimization
 
 Build the same executable source against the before and after modules in separate
-clean worktrees, selecting identical cases and repetition counts. Do not substitute
+clean worktrees **and separate, initially empty `CARGO_TARGET_DIR` directories**,
+selecting identical cases and repetition counts. Reusing one target directory
+across these worktrees reused a stale library in the recorded experiment even
+though Cargo rebuilt the example and its source-SHA string changed. A new binary
+hash or runtime source checksum alone therefore does not establish which library
+implementation was linked. Verify a known schema or behavior change through the
+actual linked library before interpreting measurements. See
+[the matched experiment report](DIAGNOSTICS_BENCHMARK_RESULTS.md) for the preserved
+invalidation evidence and corrected independent builds.
+
+Do not substitute
 mock failures or edit the baseline algorithm to make it callable from another crate.
 Alternate run order when gathering more samples to reduce systematic thermal or
 background-load bias. Retain actual numbers and source identifiers; avoid a single
