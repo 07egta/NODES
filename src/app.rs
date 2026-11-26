@@ -1291,6 +1291,11 @@ impl MorphletApp {
         if node.kind == NodeKind::Expression {
             crate::script_ui::expression_editor(ui, &mut self.project.graph, id);
         }
+        if node.kind == NodeKind::GraphMapper {
+            if let Some(n) = self.project.graph.node_mut(id) {
+                crate::math_mapper_ui::show(ui, n);
+            }
+        }
         if node.kind == NodeKind::ImportMesh {
             self.import_panel(ui, id, &node.script);
         }
