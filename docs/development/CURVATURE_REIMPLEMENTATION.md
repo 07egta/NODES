@@ -44,4 +44,30 @@ cargo test --locked --test surface_knot_roundoff --test surface_curvature_tests
 cargo test --all-targets --locked
 ```
 
-曲率サンプルは coverage 担当の fixture と調整し、別途新規作成する。
+## 新規作成した編集用サンプル
+
+`examples/surface-curvature-study.morph` は失われたファイルの推測復元ではなく、
+保存済みの node specs と 37 例 fixture の契約に基づく新しい作例。
+`node 0` は `torus_surface`、大半径 35・小半径 8。
+`node 1` の数列 `0, 0.125, ..., 1` を `node 2` の Graft で 9 枝に分け、
+評価点・ガウス曲率・平均曲率・主曲率・法線へ同じ V を接続する。
+
+固定 ID は 3=評価点、4=K、5=H、6=主曲率、7=法線、
+8=9 枝の法線表示、9=精密トーラス表示。
+37 例 fixture の `node 0 minor: 8→10` 編集と `node 5 Number` の結果変化に対応する。
+元の値へ戻すと同じグラフから再評価できる構成。これは構成上の期待であり、
+今回の実行確認はまだ行えていない。
+
+`tests/surface_curvature_study.rs` は 9 枝、トーラスの独立した解析曲率式、
+保存・再読込、温キャッシュ、半径変更による再計算を検査する。
+端点 V=0 と V=1 は同じ周期位置を異なる枝として含む。
+曲率の符号は `n=Su×Sv/|Su×Sv|` に従う。
+
+```sh
+cargo test --locked --test surface_curvature_study --test surface_knot_roundoff --test surface_curvature_tests
+cargo test --all-targets --locked
+```
+
+サンプルおよび追加テストも **Cargo 未検証・CI 待ち**。
+GUI、実機印刷、Grasshopper 互換性は検証していない。
+

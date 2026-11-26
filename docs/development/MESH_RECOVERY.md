@@ -49,5 +49,10 @@ cargo test --all-targets --locked
 ```
 
 Keep `main` and `develop/nodes-ultimate` unchanged during recovery.
-The separate curvature follow-up `997183b` requires its own recovery audit;
-it is not silently included in this mesh checkpoint.
+The original curvature follow-up `997183b` could not be recovered bytewise.
+New commit `cf91be9b3d05074af07cf8016ae250733f4867ff` separately reimplements
+the non-C2 knot roundoff fix with three regressions, based on saved source.
+A new nine-branch torus study is also provided to satisfy the documented
+37-example fixture contract (node 0 minor -> 10, node 5 mean curvature).
+See `CURVATURE_REIMPLEMENTATION.md`. These new implementations are also
+uncompiled and untested locally; all related CI tests are pending.

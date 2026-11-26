@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "name": "トーラス曲率スタディ — 9枝で外側・内側・変曲帯を比較",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "torus_surface",
+        "name": "編集する大半径・小半径",
+        "position": [
+          20,
+          160
+        ],
+        "params": {
+          "major": 35,
+          "minor": 8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "series",
+        "name": "Vを0から1へ9サンプル",
+        "position": [
+          20,
+          420
+        ],
+        "params": {
+          "start": 0,
+          "step": 0.125,
+          "count": 9
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "graft",
+        "name": "サンプルを9枝に分ける",
+        "position": [
+          280,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "evaluate_surface",
+        "name": "曲率を調べる点",
+        "position": [
+          540,
+          40
+        ],
+        "params": {
+          "u": 0.125,
+          "v": 0.5
+        },
+        "inputs": {
+          "surface": 0,
+          "v": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "surface_gaussian_curvature",
+        "name": "ガウス曲率 K — 内側は負",
+        "position": [
+          540,
+          260
+        ],
+        "params": {
+          "u": 0.125,
+          "v": 0.5
+        },
+        "inputs": {
+          "surface": 0,
+          "v": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "surface_mean_curvature",
+        "name": "平均曲率 H — 法線はSu×Sv",
+        "position": [
+          540,
+          480
+        ],
+        "params": {
+          "u": 0.125,
+          "v": 0.5
+        },
+        "inputs": {
+          "surface": 0,
+          "v": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "surface_principal_curvatures",
+        "name": "主曲率 k1・k2 — 各枝2値",
+        "position": [
+          540,
+          700
+        ],
+        "params": {
+          "u": 0.125,
+          "v": 0.5
+        },
+        "inputs": {
+          "surface": 0,
+          "v": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "surface_normal_line",
+        "name": "評価点の外向き法線",
+        "position": [
+          800,
+          40
+        ],
+        "params": {
+          "u": 0.125,
+          "v": 0.5,
+          "length": 6
+        },
+        "inputs": {
+          "surface": 0,
+          "v": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "output",
+        "name": "9枝の法線を表示",
+        "position": [
+          1080,
+          40
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 7
+        },
+        "preview": true
+      },
+      {
+        "id": 9,
+        "kind": "output",
+        "name": "精密トーラスを表示",
+        "position": [
+          1080,
+          260
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 10
+  },
+  "pan": [
+    20,
+    35
+  ],
+  "zoom": 0.72
+}
