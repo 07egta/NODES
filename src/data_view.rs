@@ -130,34 +130,38 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
         ui.label(theme::small("値はありません。"));
         return;
     }
-    let (rows, hidden) = rows(tree, MAX_ROWS);
+    ui.label(theme::small(format!("{} 枝 · {} 要素",tree.branches.len(),tree.item_count())));
     egui::ScrollArea::vertical()
         .id_salt(("data_view_scroll", salt))
         .max_height(max_height)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            egui::Grid::new(("data_view_grid", salt))
-                .num_columns(3)
-                .striped(true)
-                .spacing([14., 4.])
-                .show(ui, |ui| {
-                    ui.label(theme::small("枝"));
-                    ui.label(theme::small("番号"));
-                    ui.label(theme::small("値"));
-                    ui.end_row();
-                    for row in &rows {
-                        ui.label(RichText::new(&row.path).size(11.).color(theme::TEAL));
-                        ui.label(
-                            RichText::new(row.index.map(|i| i.to_string()).unwrap_or_default())
-                                .size(11.)
-                                .color(theme::MUTED),
-                        );
-                        ui.label(RichText::new(&row.text).size(11.).monospace());
-                        ui.end_row();
-                    }
-                });
-            if hidden > 0 {
-                ui.label(theme::small(format!("…ほか {hidden} 件")));
+            let mut shown_rows = 0;
+            let mut hidden_branches = 0;
+            for (p, values) in tree.branches.iter().take(MAX_ROWS) {
+                egui::CollapsingHeader::new(format!("{} · {} 件", path_text(p), values.len()))
+                    .id_salt((salt,p))
+                    .default_open(tree.branches.len() == 1)
+                    .show(ui, |ui| {
+                        if values.is_empty() {
+                            ui.label(theme::small("（空の枝）"));
+                        }
+                        let limit = MAX_ROWS.saturating_sub(shown_rows).min(values.len());
+                        for (i,v) in values.iter().take(limit).enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new(format!("[{i}]")).size(11.).color(theme::MUTED));
+                                ui.label(RichText::new(value_text(v)).size(11.).monospace());
+                            });
+                        }
+                        shown_rows += limit;
+                        if limit < values.len() {
+                            ui.label(theme::small(format!("…ほか {} 件",values.len()-limit)));
+                        }
+                    });
+            }
+            hidden_branches += tree.branches.len().saturating_sub(MAX_ROWS);
+            if hidden_branches > 0 {
+                ui.label(theme::small(format!("…ほか {hidden_branches} 枝")));
             }
         });
 }
