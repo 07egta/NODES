@@ -3,6 +3,7 @@
 //! no script, expression, imported file, cluster or external plugin execution.
 use crate::engine::{Evaluation, Evaluator};
 use crate::model::{DataType, Graph, NodeId, NodeKind, MAX_NODES};
+use crate::multi_port::{self, Access, OutputPort, PortId, PortRef};
 use crate::persistence::{self, Project, MAX_PROJECT_BYTES};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,7 +25,9 @@ pub fn permitted(kind: NodeKind) -> bool {
         Mirror | Twist | Wave | LinearArray | RadialArray | Merge | Flatten | Graft |
         Output | ListItem | ListLength | ReverseList | SortList | CullPattern |
         ShiftList | ConcatList | SubList | Bounds | Remap | Random | Populate |
-        Noise | NoiseDeform | GraphProfile | Shell | OverhangCheck | Distance | PointComponent)
+        Noise | NoiseDeform | GraphProfile | Shell | OverhangCheck | Distance | PointComponent |
+        DeconstructPoint | DeconstructVector | DeconstructDomain | DeconstructMesh | Dispatch |
+        SortListPaired | StreamGate | StreamMerge)
 }
 
 #[derive(Debug, Serialize)]
@@ -36,6 +39,8 @@ pub struct PortInfo {
     pub min: f64,
     pub max: f64,
     pub integer: bool,
+    pub access: Access,
+    pub optional: bool,
 }
 #[derive(Debug, Serialize)]
 pub struct NodeInfo {
@@ -45,6 +50,7 @@ pub struct NodeInfo {
     pub description: &'static str,
     pub inputs: Vec<PortInfo>,
     pub output: DataType,
+    pub outputs: Vec<OutputPort>,
 }
 #[derive(Debug, Serialize)]
 pub struct Catalog {
@@ -58,9 +64,11 @@ pub fn catalog() -> Catalog {
         nodes: NodeKind::all().iter().copied().filter(|k| permitted(*k)).map(|kind| {
             let spec = kind.spec();
             NodeInfo { kind, label: spec.label, category: spec.category, description: spec.description,
-                output: spec.output, inputs: spec.inputs.iter().map(|p| PortInfo {
+                output: spec.output, outputs: multi_port::declared_outputs(kind),
+                inputs: spec.inputs.iter().enumerate().map(|(index,p)| PortInfo {
                     key: p.key, label: p.label, kind: p.kind, default: p.default,
-                    min: p.min, max: p.max, integer: p.integer,
+                    min: p.min, max: p.max, integer: p.integer, access: multi_port::input_access(kind,index),
+                    optional: p.default.is_some() || multi_port::optional_input(kind,p.key),
                 }).collect() }
         }).collect(),
     }
@@ -71,6 +79,7 @@ pub fn catalog() -> Catalog {
 pub enum Edit {
     Add { alias: String, kind: NodeKind, position: [f32; 2] },
     Connect { from: String, to: String, input: String },
+    ConnectPort { from: String, port: PortId, to: String, input: String, #[serde(default)] append: bool },
     Set { node: String, input: String, value: f64 },
 }
 #[derive(Debug, Deserialize)]
@@ -144,6 +153,12 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                 let to = *names.get(to).ok_or("unknown target alias")?;
                 if !touched.insert((to, input.clone())) { return Err("duplicate input connection edit".into()); }
                 candidate.connect(from, to, input)?;
+            }
+            Edit::ConnectPort { from, port, to, input, append } => {
+                let from = *names.get(from).ok_or("unknown source alias")?;
+                let to = *names.get(to).ok_or("unknown target alias")?;
+                if !touched.insert((to,input.clone())) && !append { return Err("duplicate input connection edit".into()); }
+                candidate.connect_port(PortRef { node: from, port: *port },to,input,*append)?;
             }
             Edit::Set { node, input, value } => {
                 let id = *names.get(node).ok_or("unknown parameter alias")?;

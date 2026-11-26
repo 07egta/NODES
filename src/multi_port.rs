@@ -125,7 +125,7 @@ pub fn input_access(kind: NodeKind, index: usize) -> Access {
         "List" => Access::List, "Tree" => Access::Tree, "Custom" => Access::Custom, _ => Access::Item
     }
 }
-fn declared_outputs(kind: NodeKind) -> Vec<OutputPort> {
+pub fn declared_outputs(kind: NodeKind) -> Vec<OutputPort> {
     use Access::*;
     use DataType::*;
     use NodeKind as K;
@@ -186,8 +186,9 @@ impl Node {
     pub fn output_ports(&self) -> Vec<OutputPort> {
         let mut ports = declared_outputs(self.kind);
         if !self.port_layout.output_order.is_empty() {
+            let defaults = ports;
             ports = self.port_layout.output_order.iter().filter_map(|&id| {
-                declared_outputs(self.kind).into_iter().find(|p| p.id == id)
+                defaults.iter().find(|p| p.id == id).cloned()
                     .or_else(|| (self.kind == NodeKind::StreamGate).then(|| OutputPort { id, label: format!("出力 {id}"), kind: DataType::Any, access: Access::Tree }))
             }).collect();
         }
@@ -201,6 +202,9 @@ impl Node {
     }
     pub(crate) fn validate_ports(&self) -> Result<(), String> {
         let layout = &self.port_layout;
+        if self.kind == NodeKind::Cluster && (!layout.input_order.is_empty() || !layout.input_labels.is_empty()) {
+            return Err("部品の公開入力は定義側で管理してください。".into());
+        }
         let input_ids: BTreeSet<_> = self.input_ports().iter().map(|p| p.key).collect();
         let default_inputs: BTreeSet<_> = self.kind.spec().inputs.iter().map(|p| p.key).collect();
         if !layout.input_order.is_empty() && (input_ids.len() != layout.input_order.len() ||

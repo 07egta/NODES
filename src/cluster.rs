@@ -376,11 +376,11 @@ pub fn input_label(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -
     {
         return port.label.clone();
     }
-    spec.label.to_string()
+    node.input_name(spec).to_string()
 }
 /// The Script node's shape input `g` may stay unconnected.
 pub fn input_is_optional(node: &Node, spec: &InputSpec) -> bool {
-    node.kind == NodeKind::Script && spec.key == "g"
+    (node.kind == NodeKind::Script && spec.key == "g") || multi_port::optional_input(node.kind,spec.key)
 }
 /// True when an unconnected input cannot use a slider value (a shape must be connected).
 pub fn input_needs_link(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -> bool {
