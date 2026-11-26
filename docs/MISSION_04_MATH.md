@@ -116,3 +116,37 @@ Base: `df77c542473a5c637f3353dec48e367dd67db027` (evolve/all). MIT OR Apache-2.0
 
 ## 検証
 `src/math_nodes.rs` に単体テストを追加（解析解、エラー、座標往復、集合、再現性）。この変更を作成した環境は cargo/rustc が無く、GitHub の直接 clone も不可。コンパイル、cargo test、UI 実機確認、GH 実行比較は未実行。CI とレビューが必要。
+
+
+## GH1/GH2 公開索引との差分（機能単位）
+
+GH1 のシステムコンポーネントは Maths / Vector / Sets / Params に分かれる。下記は関連分類の機能比較であり、実行環境で一つずつ出力を比較したものではない。GH2 は 2026-11-25 公開版の別分類として扱う。
+
+| GH1の機能群 | NODESで利用できる処理 | 残る機能・違い |
+|---|---|---|
+| Maths / Operators | 四則・べき・剰余・負号・絶対値・階乗・総和・総積・大小・等価・基本4論理 | 整数除算、近似等価、相対差、追加ゲート、比較の多出力・演算子の異種型対応 |
+| Maths / Util | 最小最大・丸め・クランプ・平均・中央値・分散・線形補間 | 重み付き平均、定数ノード、時系列平滑化、近傍ぼかし、複素数型 |
+| Maths / Trig | 6基本三角関数、Atan2、度/ラジアン変換、双曲線関数 | Sinc、余割・正割・余接、三角形の解法 |
+| Maths / Polynomials | Power、Root、Logarithm、Exponentialで一般化 | 固有ショートカット、GH1の既定底や入力ポートとの完全一致 |
+| Maths / Domain | 区間作成・端点・長さ・範囲・再マップ・分割・包絡/共通区間・評価 | 真の区間型、2次元区間、包含判定専用ノード、区間検索、区間列同士のマッチング |
+| Maths / Matrix | 転置・積・逆行列・連立方程式 | 型付き構築/分解、行列表示、行列の行列交換、誤差推定 |
+| Maths / Script | 既存のExpressionとScript | GH式言語・スクリプト互換、可変入力ポート |
+| Maths / Time | 対象外 | 日時型と関連計算 |
+| Sets / Sequence | Series、GhRange、Random、RandomNormal、既存CullPattern | Fibonacci、Jitter、Repeatなど専用ノード |
+| Sets / Sets | CreateSet、SetUnion、SetIntersection、SetDifference、SetContains、DuplicateDetection | 対称差、部分集合、互いに素、直積、最近傍メンバー、置換、文字列等 |
+| Vector / Vector | XYZ・成分・長さ・2点・正規化・反転・倍率・除算・振幅・和差・内積・外積・角度・回転・投影 | 独立Vector型、全成分同時出力、太陽位置 |
+| Vector / Point | 点、成分、距離、最近点、平面投影 | 複数の最近点・番号・距離の同時出力、曲面への射影、極/円筒座標、点群解析 |
+| Vector / Plane | 原点+2軸の直交化、3点法線、世界平面軸、座標変換、射影、軸合わせ、回転、交線点と方向 | 平面を1データとして受け渡す、点群平面フィット、平面配列の整列、平面の複数出力 |
+| Vector / Field, Grid, Colour | 既存Populate（箱内）、Noise | 専用フィールド・格子・色型。生成デザイン担当の領域 |
+| Params / Input, Primitive | 既存数値入力、GraphMapper、0/1論理 | Boolean/Integer/Angle/Domain/Vector/Plane等の独立パラメータ、専用Toggle、複合コントロール |
+| 統計関連 | 平均、中央値、母分散、母標準偏差、総和、正規分布密度と乱数 | 標本分散、分位点、相関、回帰、CDF、分布型 |
+| GH2 Maths / Complex, Function | 数値の演算、式、補間、マッパー関数 | 複素数と関数オブジェクト、関数合成、微分・積分、関数フィット |
+| GH2 Params / Numeric | 数値、0/1論理、区間の数値列、角度単位の明示 | GH2固有のAngle、Boolean、Integer、Interval、Function、確率分布などの型 |
+| GH2 Vector / Vector, Point, Plane | ベクトル演算、点・平面の一部計算 | GH2固有の型・メタデータ、全ポート仕様、完全なリストマッチング |
+| GH2 Transform / Affine | ChangeBasis、平面射影の点計算 | 変換行列型と任意形状への基底変換 |
+
+参照した GH1 索引: https://grasshopperdocs.com/addons/grasshopper-maths.html / https://grasshopperdocs.com/addons/grasshopper-vector.html / https://grasshopperdocs.com/addons/grasshopper-sets.html / https://grasshopperdocs.com/addons/grasshopper-params.html 。GH2 の公式索引: https://www.rhino3d.com/docs/grasshopper2/specs/ 。
+
+## 統合テスト
+
+`tests/math_nodes_tests.rs` に6件を追加。新規90種の登録とserde名、旧Rangeと新GhRangeの差、枝パスとブロードキャスト、区間とベクトルの配線、GraphMapperの下流再評価とプロジェクトJSONの往復、エラー伝播と乱数シードを検査する。単体テスト8件と合わせて14件のテスト関数を追加したが、実行結果はまだない。既存CI `.github/workflows/windows.yml` の pull_request イベントで cargo test --all-targets --locked と Windows リリースビルドを実行する設定を確認したため、重複するワークフローは追加しない。
