@@ -96,6 +96,37 @@ fn invalid_files_do_not_replace_the_current_project() {
 }
 
 #[test]
+fn non_file_sources_are_rejected_without_replacing_destinations() {
+    let temp = TempDir::new();
+    let source = temp.file("directory.ghx");
+    fs::create_dir(&source).unwrap();
+    let destination = temp.file("preserved.json");
+    fs::write(&destination, b"last good document").unwrap();
+
+    assert!(
+        persistence::load(&source)
+            .unwrap_err()
+            .contains("通常のファイル")
+    );
+    assert!(
+        morphlet::graph_api::load_safe(&source)
+            .unwrap_err()
+            .contains("regular file")
+    );
+    assert!(
+        morphlet::graph_api::build_file(&source, &destination)
+            .unwrap_err()
+            .contains("regular file")
+    );
+    assert!(
+        morphlet::ghx::inspect_file(&source, &destination)
+            .unwrap_err()
+            .contains("regular file")
+    );
+    assert_eq!(fs::read(&destination).unwrap(), b"last good document");
+}
+
+#[test]
 fn oversized_and_cyclic_projects_are_rejected() {
     let temp = TempDir::new();
     let path = temp.file("oversized.morphlet");

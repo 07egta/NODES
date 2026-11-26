@@ -1,6 +1,6 @@
 # NODES development checkpoint
 
-- Updated: 2026-11-27 00:30 JST / 2026-11-26 15:30 UTC.
+- Updated: 2026-11-27 00:34 JST / 2026-11-26 15:34 UTC.
 - Development branch: `develop/nodes-ultimate`.
 - Original base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`.
 - Main initially inspected: `79f32745923adfa9e3de05ef4683b6e3b5f4948f`. No direct main push, force push or release promotion.
@@ -59,7 +59,9 @@ Before environment loss, the Linux GUI was actually launched: Japanese text, the
 
 ## Current work
 
-- Save the reviewed formatter candidate, actual measurements and dependency evidence, retaining the r-efi notice branch history.
+- Reviewed formatter candidate, actual measurements and dependency evidence are saved at `c19dca185380391ad1c875e412529e22cae05ba6`; normal Check run `45849521685` has passed fmt/check/strict Clippy and is still running tests/builds.
+- Independent review found that opening a FIFO before checking its type could block project/API/GHX reads. A follow-up on `recovery/file-input-guards` adds pre-open regular-file checks, keeps descriptor checks and byte budgets, and adds a bounded Unix process regression plus cross-platform directory rejection. These new Rust edits await CI. This does not claim to eliminate hostile path-replacement races.
+- `examples/interop/ai-vase.json` constructs an editable vase/twist/output graph through the safe API. JSON/source equivalence checks passed; actual console build/edit/STL validation awaits the binary.
 - Require committed-source formatting, check, strict Clippy, all tests and Linux/Windows release binaries.
 - Obtain a Linux CI build for native GUI revalidation if the restored desktop can execute it.
 - Update the PR and this checkpoint with the exact committed-source results and GUI scope.

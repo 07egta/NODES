@@ -6,7 +6,7 @@ use crate::model::{DataType, Graph, MAX_NODES, NodeId, NodeKind};
 use crate::persistence::{self, MAX_PROJECT_BYTES, Project};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::Path;
 
@@ -345,6 +345,10 @@ pub fn save(graph: &Graph, destination: &Path) -> Result<(), String> {
 }
 
 pub fn build_file(input: &Path, destination: &Path) -> Result<(), String> {
+    // Reject named pipes before opening them can wait for a writer.
+    if !fs::metadata(input).map_err(|e| e.to_string())?.is_file() {
+        return Err("request must be a regular file".into());
+    }
     let file = File::open(input).map_err(|e| e.to_string())?;
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("request must be a regular file".into());
@@ -366,6 +370,10 @@ pub fn build_file(input: &Path, destination: &Path) -> Result<(), String> {
 }
 
 pub fn load_safe(path: &Path) -> Result<Project, String> {
+    // Reject ordinary FIFO inputs before open; keep the descriptor check below.
+    if !fs::metadata(path).map_err(|e| e.to_string())?.is_file() {
+        return Err("project must be a regular file".into());
+    }
     let file = File::open(path).map_err(|e| e.to_string())?;
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("project must be a regular file".into());

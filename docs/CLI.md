@@ -73,6 +73,37 @@ nodes-cli evaluate edited.morph
 
 加算の結果は `16` になります。`apply` は作品名、キャンバスのパン・ズーム、既存ノードの名前・位置・プレビュー設定などを保持します。出力先と入力作品を同じパスにして保存することもできます。編集要求や評価に失敗した場合は保存を開始しません。
 
+## ねじれた花器を作り、半径を変更する
+
+`examples/interop/ai-vase.json` は `examples/01.morph` と同じ形状パラメータで、`vase → twist → output` の 3 ノードを作成します。基準半径は 32 mm、高さは 104 mm、半径方向の肉厚は 2.4 mm、ねじり角は 110 度です。周方向 72、縦方向 40 の分割数と波の設定も要求に明記しています。接続には `geometry` 入力を使い、花器の Mesh を Twist の Geometry 入力へ、変形後の Mesh を Output の DisplayGeometry 入力へ渡します。
+
+リポジトリのルートで次のコマンドを実行します。`evaluate` と `export-stl` は、`build` が保存した作品をそれぞれ読み直します。
+
+```sh
+nodes-cli build examples/interop/ai-vase.json vase.morph
+nodes-cli evaluate vase.morph
+nodes-cli export-stl vase.morph vase.stl
+```
+
+この要求では花器が ID `0`、ねじりが ID `1`、出力が ID `2` です。基準半径を 36 mm に変更するには、次の内容を `vase-radius-36.json` に保存します。`vase` などの alias は最初の要求内だけで使うため、保存済み作品の編集には ID の文字列を指定します。
+
+```json
+{
+  "api_version": 1,
+  "edits": [
+    {"op": "set", "node": "0", "input": "radius", "value": 36}
+  ]
+}
+```
+
+```sh
+nodes-cli apply vase.morph vase-radius-36.json vase-36.morph
+nodes-cli evaluate vase-36.morph
+nodes-cli export-stl vase-36.morph vase-36.stl
+```
+
+この分割数から期待される出力は、半径変更の前後とも 5,906 頂点・11,808 三角形の Mesh 1 個で、高さは 104 mm です。三角形数から算出したバイナリ STL の期待サイズは `84 + 50 × 11,808 = 590,484` バイトです。実行時の JSON 応答と保存ファイルをこれらの期待値に照合してください。幅と体積は形状の評価結果で確認します。
+
 ## STL の選択規則
 
 STL は少なくとも 1 個の明示的な `output` ノードを必要とします。すべての Output ノードが有効で、少なくとも 1 個の空でない Mesh を持ち、全項目が Mesh である必要があります。無効な Output、空の出力、曲線、点、数値、数学曲面、B-rep は保存前にエラーにします。曲面や立体はグラフ内で明示的にメッシュ化してください。

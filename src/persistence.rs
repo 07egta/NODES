@@ -83,7 +83,18 @@ fn parse_error(e: serde_json::Error) -> String {
 
 /// Read into a separate value. The caller only replaces its open project on success.
 pub fn load(path: &Path) -> Result<Project, String> {
+    let metadata = fs::metadata(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !metadata.is_file() {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let file = File::open(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !file
+        .metadata()
+        .map_err(|e| format!("作品を開けませんでした: {e}"))?
+        .is_file()
+    {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let mut bytes = Vec::new();
     file.take((MAX_PROJECT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)

@@ -741,6 +741,9 @@ fn read_ghx(path: &Path) -> Res<Vec<u8>> {
     if !extension(path, "ghx") {
         return Err("only .ghx is supported; save .gh as GHX first".into());
     }
+    if !std::fs::metadata(path).map_err(|e| e.to_string())?.is_file() {
+        return Err("GHX source must be a regular file".into());
+    }
     let file = File::open(path).map_err(|e| e.to_string())?;
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("GHX source must be a regular file".into());

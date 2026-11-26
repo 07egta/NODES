@@ -392,3 +392,62 @@ fn evaluation_previews_are_bounded_even_for_large_number_lists() {
     assert_eq!(data["preview"].as_array().unwrap().len(), 8);
     assert_eq!(data["preview_truncated"], true);
 }
+
+#[cfg(unix)]
+#[test]
+fn fifo_projects_return_json_errors_without_waiting_for_a_writer() {
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+
+    let temporary = TemporaryDirectory::new();
+    let fifo = temporary.path("input.morph");
+    assert!(
+        Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .expect("Unix CLI tests require mkfifo")
+            .success()
+    );
+
+    for command in ["validate", "evaluate"] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_nodes-cli"))
+            .arg(command)
+            .arg(&fifo)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) => {}
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("Could not poll {command}: {error}");
+                }
+            }
+            if Instant::now() >= deadline {
+                // Reap even the old blocking implementation so regression runs
+                // fail promptly instead of hanging the entire test suite.
+                let killed = child.kill();
+                let waited = child.wait();
+                panic!("{command} waited for a FIFO writer; kill={killed:?}; wait={waited:?}");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let output = child.wait_with_output().unwrap();
+        let report: Json = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+            panic!(
+                "{command} did not return JSON: {error}; stderr={}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+        });
+        assert_eq!(output.status.code(), Some(1), "{command}: {report}");
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["error"]["code"], "invalid_project");
+        assert_eq!(report["error"]["message"], "project must be a regular file");
+    }
+}
