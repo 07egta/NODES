@@ -428,6 +428,14 @@ pub enum NodeKind {
     BrepUnion,
     BrepDifference,
     BrepOffset,
+    DeconstructPoint,
+    DeconstructVector,
+    DeconstructDomain,
+    DeconstructMesh,
+    Dispatch,
+    SortListPaired,
+    StreamGate,
+    StreamMerge,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -728,10 +736,19 @@ impl NodeKind {
             Self::BrepUnion,
             Self::BrepDifference,
             Self::BrepOffset,
+            Self::DeconstructPoint,
+            Self::DeconstructVector,
+            Self::DeconstructDomain,
+            Self::DeconstructMesh,
+            Self::Dispatch,
+            Self::SortListPaired,
+            Self::StreamGate,
+            Self::StreamMerge,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
         match self {
+            Self::DeconstructPoint | Self::DeconstructVector | Self::DeconstructDomain | Self::DeconstructMesh | Self::Dispatch | Self::SortListPaired | Self::StreamGate | Self::StreamMerge => crate::multi_port::spec(self),
             Self::Number => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "数値",
@@ -1382,7 +1399,14 @@ pub struct Node {
     pub name: String,
     pub position: [f32; 2],
     pub params: BTreeMap<String, f64>,
+    /// Legacy single wire: implicitly references output port 0.
     pub inputs: BTreeMap<String, NodeId>,
+    /// Explicit, ordered sources for non-primary or multiple wires. A key must
+    /// not occur in both maps. The legacy form is retained for unchanged files.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub port_links: BTreeMap<String, Vec<crate::multi_port::PortRef>>,
+    #[serde(default, skip_serializing_if = "crate::multi_port::PortLayout::is_default")]
+    pub port_layout: crate::multi_port::PortLayout,
     pub preview: bool,
     /// Script source of a `Script` node. Empty (and not saved) for other nodes.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -1435,6 +1459,8 @@ impl Graph {
                 .filter_map(|s| s.default.map(|v| (s.key.into(), v)))
                 .collect(),
             inputs: BTreeMap::new(),
+            port_links: BTreeMap::new(),
+            port_layout: Default::default(),
             preview: true,
             script: if kind == NodeKind::Expression {
                 crate::expr::DEFAULT_EXPRESSION.into()
@@ -1459,53 +1485,22 @@ impl Graph {
         self.nodes.retain(|n| n.id != id);
         for n in &mut self.nodes {
             n.inputs.retain(|_, source| *source != id);
+            let changed: Vec<_> = n.port_links.iter()
+                .filter(|(_, sources)| sources.iter().any(|s| s.node == id))
+                .map(|(key, sources)| (key.clone(), sources.iter().copied().filter(|s| s.node != id).collect()))
+                .collect();
+            for (key, sources) in changed {
+                n.set_sources(&key, sources);
+            }
         }
     }
+    /// Backwards-compatible replacement of an input with the primary output.
     pub fn connect(&mut self, from: NodeId, to: NodeId, input: &str) -> Result<(), String> {
-        let source = self
-            .node(from)
-            .ok_or("接続元が見つかりません。")?
-            .kind
-            .spec()
-            .output;
-        let node = self.node(to).ok_or("接続先が見つかりません。")?;
-        let target = node
-            .kind
-            .spec()
-            .inputs
-            .iter()
-            .find(|s| s.key == input)
-            .ok_or("入力が見つかりません。")?;
-        if !target.kind.accepts(source) {
-            return Err(format!(
-                "{} には {} を接続できません。",
-                target.kind.label(),
-                source.label()
-            ));
-        }
-        let old = self
-            .node_mut(to)
-            .ok_or("接続先が見つかりません。")?
-            .inputs
-            .insert(input.into(), from);
-        if let Err(e) = self.topological_order() {
-            if let Some(n) = self.node_mut(to) {
-                match old {
-                    Some(v) => {
-                        n.inputs.insert(input.into(), v);
-                    }
-                    None => {
-                        n.inputs.remove(input);
-                    }
-                }
-            }
-            return Err(e);
-        }
-        Ok(())
+        self.connect_port(crate::multi_port::PortRef::primary(from), to, input, false)
     }
     pub fn disconnect(&mut self, to: NodeId, input: &str) {
         if let Some(n) = self.node_mut(to) {
-            n.inputs.remove(input);
+            n.set_sources(input, Vec::new());
         }
     }
     pub fn validate(&self) -> Result<(), String> {
@@ -1538,7 +1533,8 @@ impl Graph {
             if !valid_position(node.position) || node.name.len() > 512 {
                 return Err("ノードの位置または名前が無効です。".into());
             }
-            let specs = node.kind.spec().inputs;
+            node.validate_ports()?;
+            let specs = node.input_ports();
             for (key, value) in &node.params {
                 if key == crate::data_tree::MATCH_PARAM {
                     if !crate::data_tree_nodes::supports_matching(node.kind) {
@@ -1561,21 +1557,16 @@ impl Graph {
                 }
             }
             let mut parents = BTreeSet::new();
-            for (key, source) in &node.inputs {
-                let spec = specs
-                    .iter()
-                    .find(|s| s.key == key)
-                    .ok_or("不明な入力への接続があります。")?;
-                let other = ids
-                    .get(source)
-                    .ok_or("存在しないノードへの接続があります。")?;
-                if !spec.kind.accepts(other.kind.spec().output) {
-                    return Err(format!(
-                        "「{}」の「{}」は接続の型が違います。",
-                        node.name, spec.label
-                    ));
+            for (key, sources) in node.all_links() {
+                let spec = node.input_spec(&key).ok_or("不明な入力への接続があります。")?;
+                for source in sources {
+                    let other = ids.get(&source.node).ok_or("存在しないノードへの接続があります。")?;
+                    let output = other.output_port(source.port).ok_or("存在しない出力ポートへの接続があります。")?;
+                    if !spec.kind.accepts(output.kind) {
+                        return Err(format!("「{}」の「{}」は接続の型が違います。", node.name, spec.label));
+                    }
+                    parents.insert(source.node);
                 }
-                parents.insert(*source);
             }
             indegree.insert(node.id, parents.len());
             for p in parents {

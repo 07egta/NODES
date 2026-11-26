@@ -9,6 +9,7 @@
 //! * `.morphpart` files hold one definition plus the definitions it needs (JSON, validated,
 //!   1 MiB cap). Ids are renumbered on import so parts can move between works.
 use crate::engine;
+use crate::multi_port::{self, PortResults, PRIMARY_PORT};
 use crate::model::*;
 use crate::script::MAX_SCRIPT_BYTES;
 use serde::{Deserialize, Serialize};
@@ -211,6 +212,24 @@ pub fn evaluate_any(
     }
 }
 
+/// Port-aware entry point. Legacy script/cluster APIs receive a temporary view
+/// of the merged input trees; persistent endpoint IDs never become fake graph IDs.
+pub(crate) fn evaluate_ports(
+    graph: &Graph, node: &Node, outputs: &engine::Evaluation, cancel: &dyn Fn() -> bool,
+) -> PortResults {
+    let prepared = if node.port_links.is_empty() { None } else {
+        match multi_port::materialize(node, outputs, cancel) {
+            Ok(p) => Some(p),
+            Err(e) => return multi_port::failed(node, e),
+        }
+    };
+    let (node, data) = prepared.as_ref().map(|(n, d)| (n, d)).unwrap_or((node, &outputs.outputs));
+    match node.kind {
+        NodeKind::Script | NodeKind::Cluster => BTreeMap::from([(PRIMARY_PORT, evaluate_any(graph, node, data, cancel))]),
+        _ => multi_port::evaluate(node, data, cancel),
+    }
+}
+
 fn find(defs: &[ClusterDef], id: u64) -> Option<&ClusterDef> {
     defs.iter().find(|d| d.id == id)
 }
@@ -218,7 +237,7 @@ fn find(defs: &[ClusterDef], id: u64) -> Option<&ClusterDef> {
 /// Default value of an exposed input if it is a number slot (None for geometry slots).
 pub fn port_default(def: &ClusterDef, port: &ClusterPort) -> Option<f64> {
     let node = def.graph.node(port.node)?;
-    let spec = node.kind.spec().inputs.iter().find(|s| s.key == port.key)?;
+    let spec = node.input_spec(&port.key)?;
     let default = spec.default?;
     Some(node.params.get(&port.key).copied().unwrap_or(default))
 }
@@ -284,9 +303,9 @@ fn run_def(
 ) -> Result<Tree, String> {
     let order = def.graph.topological_nodes()?;
     // Exposed inputs are fed through "virtual" source ids so lists/trees keep working.
-    let mut local: BTreeMap<NodeId, Result<Tree, String>> = BTreeMap::new();
+    let mut local = engine::Evaluation::default();
     for (k, tree) in slots.into_iter().enumerate() {
-        local.insert(VIRTUAL_BASE + k as u64, Ok(tree));
+        local.outputs.insert(VIRTUAL_BASE + k as u64, Ok(tree));
     }
     let mut weight = 0usize;
     for original in order {
@@ -304,7 +323,7 @@ fn run_def(
         // Match the top-level evaluator: disabled nodes produce an empty tree
         // without evaluating scripts, geometry, or nested clusters.
         if original.off {
-            local.insert(id, Ok(Tree::default()));
+            local.put_component(id, multi_port::empty(original));
             continue;
         }
         let mut node = original.clone();
@@ -314,21 +333,25 @@ fn run_def(
                     .insert(port.key.clone(), VIRTUAL_BASE + k as u64);
             }
         }
-        let result = match node.kind {
-            NodeKind::Script => crate::script::evaluate_node(&node, &local, cancel),
-            NodeKind::Cluster => {
-                eval_cluster_node(defs, &node, &local, depth + 1, stack, budget, cancel)
-            }
-            _ => engine::evaluate_node(&node, &local, cancel),
+        let prepared = if node.port_links.is_empty() { None } else {
+            Some(multi_port::materialize(&node, &local, cancel)?)
         };
-        let tree = result.map_err(|e| format!("部品「{}」の「{}」: {e}", def.name, node.name))?;
-        weight = weight.saturating_add(tree.weight());
+        let (node, inputs) = prepared.as_ref().map(|(n, d)| (n, d)).unwrap_or((&node, &local.outputs));
+        let results = match node.kind {
+            NodeKind::Script => BTreeMap::from([(PRIMARY_PORT, crate::script::evaluate_node(node, inputs, cancel))]),
+            NodeKind::Cluster => BTreeMap::from([(PRIMARY_PORT, eval_cluster_node(defs, node, inputs, depth + 1, stack, budget, cancel))]),
+            _ => multi_port::evaluate(node, inputs, cancel),
+        };
+        if let Some(Err(e)) = results.get(&PRIMARY_PORT) {
+            return Err(format!("部品「{}」の「{}」: {e}", def.name, node.name));
+        }
+        weight = weight.saturating_add(multi_port::result_weight(&results));
         if weight > MAX_TOTAL_WEIGHT {
             return Err("まとめノードの中間結果が大きすぎます。".into());
         }
-        local.insert(id, Ok(tree));
+        local.put_component(id, results);
     }
-    match local.remove(&def.output) {
+    match local.outputs.remove(&def.output) {
         Some(result) => result,
         None => Err("まとめノードの出力ノードが見つかりません。".into()),
     }
@@ -343,7 +366,7 @@ pub fn real_input_count(graph: &Graph, node: &Node) -> usize {
             .cluster
             .and_then(|id| find(&graph.clusters, id))
             .map_or(0, |def| def.inputs.len()),
-        kind => kind.spec().inputs.len(),
+        _ => node.input_ports().len(),
     }
 }
 pub fn input_label(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -> String {
@@ -448,9 +471,9 @@ fn validate_def(def: &ClusterDef) -> Result<(), String> {
             .graph
             .node(port.node)
             .ok_or_else(|| context("公開する入力のノードが見つかりません。".into()))?;
-        let exists = node.kind.spec().inputs.iter().any(|s| s.key == port.key);
+        let exists = node.input_spec(&port.key).is_some();
         if !exists
-            || node.inputs.contains_key(&port.key)
+            || node.has_link(&port.key)
             || !seen.insert((port.node, port.key.clone()))
             || port.label.len() > 512
         {
@@ -566,6 +589,14 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
     }
     if graph.clusters.len() >= MAX_CLUSTER_DEFS {
         return Err(format!("部品の定義は {MAX_CLUSTER_DEFS} 個までです。"));
+    }
+    // The current exposed cluster interface has a single output. Never collapse
+    // a selected multi-output node or a new-style boundary wire into a legacy one.
+    if graph.nodes.iter().any(|n| {
+        (set.contains(&n.id) && (n.output_ports().len() != 1 || n.kind == NodeKind::StreamMerge || !n.port_links.is_empty()))
+        || n.port_links.values().flatten().any(|s| set.contains(&s.node))
+    }) {
+        return Err("複数ポートを含む選択はまだ部品化できません。配線を保持するため中止しました。".into());
     }
     let name: String = name.trim().chars().take(64).collect();
     let name = if name.is_empty() {

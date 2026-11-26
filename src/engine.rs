@@ -1,6 +1,7 @@
 //! Deterministic, bounded graph evaluation and procedural mesh construction.
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
 use crate::model::*;
+use crate::multi_port::{self, PortId, PortRef, PortResults, PRIMARY_PORT};
 use crate::data_tree as dt;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -10,24 +11,41 @@ use std::time::Instant;
 
 #[derive(Clone, Debug, Default)]
 pub struct Evaluation {
+    /// Compatibility view of the stable primary port (ID 0).
     pub outputs: BTreeMap<NodeId, Result<Tree, String>>,
+    /// Secondary ports keyed by their persistent endpoint, never by visual index.
+    pub port_outputs: BTreeMap<PortRef, Result<Tree, String>>,
     pub computed: usize,
     pub cached: usize,
     pub elapsed_ms: f64,
     pub cancelled: bool,
 }
+impl Evaluation {
+    pub fn output(&self, source: PortRef) -> Option<&Result<Tree, String>> {
+        if source.port == PRIMARY_PORT { self.outputs.get(&source.node) }
+        else { self.port_outputs.get(&source) }
+    }
+    pub(crate) fn put_component(&mut self, id: NodeId, results: PortResults) {
+        for (port, result) in results {
+            if port == PRIMARY_PORT { self.outputs.insert(id, result); }
+            else { self.port_outputs.insert(PortRef { node: id, port }, result); }
+        }
+    }
+}
 #[derive(Clone, PartialEq)]
 struct Key {
     kind: NodeKind,
     params: BTreeMap<String, u64>,
-    inputs: BTreeMap<String, (NodeId, u64)>,
+    inputs: BTreeMap<String, Vec<(PortRef, u64)>>,
+    input_order: Vec<String>,
+    output_order: Vec<PortId>,
     /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
     extra: crate::cluster::CacheExtra,
 }
 struct Cache {
     key: Key,
     revision: u64,
-    result: Result<Tree, String>,
+    result: PortResults,
     weight: usize,
 }
 #[derive(Default)]
@@ -83,7 +101,7 @@ impl Evaluator {
             Ok(o) => o,
             Err(e) => {
                 for n in &graph.nodes {
-                    out.outputs.insert(n.id, Err(e.clone()));
+                    out.put_component(n.id, multi_port::failed(n, e.clone()));
                 }
                 out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
                 return out;
@@ -108,31 +126,32 @@ impl Evaluator {
             if node.off {
                 self.remove_cached(id);
                 revisions.insert(id, 0);
-                out.outputs.insert(id, Ok(Tree::default()));
+                out.put_component(id, multi_port::empty(node));
                 continue;
             }
             let key = Key {
                 kind: node.kind,
                 // IEEE bit equality preserves signed-zero-sensitive numeric operations.
                 params: node.params.iter().map(|(k, v)| (k.clone(), v.to_bits())).collect(),
-                inputs: node
-                    .inputs
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
+                inputs: node.all_links().into_iter()
+                    .map(|(k, sources)| (k, sources.into_iter()
+                        .map(|s| (s, *revisions.get(&s.node).unwrap_or(&0))).collect()))
                     .collect(),
+                input_order: node.evaluation_inputs().iter().map(|s| s.key.to_owned()).collect(),
+                output_order: node.output_ports().iter().map(|p| p.id).collect(),
                 extra: self.cluster_keys.key_for(graph, node),
             };
             let (result, revision, is_cached, weight) =
                 if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
                     (c.result.clone(), c.revision, true, c.weight)
                 } else {
-                    let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
+                    let result = crate::cluster::evaluate_ports(graph, node, &out, &stop);
                     if stop() {
                         out.cancelled = true;
                         break;
                     }
                     self.revision = self.revision.wrapping_add(1).max(1);
-                    let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
+                    let weight = multi_port::result_weight(&result);
                     (result, self.revision, false, weight)
                 };
             if is_cached {
@@ -144,13 +163,8 @@ impl Evaluator {
                 self.remove_cached(id);
                 self.revision = self.revision.wrapping_add(1).max(1);
                 revisions.insert(id, self.revision);
-                out.outputs.insert(
-                    id,
-                    Err(
-                        "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
-                            .into(),
-                    ),
-                );
+                out.put_component(id, multi_port::failed(node,
+                    "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。".into()));
                 continue;
             }
             retained = retained.saturating_add(weight);
@@ -166,19 +180,19 @@ impl Evaluator {
                 );
             }
             revisions.insert(id, revision);
-            out.outputs.insert(id, result);
+            out.put_component(id, result);
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
 }
 
-pub(crate) fn evaluate_node(
+pub(crate) fn collect_inputs(
     node: &Node,
     outputs: &BTreeMap<NodeId, Result<Tree, String>>,
     cancel: &dyn Fn() -> bool,
-) -> Result<Tree, String> {
-    let specs = node.kind.spec().inputs;
+) -> Result<Vec<Tree>, String> {
+    let specs = node.evaluation_inputs();
     let mut inputs = Vec::with_capacity(specs.len());
     for spec in specs {
         let tree = if let Some(source) = node.inputs.get(spec.key) {
@@ -196,6 +210,8 @@ pub(crate) fn evaluate_node(
             Tree::single(Value::Number(
                 *node.params.get(spec.key).unwrap_or(&default),
             ))
+        } else if crate::multi_port::optional_input(node.kind, spec.key) {
+            Tree::default()
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
@@ -230,6 +246,15 @@ pub(crate) fn evaluate_node(
         }
         inputs.push(tree);
     }
+    Ok(inputs)
+}
+
+pub(crate) fn evaluate_node(
+    node: &Node,
+    outputs: &BTreeMap<NodeId, Result<Tree, String>>,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Tree, String> {
+    let inputs = collect_inputs(node, outputs, cancel)?;
     if crate::data_tree_nodes::is_tree_kind(node.kind) {
         return checked_tree(crate::data_tree_nodes::run_tree(node, &inputs, cancel)?, cancel);
     }

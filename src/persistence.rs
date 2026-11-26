@@ -11,7 +11,7 @@ use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 pub const MAX_PROJECT_BYTES: usize = 8 * 1024 * 1024;
 pub const HISTORY_LIMIT: usize = 64;
 const MAX_EXPORT_VERTICES: usize = 2_000_000;
@@ -63,7 +63,7 @@ impl Project {
 }
 
 fn check_schema_version(version: u32) -> Result<(), String> {
-    if version != SCHEMA_VERSION {
+    if version != 1 && version != SCHEMA_VERSION {
         return Err(format!(
             "この作品は形式 v{} です。このアプリで読める形式は v{} です。",
             version, SCHEMA_VERSION
@@ -105,8 +105,11 @@ pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
     // Read only the envelope first so future schemas get an explicit version error.
     let header: Header = serde_json::from_slice(bytes).map_err(parse_error)?;
     check_schema_version(header.schema_version)?;
-    let project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
+    let mut project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
+    // A legacy node-only connection implicitly identifies primary port 0.
+    // Unknown endpoint IDs are rejected by validation, never silently redirected.
     project.validate()?;
+    project.schema_version = SCHEMA_VERSION;
     Ok(project)
 }
 
@@ -136,6 +139,11 @@ impl<W: Write> Write for ProjectWriter<W> {
 
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     project.validate()?;
+    let upgraded;
+    let project = if project.schema_version == SCHEMA_VERSION { project } else {
+        upgraded = Project { schema_version: SCHEMA_VERSION, ..project.clone() };
+        &upgraded
+    };
     atomic_write(path, |file| {
         let mut bounded = ProjectWriter {
             inner: file,

@@ -10,6 +10,7 @@ pub mod graph_api;
 pub mod import;
 pub mod latest_channel;
 pub mod model;
+pub mod multi_port;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod persistence;

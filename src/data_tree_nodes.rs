@@ -303,6 +303,11 @@ pub fn supports_matching(kind: NodeKind) -> bool {
                 | NodeKind::Loft
                 | NodeKind::ImportMesh
                 | NodeKind::Number
+                | NodeKind::Dispatch
+                | NodeKind::SortListPaired
+                | NodeKind::DeconstructDomain
+                | NodeKind::StreamGate
+                | NodeKind::StreamMerge
         )
         && kind.spec().inputs.len() > 1
 }
@@ -326,6 +331,9 @@ pub fn access_label(kind: NodeKind, index: usize) -> &'static str {
         ConcatList => "List",
         MemberIndex if index == 1 => "List",
         k if index == 0 && (is_list_kind(k) || crate::gh_nodes::is_list_kind(k)) => "List",
+        DeconstructDomain | Dispatch | SortListPaired => "List",
+        StreamGate if index == 0 => "Item",
+        StreamGate | StreamMerge => "Tree",
         Script | Cluster => "Custom",
         Output => "Tree",
         _ => "Item",
