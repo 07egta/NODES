@@ -100,6 +100,13 @@ impl Evaluator {
                 break;
             }
             let Some(node) = graph.node(id) else { continue };
+            // Disabled node: empty output, never cached; revision 0 marks "off" for children.
+            if node.off {
+                self.remove_cached(id);
+                revisions.insert(id, 0);
+                out.outputs.insert(id, Ok(Tree::default()));
+                continue;
+            }
             let key = Key {
                 kind: node.kind,
                 params: node.params.clone(),

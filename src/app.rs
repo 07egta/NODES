@@ -1,14 +1,16 @@
 use crate::file_picker::{FilePicker, FileTask, PickerEvent};
 use crate::{
     canvas::GraphCanvas,
+    data_view,
+    help::HelpWindow,
     theme,
     viewport::{PreviewItem, Viewport},
 };
 use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
 use morphlet::{
-    cluster,
+    annotations, cluster,
     engine::{Evaluation, Evaluator},
-    model::{Graph, NodeKind, Tree, Value},
+    model::{Graph, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
@@ -116,6 +118,10 @@ pub struct MorphletApp {
     suppress_history: bool,
     /// Cluster definition waiting for a `.morphpart` file name.
     part_target: Option<u64>,
+    /// Offline node dictionary (F1 / ?).
+    help_window: HelpWindow,
+    /// 値を見る window for the selected node.
+    values_open: bool,
 }
 
 impl MorphletApp {
@@ -189,6 +195,8 @@ impl MorphletApp {
             screenshot_requested: false,
             suppress_history: false,
             part_target: None,
+            help_window: HelpWindow::default(),
+            values_open: false,
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -496,7 +504,9 @@ impl MorphletApp {
     fn group_selected(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         let name = format!("部品 {}", self.project.graph.clusters.len() + 1);
-        match cluster::group_nodes(&mut self.project.graph, &ids, &name) {
+        let result = cluster::group_nodes(&mut self.project.graph, &ids, &name);
+        annotations::prune(&mut self.project.graph);
+        match result {
             Ok(id) => {
                 self.canvas.select_only(id);
                 self.notify("選択したノードを 1 つの部品にまとめました", false);
@@ -544,6 +554,7 @@ impl MorphletApp {
         for id in ids {
             self.project.graph.remove(id);
         }
+        annotations::prune(&mut self.project.graph);
         self.canvas.selected.clear();
         self.canvas.connecting = None;
     }
@@ -571,6 +582,7 @@ impl MorphletApp {
                         n.preview = old.preview;
                         n.script = old.script.clone();
                         n.cluster = old.cluster;
+                        n.off = old.off;
                     }
                 }
                 Err(e) => {
@@ -588,6 +600,59 @@ impl MorphletApp {
             }
         }
         self.canvas.selected = map.values().copied().collect();
+    }
+    /// Toggle 無効 on the selection: if any selected node is on, turn all off; else on.
+    fn toggle_off_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        if ids.is_empty() {
+            self.notify("無効にするノードを選んでください", true);
+            return;
+        }
+        let turn_off = ids
+            .iter()
+            .any(|id| self.project.graph.node(*id).is_some_and(|n| !n.off));
+        for id in &ids {
+            if let Some(n) = self.project.graph.node_mut(*id) {
+                n.off = turn_off;
+            }
+        }
+        self.notify(
+            if turn_off {
+                "選択したノードを無効にしました（出力なし）· Ctrl+E で戻せます"
+            } else {
+                "選択したノードを有効に戻しました"
+            },
+            false,
+        );
+    }
+    fn make_group(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        let name = format!("グループ {}", self.project.graph.groups.len() + 1);
+        match annotations::add_group(&mut self.project.graph, &ids, &name) {
+            Ok(_) => self.notify(
+                "グループを作りました。見出しを右クリックで名前・色を変更できます",
+                false,
+            ),
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn add_note(&mut self, at: [f32; 2]) {
+        match annotations::add_note(&mut self.project.graph, "", at) {
+            Ok(index) => self.canvas.edit_note(index),
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn open_help(&mut self) {
+        match self
+            .canvas
+            .selected
+            .iter()
+            .next_back()
+            .and_then(|id| self.project.graph.node(*id))
+        {
+            Some(n) => self.help_window.open_for(n.kind),
+            None => self.help_window.open_index(),
+        }
     }
     fn undo(&mut self) {
         if self.history.undo(&mut self.project) {
@@ -640,6 +705,12 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::D)) {
                 self.duplicate_selected();
             }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
+                self.toggle_off_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::G)) {
+                self.make_group();
+            }
             if ctx
                 .input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
             {
@@ -663,7 +734,11 @@ impl MorphletApp {
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
-            self.help_open = !self.help_open;
+            if self.help_window.open {
+                self.help_window.open = false;
+            } else {
+                self.open_help();
+            }
         }
     }
     fn topbar(&mut self, ctx: &egui::Context) {
@@ -758,7 +833,14 @@ impl MorphletApp {
                         if ui.button("作品例").clicked() {
                             self.template_open = true;
                         }
-                        if ui.button("?").on_hover_text("使い方 · F1").clicked() {
+                        if ui
+                            .button("ノード辞典")
+                            .on_hover_text("全ノードの説明・入力・使い方 · F1（選択中のノード）")
+                            .clicked()
+                        {
+                            self.help_window.open_index();
+                        }
+                        if ui.button("?").on_hover_text("使い方").clicked() {
                             self.help_open = true;
                         }
                     });
@@ -901,6 +983,9 @@ impl MorphletApp {
                                     .size(11.)
                                     .color(theme::ERROR),
                             );
+                            if let Some(line) = self.error_line(e) {
+                                ui.label(RichText::new(line).size(11.).color(theme::ERROR));
+                            }
                         }
                         ui.label(theme::small(format!(
                             "  {:.1} ms  ·  計算 {} / 再利用 {}",
@@ -938,10 +1023,28 @@ impl MorphletApp {
             ui.label(RichText::new(spec.label).strong().size(15.));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.label(theme::small(format!("#{id:02}")));
+                if ui.small_button("?").on_hover_text("ヘルプ · F1").clicked() {
+                    self.help_window.open_for(node.kind);
+                }
             });
         });
         ui.add_space(3.);
         ui.label(theme::small(spec.description));
+        if node.off {
+            ui.colored_label(
+                theme::ERROR,
+                "このノードは無効です（出力なし）。Ctrl+E または下の設定で戻せます。",
+            );
+        }
+        if let Some(Err(message)) = self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
+            egui::Frame::new()
+                .fill(Color32::from_rgb(252, 231, 224))
+                .corner_radius(6)
+                .inner_margin(8)
+                .show(ui, |ui| {
+                    ui.label(RichText::new(message).size(12.).color(theme::ERROR));
+                });
+        }
         ui.add_space(9.);
         let mut disconnect = None;
         let shown = cluster::real_input_count(&self.project.graph, &node);
@@ -1004,41 +1107,26 @@ impl MorphletApp {
             self.part_action(action);
         }
         ui.add_space(9.);
-        egui::CollapsingHeader::new("データを見る")
+        let stale = self.stale();
+        let mut open_values = false;
+        let evaluation = self.evaluation.as_ref();
+        egui::CollapsingHeader::new("値を見る")
             .id_salt("data_inspector")
+            .default_open(true)
             .show(ui, |ui| {
-                if self.stale() {
+                if ui
+                    .small_button("別ウィンドウで開く")
+                    .on_hover_text("選択中のノードの値を、大きなウィンドウで表示します")
+                    .clicked()
+                {
+                    open_values = true;
+                }
+                if stale {
                     ui.label(theme::small("更新を待っています…"));
                     return;
                 }
-                match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
-                    Some(Ok(tree)) => {
-                        ui.label(theme::small(format!(
-                            "{} ブランチ / {} 要素",
-                            tree.branches.len(),
-                            tree.item_count()
-                        )));
-                        for (path, values) in tree.branches.iter().take(12) {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{{{}}}  ·  {} 個",
-                                    path.iter()
-                                        .map(|x| x.to_string())
-                                        .collect::<Vec<_>>()
-                                        .join(";"),
-                                    values.len()
-                                ))
-                                .size(11.)
-                                .color(theme::TEAL),
-                            );
-                            for value in values.iter().take(4) {
-                                ui.label(theme::small(value_summary(value)));
-                            }
-                            if values.len() > 4 {
-                                ui.label(theme::small(format!("… 残り {} 個", values.len() - 4)));
-                            }
-                        }
-                    }
+                match evaluation.and_then(|e| e.outputs.get(&id)) {
+                    Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
                     Some(Err(e)) => {
                         ui.colored_label(theme::ERROR, e);
                     }
@@ -1047,6 +1135,9 @@ impl MorphletApp {
                     }
                 }
             });
+        if open_values {
+            self.values_open = true;
+        }
         egui::CollapsingHeader::new("ノードの設定")
             .id_salt("node_settings")
             .show(ui, |ui| {
@@ -1056,6 +1147,7 @@ impl MorphletApp {
                         ui.text_edit_singleline(&mut n.name);
                     });
                     ui.checkbox(&mut n.preview, "「表示中」モードで表示");
+                    ui.checkbox(&mut n.off, "無効にする（出力なし） · Ctrl+E");
                 }
                 ui.horizontal(|ui| {
                     if ui.button("複製").clicked() {
@@ -1063,6 +1155,13 @@ impl MorphletApp {
                     }
                     if ui.button("削除").clicked() {
                         self.delete_selected();
+                    }
+                    if ui
+                        .button("グループ")
+                        .on_hover_text("選択中のノードを色つきの枠で囲みます · Ctrl+G")
+                        .clicked()
+                    {
+                        self.make_group();
                     }
                     if ui
                         .button("まとめる")
@@ -1174,6 +1273,23 @@ impl MorphletApp {
                                         self.canvas.center_for_add(&self.project);
                                     self.search.clear();
                                 }
+                                if ui
+                                    .small_button("メモ")
+                                    .on_hover_text(
+                                        "キャンバスにメモを置きます（右クリックでも追加）",
+                                    )
+                                    .clicked()
+                                {
+                                    let at = self.canvas.center_for_add(&self.project);
+                                    self.add_note(at);
+                                }
+                                if ui
+                                    .small_button("値を見る")
+                                    .on_hover_text("選択中のノードの出力を一覧表示")
+                                    .clicked()
+                                {
+                                    self.values_open = !self.values_open;
+                                }
                                 if ui.small_button("整列").clicked() {
                                     self.canvas.auto_arrange(&mut self.project);
                                 }
@@ -1209,6 +1325,24 @@ impl MorphletApp {
                 }
                 if outcome.duplicate {
                     self.duplicate_selected();
+                }
+                if outcome.toggle_off {
+                    self.toggle_off_selected();
+                }
+                if outcome.group {
+                    self.make_group();
+                }
+                if outcome.view_values {
+                    self.values_open = true;
+                }
+                if let Some(kind) = outcome.help {
+                    self.help_window.open_for(kind);
+                }
+                if outcome.help_index {
+                    self.help_window.open_index();
+                }
+                if let Some(at) = outcome.add_note_at {
+                    self.add_note(at);
                 }
                 if let Some(at) = outcome.add_at {
                     self.palette_open = true;
@@ -1383,8 +1517,9 @@ impl MorphletApp {
             }
             ui.separator();
             egui::Grid::new("shortcuts").num_columns(2).spacing([24.,6.]).show(ui,|ui|{
-                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
+                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("F1","選択中のノードのヘルプ（ノード辞典）"),("Ctrl+E","選択ノードを無効 / 有効"),("Ctrl+G","選択ノードをグループで囲む"),("右クリック（空き）","ここにノード / メモを追加"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
             });
+            ui.add_space(8.);if ui.button("ノード辞典を開く（全ノードの説明）").clicked(){self.help_window.open_index();}
             ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
             ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
         });
@@ -1443,6 +1578,75 @@ impl MorphletApp {
             });
         });
     }
+    /// 「名前」: message for the selected node's error, else the first error.
+    fn error_line(&self, e: &Evaluation) -> Option<String> {
+        let selected = self.canvas.selected.iter().next_back().copied();
+        let pick = selected
+            .and_then(|id| {
+                e.outputs
+                    .get(&id)
+                    .and_then(|r| r.as_ref().err())
+                    .map(|m| (id, m))
+            })
+            .or_else(|| {
+                e.outputs
+                    .iter()
+                    .find_map(|(id, r)| r.as_ref().err().map(|m| (*id, m)))
+            })?;
+        let name = self
+            .project
+            .graph
+            .node(pick.0)
+            .map(|n| n.name.as_str())
+            .unwrap_or("?");
+        let message: String = pick.1.chars().take(90).collect();
+        Some(format!("「{name}」: {message}"))
+    }
+    fn values_window(&mut self, ctx: &egui::Context) {
+        if !self.values_open {
+            return;
+        }
+        let mut open = true;
+        let id = self.canvas.selected.iter().next_back().copied();
+        let title = id
+            .and_then(|id| self.project.graph.node(id))
+            .map(|n| format!("値を見る · {}", n.name))
+            .unwrap_or_else(|| "値を見る".into());
+        egui::Window::new("値を見る")
+            .id(egui::Id::new("values_window"))
+            .open(&mut open)
+            .resizable(true)
+            .default_size([420., 460.])
+            .show(ctx, |ui| {
+                ui.label(RichText::new(title).strong());
+                let Some(id) = id else {
+                    ui.label(theme::small(
+                        "キャンバスでノードを選ぶと、その出力が表示されます。",
+                    ));
+                    return;
+                };
+                if self.stale() {
+                    ui.label(theme::small("更新を待っています…"));
+                }
+                match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
+                    Some(Ok(tree)) => {
+                        let h = (ui.available_height() - 30.).max(160.);
+                        data_view::show_tree(ui, tree, "window", h);
+                    }
+                    Some(Err(e)) => {
+                        ui.colored_label(theme::ERROR, e);
+                    }
+                    None => {
+                        ui.label(theme::small("未計算"));
+                    }
+                }
+                ui.label(theme::small(format!(
+                    "数値は小数 4 桁、最大 {} 行まで表示します。",
+                    data_view::MAX_ROWS
+                )));
+            });
+        self.values_open = open;
+    }
     fn save_recovery(&mut self) {
         if !self.dirty || self.last_autosave.elapsed() < Duration::from_secs(20) {
             return;
@@ -1484,6 +1688,10 @@ impl eframe::App for MorphletApp {
         self.template_dialog(ctx);
         self.export_dialog(ctx);
         self.help_dialog(ctx);
+        if let Some(kind) = self.help_window.show(ctx) {
+            self.add_node(kind, None);
+        }
+        self.values_window(ctx);
         self.confirm_dialog(ctx);
         self.recovery_dialog(ctx);
         self.file_dialog(ctx);
@@ -1622,6 +1830,7 @@ fn same_calculation(a: &Graph, b: &Graph) -> bool {
                 && x.inputs == y.inputs
                 && x.script == y.script
                 && x.cluster == y.cluster
+                && x.off == y.off
         })
 }
 fn matches_search(kind: NodeKind, query: &str) -> bool {
@@ -1672,22 +1881,6 @@ fn recovery_path() -> Option<PathBuf> {
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".local/share")))
             .map(|p| p.join("morphlet/recovery.morph"))
-    }
-}
-fn value_summary(value: &Value) -> String {
-    match value {
-        Value::Number(v) => format!("{v:.4}"),
-        Value::Point(p) => format!("点  ({:.2}, {:.2}, {:.2})", p[0], p[1], p[2]),
-        Value::Curve(c) => format!(
-            "曲線 · {} 点 · {}",
-            c.points.len(),
-            if c.closed { "閉じた" } else { "開いた" }
-        ),
-        Value::Mesh(m) => format!(
-            "メッシュ · {} 頂点 / {} 面",
-            m.vertices.len(),
-            m.triangles.len()
-        ),
     }
 }
 fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {

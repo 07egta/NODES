@@ -1,8 +1,10 @@
+use crate::data_view::{self, DataShape};
 use crate::theme;
 use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, Stroke, Vec2};
 use morphlet::{
+    annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
-    model::{Node, NodeId},
+    model::{Node, NodeId, NodeKind},
     persistence::Project,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,6 +21,11 @@ pub struct GraphCanvas {
     pub last_rect: Option<Rect>,
     dragging: Option<NodeId>,
     box_start: Option<Pos2>,
+    /// Note being edited in place, and whether its text box still needs focus.
+    editing_note: Option<usize>,
+    note_focus: bool,
+    /// World position of the last right-click on the empty canvas.
+    menu_at: [f32; 2],
 }
 
 #[derive(Default)]
@@ -27,6 +34,43 @@ pub struct CanvasOutcome {
     pub error: Option<String>,
     pub duplicate: bool,
     pub delete: bool,
+    /// Open the node dictionary on this kind.
+    pub help: Option<NodeKind>,
+    /// Open the node dictionary index.
+    pub help_index: bool,
+    /// Toggle 無効 (bypass) on the selection.
+    pub toggle_off: bool,
+    /// Make a group from the selection.
+    pub group: bool,
+    /// Open the 値を見る window for the selection.
+    pub view_values: bool,
+    /// Add an empty note at this world position.
+    pub add_note_at: Option<[f32; 2]>,
+}
+
+/// Screen rectangle of a group: the union of its live members plus a label band.
+fn group_rect(p: &Project, members: &[NodeId], rect: Rect) -> Option<Rect> {
+    let mut bounds = Rect::NOTHING;
+    for id in members {
+        if let Some(n) = p.graph.node(*id) {
+            bounds = bounds.union(Rect::from_min_size(
+                to_screen(n.position, rect, p.pan, p.zoom),
+                egui::vec2(WIDTH, height(n)) * p.zoom,
+            ));
+        }
+    }
+    if !bounds.is_positive() {
+        return None;
+    }
+    let pad = 14. * p.zoom;
+    Some(Rect::from_min_max(
+        bounds.min - egui::vec2(pad, pad + 24. * p.zoom),
+        bounds.max + egui::vec2(pad, pad),
+    ))
+}
+const NOTE_WIDTH: f32 = 210.0;
+fn note_fill() -> Color32 {
+    Color32::from_rgb(255, 248, 214)
 }
 
 fn height(node: &Node) -> f32 {
@@ -185,6 +229,33 @@ impl GraphCanvas {
         {
             out.add_at = Some(to_world(pos, rect, p.pan, p.zoom));
         }
+        if response.secondary_clicked()
+            && let Some(pos) = pointer
+        {
+            self.menu_at = to_world(pos, rect, p.pan, p.zoom);
+        }
+        let menu_at = self.menu_at;
+        let has_selection = !self.selected.is_empty();
+        response.context_menu(|ui| {
+            if ui.button("ここにノードを追加").clicked() {
+                out.add_at = Some(menu_at);
+                ui.close();
+            }
+            if ui.button("ここにメモを追加").clicked() {
+                out.add_note_at = Some(menu_at);
+                ui.close();
+            }
+            if has_selection && ui.button("選択をグループにする  Ctrl+G").clicked() {
+                out.group = true;
+                ui.close();
+            }
+            if ui.button("ノード辞典  F1").clicked() {
+                out.help_index = true;
+                ui.close();
+            }
+        });
+        self.draw_groups(ui, &painter, p, rect);
+        self.draw_notes(ui, &painter, p, rect);
         if response.clicked() && !card_under {
             if !ui.input(|i| i.modifiers.shift) {
                 self.selected.clear();
@@ -243,12 +314,11 @@ impl GraphCanvas {
                     } else {
                         Color32::from_rgb(156, 180, 169)
                     };
-                    bezier(
-                        &painter,
-                        a,
-                        b,
-                        Stroke::new(if selected { 2.4 } else { 1.7_f32 }, color),
-                    );
+                    let shape = evaluation
+                        .and_then(|e| e.outputs.get(from))
+                        .and_then(|r| r.as_ref().ok())
+                        .map(data_view::shape_of);
+                    wire(&painter, a, b, shape, color, selected, p.zoom);
                 }
             }
         }
@@ -269,7 +339,15 @@ impl GraphCanvas {
                 9,
                 Color32::from_rgba_unmultiplied(39, 60, 48, 15),
             );
-            painter.rect_filled(nr, 9, Color32::from_rgb(253, 254, 251));
+            painter.rect_filled(
+                nr,
+                9,
+                if n.off {
+                    Color32::from_rgb(234, 236, 232)
+                } else {
+                    Color32::from_rgb(253, 254, 251)
+                },
+            );
             painter.rect_stroke(
                 nr,
                 9,
@@ -292,13 +370,18 @@ impl GraphCanvas {
                 ],
                 Stroke::new(1_f32, theme::LINE),
             );
+            let col = if n.off { Color32::from_gray(170) } else { col };
             painter.circle_filled(pos + egui::vec2(19., 21.) * p.zoom, 4.4 * p.zoom, col);
             painter.text(
                 pos + egui::vec2(31., 19.) * p.zoom,
                 Align2::LEFT_CENTER,
-                &n.name,
+                if n.off {
+                    format!("{}（無効）", n.name)
+                } else {
+                    n.name.clone()
+                },
                 FontId::proportional(13.5 * p.zoom),
-                theme::INK,
+                if n.off { theme::MUTED } else { theme::INK },
             );
             let header = Rect::from_min_size(pos, egui::vec2(WIDTH - 26., HEADER) * p.zoom);
             let hr = ui.interact(
@@ -345,7 +428,59 @@ impl GraphCanvas {
                     out.delete = true;
                     ui.close();
                 }
+                ui.separator();
+                if ui
+                    .button(if n.off {
+                        "有効にする  Ctrl+E"
+                    } else {
+                        "無効にする（出力なし）  Ctrl+E"
+                    })
+                    .clicked()
+                {
+                    if !self.selected.contains(&n.id) {
+                        self.select_only(n.id);
+                    }
+                    out.toggle_off = true;
+                    ui.close();
+                }
+                if ui.button("値を見る").clicked() {
+                    self.select_only(n.id);
+                    out.view_values = true;
+                    ui.close();
+                }
+                if ui.button("グループにする  Ctrl+G").clicked() {
+                    if !self.selected.contains(&n.id) {
+                        self.select_only(n.id);
+                    }
+                    out.group = true;
+                    ui.close();
+                }
+                if ui.button("ヘルプ  F1").clicked() {
+                    out.help = Some(n.kind);
+                    ui.close();
+                }
             });
+            if selected {
+                let q = Rect::from_center_size(
+                    pos + egui::vec2(WIDTH - 38., 20.) * p.zoom,
+                    egui::vec2(18., 18.) * p.zoom,
+                );
+                painter.circle_stroke(q.center(), 7. * p.zoom, Stroke::new(1_f32, theme::MUTED));
+                painter.text(
+                    q.center(),
+                    Align2::CENTER_CENTER,
+                    "?",
+                    FontId::proportional(10.5 * p.zoom),
+                    theme::MUTED,
+                );
+                if ui
+                    .interact(q, Id::new(("node_help", n.id)), Sense::click())
+                    .on_hover_text("このノードのヘルプ · F1")
+                    .clicked()
+                {
+                    out.help = Some(n.kind);
+                }
+            }
             let eye = Rect::from_center_size(
                 pos + egui::vec2(WIDTH - 15., 20.) * p.zoom,
                 egui::vec2(20., 22.) * p.zoom,
@@ -477,13 +612,48 @@ impl GraphCanvas {
             if or.clicked() || or.drag_started() {
                 self.connecting = Some(n.id);
             }
+            let shape = evaluation
+                .and_then(|e| e.outputs.get(&n.id))
+                .and_then(|r| r.as_ref().ok())
+                .map(data_view::shape_of);
             or.on_hover_text(format!(
-                "{}の出力 · {}",
+                "{}の出力 · {}{}",
                 n.name,
-                n.kind.spec().output.label()
+                n.kind.spec().output.label(),
+                shape
+                    .map(|s| format!("\n形: {}", s.describe()))
+                    .unwrap_or_default()
             ));
+            if let Some(shape) = shape {
+                let galley = painter.layout_no_wrap(
+                    shape.badge(),
+                    FontId::proportional(9.5 * p.zoom),
+                    Color32::WHITE,
+                );
+                let badge = Rect::from_min_size(
+                    op + egui::vec2(5., -20.) * p.zoom,
+                    galley.size() + egui::vec2(8., 3.) * p.zoom,
+                );
+                painter.rect_filled(
+                    badge,
+                    4,
+                    match shape {
+                        DataShape::Empty => Color32::from_gray(165),
+                        DataShape::Item => col,
+                        DataShape::List(_) => col.gamma_multiply(0.85),
+                        DataShape::Tree { .. } => Color32::from_rgb(70, 84, 104),
+                    },
+                );
+                painter.galley(
+                    badge.min + egui::vec2(4., 1.5) * p.zoom,
+                    galley,
+                    Color32::WHITE,
+                );
+            }
             let text = if stale {
                 "更新中".to_owned()
+            } else if n.off {
+                "無効 · 出力なし".into()
             } else if error.is_some() {
                 "! 入力を確認".into()
             } else if let Some(Ok(tree)) = evaluation.and_then(|e| e.outputs.get(&n.id)) {
@@ -503,10 +673,22 @@ impl GraphCanvas {
                 },
             );
             if let Some(message) = error {
+                let strip = Rect::from_min_size(
+                    nr.left_bottom() + egui::vec2(0., 4. * p.zoom),
+                    egui::vec2(WIDTH, 22.) * p.zoom,
+                );
+                painter.rect_filled(strip, 6, Color32::from_rgb(252, 231, 224));
+                painter.text(
+                    strip.left_center() + egui::vec2(8. * p.zoom, 0.),
+                    Align2::LEFT_CENTER,
+                    short(message, 22),
+                    FontId::proportional(10. * p.zoom),
+                    theme::ERROR,
+                );
                 ui.interact(
                     Rect::from_min_max(
                         nr.left_bottom() - egui::vec2(0., 25. * p.zoom),
-                        nr.right_bottom(),
+                        strip.right_bottom(),
                     ),
                     Id::new(("error", n.id)),
                     Sense::hover(),
@@ -558,7 +740,7 @@ impl GraphCanvas {
         let hint = if self.connecting.is_some() {
             "入力の丸をクリックして接続  ·  Esc で中止"
         } else {
-            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン"
+            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  右クリックでメモ"
         };
         painter.rect_filled(
             Rect::from_min_max(
@@ -576,6 +758,287 @@ impl GraphCanvas {
             theme::MUTED,
         );
         out
+    }
+}
+
+impl GraphCanvas {
+    /// Coloured rectangles behind member nodes. The label band selects (click), moves
+    /// (drag) and edits (right-click: rename, colour, ungroup) the group.
+    fn draw_groups(
+        &mut self,
+        ui: &mut egui::Ui,
+        painter: &egui::Painter,
+        p: &mut Project,
+        rect: Rect,
+    ) {
+        let mut remove = None;
+        for gi in 0..p.graph.groups.len() {
+            let Some(group) = p.graph.groups.get(gi).cloned() else {
+                continue;
+            };
+            let Some(gr) = group_rect(p, &group.nodes, rect) else {
+                continue;
+            };
+            if !rect.intersects(gr) {
+                continue;
+            }
+            let [r, g, b] = group.color;
+            let color = Color32::from_rgb(r, g, b);
+            painter.rect_filled(gr, 12, Color32::from_rgba_unmultiplied(r, g, b, 30));
+            painter.rect_stroke(
+                gr,
+                12,
+                Stroke::new(1_f32, color.gamma_multiply(0.7)),
+                egui::StrokeKind::Inside,
+            );
+            let band = Rect::from_min_size(gr.min, egui::vec2(gr.width(), 24. * p.zoom));
+            painter.text(
+                band.left_center() + egui::vec2(10. * p.zoom, 0.),
+                Align2::LEFT_CENTER,
+                if group.name.is_empty() {
+                    "グループ"
+                } else {
+                    group.name.as_str()
+                },
+                FontId::proportional(12. * p.zoom),
+                color,
+            );
+            let lr = ui
+                .interact(band, Id::new(("group_band", gi)), Sense::click_and_drag())
+                .on_hover_text(
+                    "クリックで中のノードを選択 · ドラッグで移動 · 右クリックで名前・色・解除",
+                );
+            if lr.clicked() || lr.drag_started() {
+                self.selected = group
+                    .nodes
+                    .iter()
+                    .copied()
+                    .filter(|id| p.graph.node(*id).is_some())
+                    .collect();
+            }
+            if lr.dragged() {
+                let d = ui.input(|i| i.pointer.delta()) / p.zoom;
+                for id in &group.nodes {
+                    if let Some(m) = p.graph.node_mut(*id) {
+                        m.position[0] = (m.position[0] + d.x).clamp(-1e6, 1e6);
+                        m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
+                    }
+                }
+            }
+            lr.context_menu(|ui| {
+                if let Some(g) = p.graph.groups.get_mut(gi) {
+                    ui.label(theme::small("グループ名"));
+                    if ui.text_edit_singleline(&mut g.name).changed()
+                        && g.name.len() > MAX_GROUP_NAME_BYTES
+                    {
+                        g.name = annotations::truncate_bytes(&g.name, MAX_GROUP_NAME_BYTES);
+                    }
+                    ui.horizontal(|ui| {
+                        for c in GROUP_COLORS {
+                            let (sw, resp) =
+                                ui.allocate_exact_size(egui::vec2(18., 18.), Sense::click());
+                            ui.painter().circle_filled(
+                                sw.center(),
+                                7.,
+                                Color32::from_rgb(c[0], c[1], c[2]),
+                            );
+                            if g.color == c {
+                                ui.painter().circle_stroke(
+                                    sw.center(),
+                                    8.5,
+                                    Stroke::new(1.5_f32, theme::INK),
+                                );
+                            }
+                            if resp.clicked() {
+                                g.color = c;
+                            }
+                        }
+                    });
+                }
+                if ui.button("グループを解除（ノードは残す）").clicked() {
+                    remove = Some(gi);
+                    ui.close();
+                }
+            });
+        }
+        if let Some(gi) = remove
+            && gi < p.graph.groups.len()
+        {
+            p.graph.groups.remove(gi);
+        }
+    }
+
+    /// Sticky notes: drag to move, double-click to edit, right-click to delete.
+    fn draw_notes(
+        &mut self,
+        ui: &mut egui::Ui,
+        painter: &egui::Painter,
+        p: &mut Project,
+        rect: Rect,
+    ) {
+        let mut remove = None;
+        let width = NOTE_WIDTH * p.zoom;
+        for ni in 0..p.graph.notes.len() {
+            let Some(note) = p.graph.notes.get(ni).cloned() else {
+                continue;
+            };
+            let pos = to_screen(note.position, rect, p.pan, p.zoom);
+            let editing = self.editing_note == Some(ni);
+            let (text, color) = if note.text.is_empty() {
+                ("ダブルクリックでメモを書く".to_owned(), theme::MUTED)
+            } else {
+                (note.text.clone(), theme::INK)
+            };
+            let galley = painter.layout(
+                text,
+                FontId::proportional(12. * p.zoom),
+                color,
+                width - 20. * p.zoom,
+            );
+            let h =
+                (galley.size().y + 20. * p.zoom).max((if editing { 90. } else { 40. }) * p.zoom);
+            let nr = Rect::from_min_size(pos, egui::vec2(width, h));
+            if !rect.intersects(nr.expand(10.)) {
+                continue;
+            }
+            painter.rect_filled(
+                nr.translate(egui::vec2(0., 2.)),
+                6,
+                Color32::from_black_alpha(14),
+            );
+            painter.rect_filled(nr, 6, note_fill());
+            painter.rect_stroke(
+                nr,
+                6,
+                Stroke::new(1_f32, Color32::from_rgb(226, 206, 140)),
+                egui::StrokeKind::Inside,
+            );
+            if editing {
+                if let Some(n) = p.graph.notes.get_mut(ni) {
+                    let te = ui.put(
+                        nr.shrink(6. * p.zoom),
+                        egui::TextEdit::multiline(&mut n.text)
+                            .font(FontId::proportional(12. * p.zoom))
+                            .frame(false)
+                            .desired_width(width - 12. * p.zoom),
+                    );
+                    if n.text.len() > MAX_NOTE_BYTES {
+                        n.text = annotations::truncate_bytes(&n.text, MAX_NOTE_BYTES);
+                    }
+                    if self.note_focus {
+                        te.request_focus();
+                        self.note_focus = false;
+                    } else if te.lost_focus() {
+                        self.editing_note = None;
+                    }
+                }
+                continue;
+            }
+            painter.galley(nr.min + egui::vec2(10., 10.) * p.zoom, galley, color);
+            let r = ui
+                .interact(nr, Id::new(("note", ni)), Sense::click_and_drag())
+                .on_hover_text("ドラッグで移動 · ダブルクリックで編集 · 右クリックで削除");
+            if r.double_clicked() {
+                self.editing_note = Some(ni);
+                self.note_focus = true;
+            }
+            if r.dragged() {
+                let d = ui.input(|i| i.pointer.delta()) / p.zoom;
+                if let Some(n) = p.graph.notes.get_mut(ni) {
+                    n.position[0] = (n.position[0] + d.x).clamp(-1e6, 1e6);
+                    n.position[1] = (n.position[1] + d.y).clamp(-1e6, 1e6);
+                }
+            }
+            r.context_menu(|ui| {
+                if ui.button("編集").clicked() {
+                    self.editing_note = Some(ni);
+                    self.note_focus = true;
+                    ui.close();
+                }
+                if ui.button("メモを削除").clicked() {
+                    remove = Some(ni);
+                    ui.close();
+                }
+            });
+        }
+        if let Some(ni) = remove
+            && ni < p.graph.notes.len()
+        {
+            p.graph.notes.remove(ni);
+            self.editing_note = None;
+        }
+        if self.editing_note.is_some_and(|i| i >= p.graph.notes.len()) {
+            self.editing_note = None;
+        }
+    }
+    /// Start editing a note that was just created.
+    pub fn edit_note(&mut self, index: usize) {
+        self.editing_note = Some(index);
+        self.note_focus = true;
+    }
+}
+
+/// First `max` characters of `text`, with an ellipsis when cut.
+fn short(text: &str, max: usize) -> String {
+    let mut out: String = text.chars().take(max).collect();
+    if text.chars().nth(max).is_some() {
+        out.push('…');
+    }
+    out
+}
+
+fn cubic(a: Pos2, b: Pos2, samples: usize) -> Vec<Pos2> {
+    let handle = ((b.x - a.x).abs() * 0.5).clamp(40., 160.);
+    let (p0, p1, p2, p3) = (a, a + Vec2::new(handle, 0.), b - Vec2::new(handle, 0.), b);
+    (0..=samples)
+        .map(|i| {
+            let t = i as f32 / samples.max(1) as f32;
+            let u = 1. - t;
+            let v = p0.to_vec2() * (u * u * u)
+                + p1.to_vec2() * (3. * u * u * t)
+                + p2.to_vec2() * (3. * u * t * t)
+                + p3.to_vec2() * (t * t * t);
+            v.to_pos2()
+        })
+        .collect()
+}
+
+/// A wire styled by the shape of the data flowing through it:
+/// one item = thin solid, list = double line, tree = dashed, empty = thin grey dots.
+fn wire(
+    painter: &egui::Painter,
+    a: Pos2,
+    b: Pos2,
+    shape: Option<DataShape>,
+    color: Color32,
+    selected: bool,
+    zoom: f32,
+) {
+    let w = if selected { 2.4 } else { 1.7_f32 };
+    match shape {
+        Some(DataShape::List(_)) => {
+            bezier(painter, a, b, Stroke::new(w + 2.8, color));
+            bezier(painter, a, b, Stroke::new(1.3_f32, theme::CANVAS));
+        }
+        Some(DataShape::Tree { .. }) => {
+            let points = cubic(a, b, 40);
+            painter.extend(Shape::dashed_line(
+                &points,
+                Stroke::new(w + 0.6, color),
+                8. * zoom.max(0.5),
+                5. * zoom.max(0.5),
+            ));
+        }
+        Some(DataShape::Empty) => {
+            let points = cubic(a, b, 40);
+            painter.extend(Shape::dashed_line(
+                &points,
+                Stroke::new(1.2_f32, Color32::from_gray(175)),
+                3.,
+                4.,
+            ));
+        }
+        _ => bezier(painter, a, b, Stroke::new(w, color)),
     }
 }
 

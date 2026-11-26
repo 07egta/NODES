@@ -1,7 +1,9 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
 mod canvas;
+mod data_view;
 mod file_picker;
+mod help;
 mod script_ui;
 mod theme;
 mod viewport;

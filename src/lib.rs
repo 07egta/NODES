@@ -1,3 +1,4 @@
+pub mod annotations;
 pub mod cluster;
 pub mod engine;
 pub mod model;
