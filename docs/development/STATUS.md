@@ -1,3 +1,25 @@
+# NODES Omega geometry and correctness checkpoint
+
+- Updated: 2026-11-27 08:15 JST.
+- Active branch: `feat/nodes-omega-geometry`.
+- Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR #15; includes #12 structural API edits and previous c52e850 integration).
+- Scope: independent curve/surface/mesh/data correctness fixes and reproducible performance evidence; preserve concurrent multi-port work.
+- Baseline CI: Check 45907598179, Linux 448 passed / Windows 447 passed, 0 failed, 3 opt-in ignored, 35 suites. Linux fmt/check/strict Clippy/Python17/audit and both release binaries succeeded.
+- Current local checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust 1.100.0 is available at `/home/agent/.cargo/bin` (the old absence recorded below is historical).
+- Other active work: PR #14 and #13 multi-port, `fix/omega-multiport-ci` formatting repair created during initial inspection; no overlapping edits will be pushed to those branches.
+- Confirmed issue to reproduce: exact curve closest-point search omits endpoint sample cells; line [0,1], query 0.001 can return parameter 0.
+- Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
+- This checkpoint changes documentation only. No new source has yet been tested.
+- Next commands: `cargo test --locked --offline --lib`, focused curve regressions, then full fmt/check/clippy/test gates.
+- Next files: `src/curve_geometry.rs` and independent curve regressions; additional non-overlapping modules after audit.
+- PR: creation follows the first checkpoint commit; target the PR #15 branch to avoid duplicating its existing review scope.
+- Registry: 298 picker kinds + Cluster = 299; completely verified node count remains unestablished, external GH oracle VERIFIED = 0.
+- Remaining: fully verified multi-port integration is being repaired elsewhere; general trimmed B-rep, robust general Boolean, complete interchange, runtime Null and Windows GUI/Intel Arc remain incomplete.
+
+---
+
+## Historical integration checkpoint
+
 # NODES development checkpoint
 
 - Updated: 2026-11-27 01:31 JST / 2026-11-26 16:31 UTC.
