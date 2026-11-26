@@ -213,12 +213,12 @@ pub(crate) fn evaluate_node(
                 let n = value.number()?;
                 if n < spec.min || n > spec.max {
                     return Err(format!(
-                        "「{}」は {} 〜 {} の範囲にしてください。",
-                        spec.label, spec.min, spec.max
+                        "「{}」{} は {} 〜 {} の範囲にしてください。",
+                        spec.label, site(), spec.min, spec.max
                     ));
                 }
                 if spec.integer && (n - n.round()).abs() > 1e-8 {
-                    return Err(format!("「{}」は整数にしてください。", spec.label));
+                    return Err(format!("「{}」{} は整数にしてください。", spec.label, site()));
                 }
             }
           }
@@ -280,7 +280,7 @@ pub(crate) fn evaluate_node(
     }
     // Old .morph files omit MATCH_PARAM and keep the original exact-path behaviour.
     // When a matching mode is selected, use ordinal branch matching instead.
-    let matched = if matching.is_some() {
+    let matched = if matching.is_some() || crate::data_tree_nodes::is_list_kind(node.kind) {
         dt::match_branches(&inputs)?
     } else {
       paths.into_iter().map(|path| {
