@@ -31,3 +31,9 @@ Record CPU, RAM, OS, Rust version, commit SHA and power mode. Compare five relea
 ## Follow-up work (not implemented here)
 
 Multi-output port IDs and migration (retain v1 reader); opaque unknown node payloads with explicit disabled behavior; bounded latest-only worker queue and cooperative parallelism; versioned plugin API; category-specific registries; large-graph resource policy backed by measurements. These require coordinated schema/UI work and compatibility tests, not an unreviewed merge into the current graph model.
+
+## Second hardening pass
+
+Cluster instance keys now share per-root dependency token arrays. Each reachable definition is compared against its full serialized signature once per evaluation and receives a new revision only on change; tokens are not collision-prone hashes. This avoids storing the entire definition closure in every instance's cache entry. The evaluator still serializes active definitions once per evaluation and does not provide a file watcher. Definition validation memoizes depths and stops before descending past the configured maximum. Part import checks ID allocation before mutation; part export validates the generated payload and uses the same atomic, flushed writer as projects.
+
+Regression tests cover shared nested definitions, graph replacement with reused IDs, pathological definition fanout/depth, ID exhaustion and preservation of an existing part on failed saves.

@@ -21,7 +21,7 @@ struct Key {
     params: BTreeMap<String, f64>,
     inputs: BTreeMap<String, (NodeId, u64)>,
     /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
-    extra: String,
+    extra: crate::cluster::CacheExtra,
 }
 struct Cache {
     key: Key,
@@ -33,6 +33,7 @@ pub struct Evaluator {
     cache: BTreeMap<NodeId, Cache>,
     cache_weight: usize,
     revision: u64,
+    cluster_keys: crate::cluster::CacheKeys,
 }
 impl Evaluator {
     fn remove_cached(&mut self, id: NodeId) {
@@ -92,6 +93,7 @@ impl Evaluator {
         self.cache_weight = self.cache.values().fold(0usize, |sum, c| {
             sum.saturating_add(c.result.as_ref().map(Tree::weight).unwrap_or(0))
         });
+        self.cluster_keys.begin(graph);
         let mut revisions = BTreeMap::new();
         let mut retained = 0usize;
         for node in order {
@@ -115,7 +117,7 @@ impl Evaluator {
                     .iter()
                     .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
                     .collect(),
-                extra: crate::cluster::key_extra(graph, node),
+                extra: self.cluster_keys.key_for(graph, node),
             };
             let (result, revision, is_cached) =
                 if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {

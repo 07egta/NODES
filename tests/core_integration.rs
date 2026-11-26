@@ -234,3 +234,94 @@ fn benchmark_sparse_slider_edit() {
         }
     }
 }
+
+#[test]
+fn shared_definition_edits_recompute_only_dependent_instances() {
+    let mut inner = Graph::default();
+    let output = add(&mut inner, NodeKind::Number);
+    let (mut graph, instance) = nested_cluster(inner, output);
+    let independent = add(&mut graph, NodeKind::Number);
+    let second = cluster::instantiate(&mut graph, 2, [0., 0.]).unwrap();
+    let third = cluster::instantiate(&mut graph, 1, [0., 0.]).unwrap();
+    let mut evaluator = Evaluator::default();
+    assert_eq!(evaluator.evaluate(&graph, &|| false).computed, 4);
+    assert_eq!(evaluator.evaluate(&graph, &|| false).cached, 4);
+    graph.clusters[0].graph.node_mut(output).unwrap().params.insert("value".into(), 9.);
+    let changed = evaluator.evaluate(&graph, &|| false);
+    assert_eq!((changed.computed, changed.cached), (3, 1));
+    for id in [instance, second, third] {
+        assert_eq!(number(&changed, id), 9.);
+    }
+    assert_eq!(number(&changed, independent), 1.);
+    // A new work may reuse every definition ID. Compare the actual content.
+    let mut next = graph.clone();
+    next.clusters[0].graph.node_mut(output).unwrap().params.insert("value".into(), 3.);
+    assert_eq!(number(&evaluator.evaluate(&next, &|| false), instance), 3.);
+}
+
+#[test]
+fn overdeep_definition_graph_is_rejected_before_exponential_expansion() {
+    let mut graph = Graph::default();
+    for id in 1..=12u64 {
+        let mut inner = Graph::default();
+        let mut output = add(&mut inner, NodeKind::Number);
+        if id < 12 {
+            for _ in 0..16 {
+                output = add(&mut inner, NodeKind::Cluster);
+                inner.node_mut(output).unwrap().cluster = Some(id + 1);
+            }
+        }
+        graph.clusters.push(ClusterDef {
+            id, name: format!("definition {id}"), graph: inner, inputs: vec![], output,
+        });
+    }
+    assert!(graph.validate().unwrap_err().contains("深すぎ"));
+    let mut stack = Vec::new();
+    assert!(cluster::def_depth(&graph.clusters, 1, &mut stack).is_err());
+    assert!(stack.is_empty(), "failed depth checks must unwind their stack");
+}
+
+#[test]
+fn cluster_id_exhaustion_is_an_error_and_preserves_the_target() {
+    let mut inner = Graph::default();
+    let output = add(&mut inner, NodeKind::Number);
+    let (source, _) = nested_cluster(inner.clone(), output);
+    let bytes = cluster::export_part(&source, 2).unwrap();
+    let mut target = Graph::default();
+    target.clusters.push(ClusterDef {
+        id: u64::MAX - 1, name: "existing".into(), graph: inner, inputs: vec![], output,
+    });
+    target.validate().unwrap();
+    let before = target.clone();
+    assert!(cluster::import_part(&mut target, bytes.as_bytes()).is_err());
+    assert_eq!(target, before);
+    target.clusters[0].id = u64::MAX;
+    let standalone = add(&mut target, NodeKind::Number);
+    let before = target.clone();
+    assert!(cluster::group_nodes(&mut target, &[standalone], "new").is_err());
+    assert_eq!(target, before);
+}
+
+#[test]
+fn part_save_replaces_only_with_complete_valid_data() {
+    let directory = TempDir(std::env::temp_dir().join(format!(
+        "morphlet-core-part-{}", std::process::id()
+    )));
+    fs::create_dir(&directory.0).unwrap();
+    let path = directory.0.join("part.morphpart");
+    let mut inner = Graph::default();
+    let output = add(&mut inner, NodeKind::Number);
+    let (mut graph, _) = nested_cluster(inner, output);
+    cluster::save_part(&path, &graph, 2).unwrap();
+    let previous = fs::read(&path).unwrap();
+    graph.clusters[0].output = 999;
+    assert!(cluster::save_part(&path, &graph, 2).is_err());
+    assert_eq!(fs::read(&path).unwrap(), previous);
+    graph.clusters[0].output = output;
+    graph.clusters[0].name = "updated".into();
+    cluster::save_part(&path, &graph, 2).unwrap();
+    let updated = fs::read(&path).unwrap();
+    assert_ne!(updated, previous);
+    assert!(cluster::parse_part(&updated).is_ok());
+    assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 1);
+}
