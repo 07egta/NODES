@@ -176,7 +176,7 @@ fn matching_control<'a>(tree: &'a Tree, path: &[u32]) -> Option<&'a [Value]> {
         .map(Vec::as_slice)
 }
 
-fn path_text(path: &[u32]) -> String {
+pub(crate) fn path_text(path: &[u32]) -> String {
     format!(
         "{{{}}}",
         path.iter()

@@ -333,6 +333,9 @@ pub(crate) fn evaluate_node(
         let values = if node.kind == NodeKind::Merge {
             vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
         } else if node.kind == NodeKind::Loft {
+            if lists[0].len() == 1 {
+                return Err(loft_branch_error(&inputs[0], &path));
+            }
             let cap = lists
                 .get(1)
                 .and_then(|v| v.first())
@@ -1346,6 +1349,29 @@ fn signed_xy_area(points: &[[f64; 3]]) -> f64 {
         })
         .sum::<f64>()
         / 2.
+}
+
+fn loft_branch_error(sections: &Tree, path: &[u32]) -> String {
+    let path = crate::tree_nodes::path_text(path);
+    let mut nonempty = sections.branches.values().filter(|items| !items.is_empty());
+    let first = nonempty.next();
+    let singletons = if first.is_some_and(|items| items.len() == 1) {
+        nonempty.try_fold(1usize, |count, items| (items.len() == 1).then_some(count + 1))
+    } else {
+        None
+    };
+    if let Some(count) = singletons.filter(|count| *count > 1) {
+        format!(
+            "断面は合計 {count} 本ありますが、{count} 本の枝に 1 本ずつ分かれています（例: {path}）。\n\
+             1 つの面にする場合は、ロフトの「断面リスト」の手前に「フラット化」をつないでください。\n\
+             別々に面を作る場合は、各枝に断面を 2 本以上入れてください。"
+        )
+    } else {
+        format!(
+            "枝 {path} の断面は 1 本です。ロフトには同じ枝に 2 本以上の断面が必要です。\n\
+             この枝に断面を追加するか、不要ならその枝を外してください。"
+        )
+    }
 }
 
 fn loft(values: &[Value], cap: bool, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
