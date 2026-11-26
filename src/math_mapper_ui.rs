@@ -54,8 +54,8 @@ pub fn show(ui: &mut egui::Ui, node: &mut Node) {
                     let y = ((rect.bottom()-p.y)/rect.height()).clamp(0.0,1.0) as f64;
                     c[k*2] = if k==0 {x.min(c[2])} else {x.max(c[0])};
                     c[k*2+1]=y;
-                    node.params.insert(if k==0 {"x1"} else {"x2"}.into(),c[k*2]);
-                    node.params.insert(if k==0 {"y1"} else {"y2"}.into(),c[k*2+1]);
+                    node.params.insert((if k==0 {"x1"} else {"x2"}).into(),c[k*2]);
+                    node.params.insert((if k==0 {"y1"} else {"y2"}).into(),c[k*2+1]);
                 }
             }
         }
