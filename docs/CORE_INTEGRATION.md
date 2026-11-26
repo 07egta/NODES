@@ -1,6 +1,6 @@
 # Core integration: node authoring and verification
 
-Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`. This change deliberately leaves the on-disk schema (v1), node IDs, port keys, dependencies and limits unchanged.
+Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`. The initial integration preserved schema v1, node IDs, port keys and dependencies. Subsequent changes raised the graph node limit to 16,384 after adding deterministic traversal, cache pressure accounting and a 10,000-node regression. Geometry/item budgets remain separate; see [ARCHITECTURE.md](ARCHITECTURE.md) and [TEST_RESULTS.md](../TEST_RESULTS.md).
 
 ## Node authoring contract
 
@@ -26,11 +26,11 @@ cargo build --release --locked --bin Morphlet
 cargo test --release --locked --test core_integration benchmark_sparse_slider_edit -- --ignored --nocapture
 ```
 
-Record CPU, RAM, OS, Rust version, commit SHA and power mode. Compare five release-mode samples per graph size on the same machine. The benchmark excludes graph construction, runs cold/warm/sparse-edit evaluations, and prints computed/cached counts and elapsed milliseconds. Existing limit is 2,048 nodes; 10,000 is explicitly tested as a rejection, not a performance claim. Start-up, UI frame time, idle CPU, memory, GPU and real geometry workloads need separate Windows measurements.
+Record CPU, RAM, OS, Rust version, commit SHA and power mode. Compare five release-mode samples per graph size on the same machine. The benchmark excludes graph construction, runs cold/warm/sparse-edit evaluations, and prints computed/cached counts and elapsed milliseconds. The current graph limit is 16,384 nodes. `tests/large_graph_tests.rs` exercises a 10,000-node chain, warm cache reuse and a middle edit that recomputes exactly 5,000 downstream nodes. Above-limit tests use `MAX_NODES + 1`. Historical 2,048-node/rejected-10,000 results apply only to the earlier checkpoint; current measurements and their build/hardware scope belong in `TEST_RESULTS.md`. Start-up, UI frame time, idle CPU, memory, GPU and real geometry workloads need separate Windows measurements.
 
-## Follow-up work (not implemented here)
+## Remaining coordinated work
 
-Multi-output port IDs and migration (retain v1 reader); opaque unknown node payloads with explicit disabled behavior; bounded latest-only worker queue and cooperative parallelism; versioned plugin API; category-specific registries; large-graph resource policy backed by measurements. These require coordinated schema/UI work and compatibility tests, not an unreviewed merge into the current graph model.
+Multi-output port IDs and migration (retain the v1 reader); opaque unknown node payloads with explicit disabled behavior; cooperative parallel node execution; versioned plugin API; richer runtime typed registries; Windows-specific UI/geometry resource measurements. The bounded latest-only worker queue and category module dispatch are implemented. These require coordinated schema/UI work and compatibility tests, not an unreviewed merge into the current graph model.
 
 ## Second hardening pass
 
