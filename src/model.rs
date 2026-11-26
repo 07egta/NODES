@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 pub type NodeId = u64;
 pub const MAX_NODES: usize = 2_048;
-pub const MAX_ITEMS: usize = 8_192;
+pub const MAX_ITEMS: usize = 16_384;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;
 pub const MAX_TOTAL_WEIGHT: usize = 3_000_000;
@@ -184,6 +184,29 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    SimplifyTree,
+    TrimTree,
+    PruneTree,
+    MergeTree,
+    EntwineTree,
+    FlipMatrix,
+    UnflattenTree,
+    PathMapper,
+    PartitionList,
+    TreeBranch,
+    TreeItem,
+    TreeStatistics,
+    CullNth,
+    CullIndex,
+    DuplicateData,
+    RepeatData,
+    MassAddition,
+    MassMultiplication,
+    ReplaceItems,
+    InsertItems,
+    MemberIndex,
+    RandomReduce,
+    Jitter,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +276,29 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::SimplifyTree,
+            Self::TrimTree,
+            Self::PruneTree,
+            Self::MergeTree,
+            Self::EntwineTree,
+            Self::FlipMatrix,
+            Self::UnflattenTree,
+            Self::PathMapper,
+            Self::PartitionList,
+            Self::TreeBranch,
+            Self::TreeItem,
+            Self::TreeStatistics,
+            Self::CullNth,
+            Self::CullIndex,
+            Self::DuplicateData,
+            Self::RepeatData,
+            Self::MassAddition,
+            Self::MassMultiplication,
+            Self::ReplaceItems,
+            Self::InsertItems,
+            Self::MemberIndex,
+            Self::RandomReduce,
+            Self::Jitter,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -863,7 +909,7 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
-            other => crate::gh_nodes::spec(other),
+            other => crate::data_tree_nodes::spec(other).unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }
     }
 }
@@ -932,6 +978,8 @@ impl Graph {
             preview: true,
             script: if kind == NodeKind::Expression {
                 crate::expr::DEFAULT_EXPRESSION.into()
+            } else if kind == NodeKind::PathMapper {
+                "{A;B}->{B;A}".into()
             } else {
                 String::new()
             },
@@ -1024,6 +1072,21 @@ impl Graph {
             }
             let specs = node.kind.spec().inputs;
             for (key, value) in &node.params {
+                if key == crate::data_tree::MATCH_PARAM {
+                    if !crate::data_tree_nodes::supports_matching(node.kind) {
+                        return Err("このノードはデータ照合を変更できません。".into());
+                    }
+                    crate::data_tree::MatchMode::from_number(*value)?;
+                    continue;
+                }
+                if let Some(port) = key.strip_prefix(crate::data_tree::PORT_PREFIX) {
+                    if !crate::data_tree_nodes::supports_transform(node.kind) ||
+                        !specs.iter().any(|s| s.key == port) {
+                        return Err("データツリー変換のポートが無効です。".into());
+                    }
+                    crate::data_tree::PortTransform::from_number(*value)?;
+                    continue;
+                }
                 if !value.is_finite() || !specs.iter().any(|s| s.key == key && s.default.is_some())
                 {
                     return Err(format!("「{}」のパラメータが無効です。", node.name));
