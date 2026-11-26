@@ -862,13 +862,16 @@ fn perpendicular(t: [f64; 3]) -> Result<[f64; 3], String> {
     .ok_or_else(|| "パスの向きを決められません。".to_string())
 }
 
+/// Tangent, normal and binormal of one path point.
+type Frame = ([f64; 3], [f64; 3], [f64; 3]);
+
 /// Tangent, normal and binormal at each path point. The normal is carried from point to
 /// point by projection (a parallel-transport approximation), so a profile does not spin.
 /// Requires at least two path points.
 fn tube_frames(
     path: &[[f64; 3]],
     closed: bool,
-) -> Result<Vec<([f64; 3], [f64; 3], [f64; 3])>, String> {
+) -> Result<Vec<Frame>, String> {
     let n = path.len();
     let mut tangents = Vec::with_capacity(n);
     for i in 0..n {
