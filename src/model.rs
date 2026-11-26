@@ -207,6 +207,10 @@ pub enum NodeKind {
     MeshOnBed,
     MeshDeleteFace,
     MeshConstruct,
+    MeshSelfContact,
+    MeshThicknessSample,
+    MeshCompact,
+    MeshNonManifold,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -298,6 +302,10 @@ impl NodeKind {
             Self::MeshOnBed,
             Self::MeshDeleteFace,
             Self::MeshConstruct,
+            Self::MeshSelfContact,
+            Self::MeshThicknessSample,
+            Self::MeshCompact,
+            Self::MeshNonManifold,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -929,7 +937,11 @@ impl NodeKind {
             | Self::MeshCatmullClark
             | Self::MeshOnBed
             | Self::MeshDeleteFace
-            | Self::MeshConstruct => crate::mesh_fabrication::spec(self),
+            | Self::MeshConstruct
+            | Self::MeshSelfContact
+            | Self::MeshThicknessSample
+            | Self::MeshCompact
+            | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::gh_nodes::spec(other),
         }
     }
