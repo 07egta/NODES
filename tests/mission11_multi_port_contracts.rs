@@ -155,3 +155,29 @@ fn secondary_results_are_empty_when_disabled_and_removed_when_reconfigured() {
     // Ensure the test exercises the concrete geometry value, not a dummy scalar.
     assert!(matches!(engine.evaluate(&g,&||false).outputs[&n].as_ref().unwrap().branches.values().flatten().next(), Some(Value::Point(_))));
 }
+
+#[test]
+fn paired_sort_and_variable_input_order_use_real_values() {
+    let mut g = Graph::default();
+    let keys = series(&mut g, 3., -1., 3.);
+    let values = series(&mut g, 10., 10., 3.);
+    let sort = add(&mut g, NodeKind::SortListPaired);
+    g.connect(keys, sort, "keys").unwrap();
+    g.connect(values, sort, "values").unwrap();
+    let merge = add(&mut g, NodeKind::StreamMerge);
+    let third = g.add_variable_input(merge).unwrap();
+    g.connect_port(port(sort, 1), merge, &third, false).unwrap();
+    g.connect_port(port(sort, 0), merge, "in0", false).unwrap();
+    g.reorder_inputs(merge, vec![third.clone(), "in0".into(), "in1".into()]).unwrap();
+    let before = g.clone();
+    assert!(g.remove_variable_input(merge, &third).is_err());
+    assert_eq!(g, before);
+    let e = Evaluator::default().evaluate(&g, &|| false);
+    assert_eq!(numbers(&e, port(sort, 0)), vec![1., 2., 3.]);
+    assert_eq!(numbers(&e, port(sort, 1)), vec![30., 20., 10.]);
+    assert_eq!(numbers(&e, port(merge, 0)), vec![30., 20., 10., 1., 2., 3.]);
+    g.disconnect_port(port(sort,1), merge, &third).unwrap();
+    g.remove_variable_input(merge, &third).unwrap();
+    let next = g.add_variable_input(merge).unwrap();
+    assert_ne!(next, third);
+}
