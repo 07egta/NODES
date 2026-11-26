@@ -250,6 +250,21 @@ pub(crate) fn evaluate_node(
             cancel,
         );
     }
+    // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
+    if node.kind == NodeKind::ImportMesh {
+        let scale = first_number(inputs.first().ok_or("倍率の入力がありません。")?)?;
+        let center = first_number(inputs.get(1).ok_or("中心の入力がありません。")?)? != 0.;
+        let bed = first_number(inputs.get(2).ok_or("床の入力がありません。")?)? != 0.;
+        let mut mesh = crate::import::read_file(&node.script, cancel)?;
+        crate::import::place(&mut mesh, scale, center, bed)?;
+        let values = as_mesh(mesh, cancel)?;
+        return checked_tree(
+            Tree {
+                branches: BTreeMap::from([(vec![0], values)]),
+            },
+            cancel,
+        );
+    }
     // The 式 node parses its text once; every list item then reuses the parsed formula.
     let formula = if node.kind == NodeKind::Expression {
         Some(crate::expr::parse(&node.script)?)
@@ -437,6 +452,14 @@ fn preflight_run(
         return Err("配列や数列の結果が大きすぎます。生成前に停止しました。個数や分割数を減らしてください。".into());
     }
     Ok(())
+}
+fn first_number(tree: &Tree) -> Result<f64, String> {
+    tree.branches
+        .values()
+        .flatten()
+        .next()
+        .ok_or("数値を入力してください。")?
+        .number()
 }
 pub(crate) fn cancelled(stop: &dyn Fn() -> bool) -> Result<(), String> {
     if stop() {
@@ -773,7 +796,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
-        | Remap | Expression | GraphProfile => Err("このノードはリスト評価が必要です。".into()),
+        | Remap | Expression | GraphProfile | ImportMesh => {
+            Err("このノードはリスト評価が必要です。".into())
+        }
     }
 }
 

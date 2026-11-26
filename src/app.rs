@@ -10,11 +10,11 @@ use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke
 use morphlet::{
     annotations, cluster,
     engine::{Evaluation, Evaluator},
-    model::{Graph, NodeKind, Tree},
+    model::{Graph, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -122,6 +122,8 @@ pub struct MorphletApp {
     help_window: HelpWindow,
     /// 値を見る window for the selected node.
     values_open: bool,
+    /// ファイル読み込み node that the next picked mesh file is loaded into.
+    import_target: Option<NodeId>,
 }
 
 impl MorphletApp {
@@ -197,6 +199,7 @@ impl MorphletApp {
             part_target: None,
             help_window: HelpWindow::default(),
             values_open: false,
+            import_target: None,
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -408,6 +411,7 @@ impl MorphletApp {
             match event {
                 PickerEvent::Cancelled => {
                     self.after_save = None;
+                    self.import_target = None;
                 }
                 PickerEvent::Chosen(path) => match task {
                     FileTask::Open => self.request(PendingAction::Open(path), ctx),
@@ -446,6 +450,10 @@ impl MorphletApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
+                    FileTask::ImportMesh => {
+                        let target = self.import_target.take();
+                        self.set_import_file(&path, target, None);
+                    }
                     FileTask::ExportStl | FileTask::ExportObj => {
                         let result = self.result_trees().and_then(|trees| {
                             if task == FileTask::ExportStl {
@@ -469,6 +477,51 @@ impl MorphletApp {
             }
         }
     }
+    /// Points an ファイル読み込み node at a mesh file. Without a valid target, a new node is
+    /// added at `at` (or the canvas centre).
+    fn set_import_file(&mut self, path: &Path, target: Option<NodeId>, at: Option<[f32; 2]>) {
+        let Some(text) = path.to_str().map(str::to_owned) else {
+            self.notify(
+                "ファイル名を文字として読めませんでした。英数字の名前に変えてから選び直してください。",
+                true,
+            );
+            return;
+        };
+        if text.len() > morphlet::script::MAX_SCRIPT_BYTES {
+            self.notify(
+                "ファイルのパスが長すぎます。フォルダーを近くへ移すか、名前を短くしてください。",
+                true,
+            );
+            return;
+        }
+        let valid_target = target.filter(|id| {
+            self.project
+                .graph
+                .node(*id)
+                .is_some_and(|n| n.kind == NodeKind::ImportMesh)
+        });
+        let id = match valid_target {
+            Some(id) => id,
+            None => {
+                let at = at.unwrap_or_else(|| self.canvas.center_for_add(&self.project));
+                match self.project.graph.add(NodeKind::ImportMesh, at) {
+                    Ok(id) => {
+                        self.canvas.select_only(id);
+                        id
+                    }
+                    Err(e) => {
+                        self.notify(e, true);
+                        return;
+                    }
+                }
+            }
+        };
+        if let Some(node) = self.project.graph.node_mut(id) {
+            node.script = text;
+        }
+        self.notify("「ファイル読み込み」にファイルを設定しました", false);
+    }
+
     fn add_node(&mut self, kind: NodeKind, position: Option<[f32; 2]>) {
         let selected = self.canvas.selected.iter().next_back().copied();
         let at = position.unwrap_or_else(|| {
@@ -1005,6 +1058,37 @@ impl MorphletApp {
                 });
             });
     }
+    /// File line and the picker button for an ファイル読み込み node.
+    fn import_panel(&mut self, ui: &mut egui::Ui, id: NodeId, file: &str) {
+        ui.add_space(6.);
+        ui.label(RichText::new("ファイル").strong());
+        let shown = if file.is_empty() {
+            "未選択".to_string()
+        } else {
+            Path::new(file)
+                .file_name()
+                .map_or_else(|| file.to_string(), |n| n.to_string_lossy().into_owned())
+        };
+        ui.label(theme::small(shown))
+            .on_hover_text(if file.is_empty() {
+                "STL または OBJ を選んでください"
+            } else {
+                file
+            });
+        if ui
+            .button("ファイルを選ぶ")
+            .on_hover_text("STL または OBJ を選びます。ウィンドウへのドラッグでも読み込めます")
+            .clicked()
+        {
+            self.import_target = Some(id);
+            self.file_picker = Some(FilePicker::new(
+                FileTask::ImportMesh,
+                self.start_directory(),
+                String::new(),
+            ));
+        }
+    }
+
     fn inspector(&mut self, ui: &mut egui::Ui) {
         let Some(id) = self.canvas.selected.iter().next_back().copied() else {
             ui.add_space(15.);
@@ -1103,6 +1187,9 @@ impl MorphletApp {
         }
         if node.kind == NodeKind::Expression {
             crate::script_ui::expression_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::ImportMesh {
+            self.import_panel(ui, id, &node.script);
         }
         if node.kind == NodeKind::Cluster
             && let Some(action) = crate::script_ui::cluster_panel(ui, &mut self.project.graph, id)
@@ -1697,6 +1784,21 @@ impl eframe::App for MorphletApp {
         self.values_window(ctx);
         self.confirm_dialog(ctx);
         self.recovery_dialog(ctx);
+        // Dropped files run before the change check below, so a node they add is
+        // checkpointed and computed in this frame.
+        for dropped in ctx.input(|i| i.raw.dropped_files.clone()) {
+            if let Some(path) = dropped.path {
+                if morphlet::import::format_of(&path).is_some() {
+                    // The drop itself carries no position; the last pointer position is used.
+                    let at = ctx
+                        .input(|i| i.pointer.latest_pos())
+                        .and_then(|p| self.canvas.world_at(&self.project, p));
+                    self.set_import_file(&path, None, at);
+                } else {
+                    self.request(PendingAction::Open(path), ctx);
+                }
+            }
+        }
         self.file_dialog(ctx);
         if !self.suppress_history && document_changed(&before, &self.project) {
             self.dirty = true;
@@ -1739,11 +1841,6 @@ impl eframe::App for MorphletApp {
                         });
                 });
             ctx.request_repaint_after(Duration::from_millis(200));
-        }
-        for dropped in ctx.input(|i| i.raw.dropped_files.clone()) {
-            if let Some(path) = dropped.path {
-                self.request(PendingAction::Open(path), ctx);
-            }
         }
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close && self.dirty {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);

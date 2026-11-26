@@ -182,6 +182,8 @@ pub enum NodeKind {
     OverhangCheck,
     Distance,
     PointComponent,
+    /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
+    ImportMesh,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -250,6 +252,7 @@ impl NodeKind {
             Self::OverhangCheck,
             Self::Distance,
             Self::PointComponent,
+            Self::ImportMesh,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
