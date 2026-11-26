@@ -257,6 +257,20 @@ static UNKNOWN: NodeSpec = NodeSpec {
     output: DataType::Any,
 };
 
+/// ファイル読み込み. The path lives in `Node::script`; the inputs are plain numbers.
+static IMPORT_MESH: NodeSpec = NodeSpec {
+    label: "ファイル読み込み",
+    category: "立体",
+    description: "STL・OBJ ファイルの三角形メッシュを読み込みます。「ファイルを選ぶ」か、ウィンドウへのドラッグで指定します。",
+    keywords: "import load file stl obj 読み込み ファイル 取り込み 開く 3Dデータ",
+    inputs: &[
+        n("scale", "倍率", 1., 0.01, 1000., 0.01),
+        i("center", "XYを原点へ (0:しない 1:する)", 1., 0., 1.),
+        i("bed", "床に置く Z最小=0 (0:しない 1:する)", 1., 0., 1.),
+    ],
+    output: DataType::Mesh,
+};
+
 /// Specification of a node defined in this module.
 pub fn spec(kind: NodeKind) -> &'static NodeSpec {
     use NodeKind::*;
@@ -281,6 +295,7 @@ pub fn spec(kind: NodeKind) -> &'static NodeSpec {
         OverhangCheck => &OVERHANG_CHECK,
         Distance => &DISTANCE,
         PointComponent => &POINT_COMPONENT,
+        ImportMesh => &IMPORT_MESH,
         _ => &UNKNOWN,
     }
 }

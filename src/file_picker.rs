@@ -17,12 +17,14 @@ pub enum FileTask {
     ExportObj,
     SavePart,
     LoadPart,
+    /// Mesh file for the ファイル読み込み node: STL or OBJ.
+    ImportMesh,
 }
 
 impl FileTask {
     /// Tasks that pick an existing file (the others name a file to write).
     fn picks_existing(self) -> bool {
-        matches!(self, Self::Open | Self::LoadPart)
+        matches!(self, Self::Open | Self::LoadPart | Self::ImportMesh)
     }
     fn title(self) -> &'static str {
         match self {
@@ -32,15 +34,35 @@ impl FileTask {
             Self::ExportObj => "OBJ に書き出す",
             Self::SavePart => "部品を書き出す",
             Self::LoadPart => "部品を読み込む",
+            Self::ImportMesh => "ファイルを読み込む",
         }
     }
 
     fn extension(self) -> &'static str {
         match self {
             Self::Open | Self::Save => "morph",
-            Self::ExportStl => "stl",
+            Self::ExportStl | Self::ImportMesh => "stl",
             Self::ExportObj => "obj",
             Self::SavePart | Self::LoadPart => "morphpart",
+        }
+    }
+
+    /// Whether a file in the listing belongs to this task.
+    fn accepts(self, path: &Path) -> bool {
+        match self {
+            Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
+            other => has_extension(path, other.extension()),
+        }
+    }
+
+    /// Extension text for the footer line.
+    fn filter_hint(self) -> &'static str {
+        match self {
+            Self::Open | Self::Save => ".morph",
+            Self::ExportStl => ".stl",
+            Self::ExportObj => ".obj",
+            Self::SavePart | Self::LoadPart => ".morphpart",
+            Self::ImportMesh => ".stl / .obj",
         }
     }
 
@@ -48,7 +70,7 @@ impl FileTask {
         match self {
             Self::Open => "開く",
             Self::Save => "保存",
-            Self::LoadPart => "読み込む",
+            Self::LoadPart | Self::ImportMesh => "読み込む",
             Self::ExportStl | Self::ExportObj | Self::SavePart => "書き出す",
         }
     }
@@ -289,8 +311,8 @@ impl FilePicker {
                 } else {
                     ui.label(
                         RichText::new(format!(
-                            "フォルダーはダブルクリックで開く  ·  .{} ファイル",
-                            self.task.extension()
+                            "フォルダーはダブルクリックで開く  ·  {} ファイル",
+                            self.task.filter_hint()
                         ))
                         .small()
                         .weak(),
@@ -371,7 +393,7 @@ impl FilePicker {
     }
 
     fn refresh(&mut self) {
-        match read_directory(&self.directory, self.task.extension()) {
+        match read_directory(&self.directory, self.task) {
             Ok((entries, truncated)) => {
                 self.entries = entries;
                 self.truncated = truncated;
@@ -385,7 +407,7 @@ impl FilePicker {
     }
 
     fn navigate(&mut self, directory: PathBuf) {
-        match read_directory(&directory, self.task.extension()) {
+        match read_directory(&directory, self.task) {
             Ok((entries, truncated)) => {
                 self.directory = directory;
                 self.location = self.directory.to_string_lossy().into_owned();
@@ -565,7 +587,7 @@ fn shortcuts() -> Vec<(String, PathBuf)> {
     result
 }
 
-fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), String> {
+fn read_directory(path: &Path, task: FileTask) -> Result<(Vec<Entry>, bool), String> {
     let directory = fs::read_dir(path).map_err(|e| format!("フォルダーを開けませんでした: {e}"))?;
     let mut entries = Vec::new();
     let mut truncated = false;
@@ -585,7 +607,7 @@ fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), St
         };
         let is_dir = file_type.is_dir() || (file_type.is_symlink() && path.is_dir());
         let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
-        if !is_dir && (!is_file || !has_extension(&path, extension)) {
+        if !is_dir && (!is_file || !task.accepts(&path)) {
             continue;
         }
         entries.push(Entry {

@@ -109,6 +109,10 @@ impl GraphCanvas {
             .map(|r| to_world(r.center(), r, p.pan, p.zoom))
             .unwrap_or([50., 50.])
     }
+    /// Graph position under a screen point (used to place a dropped file's node).
+    pub fn world_at(&self, p: &Project, screen: Pos2) -> Option<[f32; 2]> {
+        self.last_rect.map(|r| to_world(screen, r, p.pan, p.zoom))
+    }
     pub fn select_only(&mut self, id: NodeId) {
         self.selected.clear();
         self.selected.insert(id);
