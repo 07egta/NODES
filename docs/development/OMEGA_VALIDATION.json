@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:32:16.050701+00:00",
+  "updated_at_utc": "2026-11-26T23:34:35.853420+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -37,7 +37,7 @@
       },
       "command": "cargo test --locked --offline --test aggregate_numeric_regressions --test data_tree_contracts --test math_precision_regressions",
       "review": "Independent read-only kernel_research agent; existing branch/empty/finite/count/weight/cancel contracts retained.",
-      "known_remaining": "Scaled Summation/Average can lose extremely small terms before cancellation; separate exact-accumulator work is planned."
+      "known_remaining": "Extreme cancellation and single-rounding mean are addressed by the later exact binary64 aggregation unit in this record."
     },
     {
       "name": "curve endpoint closest point and geometric closure",
@@ -113,9 +113,9 @@
       "related_suites": {
         "surface_kernel_tests": 5,
         "surface_curvature_tests": 9,
-        "surface_knot_roundoff_regressions": 3,
         "surface_curvature_study": 1,
-        "curve_surface_integration": 7
+        "curve_surface_integration": 7,
+        "surface_knot_roundoff": 3
       },
       "related_total_passed": 36,
       "review": "Independent kernel_research agent reproduced FMA cross-product and translated rational-derivative failures; root reviewed final diff. No blocking findings remain.",
@@ -127,6 +127,42 @@
       },
       "limits": "Gauss-rule difference is a convergence indicator, not a rigorous error certificate. Extreme rational boundary layers can return explicit convergence/precision errors.",
       "metadata": "SurfaceArea description and precision label synchronized; compiled 299-record inventory regenerated without inventing a verified-node count."
+    },
+    {
+      "name": "Exact binary64 sum and single-rounding mean",
+      "files": [
+        "src/number_aggregates.rs",
+        "src/math_nodes.rs",
+        "src/lib.rs",
+        "tests/sum_rounding_regressions.rs",
+        "scripts/generate_sum_oracle.py",
+        "tests/fixtures/sum_oracle.json"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 5,
+        "scope": "initial six analytical Rust regressions on previous scaled summation"
+      },
+      "after": {
+        "passed": 9,
+        "failed": 0
+      },
+      "related_suites": {
+        "aggregate_numeric_regressions": 6,
+        "math_precision_regressions": 6
+      },
+      "independent_oracle": {
+        "method": "Python Fraction.from_float; exact rational sum/mean, one final binary64 conversion",
+        "cases": 128,
+        "orders": 2,
+        "operations": 2,
+        "bitwise_comparisons": 512,
+        "generator_check": "passed locally; included in normal Linux CI"
+      },
+      "command": "cargo test --locked --offline --test sum_rounding_regressions --test aggregate_numeric_regressions --test math_precision_regressions",
+      "review": "integration_audit independently checked carry, borrow, long division, subnormal and normal rounding, remainder/sticky logic and call sites; no blocking finding. Requested remainder/limb/Fraction cases passed.",
+      "scope": "Summation, Average, MassAddition; other statistics retain their separate algorithms.",
+      "limits": "Finite binary64 values; existing node list and evaluation budgets. Empty mean remains an empty output. No external GH oracle comparison."
     }
   ],
   "environment_events": [

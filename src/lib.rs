@@ -16,6 +16,7 @@ pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod model;
 pub mod node_access;
+mod number_aggregates;
 pub mod persistence;
 pub mod polygon_triangulation;
 pub mod print_info;

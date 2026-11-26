@@ -1847,19 +1847,11 @@ pub fn run_list(
                 let sd = population_stddev(&mut data, stop)?;
                 return scalar(if kind == Variance { sd * sd } else { sd });
             }
-            let len = data.len() as f64;
-            let m = data.iter().fold(0.0_f64, |x, y| x.max(y.abs()));
-            if m == 0.0 {
-                return scalar(0.0);
-            }
-            for x in &mut data {
-                *x /= m;
-            }
-            let sum = stable_sum(&data);
-            if kind == Summation {
-                return scalar(sum * m);
-            }
-            scalar((sum / len) * m)
+            scalar(crate::number_aggregates::sum_divided(
+                &data,
+                if kind == Summation { 1 } else { data.len() },
+                stop,
+            )?)
         }
         _ => Err("未対応の数学リストノード。".into()),
     }
