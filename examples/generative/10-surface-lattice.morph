@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "円筒に沿う三角格子",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "tri_panels",
+        "name": "三角形セル",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 10,
+          "ny": 10,
+          "size": 10,
+          "fill": 0.94
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "cylinder_wrap",
+        "name": "円筒曲面へ",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "radius": 32,
+          "width": 155
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}
