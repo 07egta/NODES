@@ -12,3 +12,5 @@ pub mod raster;
 pub mod script;
 pub mod stl_export;
 pub mod templates;
+pub mod curve_geometry;
+pub mod curve_nodes;

@@ -67,7 +67,8 @@ pub fn value_text(value: &Value) -> String {
         Value::Number(v) => format!("{v:.4}"),
         Value::Point(p) => format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2]),
         Value::Curve(c) => format!(
-            "曲線 · {} 点 · {}",
+            "{} · 表示 {} 点 · {}",
+            match c.geometry.as_ref() { Some(g) if g.as_nurbs().is_some() => "NURBS", Some(_) => "解析曲線", None => "折れ線（近似を含む）" },
             c.points.len(),
             if c.closed { "閉じた" } else { "開いた" }
         ),

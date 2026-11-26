@@ -271,7 +271,8 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let curve_list = crate::curve_nodes::is_list_kind(node.kind);
+    let list_kind = curve_list || crate::gh_nodes::is_list_kind(node.kind);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -328,6 +329,8 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if curve_list {
+            crate::curve_nodes::run_list(node.kind, &lists, cancel)?
         } else if list_kind {
             crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
@@ -443,6 +446,7 @@ fn preflight_run(
             let count = num(args, 0)? as usize;
             (count, count)
         }
+        NodeKind::CurveDivide => { let count = num(args,1)? as usize + 1; (count,count) },
         NodeKind::NoiseDeform => (shape(args)?.weight(), 1),
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
@@ -490,12 +494,13 @@ fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
-    Ok(vec![Value::Curve(Arc::new(Curve { points, closed }))])
+    Ok(vec![Value::Curve(Arc::new(Curve { points, closed, geometry: None }))])
 }
 
 fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     use NodeKind::*;
     match kind {
+        k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
@@ -587,7 +592,18 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 .collect())
         }
         Point => Ok(vec![Value::Point([num(a, 0)?, num(a, 1)?, num(a, 2)?])]),
-        Circle | Polygon => {
+        Circle => {
+            let r = num(a, 0)?;
+            let n = num(a, 1)? as usize;
+            let geom = crate::curve_geometry::CurveGeometry::circle([0.;3], [0.,0.,1.], r)?;
+            // Keep the legacy angular sampling and vertex count for existing lofts/exports.
+            let points = (0..n).map(|i| {
+                let t = TAU * i as f64 / n as f64;
+                [r*t.cos(), r*t.sin(), 0.]
+            }).collect();
+            Ok(vec![Value::Curve(Arc::new(Curve { points, closed: true, geometry: Some(geom) }))])
+        }
+        Polygon => {
             let r = num(a, 0)?;
             let n = num(a, 1)? as usize;
             as_curve(
@@ -631,16 +647,14 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             let h = num(a, 1)?;
             let turns = num(a, 2)?;
             let n = num(a, 3)? as usize;
-            as_curve(
-                (0..=n)
-                    .map(|i| {
-                        let t = i as f64 / n as f64;
-                        let ang = t * turns * TAU;
-                        [r * ang.cos(), r * ang.sin(), t * h]
-                    })
-                    .collect(),
-                false,
-            )
+            let geometry = crate::curve_geometry::CurveGeometry::helix(
+                [0.;3], [r,0.,0.], [0.,r,0.], [0.,0.,h], turns, 0.)?;
+            let points = (0..=n).map(|i| {
+                let t = i as f64 / n as f64;
+                let ang = t * turns * TAU;
+                [r * ang.cos(), r * ang.sin(), t * h]
+            }).collect();
+            Ok(vec![Value::Curve(Arc::new(Curve { points, closed: false, geometry: Some(geometry) }))])
         }
         Extrude => as_mesh(
             extrude(curve(a)?.as_ref(), num(a, 1)?, num(a, 2)? as usize, cancel)?,
@@ -692,7 +706,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         ),
         Move => {
             let d = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| [p[0] + d[0], p[1] + d[1], p[2] + d[2]],
                 cancel,
@@ -701,7 +715,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         Rotate => {
             let rad = num(a, 1)?.to_radians();
             let axis = num(a, 2)? as usize;
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| rotate(p, rad, axis),
                 cancel,
@@ -709,7 +723,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Scale => {
             let factor = num(a, 1)?;
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| [p[0] * factor, p[1] * factor, p[2] * factor],
                 cancel,
@@ -717,7 +731,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         ScaleXyz => {
             let f = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| [p[0] * f[0], p[1] * f[1], p[2] * f[2]],
                 cancel,
@@ -774,7 +788,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                         num(a, 3)? * index as f64,
                         num(a, 4)? * index as f64,
                     ];
-                    values.push(map_shape(
+                    values.push(map_affine_shape(
                         source,
                         |p| [p[0] + d[0], p[1] + d[1], p[2] + d[2]],
                         cancel,
@@ -787,7 +801,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                         count.saturating_sub(1).max(1)
                     };
                     let rad = total.to_radians() * index as f64 / divisor as f64;
-                    values.push(map_shape(source, |p| rotate(p, rad, 2), cancel)?);
+                    values.push(map_affine_shape(source, |p| rotate(p, rad, 2), cancel)?);
                 }
             }
             Ok(values)
@@ -799,6 +813,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | Remap | Expression | GraphProfile | ImportMesh => {
             Err("このノードはリスト評価が必要です。".into())
         }
+        _ => Err("未対応の曲線ノードです。".into()),
     }
 }
 
@@ -874,6 +889,8 @@ pub(crate) fn map_shape(
         Value::Curve(c) => Ok(Value::Curve(Arc::new(Curve {
             points: map(&c.points)?,
             closed: c.closed,
+            // Generic map may be nonlinear (twist, wave, noise). Never retain stale precision.
+            geometry: None,
         }))),
         Value::Mesh(m) => {
             let mesh = Mesh {
@@ -885,6 +902,15 @@ pub(crate) fn map_shape(
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
     }
+}
+fn map_affine_shape(v: &Value, f: impl Fn([f64;3]) -> [f64;3], cancel: &dyn Fn() -> bool) -> Result<Value,String> {
+    let mut mapped = map_shape(v, &f, cancel)?;
+    if let (Value::Curve(before), Value::Curve(after)) = (v, &mut mapped) {
+        if let Some(g) = &before.geometry {
+            Arc::make_mut(after).geometry = Some(g.affine(&f)?);
+        }
+    }
+    Ok(mapped)
 }
 fn rotate(p: [f64; 3], r: f64, axis: usize) -> [f64; 3] {
     let (s, c) = r.sin_cos();
@@ -1099,7 +1125,7 @@ fn mirror(
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
         other => {
-            let mirrored = map_shape(other, |p| reflect(p, axis), cancel)?;
+            let mirrored = map_affine_shape(other, |p| reflect(p, axis), cancel)?;
             if keep {
                 Ok(vec![other.clone(), mirrored])
             } else {
@@ -1942,6 +1968,7 @@ mod tests {
         let c = Curve {
             points: vec![[0., 0., 0.], [10., 10., 0.], [0., 10., 0.], [10., 0., 0.]],
             closed: true,
+            geometry: None,
         };
         assert!(extrude(&c, 10., 1, &|| false).is_err());
     }

@@ -184,6 +184,47 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    // Mathematical curve nodes: appended to preserve legacy serde names.
+    CurveLine,
+    CurveLineSdl,
+    CurvePolyline,
+    CurveCircleCnr,
+    CurveCircleThree,
+    CurveArc,
+    CurveArcThree,
+    CurveEllipse,
+    CurveSpiral,
+    CurveBezier,
+    CurveNurbs,
+    CurveWeightedNurbs,
+    CurveInterpolate,
+    CurveLength,
+    CurveEvaluate,
+    CurveEvaluateLength,
+    CurveClosestParameter,
+    CurveClosestPoint,
+    CurveStart,
+    CurveEnd,
+    CurveMiddle,
+    CurveTangent,
+    CurveCurvature,
+    CurveDomain,
+    CurveClosed,
+    CurveDivide,
+    CurveDivideLength,
+    CurveSubcurve,
+    CurveShatter,
+    CurveReverse,
+    CurveControls,
+    CurveWeights,
+    CurveKnots,
+    CurveDegree,
+    CurveInsertKnot,
+    CurveOffsetPreview,
+    CurveFrameX,
+    CurveFrameY,
+    CurveLineLine,
+    CurveLinePlane,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +294,46 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::CurveLine,
+            Self::CurveLineSdl,
+            Self::CurvePolyline,
+            Self::CurveCircleCnr,
+            Self::CurveCircleThree,
+            Self::CurveArc,
+            Self::CurveArcThree,
+            Self::CurveEllipse,
+            Self::CurveSpiral,
+            Self::CurveBezier,
+            Self::CurveNurbs,
+            Self::CurveWeightedNurbs,
+            Self::CurveInterpolate,
+            Self::CurveLength,
+            Self::CurveEvaluate,
+            Self::CurveEvaluateLength,
+            Self::CurveClosestParameter,
+            Self::CurveClosestPoint,
+            Self::CurveStart,
+            Self::CurveEnd,
+            Self::CurveMiddle,
+            Self::CurveTangent,
+            Self::CurveCurvature,
+            Self::CurveDomain,
+            Self::CurveClosed,
+            Self::CurveDivide,
+            Self::CurveDivideLength,
+            Self::CurveSubcurve,
+            Self::CurveShatter,
+            Self::CurveReverse,
+            Self::CurveControls,
+            Self::CurveWeights,
+            Self::CurveKnots,
+            Self::CurveDegree,
+            Self::CurveInsertKnot,
+            Self::CurveOffsetPreview,
+            Self::CurveFrameX,
+            Self::CurveFrameY,
+            Self::CurveLineLine,
+            Self::CurveLinePlane,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -456,7 +537,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "円",
                     category: "曲線",
-                    description: "XY 平面に閉じた円の点列を作ります。分割数で滑らかさを調整。",
+                    description: "XY 平面に正確な有理円を作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "circle ring 丸 輪",
                     inputs: &[
                         n("radius", "半径", 30., 0.1, 1000., 0.5),
@@ -513,7 +594,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "らせん",
                     category: "曲線",
-                    description: "Z 軸を中心に上昇するらせん状の点列を作ります。",
+                    description: "Z 軸を中心に上昇する解析的ならせんを作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "helix spiral 螺旋 バネ スパイラル",
                     inputs: &[
                         n("radius", "半径", 25., 0.1, 1000., 0.5),
@@ -863,6 +944,7 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
             other => crate::gh_nodes::spec(other),
         }
     }
@@ -1088,6 +1170,8 @@ pub struct Mesh {
 pub struct Curve {
     pub points: Vec<[f64; 3]>,
     pub closed: bool,
+    /// Exact runtime geometry; points are a separate display/legacy meshing cache.
+    pub geometry: Option<crate::curve_geometry::CurveGeometry>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -1108,7 +1192,7 @@ impl Value {
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
-            Self::Curve(c) => c.points.len().max(1),
+            Self::Curve(c) => c.points.len().max(1).saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
             Self::Mesh(m) => m
                 .vertices
                 .len()
