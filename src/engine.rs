@@ -271,7 +271,7 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let list_kind = crate::gh_nodes::is_list_kind(node.kind) || node.kind == NodeKind::MeshConstruct;
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -328,6 +328,8 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if node.kind == NodeKind::MeshConstruct {
+            crate::mesh_fabrication::run_list(&lists, cancel)?
         } else if list_kind {
             crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
@@ -794,7 +796,28 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
-        Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
+        MeshArea
+        | MeshVolume
+        | MeshCenter
+        | MeshDimensions
+        | MeshMass
+        | MeshAudit
+        | MeshVertices
+        | MeshFaces
+        | MeshNormals
+        | MeshEdges
+        | MeshBoundary
+        | MeshClosest
+        | MeshFlip
+        | MeshWeldExact
+        | MeshUnweld
+        | MeshUnify
+        | MeshSmooth
+        | MeshSubdivide
+        | MeshCatmullClark
+        | MeshOnBed
+        | MeshDeleteFace => crate::mesh_fabrication::run_item(kind, a, cancel),
+        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
         | Remap | Expression | GraphProfile | ImportMesh => {
             Err("このノードはリスト評価が必要です。".into())
