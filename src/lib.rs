@@ -2,6 +2,7 @@ pub mod annotations;
 pub mod cluster;
 pub mod engine;
 pub mod expr;
+pub mod gcode;
 pub mod gh_nodes;
 pub mod import;
 pub mod model;

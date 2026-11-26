@@ -99,7 +99,7 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     atomic_write(path, |file| file.write_all(&bytes))
 }
 
-fn atomic_write(
+pub(crate) fn atomic_write(
     path: &Path,
     write: impl FnOnce(&mut BufWriter<File>) -> std::io::Result<()>,
 ) -> Result<(), String> {

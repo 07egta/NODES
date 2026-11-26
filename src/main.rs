@@ -3,6 +3,7 @@ mod app;
 mod canvas;
 mod data_view;
 mod file_picker;
+mod gcode_ui;
 mod help;
 mod script_ui;
 mod theme;

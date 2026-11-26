@@ -15,6 +15,7 @@ pub enum FileTask {
     Save,
     ExportStl,
     ExportObj,
+    ExportGcode,
     SavePart,
     LoadPart,
     /// Mesh file for the ファイル読み込み node: STL or OBJ.
@@ -32,6 +33,7 @@ impl FileTask {
             Self::Save => "作品を保存",
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
+            Self::ExportGcode => "G-code に書き出す",
             Self::SavePart => "部品を書き出す",
             Self::LoadPart => "部品を読み込む",
             Self::ImportMesh => "ファイルを読み込む",
@@ -43,6 +45,7 @@ impl FileTask {
             Self::Open | Self::Save => "morph",
             Self::ExportStl | Self::ImportMesh => "stl",
             Self::ExportObj => "obj",
+            Self::ExportGcode => "gcode",
             Self::SavePart | Self::LoadPart => "morphpart",
         }
     }
@@ -71,7 +74,7 @@ impl FileTask {
             Self::Open => "開く",
             Self::Save => "保存",
             Self::LoadPart | Self::ImportMesh => "読み込む",
-            Self::ExportStl | Self::ExportObj | Self::SavePart => "書き出す",
+            Self::ExportStl | Self::ExportObj | Self::ExportGcode | Self::SavePart => "書き出す",
         }
     }
 }
