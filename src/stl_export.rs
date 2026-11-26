@@ -798,36 +798,50 @@ fn write_ascii(path: &Path, bodies: &[Mesh]) -> Result<(), String> {
 const CONTENT_TYPES: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n <Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n</Types>\n";
 const RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n <Relationship Target=\"/3D/3dmodel.model\" Id=\"rel0\" Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\"/>\n</Relationships>\n";
 
-/// Builds a 3MF package (experimental). One object holding all bodies; units are millimetres.
+/// Builds an experimental 3MF package with one model object per input mesh.
+/// A mesh containing nested shells remains a single object. This does not detect
+/// shell nesting, self-intersection or geometric overlap between model objects.
 pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
     ensure_writable(bodies)?;
-    let total_vertices: usize = bodies.iter().map(|b| b.vertices.len()).sum();
-    if u32::try_from(total_vertices).is_err() {
-        return Err("形状が大きすぎて 3MF に書き出せません。".into());
+    if bodies.is_empty() {
+        return Err("3MFに書き出せるモデルがありません。".into());
     }
-    let mut vertices = String::new();
-    let mut triangles = String::new();
-    let mut offset: u32 = 0;
-    for body in bodies {
+    let mut model = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"millimeter\" xml:lang=\"ja-JP\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n <resources>\n"
+    );
+    for (index, body) in bodies.iter().enumerate() {
+        let id = index + 1;
+        // The model object requires indexed, consistently oriented manifold
+        // triangles. An independent cavity shell must not become a model object.
+        // No assertion of exact solid validity is made by this check.
+        let volume = crate::mesh_fabrication::signed_volume(body, &|| false)
+            .map_err(|e| format!("3MF オブジェクト {id}: {e}"))?;
+        if volume <= 0. {
+            return Err(format!("3MF オブジェクト {id} の体積が正ではありません。内側の殻を別オブジェクトにせず、面方向を確認してください。"));
+        }
+        model.push_str(&format!("  <object id=\"{id}\" type=\"model\">\n   <mesh>\n    <vertices>\n"));
+        // Rust's shortest round-trip representation avoids 6-decimal rounding
+        // that could collapse close vertices. Coordinates are checked beforehand.
         for p in &body.vertices {
-            vertices.push_str(&format!(
-                "     <vertex x=\"{:.6}\" y=\"{:.6}\" z=\"{:.6}\"/>\n",
+            model.push_str(&format!(
+                "     <vertex x=\"{}\" y=\"{}\" z=\"{}\"/>\n",
                 p[0], p[1], p[2]
             ));
         }
+        model.push_str("    </vertices>\n    <triangles>\n");
         for t in &body.triangles {
-            triangles.push_str(&format!(
+            model.push_str(&format!(
                 "     <triangle v1=\"{}\" v2=\"{}\" v3=\"{}\"/>\n",
-                t[0] + offset,
-                t[1] + offset,
-                t[2] + offset
+                t[0], t[1], t[2]
             ));
         }
-        offset += body.vertices.len() as u32;
+        model.push_str("    </triangles>\n   </mesh>\n  </object>\n");
     }
-    let model = format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"millimeter\" xml:lang=\"ja-JP\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n <resources>\n  <object id=\"1\" type=\"model\">\n   <mesh>\n    <vertices>\n{vertices}    </vertices>\n    <triangles>\n{triangles}    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build>\n  <item objectid=\"1\"/>\n </build>\n</model>\n"
-    );
+    model.push_str(" </resources>\n <build>\n");
+    for id in 1..=bodies.len() {
+        model.push_str(&format!("  <item objectid=\"{id}\"/>\n"));
+    }
+    model.push_str(" </build>\n</model>\n");
     zip_stored(&[
         ("[Content_Types].xml", CONTENT_TYPES.as_bytes()),
         ("_rels/.rels", RELS.as_bytes()),
