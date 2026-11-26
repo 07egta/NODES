@@ -1228,21 +1228,7 @@ impl MorphletApp {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(14, 7))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.checkbox(&mut self.viewport.wireframe, "ワイヤー");
-                            ui.checkbox(&mut self.viewport.show_grid, "グリッド");
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.small_button("上").clicked() {
-                                    self.viewport.set_view("top");
-                                }
-                                if ui.small_button("前").clicked() {
-                                    self.viewport.set_view("front");
-                                }
-                                if ui.small_button("斜め").clicked() {
-                                    self.viewport.set_view("iso");
-                                }
-                            });
-                        });
+                        self.viewport.controls(ui);
                     });
                 ui.separator();
                 egui::ScrollArea::vertical()

@@ -5,5 +5,7 @@ pub mod expr;
 pub mod gh_nodes;
 pub mod model;
 pub mod persistence;
+pub mod print_info;
+pub mod raster;
 pub mod script;
 pub mod templates;
