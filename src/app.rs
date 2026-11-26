@@ -16,6 +16,7 @@ use morphlet::{
     gcode,
     latest_channel::{self, LatestReceiver, LatestSender},
     model::{DataType, Graph, Node, NodeId, NodeKind, Tree},
+    multi_port::PortRef,
     persistence::{self, History, Project},
     templates,
 };
@@ -144,7 +145,7 @@ pub struct MorphletApp {
     /// ファイル読み込み node that the next picked mesh file is loaded into.
     import_target: Option<NodeId>,
     /// Node whose output wire was dropped on empty canvas; the search connects to it.
-    wire_source: Option<NodeId>,
+    wire_source: Option<PortRef>,
     /// Nodes added recently, shown first in the search popup.
     recent: Recent,
     /// Highlighted row of the search popup (↑ ↓ move it, Enter adds it).
@@ -589,11 +590,12 @@ impl MorphletApp {
                     let output = self
                         .project
                         .graph
-                        .node(source)
-                        .map(|n| n.kind.spec().output);
+                        .node(source.node)
+                        .and_then(|n| n.output_port(source.port))
+                        .map(|p| p.kind);
                     match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
                         Some(key) => {
-                            if let Err(e) = self.project.graph.connect(source, id, key) {
+                            if let Err(e) = self.project.graph.connect_port(source, id, key, false) {
                                 // Keep a wire-drop operation transactional: never leave a half-added node.
                                 self.project.graph.remove(id);
                                 self.notify(e, true);
@@ -719,7 +721,7 @@ impl MorphletApp {
             Err(e) => self.notify(e, true),
         }
     }
-    fn open_palette(&mut self, at: [f32; 2], source: Option<NodeId>) {
+    fn open_palette(&mut self, at: [f32; 2], source: Option<PortRef>) {
         self.wire_source = source;
         self.palette_open = true;
         self.palette_focus = true;
@@ -1194,31 +1196,34 @@ impl MorphletApp {
         ui.add_space(9.);
         let mut disconnect = None;
         let shown = cluster::real_input_count(&self.project.graph, &node);
-        for (index, input) in spec.inputs.iter().enumerate().take(shown) {
-            let linked = node.inputs.get(input.key).copied();
-            let label = cluster::input_label(&self.project.graph, &node, index, input);
+        let ports = node.input_ports();
+        for (index, input) in ports.iter().copied().enumerate().take(shown) {
+            let linked = node.sources(input.key);
+            let label = if node.kind == NodeKind::Cluster {
+                cluster::input_label(&self.project.graph, &node, index, input)
+            } else { node.input_name(input).to_owned() };
             let needs_link = cluster::input_needs_link(&self.project.graph, &node, index, input);
-            let optional = cluster::input_is_optional(&node, input);
+            let optional = cluster::input_is_optional(&node, input)
+                || morphlet::multi_port::optional_input(node.kind, input.key);
             ui.horizontal(|ui| {
                 ui.add_sized(
                     [100., 23.],
                     egui::Label::new(RichText::new(label).size(12.)),
                 );
-                if let Some(source) = linked {
-                    let name = self
-                        .project
-                        .graph
-                        .node(source)
-                        .map(|n| n.name.as_str())
-                        .unwrap_or("不明");
-                    ui.label(
-                        RichText::new(format!("← {name}"))
-                            .size(11.)
-                            .color(theme::TEAL),
-                    );
-                    if ui.small_button("切断").clicked() {
-                        disconnect = Some(input.key);
-                    }
+                if !linked.is_empty() {
+                    ui.vertical(|ui| {
+                        for source in &linked {
+                            ui.horizontal(|ui| {
+                                let name = self.project.graph.node(source.node)
+                                    .and_then(|n| n.output_port(source.port).map(|p| format!("{} / {}", n.name, p.label)))
+                                    .unwrap_or_else(|| "不明".into());
+                                ui.label(RichText::new(format!("← {name}")).size(11.).color(theme::TEAL));
+                                if ui.small_button("切断").clicked() {
+                                    disconnect = Some((input.key, *source));
+                                }
+                            });
+                        }
+                    });
                 } else if let (Some(default), false) = (input.default, needs_link) {
                     if let Some(n) = self.project.graph.node_mut(id) {
                         let value = n.params.entry(input.key.into()).or_insert(default);
@@ -1241,8 +1246,52 @@ impl MorphletApp {
                 }
             });
         }
-        if let Some(key) = disconnect {
-            self.project.graph.disconnect(id, key);
+        if let Some((key, source)) = disconnect {
+            if let Err(e) = self.project.graph.disconnect_port(source, id, key) {
+                self.notify(e, true);
+            }
+        }
+        let outputs = node.output_ports();
+        if outputs.len() > 1 || matches!(node.kind, NodeKind::StreamGate | NodeKind::StreamMerge) {
+            ui.add_space(5.);
+            egui::CollapsingHeader::new("ポート設定・出力").default_open(true)
+                .id_salt(("multi_ports", id))
+                .show(ui, |ui| {
+                    for port in &outputs {
+                        let source = PortRef { node: id, port: port.id };
+                        let result = self.evaluation.as_ref().and_then(|e| e.output(source));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(format!("{}  #{}", port.label, port.id))
+                                .color(theme::port_color(port.kind)));
+                            match result {
+                                Some(Ok(tree)) => { ui.label(theme::small(format!("{} 枝 / {} 個", tree.branches.len(), tree.item_count()))); }
+                                Some(Err(e)) => { ui.colored_label(theme::error(), "エラー").on_hover_text(e); }
+                                None => { ui.label(theme::small("未計算")); }
+                            }
+                        });
+                    }
+                    if node.kind == NodeKind::StreamMerge {
+                        if ui.small_button("＋ 入力").clicked() {
+                            if let Err(e) = self.project.graph.add_variable_input(id) { self.notify(e, true); }
+                        }
+                        for input in &ports {
+                            if ui.add_enabled(!node.has_link(input.key) && ports.len() > 1,
+                                egui::Button::new(format!("− {}", node.input_name(input)))).clicked() {
+                                if let Err(e) = self.project.graph.remove_variable_input(id, input.key) { self.notify(e, true); }
+                            }
+                        }
+                    }
+                    if node.kind == NodeKind::StreamGate {
+                        if ui.small_button("＋ 出力").clicked() {
+                            if let Err(e) = self.project.graph.add_variable_output(id) { self.notify(e, true); }
+                        }
+                        for port in outputs.iter().filter(|p| p.id != 0) {
+                            if ui.small_button(format!("− {}", port.label)).clicked() {
+                                if let Err(e) = self.project.graph.remove_variable_output(id, port.id) { self.notify(e, true); }
+                            }
+                        }
+                    }
+                });
         }
         if morphlet::data_tree_nodes::supports_transform(node.kind) {
             egui::CollapsingHeader::new("データツリー設定")
@@ -1266,7 +1315,7 @@ impl MorphletApp {
                                 else { n.params.insert(MATCH_PARAM.into(),choice as f64); }
                             }
                         }
-                        for (index,input) in spec.inputs.iter().enumerate().take(shown) {
+                        for (index,input) in ports.iter().copied().enumerate().take(shown) {
                             let key = format!("{PORT_PREFIX}{}",input.key);
                             let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
                             let previous = choice;
@@ -1532,9 +1581,12 @@ impl MorphletApp {
         let mut open = true;
         let mut add = None;
         let ordered = ordered_kinds();
-        let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
-        let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
-        let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
+        let wire_source = self.wire_source.and_then(|source| {
+            let node = self.project.graph.node(source.node)?;
+            Some((node, node.output_port(source.port)?))
+        });
+        let wire_type: Option<DataType> = wire_source.as_ref().map(|(_, port)| port.kind);
+        let wire_name: Option<String> = wire_source.as_ref().map(|(n, port)| format!("{} / {}", n.name, port.label));
         let mut ime_event = false;
         ctx.input(|i| {
             for event in &i.events {
@@ -2077,11 +2129,20 @@ fn insert_nodes(graph: &mut Graph, nodes: &[Node], offset: [f32; 2], retain_exte
         n.script = old.script.clone();
         n.cluster = old.cluster;
         n.off = old.off;
+        n.port_layout = old.port_layout.clone();
     }
     for old in nodes {
         let new = candidate.node_mut(mapping[&old.id]).ok_or("追加したノードが見つかりません。")?;
         new.inputs = old.inputs.iter().filter_map(|(key, source)| {
             mapping.get(source).copied().or_else(|| retain_external.then_some(*source)).map(|id| (key.clone(), id))
+        }).collect();
+        new.port_links = old.port_links.iter().filter_map(|(key, sources)| {
+            let mapped: Vec<_> = sources.iter().filter_map(|source| {
+                let node = mapping.get(&source.node).copied()
+                    .or_else(|| retain_external.then_some(source.node))?;
+                Some(PortRef { node, port: source.port })
+            }).collect();
+            (!mapped.is_empty()).then(|| (key.clone(), mapped))
         }).collect();
     }
     candidate.validate()?;
@@ -2138,6 +2199,9 @@ fn same_calculation(a: &Graph, b: &Graph) -> bool {
                 && x.kind == y.kind
                 && x.params == y.params
                 && x.inputs == y.inputs
+                && x.port_links == y.port_links
+                && x.port_layout.input_order == y.port_layout.input_order
+                && x.port_layout.output_order == y.port_layout.output_order
                 && x.script == y.script
                 && x.cluster == y.cluster
                 && x.off == y.off
