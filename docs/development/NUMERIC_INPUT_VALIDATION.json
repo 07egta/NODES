@@ -44,5 +44,14 @@
       "Round-trip formatting prevents precision loss on focus exit."
     ],
     "tests": "four new headless egui tests; not yet executed locally (Rust unavailable)"
-  }
+  },
+  "ci_attempts": [
+    {
+      "source_head": "521742b4ead3481f05d6bdf7460b6a42393ad97b",
+      "run_id": 45856676411,
+      "linux_job_id": 140036796232,
+      "result": "fmt failed at two multiline assert formatting differences; remaining gates and Windows skipped",
+      "correction": "Applied exact rustfmt diff in numeric_editor_tests.rs; no test removed or changed semantically."
+    }
+  ]
 }

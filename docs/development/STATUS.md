@@ -66,6 +66,8 @@ A separate 12-second settled native-GUI sample on this Linux virtual desktop obs
 
 ## Current work
 
+- Numeric fix 521742b Check `45856676411` stopped at two rustfmt assert-layout differences. This checkpoint applies the exact emitted diff; subsequent compilation, tests and GUI verification are still pending.
+
 - New-graph manual testing found a numerical UI bug at 2f94df4: a Sphere default radius 25 becomes 25.1 on display, and typing 30 saves 30.1. The slider step is anchored to its 0.1 minimum and is applied during passive rendering. A focused shared numeric-widget fix and four headless egui regressions have been added in app.rs/canvas.rs/numeric_editor_tests.rs; CI and corrected-artifact GUI verification are pending; do not call this precision issue resolved until source and actual GUI checks pass. See NUMERIC_INPUT_VALIDATION.json.
 
 - The last fully checked source is 2f94df4 (Linux433/Windows432). This checkpoint also contains a new numeric-widget source fix, which needs its own Check and actual GUI re-test. Earlier evidence-only commits are preserved at 908c668 and 38337b6.

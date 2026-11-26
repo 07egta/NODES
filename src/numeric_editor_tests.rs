@@ -76,7 +76,10 @@ fn focus(context: &egui::Context, editor: Editor, spec: &InputSpec, value: &mut 
         );
     }
     frame(context, editor, spec, value, Vec::new());
-    assert!(context.wants_keyboard_input(), "{editor:?} did not gain text focus");
+    assert!(
+        context.wants_keyboard_input(),
+        "{editor:?} did not gain text focus"
+    );
 }
 
 fn confirm(context: &egui::Context, editor: Editor, spec: &InputSpec, value: &mut f64) {
@@ -91,7 +94,10 @@ fn confirm(context: &egui::Context, editor: Editor, spec: &InputSpec, value: &mu
     }
     // Exercise focus-loss parsing and subsequent passive rendering as well.
     frame(context, editor, spec, value, Vec::new());
-    assert!(!context.wants_keyboard_input(), "Enter did not end text editing");
+    assert!(
+        !context.wants_keyboard_input(),
+        "Enter did not end text editing"
+    );
 }
 
 fn type_value(editor: Editor, spec: &InputSpec, initial: f64, text: &str) -> f64 {
