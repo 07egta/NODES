@@ -37,3 +37,9 @@ Multi-output port IDs and migration (retain v1 reader); opaque unknown node payl
 Cluster instance keys now share per-root dependency token arrays. Each reachable definition is compared against its full serialized signature once per evaluation and receives a new revision only on change; tokens are not collision-prone hashes. This avoids storing the entire definition closure in every instance's cache entry. The evaluator still serializes active definitions once per evaluation and does not provide a file watcher. Definition validation memoizes depths and stops before descending past the configured maximum. Part import checks ID allocation before mutation; part export validates the generated payload and uses the same atomic, flushed writer as projects.
 
 Regression tests cover shared nested definitions, graph replacement with reused IDs, pathological definition fanout/depth, ID exhaustion and preservation of an existing part on failed saves.
+
+## Third hardening pass: bounded worker mailbox
+
+The GUI and worker now exchange snapshots through a dependency-free latest-only mailbox rather than unbounded channels. Each direction retains at most one undelivered snapshot; superseded snapshots are released outside the lock. The worker skips stale requests before starting and still checks the revision during evaluation and before publishing; the UI retains its final revision check. Dropping the worker requests cooperative cancellation. This is a single-worker scheduling change, not parallel node execution.
+
+Mailbox unit tests exercise 10,000 updates, release of superseded payloads, final delivery on producer close, monotonic concurrent delivery and consumer disconnect. UI responsiveness and shutdown behavior still require Windows execution.

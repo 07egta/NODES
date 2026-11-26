@@ -14,6 +14,7 @@ use morphlet::{
     annotations, cluster,
     engine::{Evaluation, Evaluator},
     gcode,
+    latest_channel::{self, LatestReceiver, LatestSender},
     model::{DataType, Graph, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
@@ -22,7 +23,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
-    mpsc,
 };
 use std::time::{Duration, Instant};
 
@@ -35,21 +35,21 @@ struct ComputeResult {
     evaluation: Evaluation,
 }
 struct Worker {
-    sender: mpsc::Sender<ComputeRequest>,
-    receiver: mpsc::Receiver<ComputeResult>,
+    sender: LatestSender<ComputeRequest>,
+    receiver: LatestReceiver<ComputeResult>,
     latest: Arc<AtomicU64>,
 }
 impl Worker {
     fn new(ctx: egui::Context) -> Self {
-        let (sender, requests) = mpsc::channel::<ComputeRequest>();
-        let (results, receiver) = mpsc::channel();
+        let (sender, requests) = latest_channel::channel::<ComputeRequest>();
+        let (results, receiver) = latest_channel::channel::<ComputeResult>();
         let latest = Arc::new(AtomicU64::new(0));
         let revision = latest.clone();
         std::thread::spawn(move || {
             let mut evaluator = Evaluator::default();
-            while let Ok(mut request) = requests.recv() {
-                while let Ok(newer) = requests.try_recv() {
-                    request = newer;
+            while let Ok(request) = requests.recv() {
+                if revision.load(Ordering::Relaxed) != request.revision {
+                    continue;
                 }
                 let result = evaluator.evaluate(&request.graph, &|| {
                     revision.load(Ordering::Relaxed) != request.revision
@@ -73,6 +73,12 @@ impl Worker {
             receiver,
             latest,
         }
+    }
+}
+impl Drop for Worker {
+    fn drop(&mut self) {
+        // Cooperatively cancel the active evaluation when the UI is destroyed.
+        self.latest.fetch_add(1, Ordering::Relaxed);
     }
 }
 

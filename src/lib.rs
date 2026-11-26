@@ -5,6 +5,7 @@ pub mod expr;
 pub mod gcode;
 pub mod gh_nodes;
 pub mod import;
+pub mod latest_channel;
 pub mod model;
 pub mod persistence;
 pub mod print_info;
