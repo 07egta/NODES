@@ -75,3 +75,10 @@ One output per node, no general mixed-access scheduler or native Null value; seq
 ## Documentation and remaining validation
 
 ROADMAP.md, NODE_COVERAGE.md, TEST_RESULTS.md and docs/ARCHITECTURE.md now describe the combined implementation and its limits. CI is strict; formatting and Clippy findings are expected to remain visible until repaired. The separate diagnostic workflow may prepare reviewable patches in its checkout with contents:read, but never pushes source itself. Only the integration process updates this branch with an expected-SHA lease.
+
+## Remote validation recovery
+
+- Integrated diagnostic workflow from `1f9eb00add42f9a0c71bfb361ec98bf0023c6c44`; it has read-only repository permissions and exports review candidates, never commits or pushes.
+- Normal Check run [45836118771](https://github.com/07egta/NODES/actions/runs/45836118771) stopped at formatting. Downstream compilation/tests were not run in that job.
+- Windows run [45835122608](https://github.com/07egta/NODES/actions/runs/45835122608) compiled the timing recovery and exposed a reconstructed test fixture setting Add B to its existing default 10. The regression now changes B relative to its current value and independently asserts both downstream outputs change. The test remains present; revalidation is pending.
+- Next: review the diagnostic CI checkpoint, commit formatter/lint candidates, regenerate registry/GH2 inventories and require clean committed-source CI.

@@ -29,9 +29,13 @@ fn timings_distinguish_cache_hits_and_downstream_edits() {
     assert_eq!((warm.computed, warm.cached), (0, 4));
     assert!(warm.node_timings.values().all(|t| t.cached));
     valid_times(&warm);
-    g.node_mut(middle).unwrap().params.insert("b".into(), 10.);
+    let previous = g.node(middle).unwrap().params["b"];
+    g.node_mut(middle).unwrap().params.insert("b".into(), previous + 1.);
+    assert_ne!(g.node(middle).unwrap().params["b"], previous);
     let edit = engine.evaluate(&g, &|| false);
     assert_eq!((edit.computed, edit.cached), (2, 2));
+    assert_ne!(edit.outputs[&middle], warm.outputs[&middle]);
+    assert_ne!(edit.outputs[&end], warm.outputs[&end]);
     for (id, hit) in [(source, true), (unrelated, true), (middle, false), (end, false)] {
         assert_eq!(edit.node_timings[&id].cached, hit);
     }
