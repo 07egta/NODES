@@ -1,4 +1,5 @@
 use crate::file_picker::{FilePicker, FileTask, PickerEvent};
+use crate::stl_export_ui::{self, StlExportUi, StlSources, UiRequest};
 use crate::{
     canvas::GraphCanvas,
     data_view,
@@ -105,10 +106,9 @@ pub struct MorphletApp {
     palette_position: [f32; 2],
     template_open: bool,
     help_open: bool,
-    export_open: bool,
     /// Advanced: G-code (vase mode) from the その他の書き出し menu.
     gcode: GcodeDialog,
-    export_stats: Option<Result<persistence::ExportReport, String>>,
+    stl_export: StlExportUi,
     toast: Option<(String, bool, Instant)>,
     confirm_action: Option<PendingAction>,
     allow_close: bool,
@@ -198,9 +198,8 @@ impl MorphletApp {
             palette_position: [0., 0.],
             template_open: false,
             help_open: false,
-            export_open: false,
             gcode: GcodeDialog::default(),
-            export_stats: None,
+            stl_export: StlExportUi::new(),
             toast: None,
             confirm_action: None,
             allow_close: false,
@@ -238,7 +237,6 @@ impl MorphletApp {
         self.revision = self.revision.wrapping_add(1);
         self.worker.latest.store(self.revision, Ordering::Relaxed);
         self.pending_compute = true;
-        self.export_stats = None;
     }
     fn compute_tick(&mut self, ctx: &egui::Context) {
         while let Ok(result) = self.worker.receiver.try_recv() {
@@ -493,24 +491,14 @@ impl MorphletApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
-                    FileTask::ExportStl | FileTask::ExportObj => {
-                        let result = self.result_trees().and_then(|trees| {
-                            if task == FileTask::ExportStl {
-                                persistence::export_stl(&path, &trees)
-                            } else {
-                                persistence::export_obj(&path, &trees)
-                            }
-                        });
-                        match result {
-                            Ok(r) => {
-                                self.notify(
-                                    format!("{} 面の形状を書き出しました", r.triangles),
-                                    false,
-                                );
-                                self.export_open = false;
-                            }
-                            Err(e) => self.notify(e, true),
-                        }
+                    FileTask::ExportStl | FileTask::ExportObj | FileTask::ExportThreeMf => {
+                        let sources = self.stl_sources();
+                        self.stl_export.export_to(&sources, &path);
+                        self.flush_stl_notice();
+                    }
+                    FileTask::PickSlicer => {
+                        self.stl_export.set_slicer(path);
+                        self.flush_stl_notice();
                     }
                 },
             }
@@ -969,11 +957,7 @@ impl MorphletApp {
                             .on_hover_text("完成形状を STL / OBJ へ")
                             .clicked()
                         {
-                            self.export_stats = Some(
-                                self.result_trees()
-                                    .and_then(|trees| persistence::mesh_stats(&trees)),
-                            );
-                            self.export_open = true;
+                            self.stl_export.open_dialog();
                         }
                         ui.menu_button("その他の書き出し", |ui| {
                             if ui.button("G-code（花瓶モード・未検証）").clicked() {
@@ -1753,50 +1737,78 @@ impl MorphletApp {
             self.request(PendingAction::Template(index), ctx);
         }
     }
-    fn export_dialog(&mut self, ctx: &egui::Context) {
-        if !self.export_open {
+    fn stl_sources(&self) -> StlSources {
+        StlSources {
+            output: self.result_trees(),
+            selected: self.selected_trees(),
+            revision: self.result_revision,
+            base_name: safe_name(&self.project.name),
+            start_dir: self.start_directory(),
+        }
+    }
+    /// Trees of the nodes selected on the canvas (選択ノード mode).
+    fn selected_trees(&self) -> Result<Vec<Tree>, String> {
+        if self.stale() {
+            return Err("形状を更新中です。更新が終わってから書き出してください。".into());
+        }
+        let Some(e) = &self.evaluation else {
+            return Err("形状の計算が完了していません。".into());
+        };
+        if self.canvas.selected.is_empty() {
+            return Err("書き出すノードを選んでください。".into());
+        }
+        let mut trees = Vec::new();
+        for id in &self.canvas.selected {
+            match e.outputs.get(id) {
+                Some(Ok(tree)) => trees.push(tree.clone()),
+                Some(Err(error)) => {
+                    return Err(format!("選んだノードを計算できません: {error}"));
+                }
+                None => return Err("選んだノードの計算結果がまだありません。".into()),
+            }
+        }
+        Ok(trees)
+    }
+    fn stl_request(&mut self, request: Option<UiRequest>) {
+        match request {
+            Some(UiRequest::Pick {
+                task,
+                directory,
+                file_name,
+            }) => {
+                self.file_picker = Some(FilePicker::new(task, directory, file_name));
+            }
+            Some(UiRequest::PickSlicer { directory }) => {
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::PickSlicer,
+                    directory,
+                    String::new(),
+                ));
+            }
+            None => {}
+        }
+    }
+    fn flush_stl_notice(&mut self) {
+        if let Some((text, error)) = self.stl_export.take_notice() {
+            self.notify(text, error);
+        }
+    }
+    fn stl_quick_shortcut(&mut self, ctx: &egui::Context) {
+        if stl_export_ui::quick_export_pressed(ctx) {
+            let sources = self.stl_sources();
+            let request = self.stl_export.quick(&sources);
+            self.stl_request(request);
+            self.flush_stl_notice();
+        }
+    }
+    fn stl_export_dialog(&mut self, ctx: &egui::Context) {
+        if !self.stl_export.is_open() {
             return;
         }
-        let mut open = true;
-        let mut format = None;
-        egui::Window::new("形を書き出す").open(&mut open).collapsible(false).resizable(false).default_width(455.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.label("「出力」ノードの形状を、mm 単位で保存します。");ui.add_space(12.);
-            if self.stale(){ui.colored_label(theme::ERROR,"形状を更新中です。更新完了後に開き直してください。");return;}
-            match self.export_stats.as_ref(){
-                Some(Ok(stats))=>{
-                    egui::Grid::new("export_stats").num_columns(2).spacing([24.,10.]).show(ui,|ui|{
-                        ui.label("メッシュ");ui.label(stats.mesh_count.to_string());ui.end_row();
-                        ui.label("三角形");ui.label(stats.triangles.to_string());ui.end_row();
-                        ui.label("開いた辺");ui.label(stats.open_edges.to_string());ui.end_row();
-                        ui.label("非多様体の辺");ui.label(stats.non_manifold_edges.to_string());ui.end_row();
-                    });
-                    ui.add_space(10.);
-                    if stats.is_closed() {ui.colored_label(theme::TEAL,"閉じたメッシュです（辺のつながりを確認）。");}
-                    else{ui.colored_label(theme::ERROR,"開いた辺や面の向きに問題があります。書き出し後にスライサーで確認してください。");}
-                    ui.label(theme::small("自己交差や造形可否の判定は含みません。"));
-                    if stats.skipped_values > 0 { ui.label(theme::small(format!("数値・点・曲線の {} 要素は書き出しに含みません。", stats.skipped_values))); }
-                    if stats.degenerate_triangles > 0 { ui.colored_label(theme::ERROR, format!("面が潰れています（{} 面）。形状を修正してください。", stats.degenerate_triangles)); }
-                    ui.add_space(12.);
-                    ui.horizontal(|ui|{
-                        if ui.add_sized([195.,40.],egui::Button::new("STL · 3D プリント").fill(theme::TEAL_PALE)).clicked(){format=Some("stl");}
-                        if ui.add_sized([195.,40.],egui::Button::new("OBJ · 3D ソフト")).clicked(){format=Some("obj");}
-                    });
-                },Some(Err(e))=>{ui.colored_label(theme::ERROR,e);ui.label("立体を作り、「出力」ノードにつないでください。");},None=>{ui.label("形状を確認できませんでした。");}
-            }
-        });
-        self.export_open = open;
-        if let Some(format) = format {
-            self.file_picker = Some(FilePicker::new(
-                if format == "stl" {
-                    FileTask::ExportStl
-                } else {
-                    FileTask::ExportObj
-                },
-                self.start_directory(),
-                format!("{}.{}", safe_name(&self.project.name), format),
-            ));
-            self.export_open = false;
-        }
+        let sources = self.stl_sources();
+        let request = self.stl_export.show(ctx, &sources);
+        self.stl_request(request);
+        self.flush_stl_notice();
     }
     fn gcode_dialog(&mut self, ctx: &egui::Context) {
         if !self.gcode.is_open() {
@@ -1980,10 +1992,10 @@ impl eframe::App for MorphletApp {
             && !self.palette_open
             && !self.template_open
             && !self.help_open
-            && !self.export_open
             && !self.gcode.is_open()
             && self.file_picker.is_none()
         {
+            self.stl_quick_shortcut(ctx);
             self.keyboard(ctx);
         }
         self.topbar(ctx);
@@ -1994,8 +2006,8 @@ impl eframe::App for MorphletApp {
         self.palette(ctx);
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
-        self.export_dialog(ctx);
         self.gcode_dialog(ctx);
+        self.stl_export_dialog(ctx);
         self.help_dialog(ctx);
         if let Some(kind) = self.help_window.show(ctx) {
             self.add_node(kind, None);

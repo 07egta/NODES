@@ -16,6 +16,8 @@ pub enum FileTask {
     ExportStl,
     ExportObj,
     ExportGcode,
+    ExportThreeMf,
+    PickSlicer,
     SavePart,
     LoadPart,
     /// Mesh file for the ファイル読み込み node: STL or OBJ.
@@ -25,7 +27,7 @@ pub enum FileTask {
 impl FileTask {
     /// Tasks that pick an existing file (the others name a file to write).
     fn picks_existing(self) -> bool {
-        matches!(self, Self::Open | Self::LoadPart | Self::ImportMesh)
+        matches!(self, Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer)
     }
     fn title(self) -> &'static str {
         match self {
@@ -34,6 +36,8 @@ impl FileTask {
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
             Self::ExportGcode => "G-code に書き出す",
+            Self::ExportThreeMf => "3MF に書き出す",
+            Self::PickSlicer => "スライサーを選ぶ",
             Self::SavePart => "部品を書き出す",
             Self::LoadPart => "部品を読み込む",
             Self::ImportMesh => "ファイルを読み込む",
@@ -46,6 +50,8 @@ impl FileTask {
             Self::ExportStl | Self::ImportMesh => "stl",
             Self::ExportObj => "obj",
             Self::ExportGcode => "gcode",
+            Self::ExportThreeMf => "3mf",
+            Self::PickSlicer => "exe",
             Self::SavePart | Self::LoadPart => "morphpart",
         }
     }
@@ -74,7 +80,8 @@ impl FileTask {
             Self::Open => "開く",
             Self::Save => "保存",
             Self::LoadPart | Self::ImportMesh => "読み込む",
-            Self::ExportStl | Self::ExportObj | Self::ExportGcode | Self::SavePart => "書き出す",
+            Self::PickSlicer => "選ぶ",
+            Self::ExportStl | Self::ExportObj | Self::ExportGcode | Self::ExportThreeMf | Self::SavePart => "書き出す",
         }
     }
 }

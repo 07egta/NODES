@@ -6,6 +6,7 @@ mod file_picker;
 mod gcode_ui;
 mod help;
 mod script_ui;
+mod stl_export_ui;
 mod theme;
 mod ui_polish;
 mod viewport;
