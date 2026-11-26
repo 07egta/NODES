@@ -32,6 +32,7 @@ pub struct GraphCanvas {
     dragging: Option<NodeId>,
     /// A wire was pulled out of an output port and the mouse button is still held.
     wire_drag: bool,
+    reconnect_origin: Option<WireLink>,
     box_start: Option<Pos2>,
     box_base: BTreeSet<NodeId>,
     /// Note being edited in place, and whether its text box still needs focus.
@@ -39,6 +40,14 @@ pub struct GraphCanvas {
     note_focus: bool,
     /// World position of the last right-click on the empty canvas.
     menu_at: [f32; 2],
+    menu_wire: Option<WireLink>,
+}
+/// A particular edge, even when the source feeds multiple targets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WireLink {
+    pub from: NodeId,
+    pub to: NodeId,
+    pub input: String,
 }
 
 #[derive(Default)]
@@ -61,6 +70,7 @@ pub struct CanvasOutcome {
     pub add_note_at: Option<[f32; 2]>,
     /// A wire was dropped on empty canvas: the source node and the world position.
     pub drop_wire: Option<(NodeId, [f32; 2])>,
+    pub insert_wire: Option<(WireLink, [f32; 2])>,
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
@@ -304,10 +314,26 @@ impl GraphCanvas {
             && let Some(pos) = pointer
         {
             self.menu_at = to_world(pos, rect, p.pan, p.zoom);
+            self.menu_wire = if card_under { None } else { nearest_wire(p, rect, pos) };
         }
         let menu_at = self.menu_at;
         let has_selection = !self.selected.is_empty();
+        let menu_wire = self.menu_wire.clone();
         response.context_menu(|ui| {
+            if let Some(link) = &menu_wire {
+                ui.label(theme::small("接続線"));
+                if ui.button("ワイヤーにノードを挿入").clicked() {
+                    out.insert_wire = Some((link.clone(), menu_at));
+                    ui.close();
+                }
+                if ui.button("ワイヤーを削除").clicked() {
+                    if p.graph.node(link.to).and_then(|n| n.inputs.get(&link.input)) == Some(&link.from) {
+                        p.graph.disconnect(link.to, &link.input);
+                    }
+                    ui.close();
+                }
+                ui.separator();
+            }
             if ui.button("ここにノードを追加").clicked() {
                 out.add_at = Some(menu_at);
                 ui.close();
@@ -369,6 +395,7 @@ impl GraphCanvas {
         }
         let mut to_connect = None;
         let mut to_disconnect = None;
+        let mut reconnect_from: Option<WireLink> = None;
         // Index the endpoints once instead of searching the entire graph for each wire.
         let sources: BTreeMap<_, _> = p.graph.nodes.iter().map(|n| (n.id, n)).collect();
         for n in &p.graph.nodes {
@@ -643,6 +670,12 @@ impl GraphCanvas {
                 {
                     to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
                 }
+                if !over_map && pr.drag_started_by(egui::PointerButton::Primary) && linked
+                    && self.connecting.is_none()
+                    && let Some(from) = n.inputs.get(spec.key)
+                {
+                    reconnect_from = Some(WireLink { from: *from, to: n.id, input: spec.key.into() });
+                }
                 if pr.secondary_clicked() && linked && !over_map {
                     to_disconnect = Some((n.id, spec.key));
                 }
@@ -652,7 +685,7 @@ impl GraphCanvas {
                     spec.kind.label(),
                     if can == Some(false) { "\n現在の出力と型が合わないか、同じノードです。" } else if can == Some(true) { "\n接続候補（循環の有無は接続時に確認）" } else { "" },
                     if linked {
-                        "\n右クリックで切断"
+                        "\n右クリックで切断 · ドラッグで接続先を変更"
                     } else {
                         "\n出力からドラッグ、または出力→入力の順にクリック"
                     }
@@ -763,6 +796,7 @@ impl GraphCanvas {
                 Sense::click_and_drag(),
             );
             if !over_map && (or.clicked() || or.drag_started()) {
+                self.reconnect_origin = None;
                 self.connecting = Some(n.id);
             }
             if !over_map && or.drag_started() {
@@ -811,10 +845,18 @@ impl GraphCanvas {
                 .on_hover_text(message);
             }
         }
-        if let Some((from, to, key)) = to_connect
-            && let Err(e) = p.graph.connect(from, to, key)
-        {
-            out.error = Some(e);
+        if let Some(link) = reconnect_from {
+            self.connecting = Some(link.from);
+            self.reconnect_origin = Some(link);
+            self.wire_drag = true;
+        }
+        if let Some((from, to, key)) = to_connect {
+            let result = if let Some(old) = self.reconnect_origin.take() {
+                reconnect_wire(&mut p.graph, &old, to, key)
+            } else {
+                p.graph.connect(from, to, key)
+            };
+            if let Err(e) = result { out.error = Some(e); }
         }
         if let Some((to, key)) = to_disconnect {
             p.graph.disconnect(to, key);
@@ -824,7 +866,9 @@ impl GraphCanvas {
         if self.wire_drag && !ui.input(|i| i.pointer.primary_down()) {
             self.wire_drag = false;
             let source = self.connecting.take();
-            if !card_under
+            // A cancelled reconnect must preserve the original wire.
+            let was_reconnect = self.reconnect_origin.take().is_some();
+            if !was_reconnect && !card_under
                 && let Some(at) = pointer.filter(|pos| rect.contains(*pos))
                 && let Some(from) = source
             {
@@ -845,6 +889,8 @@ impl GraphCanvas {
         }
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.connecting = None;
+            self.reconnect_origin = None;
+            self.wire_drag = false;
             self.box_start = None;
         }
         if !ui.input(|i| i.pointer.primary_down()) {
@@ -1176,6 +1222,46 @@ fn wire_bounds(a: Pos2, b: Pos2) -> Rect {
     Rect::from_two_pos(a, b).expand2(egui::vec2(165., 8.))
 }
 
+/// Hit testing uses the same Bezier as rendering, and picks the closest edge.
+fn nearest_wire(p: &Project, rect: Rect, pointer: Pos2) -> Option<WireLink> {
+    let sources: BTreeMap<_, _> = p.graph.nodes.iter().map(|n| (n.id, n)).collect();
+    let mut nearest = None;
+    let mut best = 7.0_f32;
+    for node in &p.graph.nodes {
+        for (input, from) in &node.inputs {
+            let Some(source) = sources.get(from).copied() else { continue; };
+            let Some(index) = node.kind.spec().inputs.iter().position(|s| s.key == input) else { continue; };
+            let a = output_pos(source, rect, p.pan, p.zoom);
+            let b = input_pos(node, index, rect, p.pan, p.zoom);
+            if !wire_bounds(a,b).contains(pointer) { continue; }
+            let points = cubic(a, b, 32);
+            for pair in points.windows(2) {
+                let d = pair[1] - pair[0];
+                let t = ((pointer - pair[0]).dot(d) / d.length_sq().max(0.001)).clamp(0., 1.);
+                let distance = pointer.distance(pair[0] + d * t);
+                if distance < best {
+                    best = distance;
+                    nearest = Some(WireLink { from: *from, to: node.id, input: input.clone() });
+                }
+            }
+        }
+    }
+    nearest
+}
+
+/// Rewire atomically, preserving the old edge if the new target is invalid.
+fn reconnect_wire(graph: &mut morphlet::model::Graph, old: &WireLink, to: NodeId, input: &str) -> Result<(), String> {
+    if graph.node(old.to).and_then(|n| n.inputs.get(&old.input)) != Some(&old.from) {
+        return Err("元のワイヤーが変更されています。".into());
+    }
+    let mut candidate = graph.clone();
+    candidate.disconnect(old.to, &old.input);
+    candidate.connect(old.from, to, input)?;
+    candidate.validate()?;
+    *graph = candidate;
+    Ok(())
+}
+
 fn cubic(a: Pos2, b: Pos2, samples: usize) -> Vec<Pos2> {
     let handle = ((b.x - a.x).abs() * 0.5).clamp(40., 160.);
     let (p0, p1, p2, p3) = (a, a + Vec2::new(handle, 0.), b - Vec2::new(handle, 0.), b);
@@ -1246,6 +1332,22 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
 #[cfg(test)]
 mod premium_tests {
     use super::*;
+
+    #[test]
+    fn reconnect_preserves_edge_on_failure_and_moves_it_on_success() {
+        let mut graph = morphlet::model::Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let a = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let b = graph.add(NodeKind::Add, [600., 0.]).unwrap();
+        let key = NodeKind::Add.spec().inputs[0].key;
+        graph.connect(source, a, key).unwrap();
+        let old = WireLink { from: source, to: a, input: key.into() };
+        assert!(reconnect_wire(&mut graph, &old, b, "missing").is_err());
+        assert_eq!(graph.node(a).unwrap().inputs.get(key), Some(&source));
+        reconnect_wire(&mut graph, &old, b, key).unwrap();
+        assert!(graph.node(a).unwrap().inputs.get(key).is_none());
+        assert_eq!(graph.node(b).unwrap().inputs.get(key), Some(&source));
+    }
 
     #[test]
     fn fit_is_finite_for_narrow_and_large_graphs() {
