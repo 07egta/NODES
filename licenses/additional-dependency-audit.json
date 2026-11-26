@@ -1,0 +1,287 @@
+{
+  "audit_date": "2026-11-26",
+  "scope": "Seven pre-existing Rhai-related dependency notices recovered through recorded upstream commits after the execution environment became unavailable. Exact local archive bytes and the original local audit JSON are no longer accessible. This is not an executable or target-resolution audit.",
+  "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+  "package_count": 7,
+  "packages": [
+    {
+      "name": "const-random",
+      "version": "0.1.20",
+      "declared_license": "MIT OR Apache-2.0",
+      "declared_rust_version": "1.85",
+      "registry_checksum": "d38d4bb3e79c716fd0330d8da84171b0135e59e01076e99f22b75a64c56e952c",
+      "repository": "https://github.com/tkaitchuck/constrandom",
+      "source_archive_url": "https://static.crates.io/crates/const-random/const-random-0.1.20.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "b6876593f065c19478dd0a5da214c8d249b2755f"
+        },
+        "path_in_vcs": ""
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/Cargo.toml",
+        "git_blob_sha": "1f0b98bbeb112f17f5fea7c5a40f4c303e48b176",
+        "sha256": "c5539c96e77405742085f041c6ae02e0f7285725c3a98fba293482c6c0c193ae"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/const-random-0.1.20/LICENSE-MIT",
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "source_url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-MIT",
+          "upstream_blob_sha": "5afc2a7b0acabd34676023f9ebe3912ea2643ac2"
+        },
+        {
+          "path": "licenses/crates/const-random-0.1.20/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "source_url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-APACHE",
+          "upstream_blob_sha": "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes."
+      ]
+    },
+    {
+      "name": "const-random-macro",
+      "version": "0.1.18",
+      "declared_license": "MIT OR Apache-2.0",
+      "declared_rust_version": "1.85",
+      "registry_checksum": "d66bb491e9fc48cb3fed9d57df886880a751d540d645ebc86b6d9d35b8fa8457",
+      "repository": "https://github.com/tkaitchuck/constrandom",
+      "source_archive_url": "https://static.crates.io/crates/const-random-macro/const-random-macro-0.1.18.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "b6876593f065c19478dd0a5da214c8d249b2755f"
+        },
+        "path_in_vcs": "macro"
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/macro/Cargo.toml",
+        "git_blob_sha": "50a8900a80b0104e854031ff3f0096dc9c784c51",
+        "sha256": "9ded791995c4a17ef0f6ba34c3da279d54168a60de5415bcda4ba9d9f70f0f64"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/const-random-macro-0.1.18/LICENSE-MIT",
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "source_url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-MIT",
+          "upstream_blob_sha": "5afc2a7b0acabd34676023f9ebe3912ea2643ac2"
+        },
+        {
+          "path": "licenses/crates/const-random-macro-0.1.18/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "source_url": "https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-APACHE",
+          "upstream_blob_sha": "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes."
+      ]
+    },
+    {
+      "name": "rhai",
+      "version": "1.27.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "declared_rust_version": "1.66.0",
+      "registry_checksum": "c3925b784c0bee6542637e425ed7511a63257bf11b7ecf51ffd845e2d24d9163",
+      "repository": "https://github.com/rhaiscript/rhai",
+      "source_archive_url": "https://static.crates.io/crates/rhai/rhai-1.27.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "aaf90906bfa7eae090fc236b8572a67528cab3ed"
+        },
+        "path_in_vcs": ""
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/Cargo.toml",
+        "git_blob_sha": "747f2f73ec9de1b9de95f73c11b940f3509a678e",
+        "sha256": "6ce3562e4d3c0253d880cbe106c8e9ebdd5c163aeee4eef350f42b6b1a373544"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/rhai-1.27.0/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-MIT.txt",
+          "upstream_blob_sha": "31aa79387f27e730e33d871925e152e35e428031"
+        },
+        {
+          "path": "licenses/crates/rhai-1.27.0/LICENSE-APACHE.txt",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "source_url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-APACHE.txt",
+          "upstream_blob_sha": "d9a10c0d8e868ebf8da0b3dc95bb0be634c34bfe"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.",
+        "The retrieved MIT and Apache text SHA-256 values match the pre-outage recorded normalized LF files."
+      ]
+    },
+    {
+      "name": "rhai_codegen",
+      "version": "3.3.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "declared_rust_version": null,
+      "registry_checksum": "3d9661edb4a4b8145b017582d634c5eb88ff1a5284a5aa701f83a28f0657a826",
+      "repository": "https://github.com/rhaiscript/rhai",
+      "source_archive_url": "https://static.crates.io/crates/rhai_codegen/rhai_codegen-3.3.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "aaf90906bfa7eae090fc236b8572a67528cab3ed",
+          "dirty": true
+        },
+        "path_in_vcs": "codegen"
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/codegen/Cargo.toml",
+        "git_blob_sha": "2d25c717b038b5e95c08f86db9a8f28067cb3c2d",
+        "sha256": "0c9ab86d64f0a2c6cc157f470e539b8bef3daea396082f5cfe6b91058744203a"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/rhai_codegen-3.3.0/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-MIT.txt",
+          "upstream_blob_sha": "31aa79387f27e730e33d871925e152e35e428031"
+        },
+        {
+          "path": "licenses/crates/rhai_codegen-3.3.0/LICENSE-APACHE.txt",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "source_url": "https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-APACHE.txt",
+          "upstream_blob_sha": "d9a10c0d8e868ebf8da0b3dc95bb0be634c34bfe"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.",
+        "The pre-outage crate VCS metadata reported dirty=true. Root repository license texts at that recorded commit are supplied; no claim is made that this proves every published source file matches the commit."
+      ]
+    },
+    {
+      "name": "smartstring",
+      "version": "1.0.1",
+      "declared_license": "MPL-2.0+",
+      "declared_rust_version": "1.57",
+      "registry_checksum": "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29",
+      "repository": "https://github.com/bodil/smartstring",
+      "source_archive_url": "https://static.crates.io/crates/smartstring/smartstring-1.0.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "e407ca23c747257a812d2d2e70bf336412718c3a"
+        },
+        "path_in_vcs": ""
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/bodil/smartstring/blob/e407ca23c747257a812d2d2e70bf336412718c3a/Cargo.toml",
+        "git_blob_sha": "69b3aac6ec16c7d12994474c8dece95b681f7295",
+        "sha256": "958eed81a779ee611a71f0c490a9cbe4dd306bc811572b15b3e5de89a312202f"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/smartstring-1.0.1/LICENCE.md",
+          "sha256": "e6b6566f085df5746515c6d7e2edcaec0d2b77d527ac40d91409d783fb6c8508",
+          "source_url": "https://github.com/bodil/smartstring/blob/e407ca23c747257a812d2d2e70bf336412718c3a/LICENCE.md",
+          "upstream_blob_sha": "cd44203cd98e944d13c94b973a1665774558cca6"
+        },
+        {
+          "path": "licenses/crates/smartstring-1.0.1/COPYRIGHT.txt",
+          "sha256": "f413b6f8efac426bfcfd51e5d0709ec00a82dcbbd62d6dc98af13c1978315514",
+          "source_url": "https://github.com/bodil/smartstring/blob/e407ca23c747257a812d2d2e70bf336412718c3a/README.md",
+          "source_section": "Licence",
+          "upstream_blob_sha": "5a5486f7242dc0c06e9314a860448d5d9ddd3120"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.",
+        "Existing dependency; its MPL-2.0+ declaration is retained. NODES made no modifications to this dependency's source during this work."
+      ]
+    },
+    {
+      "name": "thin-vec",
+      "version": "0.2.21",
+      "declared_license": "MIT OR Apache-2.0",
+      "declared_rust_version": "1.85",
+      "registry_checksum": "d6a4b9ba8738cb4a4f399d37e266becfd475e75eb73425b87a05a2f2039ba63e",
+      "repository": "https://github.com/mozilla/thin-vec",
+      "source_archive_url": "https://static.crates.io/crates/thin-vec/thin-vec-0.2.21.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "326a2260b184146bbc3f12653993a115f7ec7d5e"
+        },
+        "path_in_vcs": ""
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/mozilla/thin-vec/blob/326a2260b184146bbc3f12653993a115f7ec7d5e/Cargo.toml",
+        "git_blob_sha": "d80593d9b5c5438c497a15a0ef9e5828b64dd271",
+        "sha256": "4d51f93212d18b307717902b493d9bb9afaeab2c92bdc94dabb032379ba77ec1"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/thin-vec-0.2.21/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/mozilla/thin-vec/blob/326a2260b184146bbc3f12653993a115f7ec7d5e/LICENSE-MIT",
+          "upstream_blob_sha": "31aa79387f27e730e33d871925e152e35e428031"
+        },
+        {
+          "path": "licenses/crates/thin-vec-0.2.21/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/mozilla/thin-vec/blob/326a2260b184146bbc3f12653993a115f7ec7d5e/LICENSE-APACHE",
+          "upstream_blob_sha": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes."
+      ]
+    },
+    {
+      "name": "tiny-keccak",
+      "version": "2.0.2",
+      "declared_license": "CC0-1.0",
+      "declared_rust_version": null,
+      "registry_checksum": "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237",
+      "repository": "https://github.com/debris/tiny-keccak",
+      "source_archive_url": "https://static.crates.io/crates/tiny-keccak/tiny-keccak-2.0.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "f034411460d0012925052017c1658b3ce9cda532"
+        },
+        "path_in_vcs": ""
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/debris/tiny-keccak/blob/f034411460d0012925052017c1658b3ce9cda532/Cargo.toml",
+        "git_blob_sha": "4d3a2b2ae307ca77be78a844d9887ea2d4c22995",
+        "sha256": "277a596242963d5fbef08a7d967f97e3bbd44bccdc050a94f896fbb7883040f9"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/tiny-keccak-2.0.2/LICENSE",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "source_url": "https://github.com/debris/tiny-keccak/blob/f034411460d0012925052017c1658b3ce9cda532/LICENSE",
+          "upstream_blob_sha": "0e259d42c996742e9e3cba14c677129b2c1b6311"
+        }
+      ],
+      "verification_status": "recovered_from_recorded_upstream_commit",
+      "notes": [
+        "Recovered through the GitHub connector after the local execution environment became unavailable.",
+        "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
+        "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes."
+      ]
+    }
+  ]
+}
