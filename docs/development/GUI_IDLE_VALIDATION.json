@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "measured_at_utc": "2026-11-26T15:58:20.616887+00:00",
+  "source_commit": "2f94df459533774f83593835ba1e22d4924a3c42",
+  "environment": "Linux x86_64 virtual desktop, 1364x1024, native GUI maximized and focused, dark theme, saved three-node 11808-triangle vase",
+  "executable_sha256": "010046c4274e761ed6d3a3889fa867e61f5eec683df8a64c0a7d8e78f18eaf21",
+  "sample_seconds": 12.00035872699982,
+  "clock_ticks_per_second": 100,
+  "cpu_ticks_delta": 0,
+  "cpu_percent_of_one_core": 0.0,
+  "rss_start_kib": 103888,
+  "rss_end_kib": 103888,
+  "peak_rss_kib": 109388,
+  "threads": 22,
+  "method": "Read /proc/<PID>/stat utime+stime twice and /proc/<PID>/status VmRSS/VmHWM, 12 seconds apart, verifying the executable path",
+  "limitations": [
+    "One 12-second settled GUI sample after manual interactions; native window remained focused, verified through window inventory; not startup time or frame latency",
+    "Resident memory excludes separate graphics-server processes and is not GPU memory",
+    "No Intel Arc or Windows hardware inference",
+    "0 ticks at 100 Hz is a quantized observation, not proof of literal zero CPU use; one tick over this sample is about 0.08333 percent of one core."
+  ],
+  "scope_note": "Measurement command was sent to a bound terminal window without activating it; the GUI retained window-manager focus throughout the observed sample."
+}

@@ -2,14 +2,14 @@
   "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
   "counts": {
     "ambiguous_license_expressions": 14,
-    "checked_in_text_hash_matches": 225,
+    "checked_in_text_hash_matches": 226,
     "gnu_family_declarations": 1,
     "license_declarations": 303,
     "lock_packages_absent_from_metadata": 0,
     "missing_license_declarations": 0,
     "mpl_declarations": 1,
     "packages": 303,
-    "packages_with_checked_in_text": 121,
+    "packages_with_checked_in_text": 122,
     "packages_with_review_reasons": 184,
     "workspace_packages": 1
   },
@@ -30,7 +30,7 @@
       "status": "read"
     },
     {
-      "packages": 7,
+      "packages": 8,
       "path": "licenses/additional-dependency-audit.json",
       "status": "read"
     }
@@ -7800,7 +7800,15 @@
       "workspace_member": false
     },
     {
-      "checked_in_license_texts": [],
+      "checked_in_license_texts": [
+        {
+          "actual_sha256": "d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111",
+          "expected_sha256": "d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111",
+          "ledger": "licenses/additional-dependency-audit.json",
+          "path": "licenses/crates/r-efi-6.0.0/AUTHORS",
+          "status": "matches_recorded_text_hash"
+        }
+      ],
       "checksum": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
       "checksum_evidence": "Cargo.lock_declaration_archive_not_rehashed",
       "license": {
@@ -7829,8 +7837,7 @@
       "name": "r-efi",
       "resolved_features": [],
       "review_reasons": [
-        "gnu_family_declaration_requires_review",
-        "no_checksum_attributed_checked_in_license_text"
+        "gnu_family_declaration_requires_review"
       ],
       "source": {
         "kind": "registry",

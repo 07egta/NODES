@@ -130,9 +130,9 @@ cargo test --all-targets --locked
 cargo clippy --all-targets --locked -- -D warnings
 ```
 
-`tests/cli_workflows.rs` は `CARGO_BIN_EXE_nodes-cli` を使って実際の実行ファイルを起動し、JSON と終了コード、作成→編集→保存→再読込→再評価、作品情報の保持、禁止機能、要求サイズ上限、失敗時の既存保存先の保持、STL の書き出しと再取込を検証します。c19dca1のLinux通常CIで7件が成功しました。後続のUnix FIFO拒否回帰は、そのソースのCI結果で別途確認します。
+`tests/cli_workflows.rs` は `CARGO_BIN_EXE_nodes-cli` を使って実際の実行ファイルを起動し、JSON と終了コード、作成→編集→保存→再読込→再評価、作品情報の保持、禁止機能、要求サイズ上限、失敗時の既存保存先の保持、STL の書き出しと再取込を検証します。2f94df4のLinux通常CIで、Unix FIFO拒否回帰を含む8件が成功しました。validate/evaluate、GUIバイナリのbuild-graph/inspect-ghx入口も、配布バイナリでFIFOを即座に拒否し保存先を保持することを確認しています。
 
-実用サンプルはPythonの標準ライブラリだけで再検証できます。出力ディレクトリは新規または空にしてください。
+リポジトリに含まれる実用サンプルはPythonの標準ライブラリだけで再検証できます。出力ディレクトリは新規または空にしてください。
 
 ```sh
 python3 -B scripts/validate_cli_vase.py \
@@ -141,6 +141,6 @@ python3 -B scripts/validate_cli_vase.py \
   --output-dir /tmp/nodes-vase-validation
 ```
 
-この検証はc19dca1の配布用CLIで実行済みです。8コマンドと保存内容、STLの各面・寸法・独立体積計算を確認し、`cli-vase-report.json` に実行したバイナリと入力のハッシュ、公差、結果を記録します。WindowsでもPythonから利用できますが、上記実行結果はLinuxです。実機造形の保証には使いません。
+この検証は2f94df4の配布用CLIで再実行済みです。8コマンドと保存内容、STLの各面・寸法・独立体積計算を確認し、`cli-vase-report.json` に実行したバイナリと入力のハッシュ、公差、結果を記録します。WindowsでもPythonから利用できますが、上記実行結果はLinuxです。実機造形の保証には使いません。
 
 Cargo の一次資料: [バイナリ自動検出](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#target-auto-discovery)、[実行ファイルを使う統合テスト](https://doc.rust-lang.org/cargo/commands/cargo-test.html)。

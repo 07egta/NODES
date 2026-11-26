@@ -1,6 +1,6 @@
 # NODES architecture
 
-更新: 2026-11-26。現在の実装を記す。目標機能は [ROADMAP](../ROADMAP.md)、検証範囲は [TEST_RESULTS](../TEST_RESULTS.md) に分ける。crate名と実行ファイル名は既存互換のため `morphlet` / `Morphlet`、画面上の製品名はNODES。
+更新: 2026-11-27 JST。現在の実装を記す。目標機能は [ROADMAP](../ROADMAP.md)、検証範囲は [TEST_RESULTS](../TEST_RESULTS.md) に分ける。crate名と実行ファイル名は既存互換のため `morphlet` / `Morphlet`、画面上の製品名はNODES。
 
 ## 構成
 
@@ -44,7 +44,7 @@ Rustのライブラリがデータモデルと計算を提供し、同じpackage
 
 ## 評価と非同期UI
 
-検証付きトポロジカル走査はnodeへの直接参照を返す。同順位は安定したID順。各kernelは協調キャンセルを確認し、キャンセルを通常の失敗結果としてcacheしない。
+検証付きトポロジカル走査はnodeへの直接参照を返す。初期rootと各child集合をIDで整列し、ready queueをFIFOで処理するため、保存順に依存しない決定的な順序になる。各kernelは協調キャンセルを確認し、キャンセルを通常の失敗結果としてcacheしない。
 
 cache keyはkind、数値のIEEE bit値、入力元IDと評価revision、scriptやcluster等のsemantic state。名称・座標・previewの変更は計算を無効化しない。下流だけが再計算され、エラー結果もcacheする。保持重みとordered evictionを使い、削除されたnodeの結果を除去する。
 
@@ -72,6 +72,8 @@ STLはf32へ丸めた後の退化も検査する。OBJ/3MFもmesh出力であり
 
 native v1 JSONは検証付きで読み、原子的な一時file置換で保存する。8MiB書込上限とflush/syncを使用する。未知のnative node/fieldは原fileを変更せず拒否する。編集可能なopaque未知nodeの保存は未実装。
 
+project/API request/GHXの入力はopen前に通常ファイルか確認し、open後のdescriptorでも確認する。FIFO等を通常入力として待ち続けないための対策であり、敵対的なファイル置換競合を完全に排除する保証ではない。読込byte上限も維持する。
+
 独立missionで食い違ったClosestPoint port名とtree-transform keyは明示移行し、競合を上書きしない。GHXは公開情報に基づく限定的な独立import/archiveであり、未知内容と接続を保持するが、binary GHや全component変換は未対応。
 
 JSON Graph APIはversion付き、transactional編集、型/循環/範囲検証を通る。Script、ImportMesh、Cluster、Expression、PathMapperをAPIの実行対象へ含めない。純粋なtree設定はnative graphと同じvalidatorを使う。任意のshell/file/network操作を提供しない。
@@ -98,6 +100,8 @@ Rhaiは既存の制限付きscript nodeで、操作数200000、call depth16、sc
 eframe/egui 0.33.3、Glow/OpenGL。現在の3D previewにはsoftware depth bufferとtexture uploadを使う経路があり、独自GPU CAD rendererとは異なる。図形・raster・画面出力のcacheを分け、静止中の不要な再描画を抑える。
 
 canvasにはzoom/pan、可視nodeの描画抑制、wireの索引、minimap、検索、整列、group/note、Undo/Redo等を置く。日本語/英語検索、適切なport説明とエラー修正を優先する。数千nodeの快適性はGUI実測が必要。
+
+Inspectorの入力行はnode IDとport keyに基づく明示UI scopeを持ち、その内部に通常のhorizontal行を置く。上に評価エラーが追加されても入力focusを保ち、残り縦領域を行の高さとして消費しない。ドラッグは1回の履歴にまとまるが、複数フレームの文字入力は各変更をUndoする。
 
 ## ライセンスと拡張
 

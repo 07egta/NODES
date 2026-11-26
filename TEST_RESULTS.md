@@ -42,7 +42,7 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 | 依存metadata監査 | 成功、303件のlicense宣言を取得。配布全体の法的承認を意味しない |
 | release計測 | スカラー評価、Data Tree、メッシュ、実ファイル保存再読込が成功 |
 
-候補の299個のログ断片、9ファイルのSHA-256・UTF-8バイト数と元のblobを照合した。Rustの変更はformatterによる整形のみ。詳細は [CI_INTEGRATION_VALIDATION.json](docs/development/CI_INTEGRATION_VALIDATION.json)。**この成功はCIの整形済み作業ツリーに対するもの。取り込んだコミットそのもののLinux/Windows Checkは次の必須ゲート**として区別する。
+候補の299個のログ断片、9ファイルのSHA-256・UTF-8バイト数と元のblobを照合した。Rustの変更はformatterによる整形のみ。詳細は [CI_INTEGRATION_VALIDATION.json](docs/development/CI_INTEGRATION_VALIDATION.json)。**この成功はCIの整形済み作業ツリーに対するもの**として、下記のコミット済みソースの通常Checkと区別する。
 
 復帰したローカル環境では、PythonのGH2 parser 3件、checkpoint exporter 6件、依存監査8件、合計 **17件が成功**。Rustは未インストールのため、最新Rust検証はCIへ委ねている。
 
@@ -52,11 +52,15 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 
 このrunのWindows jobは次のソース更新で中止されたため、Windows成功には数えない。artifact 15132917546 のZIP SHA-256、展開したGUI/CLIのハッシュは [CI_COMMITTED_VALIDATION.json](docs/development/CI_COMMITTED_VALIDATION.json) に保存した。
 
-実CLIでwriterのないFIFOを渡すと2秒のtimeoutで停止を再現した。`eefc9c1` に事前通常ファイル検査と回帰を保存したが、その [Check 45851162593](https://github.com/07egta/NODES/actions/runs/45851162593) はGHXの1箇所のfmt差分で停止した。差分をそのとおり修正し、GUIで発見した行間修正とともに再検証する。失敗したgateを成功へ読み替えていない。
+実CLIでwriterのないFIFOを渡すと2秒のtimeoutで停止を再現した。`eefc9c1` に事前通常ファイル検査と回帰を保存したが、その [Check 45851162593](https://github.com/07egta/NODES/actions/runs/45851162593) はGHXの1箇所のfmt差分で停止した。差分をそのとおり修正し、GUIで発見した行間修正とともに2f94df4へ保存した。失敗したgateを成功へ読み替えていない。
+
+**最新ソース `2f94df459533774f83593835ba1e22d4924a3c42`** の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` は実行中で、完了結果を確認してから成功件数へ加える。
+
+配布用Linux ZIP artifact `15134610988` のSHA-256と展開バイナリを照合した上で、FIFO拒否を4入口で実行した。`nodes-cli validate` / `evaluate`、`Morphlet --build-graph` / `--inspect-ghx` は全てexit 1で通常ファイルを要求し、各1.3〜2.3msで終了、既存出力のbytesを保持した。修正前の2秒timeout、各コマンド・時刻・バイナリの根拠は [FIFO_VALIDATION.json](docs/development/FIFO_VALIDATION.json)。敵対的なファイル差し替え競合の完全防止を主張しない。
 
 ### 実CLIの花器ワークフロー
 
-上記c19dca1の配布用CLIを使い、`scripts/validate_cli_vase.py` で作成→validate/evaluate→STL→半径変更→validate/evaluate→STLの **8コマンドが成功**。全projectフィールドの保持、元ファイルのbytes不変、半径32→36を検査した。
+上記2f94df4の配布用CLIで再実行し、`scripts/validate_cli_vase.py` で作成→validate/evaluate→STL→半径変更→validate/evaluate→STLの **8コマンドが成功**。半径以外の全projectフィールドの保持、元ファイルのbytes不変、半径32→36を検査した。
 
 STLをPythonの独立したparserで読み、両方とも5,906個の一意な頂点座標、11,808三角形、590,484 bytes、高さ104 mm、全座標・法線の有限性、全三角形の非ゼロ面積を確認。f32座標から行列式で求めた体積は52,430.418306→59,967.823772 mm³となり、CLI報告との差はそれぞれ0.000751846 / 0.000629314 mm³。相対公差1e-5・絶対公差1e-3 mm³に収まった。生データは [CLI_VASE_VALIDATION.json](docs/development/CLI_VASE_VALIDATION.json)。自己交差や実機造形の独立検証を意味しない。
 
@@ -137,7 +141,15 @@ Linuxネイティブ版を起動し、1364px幅のデスクトップ上で確認
 - アプリを閉じて保存済み作品を指定して再起動し、半径36、接続、ライトテーマの保持を確認。
 - 再起動後に半径スライダーを36→67へ動かし、Undoで36へ戻して再保存した。
 
-実画面で新たに、Inspectorの最初の入力まで約100pxの余白と、過大な行高を確認した。明示IDのscope内を通常のhorizontal行にする修正を追加した。**この配置修正後の新バイナリ確認は次のゲート**。出典・観測・ファイルハッシュは [GUI_VALIDATION.json](docs/development/GUI_VALIDATION.json)。Windows GUI、広いDPI・低解像度、実機造形は未検証。
+実画面で新たに、Inspectorの最初の入力まで約100pxの余白と、過大な行高を確認した。明示IDのscope内を通常のhorizontal行にする修正を追加した。2f94df4の配布バイナリで、**余白の解消、一定の行間、36→3（エラー）→36の継続入力、全7項目へのスクロール到達を確認した**。1116×758のclient windowで全体表示を使い3ノードを収め、1364×1000へ戻してダークテーマも確認した。
+
+修正前の[実画面](docs/development/screenshots/linux-before-inspector-layout.png)、修正後の[実画面](docs/development/screenshots/linux-after-inspector-layout.png)、GUIで保存・再読込した[作品](docs/development/gui-vase-36.morph)を保存した。PNGは起動直後のclient領域1364×920をアプリから保存したもので、後続の最大化・縮小確認時の寸法とは区別する。出典・観測・ファイルハッシュは [GUI_VALIDATION.json](docs/development/GUI_VALIDATION.json)。Windows GUI、広いDPI・さらに小さい解像度、実機造形は未検証。
+
+### Linux GUIの限定アイドル測定
+
+同じ2f94df4バイナリで3ノード・11,808三角形の花器を表示し、1364×1024仮想デスクトップ上で静止した12.000秒を測った。`/proc/<PID>/stat` のutime+stimeは **0 tick増加**（100Hz、1 tickはこの区間の約0.083% coreに相当）。「CPUを全く使わない」という保証にはしない。`VmRSS` は開始・終了とも **103,888 KiB（101.45 MiB）**、起動から操作後までの `VmHWM` は109,388 KiB（106.82 MiB）。別processのgraphics serverやGPUメモリは含まない。
+
+GUIはフォーカスを保持し、測定コマンドだけを別のbound terminalへ送った。単一の短い標本であり、起動時間・frame時間・Intel Arc・Windows性能へ一般化しない。生データと手法は [GUI_IDLE_VALIDATION.json](docs/development/GUI_IDLE_VALIDATION.json)。
 
 ## 次の必須ゲート
 
@@ -149,4 +161,4 @@ cargo test --all-targets --locked
 cargo build --release --locked --bins
 ```
 
-復旧後の最新SHAについて上記をCIで実行し、結果を追記する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。
+2f94df4についてLinuxで上記が成功した。Windowsの完了を確認し、以後のsource変更でも同じgateを再実行する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。

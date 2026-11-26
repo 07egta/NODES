@@ -22,9 +22,9 @@
 
 3D画面はドラッグで回転、ホイールでズームします。全体表示は `F`、操作を戻すには `Ctrl+Z`、やり直すには `Ctrl+Y`。ノードごとの表示切り替え、値・データツリーの確認、エラー表示、辞典も利用できます。詳細は [日本語操作ガイド](docs/USER_GUIDE_JA.md) を参照してください。
 
-![旧公開版0.1.0で撮影したWindowsの花器画面](docs/windows-vase.png)
+![2f94df4のLinux実画面: 編集可能な花器、3Dプレビュー、修正後のInspector](docs/development/screenshots/linux-after-inspector-layout.png)
 
-上の画像は旧公開版の記録です。今回のLinux実操作では、花器の3D表示、数値変更、Undo/Redo、保存を確認しました。数値入力のフォーカス不具合を発見して修正しましたが、修正後のGUI再検証とWindowsでの最新画面検証は残っています。
+上の画像は2f94df4のLinuxバイナリを実行して撮影しました。数値変更、エラーからの復帰、Undo/Redo、保存・終了・再起動、STL出力を確認し、Inspectorのフォーカスと過大な余白を修正・再検証しました。最新Windowsの画面操作と広いDPIの検証は残っています。撮影条件と実行記録は [検証結果](TEST_RESULTS.md) にあります。
 
 ## 現在の実装範囲
 

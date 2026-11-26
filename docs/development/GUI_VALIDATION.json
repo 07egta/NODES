@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "validated_utc": "2026-11-26T15:46:30.662744+00:00",
   "source_head": "c19dca185380391ad1c875e412529e22cae05ba6",
   "tested_merge_revision": "ca49e6c016c40f680117bac4dff8babe2dc2664a",
@@ -41,17 +41,48 @@
     "gui-36-light-reopened.png": {
       "bytes": 495722,
       "sha256": "33c4696f742f0944fda02f5f949ed157afb4a0e235e341ecc0bbd23df98ed677"
+    },
+    "linux-after-inspector-layout.png": {
+      "bytes": 501099,
+      "sha256": "cb636c7e52bffe882e7b98354dcb2eb547318308f6740a83042d467039e95593"
     }
   },
   "new_issue": {
     "description": "Explicit Inspector row scope used remaining vertical space; excessive blank area and inflated row heights were visibly observed.",
     "source_fix": "Keep stable scope ID and place contents inside ui.horizontal.",
-    "verification": "new binary GUI check pending"
+    "verification": "Passed with 2f94df4 Linux artifact: compact row spacing, unchanged focus recovery and seven reachable controls."
   },
   "not_verified": [
     "Windows GUI / Intel Arc",
     "broad high-DPI and low-resolution coverage",
     "physical printing",
     "complete editor workflows or complete component compatibility"
-  ]
+  ],
+  "followup": {
+    "validated_utc": "2026-11-26T15:58:40.463714+00:00",
+    "source_head": "2f94df459533774f83593835ba1e22d4924a3c42",
+    "tested_merge_revision": "19717e70917718af1374e387720b29b619c1c1ed",
+    "gui_binary_sha256": "010046c4274e761ed6d3a3889fa867e61f5eec683df8a64c0a7d8e78f18eaf21",
+    "observations": [
+      "Loaded the native saved radius-36 vase; geometry, Japanese labels and connections rendered correctly.",
+      "Inspector rows were compact and evenly spaced instead of consuming the remaining vertical space.",
+      "Entered 3 in radius to trigger the thickness error, then typed 6 without refocusing; radius 36 and geometry recovered.",
+      "Scrolled the right panel and accessed all seven parameters and the tree/value view.",
+      "Saved again; saved project SHA-256 remained identical to the earlier saved fixture.",
+      "Resized actual client window to 1116x758; Fit All brought all three nodes into view and the right panel remained scrollable.",
+      "Switched light to dark and maximized to 1364x1000 client area; labels, wires and geometry remained visible."
+    ],
+    "inspector_layout_result": "passed",
+    "screenshot_path": "docs/development/screenshots/linux-after-inspector-layout.png"
+  },
+  "preserved_in_repository": {
+    "before_screenshot": "docs/development/screenshots/linux-before-inspector-layout.png",
+    "after_screenshot": "docs/development/screenshots/linux-after-inspector-layout.png",
+    "native_project": "docs/development/gui-vase-36.morph"
+  },
+  "screenshot_dimensions": {
+    "width_pixels": 1364,
+    "height_pixels": 920,
+    "scope": "App-generated client-area screenshots captured on launch before the later maximized (1364x1000 client) and compact-window checks; desktop was 1364x1024."
+  }
 }
