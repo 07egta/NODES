@@ -9,10 +9,11 @@
 - Other active work: PR #14 and #13 multi-port, `fix/omega-multiport-ci` formatting repair created during initial inspection; no overlapping edits will be pushed to those branches.
 - Confirmed issue to reproduce: exact curve closest-point search omits endpoint sample cells; line [0,1], query 0.001 can return parameter 0.
 - Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
-- This checkpoint changes documentation only. No new source has yet been tested.
+- First implementation: legacy MassAddition/MassMultiplication share the bounded numerical math aggregation path. Six new regressions went from 1 pass / 5 fail to 6 pass / 0 fail; 17 existing tree/precision regressions also passed. See OMEGA_VALIDATION.json.
+- Other independent curve/surface/UI fixes are in progress; only explicitly staged and reviewed units are committed. Full combined gates remain pending.
 - Next commands: `cargo test --locked --offline --lib`, focused curve regressions, then full fmt/check/clippy/test gates.
 - Next files: `src/curve_geometry.rs` and independent curve regressions; additional non-overlapping modules after audit.
-- PR: creation follows the first checkpoint commit; target the PR #15 branch to avoid duplicating its existing review scope.
+- Draft PR: https://github.com/07egta/NODES/pull/16 (targets PR #15 branch, avoiding duplicate review scope).
 - Registry: 298 picker kinds + Cluster = 299; completely verified node count remains unestablished, external GH oracle VERIFIED = 0.
 - Remaining: fully verified multi-port integration is being repaired elsewhere; general trimmed B-rep, robust general Boolean, complete interchange, runtime Null and Windows GUI/Intel Arc remain incomplete.
 

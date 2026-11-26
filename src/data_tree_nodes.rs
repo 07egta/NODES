@@ -526,20 +526,19 @@ pub fn run_list(
     let len = list.len();
     let output: Result<Vec<Value>, String> = match kind {
         MassAddition | MassMultiplication => {
-            let mut value = if kind == MassAddition { 0. } else { 1. };
-            for v in list {
-                cancelled(cancel)?;
-                let x = v.number()?;
-                value = if kind == MassAddition {
-                    value + x
+            // Keep the legacy node IDs and branch/budget contracts, but share
+            // cancellation-aware numerical aggregation with the math nodes.
+            // A large intermediate is not necessarily a non-finite final sum
+            // or product, and small terms must survive later cancellation.
+            crate::math_nodes::run_list(
+                if kind == MassAddition {
+                    Summation
                 } else {
-                    value * x
-                };
-                if !value.is_finite() {
-                    return Err("集計結果が有限ではありません。".into());
-                }
-            }
-            Ok(vec![Value::Number(value)])
+                    Product
+                },
+                lists,
+                cancel,
+            )
         }
         _ if len == 0 && kind != InsertItems => Ok(Vec::new()),
         CullNth => {

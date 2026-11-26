@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "branch": "feat/nodes-omega-geometry",
+  "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+  "pr": 16,
+  "updated_at_utc": "2026-11-26T23:22:15.389990+00:00",
+  "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
+  "baseline": {
+    "run_id": 45907598179,
+    "linux_passed": 448,
+    "windows_passed": 447,
+    "failed": 0,
+    "ignored": 3,
+    "suites": 35,
+    "tested_merge_revision": "dde6fe137fb156f530096f25f8be2b06e592ee78",
+    "tree": "22d14b6055826b5d14316806ff699f31ec96d036",
+    "source_merge_tree_equal": true
+  },
+  "units": [
+    {
+      "name": "legacy aggregate numerical consistency",
+      "files": [
+        "src/data_tree_nodes.rs",
+        "tests/aggregate_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 5
+      },
+      "after": {
+        "passed": 6,
+        "failed": 0
+      },
+      "related_suites": {
+        "data_tree_contracts": 11,
+        "math_precision_regressions": 6
+      },
+      "command": "cargo test --locked --offline --test aggregate_numeric_regressions --test data_tree_contracts --test math_precision_regressions",
+      "review": "Independent read-only kernel_research agent; existing branch/empty/finite/count/weight/cancel contracts retained.",
+      "known_remaining": "Scaled Summation/Average can lose extremely small terms before cancellation; separate exact-accumulator work is planned."
+    }
+  ]
+}
