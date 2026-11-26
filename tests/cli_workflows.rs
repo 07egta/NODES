@@ -119,6 +119,7 @@ fn console_help_catalog_and_usage_have_real_stdout_and_exit_codes() {
         "catalog",
         "validate",
         "evaluate",
+        "diagnose",
         "build",
         "apply",
         "export-stl",
@@ -149,6 +150,7 @@ fn console_help_catalog_and_usage_have_real_stdout_and_exit_codes() {
     for (command, paths) in [
         ("not-a-command", Vec::<&Path>::new()),
         ("evaluate", Vec::new()),
+        ("diagnose", Vec::new()),
         ("catalog", vec![Path::new("unexpected")]),
     ] {
         let (output, response) = invoke(command, &paths);
@@ -303,11 +305,103 @@ fn evaluation_errors_have_node_ids_and_failed_apply_preserves_existing_destinati
     let error = failed("evaluate", &[&invalid]);
     assert_eq!(error["code"], "evaluation_failed");
     assert_eq!(error["nodes"][0]["node_id"], divide);
+    assert_eq!(error["diagnostics"]["summary"]["root_failure_count"], 1);
+    assert_eq!(
+        error["diagnostics"]["root_failures"][0]["node"]["id"],
+        divide
+    );
     assert!(
         error["nodes"][0]["message"]
             .as_str()
             .is_some_and(|text| !text.is_empty())
     );
+}
+
+#[test]
+fn diagnose_reports_independent_causes_and_downstream_errors_without_writing() {
+    let temporary = TemporaryDirectory::new();
+    let path = temporary.path("原因を探す.morph");
+    let mut graph = Graph::default();
+    let first = graph.add(NodeKind::Divide, [0.0, 0.0]).unwrap();
+    let second = graph.add(NodeKind::Divide, [0.0, 200.0]).unwrap();
+    for id in [first, second] {
+        graph.node_mut(id).unwrap().params.insert("b".into(), 0.0);
+    }
+    let join = graph.add(NodeKind::Add, [240.0, 0.0]).unwrap();
+    graph.connect(first, join, "a").unwrap();
+    graph.connect(second, join, "b").unwrap();
+    let downstream = graph.add(NodeKind::Multiply, [480.0, 0.0]).unwrap();
+    graph.connect(join, downstream, "a").unwrap();
+    let unrelated = graph.add(NodeKind::Number, [0.0, 400.0]).unwrap();
+    let disabled = graph.add(NodeKind::Divide, [240.0, 400.0]).unwrap();
+    graph.node_mut(disabled).unwrap().off = true;
+    graph
+        .node_mut(disabled)
+        .unwrap()
+        .params
+        .insert("b".into(), 0.0);
+    save_graph(&path, graph);
+    let before = fs::read(&path).unwrap();
+
+    let error = failed("diagnose", &[&path]);
+    assert_eq!(error["code"], "evaluation_failed");
+    let report = &error["diagnostics"];
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["causality"], "dependency_inference");
+    assert_eq!(report["summary"]["node_count"], 6);
+    assert_eq!(report["summary"]["failed_count"], 4);
+    assert_eq!(report["summary"]["root_failure_count"], 2);
+    assert_eq!(report["summary"]["blocked_count"], 2);
+    assert_eq!(report["summary"]["disabled_count"], 1);
+    assert_eq!(report["summary"]["unevaluated_count"], 0);
+    assert_eq!(report["summary"]["complete"], true);
+    assert_eq!(report["summary"]["cancelled"], false);
+    assert_eq!(report["root_failures"][0]["node"]["id"], first);
+    assert_eq!(report["root_failures"][1]["node"]["id"], second);
+    for root in report["root_failures"].as_array().unwrap() {
+        assert_eq!(root["affected_nodes"], json!([join, downstream]));
+        assert_eq!(root["affected_count"], 2);
+        assert_eq!(root["affected_nodes_truncated"], false);
+    }
+    for blocked in report["blocked_nodes"].as_array().unwrap() {
+        assert_eq!(blocked["upstream_roots"], json!([first, second]));
+        assert_eq!(blocked["upstream_root_count"], 2);
+        assert!(!blocked["message"].as_str().unwrap().is_empty());
+        assert_ne!(blocked["node"]["id"], unrelated);
+        assert_ne!(blocked["node"]["id"], disabled);
+    }
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn diagnose_success_returns_compact_measured_report_without_geometry_payloads() {
+    let temporary = TemporaryDirectory::new();
+    let path = temporary.path("box.morph");
+    save_graph(&path, mesh_graph(true));
+    let before = fs::read(&path).unwrap();
+    let result = successful("diagnose", &[&path]);
+    let report = &result["diagnostics"];
+    assert_eq!(result["project"]["node_count"], 2);
+    assert_eq!(report["summary"]["complete"], true);
+    assert_eq!(report["summary"]["failed_count"], 0);
+    assert_eq!(report["summary"]["computed_count"], 2);
+    assert_eq!(report["summary"]["cached_count"], 0);
+    assert!(
+        report["summary"]["elapsed_ms"]
+            .as_f64()
+            .unwrap()
+            .is_finite()
+    );
+    assert_eq!(report["hotspots"].as_array().unwrap().len(), 2);
+    for hotspot in report["hotspots"].as_array().unwrap() {
+        assert!(hotspot["elapsed_ms"].as_f64().unwrap() >= 0.0);
+        assert_eq!(hotspot["cached"], false);
+        assert_eq!(hotspot["completed"], true);
+        assert!(hotspot.get("data").is_none());
+    }
+    assert!(report["root_failures"].as_array().unwrap().is_empty());
+    assert!(report["blocked_nodes"].as_array().unwrap().is_empty());
+    assert_eq!(fs::read(&path).unwrap(), before);
 }
 
 #[test]
@@ -346,7 +440,7 @@ fn blocked_capabilities_and_oversized_requests_never_replace_destination() {
     graph.add(NodeKind::Script, [0.0, 0.0]).unwrap();
     let script_project = temporary.path("script.morph");
     save_graph(&script_project, graph);
-    for command in ["validate", "evaluate"] {
+    for command in ["validate", "evaluate", "diagnose"] {
         assert_eq!(
             failed(command, &[&script_project])["code"],
             "invalid_project"
@@ -467,7 +561,7 @@ fn fifo_projects_return_json_errors_without_waiting_for_a_writer() {
             .success()
     );
 
-    for command in ["validate", "evaluate"] {
+    for command in ["validate", "evaluate", "diagnose"] {
         let mut child = Command::new(env!("CARGO_BIN_EXE_nodes-cli"))
             .arg(command)
             .arg(&fifo)

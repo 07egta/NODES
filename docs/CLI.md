@@ -18,6 +18,7 @@ Windows では `target/release/nodes-cli.exe`、Linux/macOS では `target/relea
 | `nodes-cli catalog` | 制限付き Graph API が許可するノードとポートの一覧を JSON で返す |
 | `nodes-cli validate PROJECT.morph` | 保存形式、グラフ構造、型、数値設定、許可する機能を検査する。ノード評価は行わない |
 | `nodes-cli evaluate PROJECT.morph` | 安全性を検査して全ノードを評価し、件数・小さなプレビュー・計算時間を返す |
+| `nodes-cli diagnose PROJECT.morph` | 全ノードを一度評価し、エラーの原因候補・影響先・実測した処理時間を返す |
 | `nodes-cli build REQUEST.json OUTPUT.morph` | API v1 の編集要求から新しいグラフを作り、全ノードの評価成功後に保存する |
 | `nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph` | 既存作品に編集要求を適用し、評価成功後に保存する |
 | `nodes-cli export-stl PROJECT.morph OUTPUT.stl` | 明示的な Output ノードのメッシュを、ミリメートル単位のバイナリ STL として保存する |
@@ -44,6 +45,33 @@ Windows では `target/release/nodes-cli.exe`、Linux/macOS では `target/relea
 `evaluate`、`build`、`apply` の `result.evaluation.nodes` はノード ID、種類、枝数、項目数、値の種類別件数を含みます。各ノードのプレビューは先頭 8 項目までです。メッシュは頂点数・三角形数、曲線は表示点数と数学曲線データの有無だけを返し、全頂点や全三角形は標準出力へ展開しません。数値と点のプレビューは実値を返します。`preview_truncated` は省略の有無を示します。
 
 各 `evaluate` 呼び出しは新しい評価器を使います。`elapsed_ms` は当該プロセスの実測値であり、GUI フレーム時間や Windows 全環境での性能を表すものではありません。
+
+## エラーの原因候補を調べる
+
+```sh
+nodes-cli diagnose examples/01.morph
+```
+
+成功すると `result.diagnostics` に診断レポートを返します。評価エラーがある場合は終了コード `1` と `error.code: "evaluation_failed"` を維持し、`error.diagnostics` に同じ形式のレポートを添えます。`evaluate`、`build`、`apply`、`export-stl` の評価エラーにも診断を添えます。保存形式の破損や許可されない機能など、評価開始前の失敗は従来のエラー形式で返し、評価したかのようなレポートは作りません。`diagnose` は作品を保存・変更しません。
+
+レポートの `schema_version` は `1` です。
+
+| フィールド | 内容 |
+|---|---|
+| `summary` | 成功・失敗・原因候補・下流エラー・無効・未評価の件数、完了状態、計算・キャッシュ利用の件数 |
+| `root_failures` | 失敗した入力元を持たないエラーノード。元のメッセージと、影響を受けた失敗ノードの ID・件数 |
+| `blocked_nodes` | 上流にも失敗があるノード。元のメッセージ、たどり着く原因候補の ID・件数 |
+| `disabled_nodes` / `unevaluated_nodes` | 無効化されたノードと、キャンセルなどで結果のないノード |
+| `graph_error` | グラフ全体の構造エラー。通常の CLI 読込では評価前の検証で拒否される |
+| `hotspots` | 実測時間の長い順のノード。キャッシュ使用・途中中断の区別を含む |
+
+`causality: "dependency_inference"` は、原因候補を**接続と評価結果から推定**したことを示します。下流に別の問題がある可能性は残るため、原因候補を修正して再評価してください。エンジンのエラー文を解析して断定する仕組みではありません。
+
+`summary.complete` は評価が最後まで終わったことを表し、全ノードの成功を意味しません。失敗の有無は `failed_count` と `graph_error` も確認してください。無効ノード、未評価ノード、実際に空の値を正常出力したノードを混同しません。
+
+大量のエラーでも出力を抑えるため、各ノードの原因 ID は最大 64 個、各原因候補の影響先 ID は最大 256 個です。総数は `upstream_root_count` / `affected_count`、省略の有無は `upstream_roots_truncated` / `affected_nodes_truncated` で確認できます。形状の頂点配列やデータツリー全体は診断に含めません。
+
+各診断コマンドは新しい評価器を使うので、通常 `cached_count` は `0` です。`hotspots[].elapsed_ms` は入力準備・キャッシュ処理・形状計算などを含むノード処理の経過時間、`share_percent` は対象ノードの計測時間合計に対する比率です。CPU 使用率、GUI のフレーム時間、最適化後の予測時間としては扱わないでください。
 
 ## 編集例
 

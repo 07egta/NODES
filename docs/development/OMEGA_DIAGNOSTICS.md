@@ -76,3 +76,47 @@ the latest 15 Actions runs using the GitHub connector. Git clone succeeded.
 
 This first checkpoint intentionally records the useful repository audit and
 collision-free ownership before the implementation is finished.
+
+## Functional checkpoint 1
+
+- Implemented `diagnostics::diagnose`, read-only `nodes-cli diagnose`, and the
+  desktop 「診断と処理時間」 window. The report distinguishes independent root
+  candidates, blocked failures, disabled nodes, unvisited nodes, and measured
+  cached/computed/partial node visits.
+- Desktop worker calculates the report once per matching evaluation. Revision
+  checks surround diagnosis and publication; stale UI navigation is disabled.
+- Relationship previews are capped at 64 roots and 256 affected nodes, with
+  exact counts and explicit truncation flags. Desktop sections display at most
+  100 rows and 8 upstream links, with exact total counts.
+- Local Rust 1.100.0 verification: real CLI integration **11 passed**;
+  diagnostic regressions **9 passed**; diagnostic UI logic **2 passed**.
+  `cargo fmt --all -- --check` passed. Strict Clippy and full-suite results are
+  still pending; these focused passes do not certify the full application.
+- Two initial test expectations were corrected after execution: a successfully
+  propagated empty branch `{0}: []` differs from a tree with no branches;
+  `graph_error: null` is legitimate JSON and must not fail a finite-timing test.
+- Independent review found a distinct-prefix fan-in worst case worth optimizing:
+  many different root sets can spend excessive time merging bounded previews.
+  Preserve this functional checkpoint, benchmark the same workload, then save the
+  optimization separately. No performance improvement is claimed yet.
+- Initial GUI launch from the command shell failed because that shell has no
+  display environment. Native desktop interaction remains to be attempted.
+
+The initial record is saved at remote commit
+`9d38348400dba22dbe353e25c4234de219d2a3c9` in
+[Draft PR #18](https://github.com/07egta/NODES/pull/18).
+Normal git push could not authenticate. The connected GitHub Git-data API saved
+the same tree, its branch ref was verified, and local history was aligned to the
+remote checkpoint without dropping in-progress changes. Continue using a
+fast-forward ref update with the expected old SHA; never force-push.
+
+### Public specification research
+
+McNeel's [GH1 downstream expiration API](https://developer.rhino3d.com/api/grasshopper/html/M_Grasshopper_Kernel_GH_Component_ExpireDownStreamObjects.htm)
+and [runtime message API](https://developer.rhino3d.com/api/grasshopper/html/M_Grasshopper_Kernel_GH_ActiveObject_AddRuntimeMessage.htm)
+separate dependency invalidation and recording runtime errors. The
+[GH2 component migration guide](https://developer.rhino3d.com/en/guides/grasshopper2/migrating-components-to-gh2/)
+documents cancellable solving and null gaps on unassigned item outputs, which
+differ from compact whole-twig routing. These inform review questions; the new
+NODES report is dependency inference and does not implement or certify GH error
+semantics, native null values, multi-output gap rules, or cluster-internal causes.
