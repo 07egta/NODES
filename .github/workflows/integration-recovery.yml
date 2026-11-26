@@ -1,0 +1,217 @@
+name: Integration recovery diagnostics
+
+# Read-only manual diagnostics; normal push/PR gates live in windows.yml.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-recovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: never
+      NODES_SOURCE_SHA: ${{ github.sha }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the exact source commit without persisted credentials
+        id: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Linux desktop build dependencies
+        id: system
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config libx11-dev libxi-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxkbcommon-dev libgl1-mesa-dev
+
+      - name: Install the pinned Rust compiler and lint components
+        id: toolchain
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.100.0
+          components: rustfmt, clippy
+
+      - name: Restore compiled Cargo dependencies
+        id: cache
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-1.100.0-quality-v1-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+
+      - name: Test checkpoint boundaries before collecting any source
+        id: exporter_self_test
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: python3 scripts/export_ci_checkpoint.py --self-test
+
+      - name: Produce formatter repair candidates
+        id: fmt_fix
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        continue-on-error: true
+        run: cargo +1.100.0 fmt --all
+
+      - name: Produce Clippy repair candidates and retain failures
+        id: clippy_fix
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 30
+        run: cargo +1.100.0 clippy --fix --allow-dirty --allow-staged --all-targets --locked
+
+      - name: Format Clippy's candidates
+        id: fmt_after_fix
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        run: cargo +1.100.0 fmt --all
+
+      - name: Require compilation of all targets after repairs
+        id: check
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        timeout-minutes: 20
+        run: cargo +1.100.0 check --all-targets --locked
+
+      - name: Require all target tests after repairs
+        id: test
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        timeout-minutes: 25
+        run: cargo +1.100.0 test --all-targets --locked
+
+      - name: Require formatting after repairs
+        id: fmt_check
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        run: cargo +1.100.0 fmt --all -- --check
+
+      - name: Require a clean lint result after repairs
+        id: clippy_check
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        timeout-minutes: 20
+        run: cargo +1.100.0 clippy --all-targets --locked -- -D warnings
+
+      - name: Regenerate compiled registry metadata
+        id: registry
+        if: ${{ !cancelled() && steps.check.outcome == 'success' }}
+        timeout-minutes: 10
+        run: |
+          mkdir -p docs/compatibility
+          cargo +1.100.0 run --locked --example coverage_inventory \
+            -- --source-revision "$NODES_SOURCE_SHA" \
+            > docs/compatibility/nodes_inventory.json.tmp
+          mv docs/compatibility/nodes_inventory.json.tmp docs/compatibility/nodes_inventory.json
+
+      - name: Audit exact dependency manifest declarations
+        id: dependencies
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          python3 scripts/audit_dependencies.py --self-test
+          cargo +1.100.0 metadata --locked --format-version 1 > "$RUNNER_TEMP/nodes-cargo-metadata.json"
+          python3 scripts/audit_dependencies.py --metadata "$RUNNER_TEMP/nodes-cargo-metadata.json" --output docs/development/dependency-manifests.json
+
+      - name: Regenerate the pinned official GH2 inventory
+        id: gh2
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          python3 scripts/update_gh2_inventory.py --self-test
+          python3 scripts/update_gh2_inventory.py \
+            --expect-count 1419 --expect-version 9.3.26329.6001
+
+      - name: Measure the release evaluator workload
+        id: perf
+        if: ${{ !cancelled() && steps.check.outcome == 'success' && steps.test.outcome == 'success' }}
+        timeout-minutes: 40
+        run: |
+          mkdir -p docs/development
+          cargo +1.100.0 run --release --locked --example coverage_perf \
+            > docs/development/performance.json.tmp
+          mv docs/development/performance.json.tmp docs/development/performance.json
+
+      - name: Always export bounded review candidates and step outcomes
+        id: checkpoint
+        if: ${{ always() && steps.checkout.outcome == 'success' && steps.exporter_self_test.outcome == 'success' }}
+        timeout-minutes: 3
+        run: |
+          python3 scripts/export_ci_checkpoint.py --source-revision "$NODES_SOURCE_SHA" \
+            --step "checkout=${{ steps.checkout.outcome }}" \
+            --step "system=${{ steps.system.outcome }}" \
+            --step "toolchain=${{ steps.toolchain.outcome }}" \
+            --step "exporter_self_test=${{ steps.exporter_self_test.outcome }}" \
+            --step "fmt_fix=${{ steps.fmt_fix.outcome }}" \
+            --step "clippy_fix=${{ steps.clippy_fix.outcome }}" \
+            --step "fmt_after_fix=${{ steps.fmt_after_fix.outcome }}" \
+            --step "check=${{ steps.check.outcome }}" \
+            --step "test=${{ steps.test.outcome }}" \
+            --step "fmt_check=${{ steps.fmt_check.outcome }}" \
+            --step "clippy_check=${{ steps.clippy_check.outcome }}" \
+            --step "registry=${{ steps.registry.outcome }}" \
+            --step "dependencies=${{ steps.dependencies.outcome }}" \
+            --step "gh2=${{ steps.gh2.outcome }}" \
+            --step "perf=${{ steps.perf.outcome }}"
+
+      - name: Save compiled dependencies even when a source gate fails
+        if: ${{ always() && !cancelled() && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      - name: Preserve every failed or skipped required gate
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SYSTEM_OUTCOME: ${{ steps.system.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          EXPORTER_OUTCOME: ${{ steps.exporter_self_test.outcome }}
+          FMT_FIX_OUTCOME: ${{ steps.fmt_fix.outcome }}
+          CLIPPY_FIX_OUTCOME: ${{ steps.clippy_fix.outcome }}
+          FMT_AFTER_FIX_OUTCOME: ${{ steps.fmt_after_fix.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          FMT_CHECK_OUTCOME: ${{ steps.fmt_check.outcome }}
+          CLIPPY_CHECK_OUTCOME: ${{ steps.clippy_check.outcome }}
+          REGISTRY_OUTCOME: ${{ steps.registry.outcome }}
+          DEPENDENCIES_OUTCOME: ${{ steps.dependencies.outcome }}
+          GH2_OUTCOME: ${{ steps.gh2.outcome }}
+          PERF_OUTCOME: ${{ steps.perf.outcome }}
+          CHECKPOINT_OUTCOME: ${{ steps.checkpoint.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          names = (
+              "CHECKOUT", "SYSTEM", "TOOLCHAIN", "EXPORTER", "FMT_FIX", "CLIPPY_FIX",
+              "FMT_AFTER_FIX", "CHECK", "TEST", "FMT_CHECK", "CLIPPY_CHECK",
+              "REGISTRY", "DEPENDENCIES", "GH2", "PERF", "CHECKPOINT",
+          )
+          failed = []
+          for name in names:
+              outcome = os.environ.get(name + "_OUTCOME", "unknown")
+              print(f"{name}: {outcome}")
+              if outcome != "success":
+                  failed.append(name)
+          if failed:
+              print("Recovery diagnostics are incomplete or failed; no clean-source pass is implied.")
+              sys.exit(1)
+          print("Candidate working tree passed diagnostics; review and rerun the committed-source gates.")
+          PY

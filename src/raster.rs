@@ -84,7 +84,7 @@ impl Frame {
                 }
                 let key = wa * a.key + wb * b.key + wc * c.key;
                 let index = py * self.width + px;
-                if !(key > self.key[index]) {
+                if key.partial_cmp(&self.key[index]) != Some(std::cmp::Ordering::Greater) {
                     continue;
                 }
                 self.key[index] = key;

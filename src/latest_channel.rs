@@ -42,7 +42,9 @@ impl<T> LatestSender<T> {
             Ok(()) | Err(TrySendError::Full(())) => Ok(()),
             Err(TrySendError::Disconnected(())) => {
                 // The slot is still locked; the value we just placed is present.
-                Err(SendError(slot.take().expect("mailbox holds the submitted value")))
+                Err(SendError(
+                    slot.take().expect("mailbox holds the submitted value"),
+                ))
             }
         };
         drop(slot);
@@ -53,7 +55,10 @@ impl<T> LatestSender<T> {
 
 impl<T> LatestReceiver<T> {
     fn take(&self) -> Option<T> {
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).take()
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
     }
 
     pub fn recv(&self) -> Result<T, RecvError> {

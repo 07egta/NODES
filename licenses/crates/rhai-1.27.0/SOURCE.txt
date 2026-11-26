@@ -1,0 +1,16 @@
+Package: rhai 1.27.0
+Declared license: MIT OR Apache-2.0
+Registry source archive: https://static.crates.io/crates/rhai/rhai-1.27.0.crate
+Archive SHA-256 recorded by Cargo.lock: c3925b784c0bee6542637e425ed7511a63257bf11b7ecf51ffd845e2d24d9163
+Upstream repository: https://github.com/rhaiscript/rhai
+Upstream commit recorded before outage: aaf90906bfa7eae090fc236b8572a67528cab3ed
+Manifest: Cargo.toml
+
+Recovered notice sources:
+LICENSE-MIT.txt: https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-MIT.txt (SHA-256 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3)
+LICENSE-APACHE.txt: https://github.com/rhaiscript/rhai/blob/aaf90906bfa7eae090fc236b8572a67528cab3ed/LICENSE-APACHE.txt (SHA-256 a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9)
+
+Recovered through the GitHub connector after the local execution environment became unavailable.
+Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.
+These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.
+The retrieved MIT and Apache text SHA-256 values match the pre-outage recorded normalized LF files.

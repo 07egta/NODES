@@ -194,7 +194,16 @@ pub fn tip(kind: NodeKind) -> &'static str {
         .unwrap_or(FALLBACK_TIP)
 }
 
-const CATEGORY_ORDER: [&str; 8] = ["立体", "精密曲面", "曲線", "変形", "配列", "数値", "データ", "出力"];
+const CATEGORY_ORDER: [&str; 8] = [
+    "立体",
+    "精密曲面",
+    "曲線",
+    "変形",
+    "配列",
+    "数値",
+    "データ",
+    "出力",
+];
 
 fn type_hint(kind: DataType) -> &'static str {
     match kind {

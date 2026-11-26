@@ -1,0 +1,13 @@
+{
+  "integration_scope": "Verified CI formatter candidate plus reviewed recovery branches; latest integration requires CI.",
+  "parents": {
+    "recovery/ci-formatted": "2080af67dc4317bb4340aebcae22bbf0c01a8aa0",
+    "recovery/strict-lint": "d18183fd61c5f436099b4ba221ed630ef418c4e0",
+    "recovery/lint-source": "d6add3456f5bb80a253c7a2941393f64bad1b28f",
+    "recovery/search-and-docs": "98f0310495a7d4085c09674f1b712ff2b9f15d8c",
+    "recovery/console-cli": "fc82663ba47af2640f6ec62fdfeac22303ddd3ca",
+    "recovery/perf-workloads": "3ef999f68d7062240474dd1c0660cf1fa27c3211",
+    "recovery/dependency-metadata": "0e59b6f57f2f7b60600c6dac903368ddec83e16e",
+    "recovery/ci-diagnostics": "cfa8901215c2efca835025026a2bb31812e3a2fb"
+  }
+}

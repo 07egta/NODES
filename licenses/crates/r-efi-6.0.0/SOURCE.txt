@@ -1,0 +1,38 @@
+r-efi 6.0.0: upstream license provenance
+
+Selected license for the existing NODES locked dependency: MIT.
+Upstream declaration: MIT OR Apache-2.0 OR LGPL-2.1-or-later.
+This selection does not introduce or change a Cargo dependency.
+
+Official repository: https://github.com/r-efi/r-efi
+Official annotated tag: v6.0.0
+Tag object: 6322b4fc8548045080176f00558b6092698349f1
+Tag target commit: 7e1b0322d31d625f81a5656096330934f9cd835d
+Tag metadata: https://api.github.com/repos/r-efi/r-efi/git/tags/6322b4fc8548045080176f00558b6092698349f1
+GitHub reports the tag signature as verified; independent key verification
+was not performed in this follow-up.
+
+Official manifest:
+https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/Cargo.toml
+Manifest Git blob: 128d8beaa5b5c5d24d50c26e11997e16b036eb99
+Manifest SHA-256: b8e89c393831c2161b6d390bd40422910ac34f02903ad39edd85ec38d4513fef
+Verified package name: r-efi
+Verified package version: 6.0.0
+Verified license declaration: MIT OR Apache-2.0 OR LGPL-2.1-or-later
+
+AUTHORS is preserved exactly, including its MIT permission notice, copyright
+statements, and upstream notices for the alternative licenses:
+https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/AUTHORS
+AUTHORS Git blob: 79c8b7c4a1dabcfbc718b7fe6d43b1892f9850cd
+AUTHORS SHA-256: d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111
+AUTHORS size: 3733 UTF-8 bytes.
+No separately invented or reconstructed LICENSE-MIT text is supplied.
+
+NODES Cargo.lock at b26d246341d359a6284a7b1036d1369a02e59a72 declares archive SHA-256:
+f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf
+The registry archive was not downloaded or rehashed during this narrow
+follow-up, so archive byte identity is not independently established here.
+
+Verification date: 2026-11-26.
+This record covers only the source version and license notice above.
+It does not claim completion of the full dependency or distribution audit.

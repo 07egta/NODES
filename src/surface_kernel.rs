@@ -216,18 +216,30 @@ fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
     [b, d, dd]
 }
 /// Do not invent a unique curvature at a knot where the parameterization is not C2.
+/// Normalized UV conversion can land a few ULPs from an intended native knot.
 fn require_second_order_continuity(k: &[f64], n: usize, p: usize, t: f64) -> R<()> {
+    // At the exact domain endpoints the documented derivative is one-sided.
     if t == k[p] || t == k[n] {
         return Ok(());
     }
-    let multiplicity = k.iter().filter(|u| **u == t).count();
-    if multiplicity > 0 && p.saturating_sub(multiplicity) < 2 {
-        fail(
-            "二階微分が連続でない内部ノットでは曲率を一意に評価できません。U/Vをノットからずらしてください。",
-        )
-    } else {
-        Ok(())
+    let tolerance = 8. * f64::EPSILON * k[p].abs().max(k[n].abs()).max(1.);
+    let mut first = p + 1;
+    while first < n {
+        let knot = k[first];
+        let mut end = first + 1;
+        while end < n && k[end] == knot {
+            end += 1;
+        }
+        // Multiplicity counts exactly equal knots, not nearby distinct knots.
+        // Otherwise a pair of close simple cubic knots would be misclassified.
+        if (t - knot).abs() <= tolerance && p.saturating_sub(end - first) < 2 {
+            return fail(
+                "二階微分が連続でない内部ノット付近では曲率を一意に評価できません。U/Vをノットからずらしてください。",
+            );
+        }
+        first = end;
     }
+    Ok(())
 }
 
 impl NurbsSurface {

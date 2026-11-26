@@ -1,11 +1,11 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
-mod math_mapper_ui;
 mod canvas;
 mod data_view;
 mod file_picker;
 mod gcode_ui;
 mod help;
+mod math_mapper_ui;
 mod script_ui;
 mod stl_export_ui;
 mod theme;
@@ -20,25 +20,41 @@ fn main() -> eframe::Result<()> {
     if args.first().is_some_and(|a| a == "--node-catalog") {
         match serde_json::to_string_pretty(&morphlet::graph_api::catalog()) {
             Ok(json) => println!("{json}"),
-            Err(e) => { eprintln!("{e}"); std::process::exit(1); }
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
         }
         return Ok(());
     }
     if args.first().is_some_and(|a| a == "--build-graph") {
         let result = match (args.get(1), args.get(2), args.len()) {
-            (Some(input), Some(output), 3) => morphlet::graph_api::build_file(Path::new(input), Path::new(output)),
+            (Some(input), Some(output), 3) => {
+                morphlet::graph_api::build_file(Path::new(input), Path::new(output))
+            }
             _ => Err("Usage: --build-graph request.json output.morph".into()),
         };
-        if let Err(e) = result { eprintln!("{e}"); std::process::exit(1); }
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
         return Ok(());
     }
-    if matches!(args.first().map(String::as_str), Some("--inspect-ghx" | "--convert-ghx")) {
+    if matches!(
+        args.first().map(String::as_str),
+        Some("--inspect-ghx" | "--convert-ghx")
+    ) {
         let result = match (args.get(1), args.get(2), args.len()) {
-            (Some(input), Some(output), 3) if args[0] == "--inspect-ghx" =>
-                morphlet::ghx::inspect_file(Path::new(input), Path::new(output)),
-            (Some(input), Some(output), 3) =>
-                morphlet::ghx::convert_file(Path::new(input), Path::new(output)),
-            _ => Err("Usage: --inspect-ghx input.ghx report.json | --convert-ghx input.ghx output.morph".into()),
+            (Some(input), Some(output), 3) if args[0] == "--inspect-ghx" => {
+                morphlet::ghx::inspect_file(Path::new(input), Path::new(output))
+            }
+            (Some(input), Some(output), 3) => {
+                morphlet::ghx::convert_file(Path::new(input), Path::new(output))
+            }
+            _ => Err(
+                "Usage: --inspect-ghx input.ghx report.json | --convert-ghx input.ghx output.morph"
+                    .into(),
+            ),
         };
         if let Err(e) = result {
             eprintln!("{e}");
@@ -97,7 +113,7 @@ fn main() -> eframe::Result<()> {
         .map(PathBuf::from);
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Morphlet · Geometry Studio")
+            .with_title("NODES · Geometry Studio")
             .with_inner_size([1380., 920.])
             .with_min_inner_size([1100., 720.])
             .with_icon(icon()),

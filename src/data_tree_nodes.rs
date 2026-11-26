@@ -4,6 +4,26 @@ use crate::data_tree as dt;
 use crate::engine::cancelled;
 use crate::model::*;
 
+/// Validate the reserved, non-executable tree settings shared by native graphs
+/// and the structured API. `false` means that this is an ordinary parameter.
+pub fn validate_parameter(kind: NodeKind, key: &str, value: f64) -> Result<bool, String> {
+    if key == dt::MATCH_PARAM {
+        if !supports_matching(kind) {
+            return Err("このノードはデータ照合を変更できません。".into());
+        }
+        dt::MatchMode::from_number(value)?;
+        return Ok(true);
+    }
+    if let Some(port) = key.strip_prefix(dt::PORT_PREFIX) {
+        if !supports_transform(kind) || !kind.spec().inputs.iter().any(|s| s.key == port) {
+            return Err("データツリー変換のポートが無効です。".into());
+        }
+        dt::PortTransform::from_number(value)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 macro_rules! node {
     ($name:ident,$label:literal,$description:literal,$keywords:literal,$inputs:expr,$output:expr) => {
         static $name: NodeSpec = NodeSpec {
