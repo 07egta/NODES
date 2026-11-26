@@ -1006,6 +1006,14 @@ impl Graph {
         crate::cluster::validate_graph(self)
     }
     pub fn topological_order(&self) -> Result<Vec<NodeId>, String> {
+        self.topological_nodes()
+            .map(|nodes| nodes.into_iter().map(|node| node.id).collect())
+    }
+
+    /// Validated topological order with direct node references. Evaluators must use this
+    /// instead of repeatedly scanning `Graph::nodes` by id. The transient index does not
+    /// alter the serialized graph or need invalidation after an edit.
+    pub(crate) fn topological_nodes(&self) -> Result<Vec<&Node>, String> {
         if self.nodes.len() > MAX_NODES {
             return Err(format!("ノード数が上限 {MAX_NODES} を超えています。"));
         }
@@ -1051,14 +1059,19 @@ impl Graph {
                 after.entry(p).or_default().push(node.id);
             }
         }
+        // Stable sibling ordering makes independent output admission deterministic,
+        // even when the document stores the same nodes in a different order.
+        for children in after.values_mut() {
+            children.sort_unstable();
+        }
         let mut queue: VecDeque<_> = indegree
             .iter()
             .filter(|(_, v)| **v == 0)
             .map(|(id, _)| *id)
             .collect();
-        let mut order = Vec::new();
+        let mut order = Vec::with_capacity(self.nodes.len());
         while let Some(id) = queue.pop_front() {
-            order.push(id);
+            order.push(*ids.get(&id).ok_or("ノード ID が見つかりません。")?);
             for child in after.get(&id).into_iter().flatten() {
                 if let Some(d) = indegree.get_mut(child) {
                     *d = d.saturating_sub(1);

@@ -14,9 +14,10 @@ use crate::script::MAX_SCRIPT_BYTES;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Arc;
 
 pub const MAX_CLUSTER_DEPTH: usize = 4;
 pub const MAX_CLUSTER_INPUTS: usize = 8;
@@ -98,12 +99,90 @@ pub fn key_extra(graph: &Graph, node: &Node) -> String {
 fn signature(defs: &[ClusterDef], root: u64) -> String {
     let mut out = String::new();
     for id in closure_ids(defs, root) {
-        if let Some(def) = defs.iter().find(|d| d.id == id) {
-            out.push_str(&serde_json::to_string(def).unwrap_or_default());
+        if let Some(def) = find(defs, id) {
+            out.push_str(&definition_signature(def));
+        }
+    }
+    out
+}
+
+fn definition_signature(def: &ClusterDef) -> String {
+    let mut out = serde_json::to_string(def).unwrap_or_default();
+    out.push('\n');
+    // The definition JSON contains paths, not external resource state.
+    for node in &def.graph.nodes {
+        if node.kind == NodeKind::ImportMesh && !node.off {
+            let source = crate::import::source_key(&node.script);
+            out.push_str(&serde_json::to_string(&source).unwrap_or_default());
             out.push('\n');
         }
     }
     out
+}
+
+/// Exact cache identities without copying complete definition JSON into every instance.
+/// The token is assigned only after comparing the full definition signature (not a hash).
+#[derive(Clone, PartialEq)]
+pub(crate) enum CacheExtra {
+    Text(String),
+    Cluster(Option<Arc<[(u64, Option<u128>)]>>),
+}
+
+struct DefinitionRevision {
+    signature: String,
+    revision: u128,
+}
+
+/// Shared by one evaluator. A definition is serialized at most once per evaluation,
+/// regardless of how often it occurs in nested clusters or on the canvas.
+#[derive(Default)]
+pub(crate) struct CacheKeys {
+    definitions: BTreeMap<u64, DefinitionRevision>,
+    checked: BTreeSet<u64>,
+    roots: BTreeMap<u64, Arc<[(u64, Option<u128>)]>>,
+    revision: u128,
+}
+
+impl CacheKeys {
+    pub(crate) fn begin(&mut self, graph: &Graph) {
+        self.checked.clear();
+        self.roots.clear();
+        let existing: BTreeSet<_> = graph.clusters.iter().map(|d| d.id).collect();
+        self.definitions.retain(|id, _| existing.contains(id));
+    }
+
+    pub(crate) fn key_for(&mut self, graph: &Graph, node: &Node) -> CacheExtra {
+        if node.kind != NodeKind::Cluster {
+            return CacheExtra::Text(key_extra(graph, node));
+        }
+        let Some(root) = node.cluster else {
+            return CacheExtra::Cluster(None);
+        };
+        if let Some(key) = self.roots.get(&root) {
+            return CacheExtra::Cluster(Some(Arc::clone(key)));
+        }
+        let mut dependencies = Vec::new();
+        for id in closure_ids(&graph.clusters, root) {
+            if self.checked.insert(id) {
+                if let Some(def) = find(&graph.clusters, id) {
+                    let signature = definition_signature(def);
+                    if !self.definitions.get(&id).is_some_and(|old| old.signature == signature) {
+                        self.revision = self.revision.wrapping_add(1);
+                        self.definitions.insert(id, DefinitionRevision {
+                            signature,
+                            revision: self.revision,
+                        });
+                    }
+                } else {
+                    self.definitions.remove(&id);
+                }
+            }
+            dependencies.push((id, self.definitions.get(&id).map(|d| d.revision)));
+        }
+        let key: Arc<[(u64, Option<u128>)]> = dependencies.into();
+        self.roots.insert(root, Arc::clone(&key));
+        CacheExtra::Cluster(Some(key))
+    }
 }
 
 /// Single entry point used by `Evaluator::evaluate` for every node.
@@ -203,14 +282,14 @@ fn run_def(
     budget: &Cell<usize>,
     cancel: &dyn Fn() -> bool,
 ) -> Result<Tree, String> {
-    let order = def.graph.topological_order()?;
+    let order = def.graph.topological_nodes()?;
     // Exposed inputs are fed through "virtual" source ids so lists/trees keep working.
     let mut local: BTreeMap<NodeId, Result<Tree, String>> = BTreeMap::new();
     for (k, tree) in slots.into_iter().enumerate() {
         local.insert(VIRTUAL_BASE + k as u64, Ok(tree));
     }
     let mut weight = 0usize;
-    for id in order {
+    for original in order {
         if cancel() {
             return Err("計算を停止しました。".into());
         }
@@ -221,9 +300,13 @@ fn run_def(
             ));
         }
         budget.set(left - 1);
-        let Some(original) = def.graph.node(id) else {
+        let id = original.id;
+        // Match the top-level evaluator: disabled nodes produce an empty tree
+        // without evaluating scripts, geometry, or nested clusters.
+        if original.off {
+            local.insert(id, Ok(Tree::default()));
             continue;
-        };
+        }
         let mut node = original.clone();
         for (k, port) in def.inputs.iter().enumerate() {
             if port.node == id {
@@ -307,9 +390,10 @@ pub fn validate_graph(graph: &Graph) -> Result<(), String> {
         validate_def(def)?;
     }
     check_nodes(&graph.nodes, defs)?;
+    let mut depths = BTreeMap::new();
     for def in defs {
         check_nodes(&def.graph.nodes, defs)?;
-        def_depth(defs, def.id, &mut Vec::new())?;
+        def_depth_cached(defs, def.id, &mut Vec::new(), &mut depths)?;
     }
     Ok(())
 }
@@ -378,28 +462,44 @@ fn validate_def(def: &ClusterDef) -> Result<(), String> {
 /// Nesting depth of a definition (1 for a flat one). Errors on cycles, missing definitions
 /// and anything deeper than `MAX_CLUSTER_DEPTH`.
 pub fn def_depth(defs: &[ClusterDef], id: u64, stack: &mut Vec<u64>) -> Result<usize, String> {
+    def_depth_cached(defs, id, stack, &mut BTreeMap::new())
+}
+
+fn def_depth_cached(
+    defs: &[ClusterDef],
+    id: u64,
+    stack: &mut Vec<u64>,
+    memo: &mut BTreeMap<u64, usize>,
+) -> Result<usize, String> {
+    let too_deep = || format!(
+        "まとめノードの入れ子が深すぎます（上限 {MAX_CLUSTER_DEPTH} 段）。"
+    );
     if stack.contains(&id) {
         return Err("まとめノードの定義が循環しています。".into());
     }
+    // Reject over-deep hostile definitions before descending, not while unwinding.
+    if stack.len() >= MAX_CLUSTER_DEPTH {
+        return Err(too_deep());
+    }
+    if let Some(&depth) = memo.get(&id) {
+        if stack.len() + depth > MAX_CLUSTER_DEPTH {
+            return Err(too_deep());
+        }
+        return Ok(depth);
+    }
     let def = find(defs, id).ok_or("まとめノードの定義が見つかりません。")?;
     stack.push(id);
-    let mut deepest = 0;
-    for node in def
-        .graph
-        .nodes
-        .iter()
-        .filter(|n| n.kind == NodeKind::Cluster)
-    {
-        let child = node.cluster.ok_or("まとめノードの定義がありません。")?;
-        deepest = deepest.max(def_depth(defs, child, stack)?);
-    }
+    let result = (|| -> Result<usize, String> {
+        let mut deepest = 0;
+        for node in def.graph.nodes.iter().filter(|n| n.kind == NodeKind::Cluster) {
+            let child = node.cluster.ok_or("まとめノードの定義がありません。")?;
+            deepest = deepest.max(def_depth_cached(defs, child, stack, memo)?);
+        }
+        Ok(deepest + 1)
+    })();
     stack.pop();
-    let depth = deepest + 1;
-    if depth > MAX_CLUSTER_DEPTH {
-        return Err(format!(
-            "まとめノードの入れ子が深すぎます（上限 {MAX_CLUSTER_DEPTH} 段）。"
-        ));
-    }
+    let depth = result?;
+    memo.insert(id, depth);
     Ok(depth)
 }
 /// `root` and every definition it uses, root first. Cycle-safe.
@@ -426,11 +526,11 @@ fn closure_ids(defs: &[ClusterDef], root: u64) -> Vec<u64> {
     }
     out
 }
-fn next_def_id(defs: &[ClusterDef]) -> u64 {
-    defs.iter()
-        .map(|d| d.id)
-        .max()
-        .map_or(1, |m| m.saturating_add(1))
+fn next_def_id(defs: &[ClusterDef]) -> Result<u64, String> {
+    match defs.iter().map(|d| d.id).max() {
+        Some(id) => id.checked_add(1).ok_or_else(|| "部品の ID をこれ以上追加できません。".into()),
+        None => Ok(1),
+    }
 }
 
 // ---------------------------------------------------------------- commands
@@ -575,9 +675,10 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
             inner.nodes.push(node);
         }
     }
-    inner.next_id = inner.nodes.iter().map(|n| n.id).max().map_or(0, |m| m + 1);
+    inner.next_id = inner.nodes.iter().map(|n| n.id).max().unwrap_or(0)
+        .checked_add(1).ok_or("ノード ID をこれ以上追加できません。")?;
     let def = ClusterDef {
-        id: next_def_id(&graph.clusters),
+        id: next_def_id(&graph.clusters)?,
         name: name.clone(),
         graph: inner,
         inputs: ports,
@@ -697,6 +798,8 @@ pub fn export_part(graph: &Graph, def_id: u64) -> Result<String, String> {
     if text.len() > MAX_PART_BYTES {
         return Err("部品のファイルが大きすぎます（上限 1 MB）。".into());
     }
+    // Reject malformed in-memory definitions rather than exporting an unreadable part.
+    parse_part(text.as_bytes())?;
     Ok(text)
 }
 
@@ -741,7 +844,10 @@ pub fn import_part(graph: &mut Graph, bytes: &[u8]) -> Result<u64, String> {
     if graph.clusters.len() + file.clusters.len() > MAX_CLUSTER_DEFS {
         return Err(format!("部品の定義は合計 {MAX_CLUSTER_DEFS} 個までです。"));
     }
-    let base = next_def_id(&graph.clusters);
+    let base = next_def_id(&graph.clusters)?;
+    // Check the full contiguous allocation before any additions or mutations.
+    base.checked_add(file.clusters.len().saturating_sub(1) as u64)
+        .ok_or("部品の ID をこれ以上追加できません。")?;
     let map: BTreeMap<u64, u64> = file
         .clusters
         .iter()
@@ -772,20 +878,10 @@ pub fn import_part(graph: &mut Graph, bytes: &[u8]) -> Result<u64, String> {
 
 pub fn save_part(path: &Path, graph: &Graph, def_id: u64) -> Result<(), String> {
     let text = export_part(graph, def_id)?;
-    let name = path
-        .file_name()
-        .ok_or("保存先のファイル名を指定してください。")?
-        .to_os_string();
-    let mut temporary_name = name;
-    temporary_name.push(format!(".morphlet-{}.tmp", std::process::id()));
-    let temporary = path.with_file_name(temporary_name);
-    fs::write(&temporary, text.as_bytes())
-        .map_err(|e| format!("部品を書き込めませんでした: {e}"))?;
-    if let Err(e) = fs::rename(&temporary, path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(format!("部品を保存できませんでした: {e}"));
-    }
-    Ok(())
+    crate::persistence::atomic_write(path, |file| {
+        use std::io::Write;
+        file.write_all(text.as_bytes())
+    })
 }
 
 pub fn load_part(path: &Path, graph: &mut Graph) -> Result<u64, String> {

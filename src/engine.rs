@@ -18,28 +18,31 @@ pub struct Evaluation {
 #[derive(Clone, PartialEq)]
 struct Key {
     kind: NodeKind,
-    params: BTreeMap<String, f64>,
+    params: BTreeMap<String, u64>,
     inputs: BTreeMap<String, (NodeId, u64)>,
     /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
-    extra: String,
+    extra: crate::cluster::CacheExtra,
 }
 struct Cache {
     key: Key,
     revision: u64,
     result: Result<Tree, String>,
+    weight: usize,
 }
 #[derive(Default)]
 pub struct Evaluator {
     cache: BTreeMap<NodeId, Cache>,
+    // Match the previous oldest-revision eviction policy, with logarithmic removal.
+    cache_order: BTreeSet<(u64, NodeId)>,
     cache_weight: usize,
     revision: u64,
+    cluster_keys: crate::cluster::CacheKeys,
 }
 impl Evaluator {
     fn remove_cached(&mut self, id: NodeId) {
         if let Some(old) = self.cache.remove(&id) {
-            self.cache_weight = self
-                .cache_weight
-                .saturating_sub(old.result.as_ref().map(Tree::weight).unwrap_or(0));
+            self.cache_order.remove(&(old.revision, id));
+            self.cache_weight = self.cache_weight.saturating_sub(old.weight);
         }
     }
 
@@ -47,17 +50,15 @@ impl Evaluator {
     // retained cache memory independently of the current evaluation's output budget.
     fn store_cached(&mut self, id: NodeId, entry: Cache) {
         self.remove_cached(id);
-        let weight = entry.result.as_ref().map(Tree::weight).unwrap_or(0);
-        while self.cache_weight.saturating_add(weight) > MAX_TOTAL_WEIGHT {
-            let oldest = self
-                .cache
-                .iter()
-                .min_by_key(|(_, c)| c.revision)
-                .map(|(id, _)| *id);
-            let Some(oldest) = oldest else { return };
+        if entry.weight > MAX_TOTAL_WEIGHT {
+            return;
+        }
+        while self.cache_weight.saturating_add(entry.weight) > MAX_TOTAL_WEIGHT {
+            let Some(&(_, oldest)) = self.cache_order.first() else { return };
             self.remove_cached(oldest);
         }
-        self.cache_weight = self.cache_weight.saturating_add(weight);
+        self.cache_weight = self.cache_weight.saturating_add(entry.weight);
+        self.cache_order.insert((entry.revision, id));
         self.cache.insert(id, entry);
     }
 
@@ -77,7 +78,7 @@ impl Evaluator {
             out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
             return out;
         }
-        let order = match graph.topological_order() {
+        let order = match graph.topological_nodes() {
             Ok(o) => o,
             Err(e) => {
                 for n in &graph.nodes {
@@ -88,18 +89,20 @@ impl Evaluator {
             }
         };
         let existing: BTreeSet<_> = graph.nodes.iter().map(|n| n.id).collect();
-        self.cache.retain(|id, _| existing.contains(id));
-        self.cache_weight = self.cache.values().fold(0usize, |sum, c| {
-            sum.saturating_add(c.result.as_ref().map(Tree::weight).unwrap_or(0))
-        });
+        let removed: Vec<_> = self.cache.keys().copied()
+            .filter(|id| !existing.contains(id)).collect();
+        for id in removed {
+            self.remove_cached(id);
+        }
+        self.cluster_keys.begin(graph);
         let mut revisions = BTreeMap::new();
         let mut retained = 0usize;
-        for id in order {
+        for node in order {
             if stop() {
                 out.cancelled = true;
                 break;
             }
-            let Some(node) = graph.node(id) else { continue };
+            let id = node.id;
             // Disabled node: empty output, never cached; revision 0 marks "off" for children.
             if node.off {
                 self.remove_cached(id);
@@ -109,17 +112,18 @@ impl Evaluator {
             }
             let key = Key {
                 kind: node.kind,
-                params: node.params.clone(),
+                // IEEE bit equality preserves signed-zero-sensitive numeric operations.
+                params: node.params.iter().map(|(k, v)| (k.clone(), v.to_bits())).collect(),
                 inputs: node
                     .inputs
                     .iter()
                     .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
                     .collect(),
-                extra: crate::cluster::key_extra(graph, node),
+                extra: self.cluster_keys.key_for(graph, node),
             };
-            let (result, revision, is_cached) =
+            let (result, revision, is_cached, weight) =
                 if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
-                    (c.result.clone(), c.revision, true)
+                    (c.result.clone(), c.revision, true, c.weight)
                 } else {
                     let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
                     if stop() {
@@ -127,14 +131,14 @@ impl Evaluator {
                         break;
                     }
                     self.revision = self.revision.wrapping_add(1).max(1);
-                    (result, self.revision, false)
+                    let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
+                    (result, self.revision, false, weight)
                 };
             if is_cached {
                 out.cached += 1;
             } else {
                 out.computed += 1;
             }
-            let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
             if retained.saturating_add(weight) > MAX_TOTAL_WEIGHT {
                 self.remove_cached(id);
                 self.revision = self.revision.wrapping_add(1).max(1);
@@ -156,6 +160,7 @@ impl Evaluator {
                         key,
                         revision,
                         result: result.clone(),
+                        weight,
                     },
                 );
             }
@@ -1690,6 +1695,11 @@ mod tests {
         assert!(result.cancelled);
         assert_eq!(result.computed, 8);
         assert!(engine.cache_weight <= MAX_TOTAL_WEIGHT);
+        assert_eq!(engine.cache_order.len(), engine.cache.len());
+        for (id, cached) in &engine.cache {
+            assert!(engine.cache_order.contains(&(cached.revision, *id)));
+            assert_eq!(cached.weight, cached.result.as_ref().map(Tree::weight).unwrap_or(0));
+        }
         assert_eq!(
             engine.cache_weight,
             engine
