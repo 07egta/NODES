@@ -3,14 +3,13 @@
 //! so the ranking and persistence rules can be unit tested on their own.
 
 use morphlet::model::{DataType, NodeKind};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 /// How many recently added nodes are remembered (newest first).
 pub const RECENT_LIMIT: usize = 8;
 /// Bonus per position in the recent list: the newest node gets `RECENT_LIMIT * RECENT_STEP`.
 const RECENT_STEP: i32 = 4;
-/// Bonus for a node that can take the wire being dragged from a port.
-const COMPAT_BONUS: i32 = 40;
 /// Typo tolerance (subsequence match) is only used for tokens at least this long.
 const MIN_FUZZY_CHARS: usize = 3;
 
@@ -20,6 +19,9 @@ pub fn normalize(text: &str) -> String {
     text.chars()
         .map(|c| match c {
             '\u{3000}' => ' ',
+            '\u{ff01}'..='\u{ff5e}' => char::from_u32(c as u32 - 0xfee0)
+                .unwrap_or(c)
+                .to_ascii_lowercase(),
             'ァ'..='ヶ' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
             _ => c.to_ascii_lowercase(),
         })
@@ -33,9 +35,36 @@ fn alias(token: &str) -> &str {
         "はこ" => "箱",
         "しかく" => "長方形",
         "はなびん" | "かびん" => "花器",
-        "ならべる" => "配列",
+        "ならべる" => "並べる",
         "おしだし" => "押し出し",
         _ => token,
+    }
+}
+
+/// A small, explicit intent dictionary. These are suggestions for supported operations,
+/// not a claim that the editor implements every Grasshopper component or understands
+/// arbitrary Japanese sentences. No labels or aliases become persistent node IDs.
+fn intent(query: &str) -> Option<&'static [NodeKind]> {
+    use NodeKind::*;
+    match query {
+        "円を作る" | "円をつくる" | "まるを作る" | "まるをつくる" => Some(&[Circle]),
+        "花瓶を作る" | "花瓶をつくる" | "花器を作る" | "かびんをつくる" |
+        "はなびんをつくる" | "vase" => Some(&[Vase]),
+        "点を作る" | "点をつくる" | "点を置く" | "constructpoint" => Some(&[Point]),
+        "点を並べる" | "点をならべる" | "点の配列" => Some(&[LinearArray, RadialArray, Populate]),
+        "面を作る" | "面をつくる" => Some(&[Plane, Loft]),
+        "曲面を作る" | "曲面をつくる" => Some(&[Loft, Revolve]),
+        "ねじる" | "捻る" => Some(&[Twist]),
+        "箱を作る" | "箱をつくる" | "はこをつくる" => Some(&[Box]),
+        "押し出す" | "押出す" | "おしだす" => Some(&[Extrude]),
+        "直線配列" | "lineararray" => Some(&[LinearArray]),
+        "円形配列" | "polararray" | "radialarray" => Some(&[RadialArray]),
+        "numberslider" => Some(&[Number]),
+        "deconstructpoint" => Some(&[PointComponent]),
+        "listlength" => Some(&[ListLength]),
+        "listitem" => Some(&[ListItem]),
+        "remapnumbers" => Some(&[Remap]),
+        _ => None,
     }
 }
 
@@ -48,6 +77,9 @@ pub fn is_subsequence(needle: &str, hay: &str) -> bool {
 /// Score of one query token against the label, keywords and category of a node.
 /// Exact substring hits outrank typo-tolerant hits. Zero means no match.
 fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 {
+    if label == token {
+        return 160;
+    }
     if label.contains(token) {
         return 100;
     }
@@ -71,7 +103,17 @@ fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 
 /// Total match score of a query for one node, or `None` if any token fails to match.
 /// An empty query matches everything with score 0.
 pub fn query_score(kind: NodeKind, query: &str) -> Option<i32> {
-    let tokens: Vec<String> = normalize(query)
+    let normalized = normalize(query);
+    let compact: String = normalized.chars().filter(|c| !c.is_whitespace()).collect();
+    if let Some(kinds) = intent(&compact) {
+        return kinds.iter().position(|k| *k == kind).map(|i| 400 - i as i32 * 50);
+    }
+    // A simple object + "make" phrase also works for nodes outside the dictionary.
+    let query = ["を作りたい", "をつくりたい", "を作る", "をつくる"]
+        .iter()
+        .find_map(|suffix| normalized.trim().strip_suffix(*suffix))
+        .unwrap_or(&normalized);
+    let tokens: Vec<String> = query
         .split_whitespace()
         .map(|t| alias(t).to_owned())
         .collect();
@@ -116,7 +158,6 @@ impl Recent {
         self.kinds.insert(0, kind);
         self.kinds.truncate(RECENT_LIMIT);
     }
-    #[cfg(test)]
     pub fn kinds(&self) -> &[NodeKind] {
         &self.kinds
     }
@@ -127,8 +168,8 @@ impl Recent {
 
 /// Ranks the nodes for the search popup.
 /// `base` is the default order (used for ties and for an empty query).
-/// Recently used nodes get a bonus that is larger for newer entries, and when a wire
-/// is being dropped, nodes that can take it get a bonus too.
+/// Recently used nodes get a small bonus. When a wire is being dropped, incompatible
+/// nodes are excluded rather than merely ranked lower.
 pub fn rank(
     base: &[NodeKind],
     query: &str,
@@ -139,13 +180,13 @@ pub fn rank(
         .iter()
         .enumerate()
         .filter_map(|(index, kind)| {
+            if wire.is_some_and(|source| !accepts_from(*kind, source)) {
+                return None;
+            }
             let mut score = query_score(*kind, query)?;
             if let Some(position) = recent.position(*kind) {
                 let freshness = RECENT_LIMIT.saturating_sub(position) as i32;
                 score += freshness * RECENT_STEP;
-            }
-            if wire.is_some_and(|t| accepts_from(*kind, t)) {
-                score += COMPAT_BONUS;
             }
             Some((score, index, *kind))
         })
@@ -217,6 +258,31 @@ pub fn save_dark(dark: bool) -> Result<(), String> {
     std::fs::write(&path, format_dark(dark)).map_err(|e| format!("設定を保存できません: {e}"))
 }
 
+/// Favorites are stored separately from the project and theme, using stable enum IDs.
+/// Corrupt or missing settings are harmless; the list is limited to real library nodes.
+fn favorites_path() -> Option<PathBuf> {
+    settings_path().map(|p| p.with_file_name("favorites.json"))
+}
+
+pub fn load_favorites() -> BTreeSet<NodeKind> {
+    favorites_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str::<BTreeSet<NodeKind>>(&s).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|k| NodeKind::all().contains(k))
+        .collect()
+}
+
+pub fn save_favorites(kinds: &BTreeSet<NodeKind>) -> Result<(), String> {
+    let path = favorites_path().ok_or("設定を保存する場所が見つかりません。")?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("設定フォルダーを作れません: {e}"))?;
+    }
+    let text = serde_json::to_string(kinds).map_err(|e| e.to_string())?;
+    std::fs::write(path, text).map_err(|e| format!("お気に入りを保存できません: {e}"))
+}
+
 /// Shortcut cheat-sheet rows: (keys, what it does).
 pub const SHORTCUTS: &[(&str, &str)] = &[
     ("Ctrl+S", "保存"),
@@ -235,6 +301,8 @@ pub const SHORTCUTS: &[(&str, &str)] = &[
     ("Ctrl+G", "選択をグループで囲む"),
     ("Ctrl+Shift+G", "格子への吸着を切り替え"),
     ("F / Home", "形とキャンバスを画面に収める"),
+    ("Shift+F", "選択ノードを画面に収める"),
+    ("Ctrl+C / Ctrl+V", "ノードをコピー / 貼り付け（同じ作品内）"),
     ("F1", "選択ノードのヘルプ（ノード辞典）"),
     ("?", "このショートカット一覧"),
     ("検索欄: ↑ ↓ / Enter", "候補を選ぶ / 追加"),
@@ -314,6 +382,32 @@ mod tests {
         let ranked = rank(&all(), "", &Recent::default(), Some(DataType::Number));
         let first = ranked.first().copied();
         assert!(first.is_some_and(|k| accepts_from(k, DataType::Number)));
+    }
+
+    #[test]
+    fn natural_japanese_and_full_width_english_find_supported_nodes() {
+        for (query, expected) in [
+            ("円を作る", NodeKind::Circle),
+            ("　ＣＩＲＣＬＥ　", NodeKind::Circle),
+            ("点を並べる", NodeKind::LinearArray),
+            ("面を作る", NodeKind::Plane),
+            ("花瓶を作る", NodeKind::Vase),
+            ("ねじる", NodeKind::Twist),
+            ("Construct Point", NodeKind::Point),
+            ("Number Slider", NodeKind::Number),
+        ] {
+            assert_eq!(rank(&all(), query, &Recent::default(), None).first(), Some(&expected), "{query}");
+        }
+    }
+
+    #[test]
+    fn wire_search_never_suggests_an_incompatible_node() {
+        for source in [DataType::Number, DataType::Point, DataType::Curve, DataType::Mesh, DataType::Geometry, DataType::Any] {
+            let ranked = rank(&all(), "", &Recent::default(), Some(source));
+            assert!(!ranked.is_empty());
+            assert!(ranked.iter().all(|kind| accepts_from(*kind, source)));
+        }
+        assert!(rank(&all(), "円を作る", &Recent::default(), Some(DataType::Mesh)).is_empty());
     }
 
     #[test]
