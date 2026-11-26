@@ -1,13 +1,13 @@
 # NODES Omega geometry and correctness checkpoint
 
-- Updated: 2026-11-27 08:32 JST.
+- Updated: 2026-11-27 08:56 JST.
 - Active branch: `feat/nodes-omega-geometry`.
 - Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR #15; includes #12 structural API edits and previous c52e850 integration).
 - Scope: independent curve/surface/mesh/data correctness fixes and reproducible performance evidence; preserve concurrent multi-port work.
 - Baseline CI: Check 45907598179, Linux 448 passed / Windows 447 passed, 0 failed, 3 opt-in ignored, 35 suites. Linux fmt/check/strict Clippy/Python17/audit and both release binaries succeeded.
 - Current local checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust 1.100.0 is available at `/home/agent/.cargo/bin` (the old absence recorded below is historical).
 - Other active work: PR #14 and #13 multi-port, `fix/omega-multiport-ci` formatting repair created during initial inspection; no overlapping edits will be pushed to those branches.
-- Saved checkpoints: e7ecc750 (initial state), 829982f6 (legacy aggregates), 77a3e788 (curve endpoint/closure and signed-zero editing/history), 996d76de (surface integration/projection), cd8caac9 (exact binary64 sum/mean), 55c72c42 (OBJ coordinate precision), 70229870 (NURBS local support), f65dd28a (unified mesh diagnostics), 9a4ae055 (regular part input).
+- Saved checkpoints: e7ecc750 (initial state), 829982f6 (legacy aggregates), 77a3e788 (curve endpoint/closure and signed-zero editing/history), 996d76de (surface integration/projection), cd8caac9 (exact binary64 sum/mean), 55c72c42 (OBJ coordinate precision), 70229870 (NURBS local support), f65dd28a (unified mesh diagnostics), 9a4ae055 (regular part input), b8f2f14f (prepared split exports).
 - Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
 - First implementation: legacy MassAddition/MassMultiplication share the bounded numerical math aggregation path. Six new regressions went from 1 pass / 5 fail to 6 pass / 0 fail; 17 existing tree/precision regressions also passed. See OMEGA_VALIDATION.json.
 - Curve endpoint/closure fixes: 9 new + 11 existing regressions pass. Bounded closure probes avoid an initial O(knot-count) performance regression.
@@ -19,8 +19,10 @@
 - Performance finding: large NURBS knot-grid area regressed about 25x after mandatory knot-cell coverage. Local-support optimization passes 5 new + 36 existing tests and an independent review; optimized performance remeasurement is pending. The initial measurement is retained.
 - Export topology: shared vertex-fan/duplicate-face audit now drives viewport, STL checks and CLI. Seven new regressions pass; related seven suites total 181/0. Open meshes remain exportable, but invalid closed-manifold volume/weight are no longer presented as determined.
 - Reusable part input: ordinary directories/FIFOs are rejected before opening; new tests went from 1/2 to 3/0, with existing 32 Script/cluster tests passing.
-- Current numeric review: a proposed shared FMA lerp exposed additional cancellation/overflow-boundary defects before publication. A separate exact product accumulator and independent Fraction interpolation oracle are being prepared. Do not treat the temporary working-tree lerp as validated.
+- Exact interpolation is now wired into math nodes and Script lerp/linspace. The rejected FMA candidate was replaced before publication. Independent Fraction 128-case node+Script oracle and all six related suites pass (61/0); separate implementation probe5720/0.
 - Split output preservation: 6 new integration tests plus a real-I/O partial-commit unit pass; related lib/GUI/STL total161/0/1ignored. All stages finish before any destination replacement, and partial replacement results are explicit.
+- Latest basis optimization: all41 surface tests and15 benchmark fixtures pass; controlled large-surface p50 improves from27.094ms to11.569ms. Performance JSON preserves the earlier132.919ms stage and its4.74x improvement to28.071ms. Aggregation timings and precision tradeoffs are also recorded.
+- Full local gates pass: fmt, all-target check, strictClippy,520 Rust tests (0fail/3manual ignored),17 Python tests and both128-case oracle generator checks. The initial Clippy module-placement failure was repaired by moving the unchanged test module. Release, Windows CI and native GUI are next.
 - Next files: `src/number_aggregates.rs`, `src/math_nodes.rs`, `src/lib.rs`, `tests/sum_rounding_regressions.rs`, its fixture/generator and CI check; then mesh closed/manifold diagnostics and OBJ precision after audit. Next commands: focused tests, `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked`, release binaries and native GUI.
 - Draft PR: https://github.com/07egta/NODES/pull/16 (targets PR #15 branch, avoiding duplicate review scope).
 - Registry: 298 picker kinds + Cluster = 299; completely verified node count remains unestablished, external GH oracle VERIFIED = 0.

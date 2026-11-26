@@ -53,6 +53,34 @@ paper's xsum implementation. Binary layout and bit conversions follow the
 [Rust binary64 documentation](https://doc.rust-lang.org/std/primitive.f64.html).
 These tests establish local numerical contracts, not an external GH oracle.
 
+## Exactly rounded affine interpolation
+
+`src/number_interpolation.rs` evaluates exact `a + t*b - t*a` for finite binary64
+inputs in fixed-point integer units of 2^-2148. A pair of 68-word magnitudes
+covers all three terms, including the largest possible intermediate products.
+Each 106-bit product is inserted as two words so no u128 shift can truncate it.
+Only the final result is rounded to nearest/even. Endpoint and identical-bit
+constant cases preserve their bits; other exact cancellation gives +0, and a
+negative nonzero underflow can give -0. True rounded overflow remains an error
+at the math node and Script boundaries.
+
+This implementation is shared by scalar math interpolation and Script `lerp`
+and `linspace`. It avoids both difference overflow between opposite extrema
+and cancellation/overflow-boundary defects found in an intermediate FMA design.
+The discarded design and its counterexamples are identified in the independent
+Fraction interpolation fixture. No full correctly-rounded composite Bezier or
+other multi-step algorithm is claimed merely because its individual affine
+operations use this primitive.
+
+```sh
+python3 scripts/generate_interpolation_oracle.py --check
+cargo test --locked --test interpolation_oracle --test script_numeric_regressions
+```
+
+The checked-in 128-case oracle covers 112 finite results, 16 overflows and seven
+negative-zero results, through both the actual node and sandboxed Script APIs.
+This exactness has a computation cost; no interpolation speedup is claimed.
+
 ## NURBS surface area and plane projection
 
 Area integration visits every nonzero native U/V knot cell. A pair of tensor
@@ -73,6 +101,10 @@ first and second derivatives under translation. Plane projection uses an
 orthogonal frame and a compensated difference of products for its normal.
 Boundary candidates are compared in the plane to avoid burying small distance
 differences beneath a large shared normal distance.
+
+Local-support evaluation and per-degree basis recurrences visit only the active
+control window, including endpoint controls whose values vanish but derivatives
+do not. Full knot-cell integration and the convergence tests remain in place.
 
 The regressions use rectangles with uneven knots, a rational cylinder with
 analytical area, translated rational derivatives and exactly representable

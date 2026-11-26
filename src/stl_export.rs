@@ -1112,64 +1112,6 @@ fn commit_prepared(prepared: Vec<PreparedOutput>) -> Result<WriteSummary, WriteF
     Ok(completed)
 }
 
-#[cfg(test)]
-mod batch_commit_tests {
-    use super::*;
-
-    #[test]
-    fn failed_replacement_reports_completed_files_and_cleans_uncommitted_stages() {
-        struct TemporaryDirectory(PathBuf);
-        impl Drop for TemporaryDirectory {
-            fn drop(&mut self) {
-                let _ = fs::remove_dir_all(&self.0);
-            }
-        }
-        let sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let temp = TemporaryDirectory(std::env::temp_dir().join(format!(
-            "nodes-export-commit-{}-{sequence}",
-            std::process::id()
-        )));
-        fs::create_dir_all(&temp.0).unwrap();
-        let base = temp.0.join("parts.stl");
-        let targets: Vec<_> = (1..=3)
-            .map(|index| numbered_path(&base, index, 3))
-            .collect();
-        for target in &targets {
-            fs::write(target, b"EXISTING").unwrap();
-        }
-        let mesh = Mesh {
-            vertices: vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
-            triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
-        };
-        let prepared = prepare_split(
-            OutputFormat::StlBinary,
-            &base,
-            &[mesh.clone(), mesh.clone(), mesh],
-        )
-        .unwrap();
-        for target in &targets {
-            assert_eq!(fs::read(target).unwrap(), b"EXISTING");
-        }
-        // A real filesystem change between preparation and replacement must
-        // produce a partial result, without a timing race or injected mock.
-        fs::remove_file(&targets[1]).unwrap();
-        fs::create_dir(&targets[1]).unwrap();
-        let failure = commit_prepared(prepared).unwrap_err();
-        assert_eq!(failure.completed.files, vec![targets[0].clone()]);
-        assert_eq!(failure.completed.triangles, 4);
-        assert_eq!(failure.failed_path.as_ref(), Some(&targets[1]));
-        assert!(
-            failure
-                .to_string()
-                .contains("1 個のファイル（4 面）は保存済み")
-        );
-        assert_ne!(fs::read(&targets[0]).unwrap(), b"EXISTING");
-        assert!(targets[1].is_dir());
-        assert_eq!(fs::read(&targets[2]).unwrap(), b"EXISTING");
-        assert_eq!(fs::read_dir(&temp.0).unwrap().count(), 3);
-    }
-}
-
 fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usize, String> {
     match format {
         OutputFormat::StlBinary => {
@@ -1465,4 +1407,62 @@ pub fn save_stored(path: &Path, settings: &StoredSettings) -> Result<(), String>
     let bytes = serde_json::to_vec_pretty(settings)
         .map_err(|e| format!("設定を保存形式に変換できませんでした: {e}"))?;
     persistence::atomic_write(path, |file| file.write_all(&bytes))
+}
+
+#[cfg(test)]
+mod batch_commit_tests {
+    use super::*;
+
+    #[test]
+    fn failed_replacement_reports_completed_files_and_cleans_uncommitted_stages() {
+        struct TemporaryDirectory(PathBuf);
+        impl Drop for TemporaryDirectory {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let temp = TemporaryDirectory(std::env::temp_dir().join(format!(
+            "nodes-export-commit-{}-{sequence}",
+            std::process::id()
+        )));
+        fs::create_dir_all(&temp.0).unwrap();
+        let base = temp.0.join("parts.stl");
+        let targets: Vec<_> = (1..=3)
+            .map(|index| numbered_path(&base, index, 3))
+            .collect();
+        for target in &targets {
+            fs::write(target, b"EXISTING").unwrap();
+        }
+        let mesh = Mesh {
+            vertices: vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+            triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
+        };
+        let prepared = prepare_split(
+            OutputFormat::StlBinary,
+            &base,
+            &[mesh.clone(), mesh.clone(), mesh],
+        )
+        .unwrap();
+        for target in &targets {
+            assert_eq!(fs::read(target).unwrap(), b"EXISTING");
+        }
+        // A real filesystem change between preparation and replacement must
+        // produce a partial result, without a timing race or injected mock.
+        fs::remove_file(&targets[1]).unwrap();
+        fs::create_dir(&targets[1]).unwrap();
+        let failure = commit_prepared(prepared).unwrap_err();
+        assert_eq!(failure.completed.files, vec![targets[0].clone()]);
+        assert_eq!(failure.completed.triangles, 4);
+        assert_eq!(failure.failed_path.as_ref(), Some(&targets[1]));
+        assert!(
+            failure
+                .to_string()
+                .contains("1 個のファイル（4 面）は保存済み")
+        );
+        assert_ne!(fs::read(&targets[0]).unwrap(), b"EXISTING");
+        assert!(targets[1].is_dir());
+        assert_eq!(fs::read(&targets[2]).unwrap(), b"EXISTING");
+        assert_eq!(fs::read_dir(&temp.0).unwrap().count(), 3);
+    }
 }

@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:53:09.281547+00:00",
+  "updated_at_utc": "2026-11-26T23:57:49.970253+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -287,6 +287,70 @@
       "review": "Root inspected reservation via create_new, same-directory staging through existing serializers, cleanup on failure, no pre-delete of destinations and detailed completed-files reporting.",
       "contract": "A preparation failure preserves every destination. Replacement failure returns successful paths/triangle count and the failed target. Existing write_bodies String-error wrapper remains; UI uses the detailed report.",
       "limits": "A sequence of per-file atomic renames is not one atomic multi-file transaction. Split export needs staging disk space. Linux real I/O passed; Windows replacement and GUI follow-up remain pending."
+    },
+    {
+      "name": "Local B-spline basis recurrence",
+      "files": [
+        "src/surface_kernel.rs",
+        "examples/geometry_numeric_benchmark.rs",
+        "docs/development/OMEGA_GEOMETRY_PERFORMANCE.json"
+      ],
+      "after": {
+        "related_passed": 41,
+        "failed": 0,
+        "benchmark_cases_passed": 15
+      },
+      "review": "multiport_audit checked each degree-d support [span-d,span], index bounds, full-vector zero initialization, derivative support, arithmetic order and one-sided knots; root inspected diff.",
+      "source_sha256": "9a0c08d1aa1b23bef417cde9037c211265baea54c2cd285c0061ae942b07d60a",
+      "performance": {
+        "before_support_version_pooled_p50_ms": 27.093942,
+        "after_local_recurrence_pooled_p50_ms": 11.569339,
+        "input": "32x32 control planar cubic NURBS area, all native knot cells",
+        "method": "same CPU0/compiler/flags/input, four alternating processes, 22 batches per version",
+        "limits": "Kernel-only shared Linux VM measurement; smallest case slowed slightly. Original midpoint was faster but failed six of the fifteen numerical fixtures."
+      }
+    },
+    {
+      "name": "Exactly rounded affine interpolation for nodes and scripts",
+      "files": [
+        "src/number_interpolation.rs",
+        "src/math_nodes.rs",
+        "src/script.rs",
+        "src/lib.rs",
+        "tests/script_numeric_regressions.rs",
+        "tests/interpolation_oracle.rs",
+        "scripts/generate_interpolation_oracle.py",
+        "tests/fixtures/interpolation_oracle.json"
+      ],
+      "initial_script_before": {
+        "passed": 1,
+        "failed": 3,
+        "scope": "initial four Script extreme-range tests"
+      },
+      "rejected_fma_candidate": {
+        "oracle_passed": 0,
+        "oracle_failed": 2,
+        "review": "Independent Fraction/libm review found cancellation and finite/overflow boundary errors. The candidate was replaced before publication."
+      },
+      "after": {
+        "script_numeric_passed": 6,
+        "oracle_tests_passed": 2,
+        "failed": 0,
+        "six_suite_total_passed": 61
+      },
+      "independent_oracle": {
+        "method": "Python Fraction exact a+t*b-t*a; one final binary64 conversion",
+        "fixtures": 128,
+        "node_and_script_comparisons": 256,
+        "finite": 112,
+        "overflow": 16,
+        "negative_zero": 7,
+        "standalone_additional_probe_passed": 5720,
+        "standalone_scope": "implementation agent, separate temporary Rust debug-assertions harness; independent checked-in 128-case generator is the reproducible CI oracle"
+      },
+      "command": "cargo test --locked --offline --test interpolation_oracle --test script_numeric_regressions --test script_tests --test math_nodes_tests --test math_precision_regressions --test sum_rounding_regressions --no-fail-fast",
+      "review": "Independent multiport_audit and root checked product-word splitting, fixed capacity, signed terms, borrow, subnormal and normal rounding, overflow and zero contracts.",
+      "limits": "Finite binary64 affine operation is rounded once; composite Bezier/other multi-step algorithms are not thereby exact as a whole. Existing callers reject nonfinite results."
     }
   ],
   "environment_events": [
@@ -295,5 +359,46 @@
       "impact": "sum-rounding baseline failed to link and a new surface regression failed to compile; neither counts as an executed test",
       "mitigation": "Removed only this checkout target directory via cargo clean (4.1GiB), retained sources, rebuilt with CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0"
     }
-  ]
+  ],
+  "quality_gate_attempts": [
+    {
+      "gate": "fmt",
+      "result": "passed"
+    },
+    {
+      "gate": "check all targets",
+      "result": "passed",
+      "seconds": 17.2
+    },
+    {
+      "gate": "strict Clippy",
+      "result": "failed",
+      "seconds": 4.77,
+      "finding": "items_after_test_module in stl_export.rs; test module being moved to end, no test removed",
+      "recheck": "passed after moving test module to end, no tests or warning checks removed"
+    }
+  ],
+  "combined_local_gates": {
+    "source": "working tree based on b8f2f14; final code checkpoint follows this test run",
+    "rust_passed": 520,
+    "rust_failed": 0,
+    "rust_ignored": 3,
+    "targets": 48,
+    "nonempty_targets": 44,
+    "python_passed": 17,
+    "oracle_reproduction": [
+      128,
+      128
+    ],
+    "fmt_seconds": 0.532,
+    "check_seconds": 4.494,
+    "clippy_seconds": 3.955,
+    "test_gate_seconds": 22.451,
+    "test_compile_seconds": 20.78,
+    "test_body_total_seconds": 1.49,
+    "profile": "dev/test optimized profile, debug=0, incremental=0, existing cache",
+    "release": "pending",
+    "windows": "pending CI",
+    "native_gui": "pending"
+  }
 }

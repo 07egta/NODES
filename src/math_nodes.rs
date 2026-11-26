@@ -1327,15 +1327,12 @@ impl Frame {
         )
     }
 }
-fn lerp(a: f64, b: f64, t: f64) -> f64 {
-    if t == 0.0 {
-        a
-    } else if t == 1.0 {
-        b
-    } else {
-        (1.0 - t) * a + t * b
-    }
+/// Shared exact affine interpolation for math nodes and the sandboxed script API.
+/// The fixed-point product accumulator rounds once, including extrapolation.
+pub(crate) fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    crate::number_interpolation::lerp(a, b, t)
 }
+
 fn cubic(t: f64, a: f64, b: f64) -> f64 {
     let s = 1.0 - t;
     3.0 * s * s * t * a + 3.0 * s * t * t * b + t * t * t

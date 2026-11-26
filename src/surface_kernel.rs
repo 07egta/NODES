@@ -171,7 +171,9 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
             lower = b.clone();
         }
         let mut next = vec![0.; b.len() - 1];
-        for i in 0..next.len() {
+        // From the degree-zero seed at span, each recurrence can extend its
+        // support one index to the left. Other full-vector entries stay zero.
+        for i in span - d..=span {
             let l = k[i + d] - k[i];
             let r = k[i + d + 1] - k[i + 1];
             if l > 0. {
@@ -183,19 +185,18 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
         }
         b = next;
     }
-    let d = (0..n)
-        .map(|i| {
-            let l = k[i + p] - k[i];
-            let r = k[i + p + 1] - k[i + 1];
-            let a = if l > 0. { p as f64 * lower[i] / l } else { 0. };
-            let z = if r > 0. {
-                p as f64 * lower[i + 1] / r
-            } else {
-                0.
-            };
-            a - z
-        })
-        .collect();
+    let mut d = vec![0.; n];
+    for i in span - p..=span {
+        let l = k[i + p] - k[i];
+        let r = k[i + p + 1] - k[i + 1];
+        let a = if l > 0. { p as f64 * lower[i] / l } else { 0. };
+        let z = if r > 0. {
+            p as f64 * lower[i + 1] / r
+        } else {
+            0.
+        };
+        d[i] = a - z;
+    }
     (b, d)
 }
 /// Values and exact first/second derivatives of the B-spline basis.
@@ -211,7 +212,9 @@ fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
         let mut next = vec![0.; b.len() - 1];
         let mut nd = next.clone();
         let mut ndd = next.clone();
-        for i in 0..next.len() {
+        // Values and both derivatives share this support. Keep endpoint terms
+        // even when their basis value alone is zero.
+        for i in span - degree..=span {
             let l = k[i + degree] - k[i];
             let r = k[i + degree + 1] - k[i + 1];
             if l > 0. {
