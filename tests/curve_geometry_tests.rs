@@ -207,3 +207,27 @@ fn approximate_intersections_and_chord_distance(){
     near(p[2],[3.,0.,0.],1e-10);
     assert!(ci::intersect(&a,&b,32,1e-8,&||true).is_err());
 }
+
+#[test]
+fn least_squares_fit_preserves_endpoints_and_line_locus(){
+    let points:Vec<[f64;3]>=(0..21).map(|i|[i as f64*0.5,2.,-3.]).collect();
+    let c=NurbsCurve::fit(&points,5,3,&||false).unwrap();
+    assert_eq!(c.control_points().len(),5);
+    for i in 0..=100{let u=i as f64/100.;near(c.point(u).unwrap(),[10.*u,2.,-3.],1e-10);}
+    assert!(NurbsCurve::fit(&points,5,5,&||false).is_err());
+    assert!(NurbsCurve::fit(&points,5,3,&||true).is_err());
+}
+#[test]
+fn polyline_corner_fillets_and_chamfers(){
+    let g=CurveGeometry::nurbs(NurbsCurve::polyline(vec![[0.,0.,0.],[5.,0.,0.],[5.,5.,0.]],false).unwrap());
+    let v=val(g);
+    for (kind,len) in [(NodeKind::CurveFilletPolyline,8.+PI/2.),(NodeKind::CurveChamferPolyline,8.+2_f64.sqrt())]{
+        let result=curve_nodes::run_item(kind,&[&v,&Value::Number(1.),&Value::Number(64.)],&||false).unwrap();
+        if let Value::Curve(c)=&result[0]{
+            let g=c.geometry.as_ref().unwrap();
+            near(g.point(0.).unwrap(),[0.;3],1e-10);near(g.point(1.).unwrap(),[5.,5.,0.],1e-10);
+            close(g.length_table(&||false).unwrap().total(),len,1e-8);
+        }else{panic!("curve expected");}
+        assert!(curve_nodes::run_item(kind,&[&v,&Value::Number(10.),&Value::Number(64.)],&||false).is_err());
+    }
+}

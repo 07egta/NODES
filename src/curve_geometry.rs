@@ -261,6 +261,58 @@ impl NurbsCurve {
         }
         Ok(c)
     }
+    /// End-point constrained least-squares approximation with uniform clamped knots
+    /// and chord-length parameters. Solve by Householder QR, not normal equations.
+    /// The residual is sampled, not a certified Hausdorff bound.
+    pub fn fit(points:&[Point3],controls:usize,degree:usize,cancel:&dyn Fn()->bool)->R<Self>{
+        let n=points.len();let p=degree;
+        if !(2..=256).contains(&n)||controls<2||controls>64||controls>n||p==0||p>MAX_DEGREE||p>=controls||
+            points.iter().any(|v|!finite(*v)){
+            return Err("近似は2〜256点、2〜64制御点、制御点数未満の次数に対応します。".into());
+        }
+        let mut u=vec![0.;n];
+        for i in 1..n{
+            let d=norm(sub(points[i],points[i-1]));
+            if d<=0.||!d.is_finite(){return Err("連続した近似点の重複または無効な距離。".into());}
+            u[i]=u[i-1]+d;
+        }
+        let total=u[n-1];if !total.is_finite(){return Err("距離が大きすぎます。".into());}
+        for x in &mut u{*x/=total;}
+        let k=clamped_knots(controls,p);
+        let cols=controls-2;let rows=n-2;
+        let mut a=vec![vec![0.;cols+3];rows];
+        for i in 0..rows{
+            stopped(cancel)?;
+            let t=u[i+1];
+            let basis=|j|deboor(p,controls,&k,t,|h|[if h==j{1.}else{0.},0.,0.,0.])[0];
+            let rhs=sub(sub(points[i+1],scale(points[0],basis(0))),scale(points[n-1],basis(controls-1)));
+            for j in 0..cols{a[i][j]=basis(j+1);}
+            a[i][cols..cols+3].copy_from_slice(&rhs);
+        }
+        for j in 0..cols{
+            stopped(cancel)?;
+            let len=(j..rows).fold(0_f64,|s,i|s.hypot(a[i][j]));
+            if !len.is_finite()||len<1e-12{return Err("近似方程式が階数不足です。".into());}
+            let mut v:Vec<f64>=(j..rows).map(|i|a[i][j]).collect();
+            v[0]+=len.copysign(v[0]);
+            let vlen=v.iter().fold(0_f64,|s,x|s.hypot(*x));
+            if vlen==0.||!vlen.is_finite(){return Err("近似方程式を解けません。".into());}
+            for x in &mut v{*x/=vlen;}
+            for c in j..cols+3{
+                let proj=2.*v.iter().enumerate().map(|(i,x)|x*a[i+j][c]).sum::<f64>();
+                for (i,x) in v.iter().enumerate(){a[i+j][c]-=proj*x;}
+            }
+        }
+        let mut cp=vec![[0.;3];controls];cp[0]=points[0];cp[controls-1]=points[n-1];
+        for j in (0..cols).rev(){
+            let diag=a[j][j];
+            if diag.abs()<1e-12||!diag.is_finite(){return Err("近似方程式の条件が悪すぎます。".into());}
+            let mut rhs=[a[j][cols],a[j][cols+1],a[j][cols+2]];
+            for c in j+1..cols{rhs=sub(rhs,scale(cp[c+1],a[j][c]));}
+            cp[j+1]=checked(scale(rhs,1./diag))?;
+        }
+        Self::new(p,cp,vec![1.;controls],k)
+    }
     fn affine(&self,f:&dyn Fn(Point3)->Point3)->R<Self> {
         let points=self.control_points().into_iter().map(f).collect();
         let mut c=Self::new(self.degree,points,self.weights(),self.knots.clone())?;

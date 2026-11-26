@@ -48,7 +48,9 @@
           "y": -25,
           "z": 0
         },
-        "inputs": {},
+        "inputs": {
+          "x": 7
+        },
         "preview": false
       },
       {
@@ -64,7 +66,9 @@
           "y": 25,
           "z": 0
         },
-        "inputs": {},
+        "inputs": {
+          "x": 7
+        },
         "preview": false
       },
       {
@@ -113,9 +117,25 @@
           "b": 5
         },
         "preview": true
+      },
+      {
+        "id": 7,
+        "kind": "range",
+        "name": "配置 X 座標",
+        "position": [
+          815,
+          225
+        ],
+        "params": {
+          "start": -20,
+          "end": 20,
+          "count": 5
+        },
+        "inputs": {},
+        "preview": false
       }
     ],
-    "next_id": 7
+    "next_id": 8
   },
   "pan": [
     24,

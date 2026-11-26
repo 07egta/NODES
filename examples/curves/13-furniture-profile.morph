@@ -89,9 +89,27 @@
           "points": 3
         },
         "preview": true
+      },
+      {
+        "id": 5,
+        "kind": "move",
+        "name": "家具の第2輪郭",
+        "position": [
+          285,
+          225
+        ],
+        "params": {
+          "x": 0,
+          "y": 0,
+          "z": 25
+        },
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": true
       }
     ],
-    "next_id": 5
+    "next_id": 6
   },
   "pan": [
     24,

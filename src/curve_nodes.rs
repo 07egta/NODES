@@ -27,7 +27,7 @@ macro_rules! spec {
 }
 pub fn is_curve_kind(k:NodeKind)->bool {
     use NodeKind::*;
-    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane | CurveJoin | CurveExplode | CurveExtend | CurveBlend | CurveRebuildApprox | CurveDeviationApprox | CurveOrientationXy | CurvePlanarityApprox | CurvePlaneNormalApprox | CurveIntersectApprox | CurvePlaneIntersectApprox | CurveSelfIntersectApprox | CurveDistanceApprox | CurveCircleCircleXy | CurveFrameCircle | CurveDivideDistanceApprox)
+    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane | CurveJoin | CurveExplode | CurveExtend | CurveBlend | CurveRebuildApprox | CurveDeviationApprox | CurveOrientationXy | CurvePlanarityApprox | CurvePlaneNormalApprox | CurveIntersectApprox | CurvePlaneIntersectApprox | CurveSelfIntersectApprox | CurveDistanceApprox | CurveCircleCircleXy | CurveFrameCircle | CurveDivideDistanceApprox | CurveFitApprox | CurveFilletPolyline | CurveChamferPolyline | CurveHorizontalFrameX)
 }
 pub fn is_list_kind(k:NodeKind)->bool {
     use NodeKind::*;
@@ -92,6 +92,10 @@ pub fn spec(k:NodeKind)->&'static NodeSpec {
         CurveCircleCircleXy=>spec!("2円の交点 XY","circle circle intersection","XYに平行な同一平面上の2円を中心・半径から解析的に交差。重複はエラー。",Point,[g("a","中心 A",DataType::Point),n("ra","半径 A",30.,0.000001,1000000.,0.5),g("b","中心 B",DataType::Point),n("rb","半径 B",30.,0.000001,1000000.,0.5),TOL]),
         CurveFrameCircle=>spec!("曲線の垂直断面円","perpendicular frame circle section","指定パラメータの曲線点を中心、接線を法線とする正確な有理円。",Curve,[C,T,RAD,SEG]),
         CurveDivideDistanceApprox=>spec!("直線距離で分割（近似）","divide distance chord","直前の点からの直線距離が指定値になる最初のパラメータをサンプル探索する。弧長分割とは異なる。",Point,[C,n("distance","直線距離",10.,0.000001,1000000000.,0.1),i("samples","計算分割数",256.,8.,512.)]),
+        CurveFitApprox=>spec!("曲線の最小二乗フィット（近似）","fit curve least squares nurbs","元の曲線をサンプルし、両端固定の非有理B-splineをHouseholder QR最小二乗で近似。偏差ノードで確認。",Curve,[C,i("samples","サンプル数",64.,8.,256.),i("controls","制御点数",12.,2.,64.),DEG,SEG]),
+        CurveFilletPolyline=>spec!("折れ線の角を丸める","fillet polyline radius","次数1の曲線の各角に接する正確な有理円弧。半径が大きすぎる場合はエラー。一般曲線同士のFilletではない。",Curve,[C,RAD,SEG]),
+        CurveChamferPolyline=>spec!("折れ線の面取り","chamfer polyline distance","次数1の曲線の角から両側に指定距離を切り取り、直線で面取り。",Curve,[C,n("distance","各辺の切取距離",2.,0.000001,100000.,0.1),SEG]),
+        CurveHorizontalFrameX=>spec!("水平断面 X 軸","horizontal frame","接線のXY平面への投影を正規化。水平投影がゼロならエラー。",Point,[C,T]),
         _=>unreachable!("curve node dispatch"),
     }
 }
@@ -171,6 +175,51 @@ pub fn run_list(k:NodeKind,l:&[&[Value]],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
 fn exact_line(a:Point3,b:Point3)->R<CurveGeometry>{
     if a==b{return Err("長さゼロの直線です。".into());}
     Ok(CurveGeometry::nurbs(NurbsCurve::polyline(vec![a,b],false)?))
+}
+/// Round or chamfer piecewise-linear corners. Adjacent modifications must fit
+/// within the original edge; do not silently reduce the requested radius.
+fn corner_edit(g:&CurveGeometry,size:f64,fillet:bool,cancel:&dyn Fn()->bool)->R<CurveGeometry>{
+    if !size.is_finite()||size<=0.{return Err("正の半径または距離が必要です。".into());}
+    if !g.as_nurbs().is_some_and(|n|n.degree()==1){return Err("次数1の折れ線に対応しています。".into());}
+    let mut points:Vec<Point3>=g.breaks().into_iter().map(|t|g.point(t)).collect::<R<_>>()?;
+    let closed=g.closed()?;
+    if closed{points.pop();}
+    let count=points.len();
+    if count<3||count>64{return Err("角編集は3〜64頂点の折れ線に対応します。".into());}
+    let mut ins=points.clone();let mut outs=points.clone();
+    let mut rounds:Vec<Option<CurveGeometry>>=vec![None;count];let mut trims=vec![0.;count];
+    for i in 0..count{
+        cancelled(cancel)?;
+        if !closed&&(i==0||i+1==count){continue;}
+        let p=points[i];let u=cg::unit(cg::sub(p,points[(i+count-1)%count]))?;
+        let v=cg::unit(cg::sub(points[(i+1)%count],p))?;
+        let angle=cg::dot(u,v).clamp(-1.,1.).acos();
+        if angle<1e-7{continue;}
+        if std::f64::consts::PI-angle<1e-7{return Err("180度の折返し角は編集できません。".into());}
+        let cut=if fillet{size*(angle/2.).tan()}else{size};
+        if !cut.is_finite(){return Err("切取距離が有限ではありません。".into());}
+        let a=cg::sub(p,cg::scale(u,cut));let b=cg::add(p,cg::scale(v,cut));
+        ins[i]=a;outs[i]=b;trims[i]=cut;
+        rounds[i]=Some(if fillet{
+            let normal=cg::unit(cg::cross(u,v))?;
+            let center=cg::add(a,cg::scale(cg::cross(normal,u),size));
+            let x=cg::sub(a,center);let y=cg::cross(normal,x);
+            CurveGeometry::arc(center,x,y,0.,angle)?
+        }else{exact_line(a,b)?});
+    }
+    let edge_count=if closed{count}else{count-1};let mut parts=Vec::new();
+    let mut scale: f64=1.;
+    for i in 0..edge_count{
+        cancelled(cancel)?;
+        let j=(i+1)%count;
+        let len=cg::norm(cg::sub(points[i],points[j]));scale=scale.max(len);
+        if trims[i]+trims[j]>len{return Err("隣接する角の切取距離が重なります。半径または距離を小さくしてください。".into());}
+        if outs[i]!=ins[j]{parts.push(exact_line(outs[i],ins[j])?);}
+        if let Some(c)=&rounds[j]{parts.push(c.clone());}
+    }
+    let mut edited=CurveGeometry::join_ordered(&parts,scale*1e-10,cancel)?;
+    if g.is_approximate(){edited=edited.marked_approximate();}
+    Ok(edited)
 }
 fn deviation(a:&CurveGeometry,b:&CurveGeometry,count:usize,cancel:&dyn Fn()->bool)->R<f64>{
     if !(4..=64).contains(&count){return Err("偏差のサンプル数は4〜64にしてください。".into());}
@@ -322,6 +371,20 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
                     preview(CurveGeometry::circle(g.point(t)?,g.tangent(t)?,num(a,2)?)?,num(a,3)? as usize,cancel)?
                 }
                 CurveDivideDistanceApprox=>return Ok(ci::divide_chord(&g,num(a,1)?,num(a,2)? as usize,cancel)?.into_iter().map(Value::Point).collect()),
+                CurveFitApprox=>{
+                    let samples=num(a,1)? as usize;let controls=num(a,2)? as usize;let degree=num(a,3)? as usize;
+                    if !(8..=256).contains(&samples){return Err("近似サンプル数は8〜256です。".into());}
+                    let pts=(0..samples).map(|i|{cancelled(cancel)?;g.point(i as f64/(samples-1) as f64)}).collect::<R<Vec<_>>>()?;
+                    let fit=CurveGeometry::nurbs(NurbsCurve::fit(&pts,controls,degree,cancel)?).marked_approximate();
+                    preview(fit,num(a,4)? as usize,cancel)?
+                }
+                CurveFilletPolyline|CurveChamferPolyline=>{
+                    preview(corner_edit(&g,num(a,1)?,k==CurveFilletPolyline,cancel)?,num(a,2)? as usize,cancel)?
+                }
+                CurveHorizontalFrameX=>{
+                    let t=g.tangent(num(a,1)?)?;
+                    Value::Point(cg::unit([t[0],t[1],0.])?)
+                }
                 CurveStart=>Value::Point(g.point(0.)?),
                 CurveEnd=>Value::Point(g.point(1.)?),
                 CurveTangent=>Value::Point(g.tangent(num(a,1)?)?),
