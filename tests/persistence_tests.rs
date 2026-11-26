@@ -413,8 +413,9 @@ fn new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged() {
         assert!(NodeKind::all().contains(kind), "{name} missing from all()");
     }
     // 42 geometry/data nodes, the Script node, the 20 list/pattern/print nodes and the
-    // ImportMesh node (Cluster is created from a definition).
-    assert_eq!(NodeKind::all().len(), 64);
+    // ImportMesh node and the 18 curve/tube/repair/transform nodes in nodes_shape.rs
+    // (Cluster is created from a definition).
+    assert_eq!(NodeKind::all().len(), 82);
     let mut seen = std::collections::BTreeSet::new();
     assert!(NodeKind::all().iter().all(|k| seen.insert(*k)));
 }
@@ -805,7 +806,7 @@ fn shipped_example_files_load_and_evaluate() {
     }
     // The newest example files are written to match their templates exactly.
     // If this fails after a template edit, regenerate with `Morphlet --export-demos examples`.
-    for index in [6, 7, 8, 9] {
+    for index in [6, 7, 8, 9, 10, 11] {
         let path = dir.join(format!("{:02}.morph", index + 1));
         assert_eq!(persistence::load(&path).unwrap(), templates::create(index));
     }
@@ -813,7 +814,7 @@ fn shipped_example_files_load_and_evaluate() {
 
 #[test]
 fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
-    assert_eq!(templates::TEMPLATES.len(), 10);
+    assert_eq!(templates::TEMPLATES.len(), 12);
     let old_names = [
         "ねじれの花器",
         "光のリング",

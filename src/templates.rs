@@ -60,6 +60,16 @@ pub const TEMPLATES: &[Template] = &[
         description: "ばらまいた点と引力点の距離を再マップして、近いほど高い柱を並べます。",
         tag: "パターン",
     },
+    Template {
+        name: "パイプのらせんランプ",
+        description: "らせんの曲線に沿って円い管を通します。半径・巻き数・管の太さを変えて、光を通す形へ。",
+        tag: "曲線から立体へ",
+    },
+    Template {
+        name: "ジャイロイドの小物入れ",
+        description: "網目状のジャイロイドを箱の中に作ります。単位の大きさと壁の太さで、すき間の大きさを調整。",
+        tag: "格子・網目",
+    },
 ];
 
 fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
@@ -407,6 +417,52 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(x, moved, "x")?;
             graph.connect(y, moved, "y")?;
             finish(&mut graph, moved, [988.0, 30.0])?;
+        }
+        10 => {
+            let path = add(
+                &mut graph,
+                NodeKind::Helix,
+                [20.0, 30.0],
+                &[
+                    ("radius", 30.0),
+                    ("height", 160.0),
+                    ("turns", 4.0),
+                    ("segments", 256.0),
+                ],
+            )?;
+            let tube = add(
+                &mut graph,
+                NodeKind::Pipe,
+                [262.0, 30.0],
+                &[("radius", 3.0), ("sides", 16.0), ("caps", 1.0)],
+            )?;
+            graph.connect(path, tube, "curve")?;
+            finish(&mut graph, tube, [504.0, 30.0])?;
+        }
+        11 => {
+            let lattice = add(
+                &mut graph,
+                NodeKind::Gyroid,
+                [20.0, 30.0],
+                &[
+                    ("width", 60.0),
+                    ("depth", 60.0),
+                    ("height", 40.0),
+                    ("cell", 15.0),
+                    ("thickness", 0.35),
+                    ("resolution", 40.0),
+                ],
+            )?;
+            let smooth = add(
+                &mut graph,
+                NodeKind::SmoothMesh,
+                [262.0, 30.0],
+                &[("strength", 0.5), ("iterations", 2.0), ("method", 1.0)],
+            )?;
+            graph.connect(lattice, smooth, "geometry")?;
+            let info = add(&mut graph, NodeKind::MeshInfo, [262.0, 310.0], &[])?;
+            graph.connect(smooth, info, "geometry")?;
+            finish(&mut graph, smooth, [504.0, 30.0])?;
         }
         _ => {
             let base = add(
