@@ -5,6 +5,7 @@
 
 use crate::model::{Graph, Mesh, Tree, Value};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Read, Write};
@@ -234,8 +235,17 @@ pub struct History {
 
 impl History {
     pub fn checkpoint(&mut self, project: &Project) {
-        if self.undo.last() != Some(project) {
-            self.undo.push(project.clone());
+        self.store_checkpoint(Cow::Borrowed(project));
+    }
+
+    /// Accept a pre-edit snapshot that the editor no longer needs to retain.
+    pub fn checkpoint_owned(&mut self, project: Project) {
+        self.store_checkpoint(Cow::Owned(project));
+    }
+
+    fn store_checkpoint(&mut self, project: Cow<'_, Project>) {
+        if self.undo.last() != Some(project.as_ref()) {
+            self.undo.push(project.into_owned());
             if self.undo.len() > HISTORY_LIMIT {
                 self.undo.remove(0);
             }
