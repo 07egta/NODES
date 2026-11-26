@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "name": "ねじれの花器・診断",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "vase",
+        "name": "花器",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "radius": 32,
+          "height": 104,
+          "thickness": 2.4,
+          "lobes": 7,
+          "amplitude": 0.18,
+          "segments": 48,
+          "layers": 24
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          270,
+          20
+        ],
+        "params": {
+          "angle": 110
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "mesh_audit",
+        "name": "健全性",
+        "position": [
+          540,
+          210
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "mesh_mass",
+        "name": "材料重量",
+        "position": [
+          790,
+          210
+        ],
+        "params": {
+          "density": 1.24
+        },
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}
