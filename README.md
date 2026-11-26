@@ -1,8 +1,12 @@
-# Morphlet（仮称）0.1
+# NODES
 
 **ノードをつないで、形を作る。** 日本語を中心にした、独立したデスクトップ用ノードモデラです。Rhinoのインストールやログインは不要で、モデリング・保存・書き出しをオフラインで行えます。
 
-![Morphlet の実画面（Linuxでの確認）](docs/Morphlet.png)
+[Windows版をダウンロード（ZIP・10.5 MiB）](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip) · [使い方](docs/USER_GUIDE_JA.md) · [開発に参加する](CONTRIBUTING.md)
+
+最初の公開版は Morphlet 0.1.0 です。展開したフォルダーで `Morphlet.exe` を開いてください。
+
+![Windowsで花器とねじりをつなぎ、右に完成形を表示した画面](docs/windows-vase.png)
 
 ## まず使ってみる
 
@@ -16,7 +20,7 @@
 
 詳しい作り方と操作は **[はじめての使い方](docs/USER_GUIDE_JA.md)** にまとめています。
 
-**Windows実機での操作確認はまだ行っていません。** この版の確認環境と結果は [検証記録](docs/VERIFICATION.md) を参照してください。
+Windowsで配布版を起動し、花器の3D表示と付属の6作品の読み込み・計算を確認しました。[検証記録](docs/VERIFICATION.md)
 
 ## この版でできること
 
