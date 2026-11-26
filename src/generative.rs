@@ -444,7 +444,7 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
             let angle=num(a,1)?.to_radians();
             let ratio=num(a,2)?;
             let depth=count(a,3,10)?;
-            let mut stack=vec![([0.;3],0.,len,depth)];
+            let mut stack: Vec<([f64; 3], f64, f64, usize)> = vec![([0.; 3], 0., len, depth)];
             let mut out=Vec::with_capacity((1usize<<depth)-1);
             while let Some((p,t,l,d))=stack.pop() {
                 cancelled(cancel)?;
