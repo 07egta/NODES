@@ -3,19 +3,113 @@ name: Check
 on:
   pull_request:
   push:
-    branches: [main, "evolve/**"]
+    branches: [main, "evolve/**", "develop/**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: check-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: 1.100.0
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_BUILD_JOBS: 2
+  RUST_BACKTRACE: 1
+
 jobs:
-  windows:
-    runs-on: windows-latest
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Test
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Rust and quality tools
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - name: Install desktop build libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config libxcb-render0-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - name: Restore Rust cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-${{ env.RUST_TOOLCHAIN }}-quality-v1-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+      - name: Record compiler
+        run: |
+          rustc --version --verbose
+          cargo --version
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check all targets
+        run: cargo check --all-targets --locked
+      - name: Check Clippy warnings
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test all targets
+        run: cargo test --all-targets --locked
+
+  windows:
+    needs: linux
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Restore Rust cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-${{ env.RUST_TOOLCHAIN }}-release-v1-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+      - name: Record compiler
+        run: |
+          rustc --version --verbose
+          cargo --version
+      - name: Test all targets
         run: cargo test --all-targets --locked
       - name: Build Morphlet
         run: cargo build --release --locked --bin Morphlet
+      - name: Prepare development artifact
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "NODES-windows-x64"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          Copy-Item target/release/Morphlet.exe $package
+          Copy-Item README.md,LICENSE-MIT,LICENSE-APACHE,Cargo.lock $package
+          Copy-Item examples,licenses,docs $package -Recurse
+          @(
+            "NODES development build"
+            "Commit: $env:GITHUB_SHA"
+            "Target: x86_64-pc-windows-msvc"
+            "Compiler: $(rustc --version)"
+            "Build: cargo build --release --locked --bin Morphlet"
+            "Tests: cargo test --all-targets --locked (Windows and Linux)"
+            "This CI artifact has not been validated by GUI or 3D-print hardware testing."
+            "License audit scope and unresolved items: docs/DEPENDENCIES.md"
+          ) | Set-Content (Join-Path $package "BUILD-INFO.txt") -Encoding utf8
+      - name: Upload Windows development artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: NODES-windows-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/NODES-windows-x64
+          if-no-files-found: error
+          retention-days: 14
