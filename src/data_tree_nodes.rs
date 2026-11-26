@@ -67,6 +67,19 @@ pub fn is_list_kind(kind: NodeKind) -> bool {
     spec(kind).is_some() && !is_tree_kind(kind)
 }
 
+/// The legacy Script/Cluster evaluator is separate. Tree and list nodes have
+/// their own access rules; only ordinary item nodes expose item matching modes.
+pub fn supports_transform(kind: NodeKind) -> bool {
+    !matches!(kind, NodeKind::Script | NodeKind::Cluster)
+}
+pub fn supports_matching(kind: NodeKind) -> bool {
+    supports_transform(kind) && !is_tree_kind(kind) && !is_list_kind(kind)
+        && !crate::gh_nodes::is_list_kind(kind)
+        && !matches!(kind, NodeKind::Flatten | NodeKind::Graft | NodeKind::Output |
+            NodeKind::Merge | NodeKind::Loft | NodeKind::ImportMesh | NodeKind::Number)
+        && kind.spec().inputs.len() > 1
+}
+
 /// Access labels are explicit. Existing special nodes retain their original access policy.
 pub fn access_label(kind: NodeKind, index: usize) -> &'static str {
     use NodeKind::*;
@@ -109,6 +122,7 @@ fn input_path(inputs: &[Tree]) -> Result<dt::Path, String> {
 pub fn run_tree(node: &Node, inputs: &[Tree], cancel: &dyn Fn() -> bool) -> Result<Tree,String> {
     use NodeKind::*;
     cancelled(cancel)?;
+    if inputs.len() != node.kind.spec().inputs.len() { return Err("入力数が一致しません。".into()); }
     let t = inputs.first().ok_or("ツリーがありません。")?;
     let result = match node.kind {
         SimplifyTree => dt::simplify(t),
@@ -172,6 +186,7 @@ pub fn run_list(kind: NodeKind, lists: &[&[Value]], remaining: usize,
     use NodeKind::*;
     use std::collections::{BTreeMap,BTreeSet};
     cancelled(cancel)?;
+    if lists.len() != kind.spec().inputs.len() { return Err("入力数が一致しません。".into()); }
     let list = lists.first().copied().unwrap_or(&[]);
     let len = list.len();
     match kind {
@@ -231,6 +246,7 @@ pub fn run_list(kind: NodeKind, lists: &[&[Value]], remaining: usize,
             Ok(out)
         }
         MemberIndex => {
+            if len.saturating_mul(lists[1].len()) > 1_000_000 { return Err("検索比較の件数が上限を超えました。".into()); }
             let mut out = Vec::new();
             for member in lists[1] {
                 for (i,v) in list.iter().enumerate() {
