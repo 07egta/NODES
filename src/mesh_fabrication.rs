@@ -2,7 +2,7 @@
 //! Index topology and oriented volume are not self-intersection or printability tests.
 use crate::engine::{as_mesh, cancelled, checked_size, cross, dot, finite_point, length, num, shape, sub, validate_mesh};
 use crate::model::*;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 type P = [f64; 3];
