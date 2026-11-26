@@ -584,13 +584,157 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
             };
             Some(&SPEC)
         },
+        VectorMultiply => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "ベクトル倍率", category: "数値",
+                description: "ベクトルに倍率を掛ける。", keywords: "vector multiply scale",
+                inputs: &[g("vector", "ベクトル (XYZ)", DataType::Point), n("scale", "倍率", 1.0, -1e12, 1e12, 0.01)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        VectorDivide => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "ベクトル除算", category: "数値",
+                description: "ベクトルを非ゼロの倍率で割る。", keywords: "vector divide",
+                inputs: &[g("vector", "ベクトル (XYZ)", DataType::Point), n("scale", "除数", 1.0, -1e12, 1e12, 0.01)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        VectorAmplitude => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "ベクトル長を設定", category: "数値",
+                description: "方向を保ち、指定した非負の長さにする。", keywords: "vector amplitude",
+                inputs: &[g("vector", "ベクトル (XYZ)", DataType::Point), n("length","長さ",1.0,0.0,1e9,0.1)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        Lerp => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "線形補間", category: "数値",
+                description: "A から B へ t で補間。範囲外は外挿。", keywords: "lerp interpolate",
+                inputs: &[n("a", "A", 0.0, -1e12, 1e12, 0.01), n("b", "B", 1.0, -1e12, 1e12, 0.01), n("t", "t", 0.0, -1e12, 1e12, 0.01)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        SmoothStep => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "滑らかな補間", category: "数値",
+                description: "0〜1 で 3t² − 2t³。外側は端点に固定。", keywords: "smoothstep ease",
+                inputs: &[n("t", "t", 0.0, -1e12, 1e12, 0.01)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        BezierValue => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "3次ベジェ補間", category: "数値",
+                description: "4つの数値制御点を de Casteljau 法で評価。", keywords: "bezier cubic interpolate",
+                inputs: &[n("a", "P0", 0.0, -1e12, 1e12, 0.01), n("b", "P1", 1.0, -1e12, 1e12, 0.01), n("c", "P2", 1.0, -1e12, 1e12, 0.01), n("d", "P3", 0.0, -1e12, 1e12, 0.01), n("t","t",0.5,0.0,1.0,0.01)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        NormalPdf => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "正規分布密度", category: "数値",
+                description: "平均と正の標準偏差から確率密度を評価。", keywords: "normal distribution pdf gaussian",
+                inputs: &[n("x", "値", 0.0, -1e12, 1e12, 0.01), n("mean", "平均", 0.0, -1e12, 1e12, 0.01), n("sigma","標準偏差",1.0,1e-12,1e12,0.01)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        MatrixTranspose => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "行列転置", category: "数値",
+                description: "枝に行優先の数値列、行数・列数を指定。転置した平坦な列。", keywords: "matrix transpose",
+                inputs: &[g("matrix", "行優先の数値列", DataType::Number), i("rows", "行数", 2.0, 1.0, 64.0), i("cols", "列数", 2.0, 1.0, 64.0)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        MatrixMultiply => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "行列積", category: "数値",
+                description: "A(m×k) と B(k×n) の積。行優先の数値列で入出力。", keywords: "matrix multiply product",
+                inputs: &[g("a", "行列 A", DataType::Number), g("b", "行列 B", DataType::Number), i("rows", "m", 2.0, 1.0, 64.0), i("inner", "k", 2.0, 1.0, 64.0), i("cols", "n", 2.0, 1.0, 64.0)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        MatrixInverse => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "逆行列", category: "数値",
+                description: "行優先の正方行列。ピボット付きガウス・ジョルダン法。", keywords: "matrix inverse invert",
+                inputs: &[g("matrix", "行優先の数値列", DataType::Number), i("size", "次数", 2.0, 1.0, 32.0)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        LinearSolve => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "連立一次方程式", category: "数値",
+                description: "Ax=b をピボット付き消去で解く。A は行優先の正方行列。", keywords: "linear solve equation matrix",
+                inputs: &[g("matrix", "行優先の数値列", DataType::Number), g("rhs", "右辺 b", DataType::Number), i("size", "次数", 2.0, 1.0, 32.0)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        FourierMagnitude => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "離散フーリエ振幅", category: "数値",
+                description: "枝の実数列から DFT の絶対値を返す。512 点以下。正規化なし。", keywords: "dft fourier spectrum magnitude",
+                inputs: &[g("values", "実数のリスト", DataType::Number)], output: DataType::Number,
+            };
+            Some(&SPEC)
+        },
+        PlaneIntersectionPoint => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "平面交線上の点", category: "数値",
+                description: "2つの平面の交線で原点に最も近い点。各平面は点と法線で指定。平行・一致はエラー。", keywords: "plane intersection point",
+                inputs: &[g("a", "平面 A の点", DataType::Point), g("na", "平面 A の法線", DataType::Point), g("b", "平面 B の点", DataType::Point), g("nb", "平面 B の法線", DataType::Point)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        PlaneIntersectionDirection => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "平面交線方向", category: "数値",
+                description: "2平面の法線の外積を単位化。平行・一致はエラー。", keywords: "plane intersection direction",
+                inputs: &[g("na", "平面 A の法線", DataType::Point), g("nb", "平面 B の法線", DataType::Point)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        PlaneRotateAxis => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "平面の回転軸成分", category: "数値",
+                description: "原点とX/Y方向で平面を作り、Z周りに回転したXまたはY軸を返す。", keywords: "rotate plane axis",
+                inputs: &[g("origin", "原点", DataType::Point), g("axis_x", "X 方向", DataType::Point), g("axis_y", "Y 方向", DataType::Point), n("angle", "角度 (rad)", 0.0, -1e12, 1e12, 0.01), i("axis", "0:X 1:Y", 0.0, 0.0, 1.0)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        PlaneAlignAxis => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "平面の軸合わせ", category: "数値",
+                description: "ガイドを平面内へ投影し単位化した新X軸。垂直ガイドはエラー。", keywords: "align plane vector",
+                inputs: &[g("origin", "原点", DataType::Point), g("axis_x", "X 方向", DataType::Point), g("axis_y", "Y 方向", DataType::Point), g("guide", "ガイド方向", DataType::Point)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        WorldPlaneAxis => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "世界平面の軸", category: "数値",
+                description: "XY/XZ/YZ の右手系 X/Y/Z 軸の一つを返す。", keywords: "xy xz yz plane axis",
+                inputs: &[i("plane", "0:XY 1:XZ 2:YZ", 0.0, 0.0, 2.0), i("axis", "0:X 1:Y 2:Z", 0.0, 0.0, 2.0)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
+        ChangeBasis => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "基底変換", category: "数値",
+                description: "A平面の局所座標を B平面の局所座標へ変換。", keywords: "change basis coordinate transform",
+                inputs: &[g("origin_a", "A原点", DataType::Point), g("x_a", "A X方向", DataType::Point), g("y_a", "A Y方向", DataType::Point), g("origin_b", "B原点", DataType::Point), g("x_b", "B X方向", DataType::Point), g("y_b", "B Y方向", DataType::Point), g("point", "点", DataType::Point)], output: DataType::Point,
+            };
+            Some(&SPEC)
+        },
         _ => None,
     }
 }
 
 pub fn is_list_kind(kind: NodeKind) -> bool {
     use NodeKind::*;
-    matches!(kind, Summation | Product | Average | Median | Variance | StdDeviation | DomainEndpoint | DomainLength | EvaluateDomain | DivideDomain | DomainIntersection | DomainUnion | SetContains | SetUnion | SetIntersection | SetDifference | CreateSet | DuplicateDetection | ClosestPoint)
+    matches!(kind, Summation | Product | Average | Median | Variance | StdDeviation | DomainEndpoint | DomainLength | EvaluateDomain | DivideDomain | DomainIntersection | DomainUnion | SetContains | SetUnion | SetIntersection | SetDifference | CreateSet | DuplicateDetection | ClosestPoint | MatrixTranspose | MatrixMultiply | MatrixInverse | LinearSolve | FourierMagnitude)
 }
 
 pub fn accepts_empty_second(kind: NodeKind) -> bool {
@@ -714,6 +858,59 @@ fn stable_sum(a: &[f64]) -> f64 {
     s+c
 }
 
+// A matrix is transported as a row-major numeric list; dimensions are explicit.
+fn dim(lists: &[&[Value]], index: usize, limit: usize) -> Result<usize,String> {
+    let n=lists.get(index).and_then(|l|l.first()).ok_or("行列の次元がありません。")?.number()?;
+    if n.fract()!=0.0 || n<1.0 || n>limit as f64 {return Err("行列の次元が範囲外です。".into());}
+    Ok(n as usize)
+}
+fn numeric_list(list:&[Value])->Result<Vec<f64>,String> { list.iter().map(Value::number).collect() }
+fn matrix_shape(data:&[f64],rows:usize,cols:usize)->Result<(),String>{
+    if data.len()!=rows*cols {Err("行列の要素数と次元が一致しません。".into())} else {Ok(())}
+}
+/// Scaled partial-pivot Gauss-Jordan elimination on an augmented system.
+/// Returns the right block in row-major order. Rejects numerically tiny pivots.
+fn eliminate(a:&[f64],rhs:&[f64],size:usize,cols:usize,stop:&dyn Fn()->bool)->Result<Vec<f64>,String>{
+    matrix_shape(a,size,size)?;matrix_shape(rhs,size,cols)?;
+    let w=size+cols;
+    let mut aug=vec![0.0;size*w];
+    let mut scales=vec![0.0_f64;size];
+    for i in 0..size {
+        cancelled(stop)?;
+        for j in 0..size {
+            let v=a[i*size+j];aug[i*w+j]=v;scales[i]=scales[i].max(v.abs());
+        }
+        if scales[i]==0.0 {return Err("行列が特異です。".into());}
+        aug[i*w+size..(i+1)*w].copy_from_slice(&rhs[i*cols..(i+1)*cols]);
+    }
+    for k in 0..size {
+        cancelled(stop)?;
+        let mut pivot=k;
+        for i in k+1..size {
+            if aug[i*w+k].abs()/scales[i]>aug[pivot*w+k].abs()/scales[pivot] {pivot=i;}
+        }
+        if aug[pivot*w+k].abs()/scales[pivot]<=1e-12 {return Err("行列が特異、または数値的に不安定です。".into());}
+        if pivot!=k {
+            for j in 0..w {aug.swap(k*w+j,pivot*w+j);}
+            scales.swap(k,pivot);
+        }
+        let d=aug[k*w+k];
+        for j in 0..w {aug[k*w+j]/=d;}
+        for i in 0..size {
+            if i==k {continue;}
+            let factor=aug[i*w+k];
+            for j in 0..w {
+                let q=aug[k*w+j];
+                aug[i*w+j]-=factor*q;
+            }
+        }
+        if aug.iter().any(|x|!x.is_finite()){return Err("行列計算で桁あふれしました。".into());}
+    }
+    let mut out=Vec::with_capacity(size*cols);
+    for i in 0..size {out.extend_from_slice(&aug[i*w+size..(i+1)*w]);}
+    Ok(out)
+}
+
 pub fn run_list(kind: NodeKind, lists: &[&[Value]], stop: &dyn Fn()->bool) -> Result<Vec<Value>,String> {
     use NodeKind::*;
     cancelled(stop)?;
@@ -786,6 +983,50 @@ pub fn run_list(kind: NodeKind, lists: &[&[Value]], stop: &dyn Fn()->bool) -> Re
                 if let Some((_,p))=best {out.push(Value::Point(p));}
             }
             Ok(out)
+        }
+        MatrixTranspose=>{
+            let r=dim(lists,1,64)?;let c=dim(lists,2,64)?;let a=numeric_list(a)?;
+            matrix_shape(&a,r,c)?;
+            let mut out=vec![0.0;r*c];
+            for i in 0..r {cancelled(stop)?;for j in 0..c {out[j*r+i]=a[i*c+j];}}
+            values(out)
+        }
+        MatrixMultiply=>{
+            let r=dim(lists,2,64)?;let k=dim(lists,3,64)?;let c=dim(lists,4,64)?;
+            let a=numeric_list(a)?;let b=numeric_list(b)?;
+            matrix_shape(&a,r,k)?;matrix_shape(&b,k,c)?;
+            let mut out=vec![0.0;r*c];let mut terms=vec![0.0;k];
+            for i in 0..r {cancelled(stop)?;for j in 0..c {
+                for h in 0..k {terms[h]=a[i*k+h]*b[h*c+j];}
+                out[i*c+j]=stable_sum(&terms);
+            }}
+            values(out)
+        }
+        MatrixInverse|LinearSolve=>{
+            let a=numeric_list(a)?;
+            let size=dim(lists,if kind==MatrixInverse {1}else{2},32)?;
+            if kind==MatrixInverse {
+                let mut identity=vec![0.0;size*size];
+                for i in 0..size {identity[i*size+i]=1.0;}
+                values(eliminate(&a,&identity,size,size,stop)?)
+            }else{
+                values(eliminate(&a,&numeric_list(b)?,size,1,stop)?)
+            }
+        }
+        FourierMagnitude=>{
+            if a.len()>512 {return Err("DFT は 512 点までです。".into());}
+            let a=numeric_list(a)?;let len=a.len();
+            let mut out=Vec::with_capacity(len);
+            let mut re=vec![0.0;len];let mut im=vec![0.0;len];
+            for k in 0..len {
+                cancelled(stop)?;
+                for j in 0..len {
+                    let phase=-TAU*((k*j)%len) as f64/len as f64;
+                    let(s,c)=phase.sin_cos();re[j]=a[j]*c;im[j]=a[j]*s;
+                }
+                out.push(stable_sum(&re).hypot(stable_sum(&im)));
+            }
+            values(out)
         }
         Summation|Product|Average|Median|Variance|StdDeviation=>{
             let mut data=Vec::with_capacity(a.len());
@@ -868,6 +1109,51 @@ pub fn run_item(kind: NodeKind, a: &[&Value], stop: &dyn Fn()->bool) -> Result<V
             }
         }
         PlaneNormal3Pt=>{let p=v()?;let f=Frame::new(p,sub(w()?,p),sub(xyz(a,2)?,p))?;return point(f.z)},
+        VectorMultiply=>return point(scale(v()?,y()?)),
+        VectorDivide=>{let d=y()?;if d==0.0{return Err("ゼロでは割れません。".into());}return point(v()?.map(|x|x/d));},
+        VectorAmplitude=>{let amp=y()?;if amp<0.0{return Err("長さは非負です。".into());}return point(scale(unit(v()?)?,amp));},
+        Lerp=>lerp(x()?,y()?,num(a,2)?),
+        SmoothStep=>{let t=x()?.clamp(0.0,1.0);t*t*(3.0-2.0*t)},
+        BezierValue=>{
+            let t=num(a,4)?;
+            let (p,q,r)=(lerp(x()?,y()?,t),lerp(y()?,num(a,2)?,t),lerp(num(a,2)?,num(a,3)?,t));
+            lerp(lerp(p,q,t),lerp(q,r,t),t)
+        }
+        NormalPdf=>{let sigma=num(a,2)?;if sigma<=0.0{return Err("標準偏差は正です。".into());}let z=(x()?-y()?)/sigma;(-0.5*z*z).exp()/(TAU.sqrt()*sigma)}
+        PlaneIntersectionDirection=>{
+            let d=cross(unit(v()?)?,unit(w()?)?);
+            if norm(d)<=1e-12 {return Err("平面が平行または一致しています。".into());}
+            return point(unit(d)?)
+        }
+        PlaneIntersectionPoint=>{
+            let (p,n,q,m)=(v()?,unit(w()?)?,xyz(a,2)?,unit(xyz(a,3)?)?);
+            let d=cross(n,m);let mag=norm(d);
+            if mag<=1e-12{return Err("平面が平行または一致しています。".into());}
+            return point(scale(plus(scale(cross(m,d),dot(n,p)),scale(cross(d,n),dot(m,q))),1.0/(mag*mag)));
+        }
+        PlaneRotateAxis=>{
+            let f=Frame::new(v()?,w()?,xyz(a,2)?)?;
+            let axis=if num(a,4)?==0.0{f.x}else{f.y};
+            return point(rotate(axis,f.z,num(a,3)?)?)
+        }
+        PlaneAlignAxis=>{
+            let f=Frame::new(v()?,w()?,xyz(a,2)?)?;
+            let guide=unit(xyz(a,3)?)?;
+            let d=sub(guide,scale(f.z,dot(guide,f.z)));
+            if norm(d)<=1e-12 {return Err("ガイドが平面に垂直です。".into());}
+            return point(unit(d)?)
+        }
+        WorldPlaneAxis=>{
+            let (ex,ey,ez)=([1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0]);
+            let (ux,uy)=match x()? as usize {0=>(ex,ey),1=>(ex,ez),2=>(ey,ez),_=>return Err("世界平面の種類が無効です。".into())};
+            let axes=[ux,uy,cross(ux,uy)];
+            return point(*axes.get(y()? as usize).ok_or("平面の軸が無効です。")?)
+        }
+        ChangeBasis=>{
+            let from=Frame::new(v()?,w()?,xyz(a,2)?)?;
+            let to=Frame::new(xyz(a,3)?,xyz(a,4)?,xyz(a,5)?)?;
+            return point(to.local(from.world(xyz(a,6)?)))
+        }
         RandomNormal=>{
             let count=x()? as usize;let mean=y()?;let sigma=num(a,2)?;let seed=num(a,3)? as u64;
             if count>512||sigma<0.0{return Err("乱数パラメータが範囲外です。".into());}
@@ -936,6 +1222,25 @@ mod tests {
         assert_eq!(run_list(SetUnion,&[&b,&[]],&||false).unwrap().len(),2);
         assert_eq!(run_list(SetIntersection,&[&b,&[]],&||false).unwrap().len(),0);
         assert!(run_list(Average,&[&a],&||true).is_err());
+    }
+    #[test]
+    fn linear_algebra_and_fourier(){
+        let a=[4.0,7.0,2.0,6.0];let i=[1.0,0.0,0.0,1.0];
+        let inv=eliminate(&a,&i,2,2,&||false).unwrap();
+        for (x,y) in inv.into_iter().zip([0.6,-0.7,-0.2,0.4]) {close(x,y);}
+        let x=eliminate(&[0.0,2.0,1.0,3.0],&[4.0,7.0],2,1,&||false).unwrap();
+        close(x[0],1.0);close(x[1],2.0);
+        assert!(eliminate(&[1.0,2.0,2.0,4.0],&i,2,2,&||false).is_err());
+        let a=[1.0,1.0,1.0,1.0].map(Value::Number);
+        let f=run_list(FourierMagnitude,&[&a],&||false).unwrap();
+        close(f[0].number().unwrap(),4.0);for v in &f[1..]{close(v.number().unwrap(),0.0);}
+    }
+    #[test]
+    fn intersection_and_basis(){
+        let p=Value::Point([1.0,0.0,0.0]);let n=Value::Point([1.0,0.0,0.0]);
+        let q=Value::Point([0.0,2.0,0.0]);let m=Value::Point([0.0,1.0,0.0]);
+        assert_eq!(run(PlaneIntersectionPoint,&[p,n,q,m]).unwrap(),vec![Value::Point([1.0,2.0,0.0])]);
+        assert_eq!(run(WorldPlaneAxis,&[Value::Number(1.0),Value::Number(2.0)]).unwrap(),vec![Value::Point([0.0,-1.0,0.0])]);
     }
     #[test]
     fn mapper_and_seed(){
