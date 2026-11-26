@@ -184,6 +184,29 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    // Mesh and fabrication nodes; append-only serialized identifiers.
+    MeshArea,
+    MeshVolume,
+    MeshCenter,
+    MeshDimensions,
+    MeshMass,
+    MeshAudit,
+    MeshVertices,
+    MeshFaces,
+    MeshNormals,
+    MeshEdges,
+    MeshBoundary,
+    MeshClosest,
+    MeshFlip,
+    MeshWeldExact,
+    MeshUnweld,
+    MeshUnify,
+    MeshSmooth,
+    MeshSubdivide,
+    MeshCatmullClark,
+    MeshOnBed,
+    MeshDeleteFace,
+    MeshConstruct,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +276,28 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::MeshArea,
+            Self::MeshVolume,
+            Self::MeshCenter,
+            Self::MeshDimensions,
+            Self::MeshMass,
+            Self::MeshAudit,
+            Self::MeshVertices,
+            Self::MeshFaces,
+            Self::MeshNormals,
+            Self::MeshEdges,
+            Self::MeshBoundary,
+            Self::MeshClosest,
+            Self::MeshFlip,
+            Self::MeshWeldExact,
+            Self::MeshUnweld,
+            Self::MeshUnify,
+            Self::MeshSmooth,
+            Self::MeshSubdivide,
+            Self::MeshCatmullClark,
+            Self::MeshOnBed,
+            Self::MeshDeleteFace,
+            Self::MeshConstruct,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -863,6 +908,28 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            Self::MeshArea
+            | Self::MeshVolume
+            | Self::MeshCenter
+            | Self::MeshDimensions
+            | Self::MeshMass
+            | Self::MeshAudit
+            | Self::MeshVertices
+            | Self::MeshFaces
+            | Self::MeshNormals
+            | Self::MeshEdges
+            | Self::MeshBoundary
+            | Self::MeshClosest
+            | Self::MeshFlip
+            | Self::MeshWeldExact
+            | Self::MeshUnweld
+            | Self::MeshUnify
+            | Self::MeshSmooth
+            | Self::MeshSubdivide
+            | Self::MeshCatmullClark
+            | Self::MeshOnBed
+            | Self::MeshDeleteFace
+            | Self::MeshConstruct => crate::mesh_fabrication::spec(self),
             other => crate::gh_nodes::spec(other),
         }
     }
