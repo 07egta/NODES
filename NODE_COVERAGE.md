@@ -9,7 +9,7 @@
 | ノード選択欄の登録 | 実行したGUIで298種類を確認 |
 | Cluster | 選択欄に含めず、定義から生成する1種類 |
 | 完全実装済みノード数 | 未集計。登録には限定・近似の演算を含むため、298を完全実装数としない |
-| 機能検証 | 2f94df4の通常Linux CIで433件成功（fmt/check/strict Clippy/releaseも通過）。最新Windowsは実行中。旧Windows350件成功は別checkpoint。個別ノードの完全検証数とは異なる |
+| 機能検証 | 2f94df4の通常Linux CIで433件成功（fmt/check/strict Clippy/releaseも通過）。同じsourceのWindows432件と両バイナリreleaseも成功。旧Windows350件成功は別checkpoint。個別ノードの完全検証数とは異なる |
 | GH期待値でVERIFIED | 0。Rhino/GHから採取した版付きoracle fixtureとの比較は未実施 |
 | GH2公式index | 取得時1419件。build 9.3.26329.6001 / export 2026-11-25T15:23:50Z。詳細未調査はUNKNOWN |
 

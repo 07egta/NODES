@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-11-26T16:06:34.214641+00:00",
+  "source_head": "2f94df459533774f83593835ba1e22d4924a3c42",
+  "gui_binary_sha256": "010046c4274e761ed6d3a3889fa867e61f5eec683df8a64c0a7d8e78f18eaf21",
+  "workflow": [
+    "Created a new empty graph through File > New.",
+    "Pasted Japanese intent query 円を作りたい; library showed exactly one result, Circle.",
+    "Searched sphere in English; results Sphere and Sphere Surface appeared; added Sphere.",
+    "Dragged Sphere node, searched output, added Output; compatible connection was created automatically.",
+    "Disconnected in Inspector; output error and empty preview appeared.",
+    "Dragged a wire manually from Sphere to Output; geometry returned.",
+    "Ctrl+Z removed the wire and restored error; Ctrl+Y restored the wire and geometry.",
+    "Typed exactly 30 into Sphere radius and pressed Return; UI showed 30.1 and bounds60.2.",
+    "Saved gui-sphere.morph through the in-app picker."
+  ],
+  "bug": {
+    "kind": "passive_slider_quantization",
+    "registered_default": 25.0,
+    "new_node_displayed_value": 25.1,
+    "typed_value": 30.0,
+    "saved_value": 30.1,
+    "spec_min": 0.1,
+    "spec_step": 0.5,
+    "status": "source fix and regression tests in progress"
+  },
+  "saved_fixture": {
+    "path": "docs/development/gui-sphere-before-numeric-fix.morph",
+    "bytes": 717,
+    "sha256": "1a238cd22d42e4275a2230702ccf8486df22c18209c3673d021d172b480501de"
+  },
+  "known_limit": "This is evidence of an actual UI bug, not a valid exact-radius-30 model or a passing precision check."
+}

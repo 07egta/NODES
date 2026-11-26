@@ -51,7 +51,7 @@ All material recovery branches are on GitHub. [recovery-parents.json](recovery-p
    https://github.com/07egta/NODES/actions/runs/45846736773
 6. `c19dca185380391ad1c875e412529e22cae05ba6` passed normal Linux Check `45849521685` with 431 tests and both release binaries; its Windows job was cancelled by the follow-up source and is not counted as successful.
 7. `eefc9c1baab03dcb1e217730a0cd61382b298660` preserved the file-input guards before testing. Its Check stopped at one GHX rustfmt difference; that exact difference was corrected.
-8. Current source `2f94df459533774f83593835ba1e22d4924a3c42`, normal Check `45852634502`, Linux job `140022721574`: **433 passed, 0 failed, 2 opt-in ignored, 35 Rust suites**; fmt/check/strict Clippy, 17 Python tests, desktop/console release build and artifact upload passed. The actual PR checkout `19717e70917718af1374e387720b29b619c1c1ed` has the same tree. Windows job `140024871303` is still running; record its outcome before claiming success.
+8. Current source `2f94df459533774f83593835ba1e22d4924a3c42`, normal Check `45852634502`, Linux job `140022721574`: **433 passed, 0 failed, 2 opt-in ignored, 35 Rust suites**; fmt/check/strict Clippy, 17 Python tests, desktop/console release build and artifact upload passed. The actual PR checkout `19717e70917718af1374e387720b29b619c1c1ed` has the same tree. Windows job `140024871303` also passed **432 tests, 0 failed, 2 opt-in ignored, 35 suites**, both release binaries and artifact upload. The single-test difference is the Unix-only FIFO regression.
 9. Python checks also executed locally after environment recovery: GH2 parser 3/3, checkpoint exporter 6/6, dependency auditor 8/8. `git -c core.whitespace=cr-at-eol diff --check` passed.
 
 The diagnostic workflow's repaired working tree is not the same as an unmodified commit. Formatting-only candidate import was completed at c19dca1; subsequent FIFO and layout fixes are real source changes and have their own successful Linux Check at 2f94df4. The recovery workflow is manual-only. Normal Check validates committed source and builds desktop/console binaries for Linux and Windows. Exact source/tree/artifact hashes are in CI_COMMITTED_VALIDATION.json.
@@ -66,10 +66,12 @@ A separate 12-second settled native-GUI sample on this Linux virtual desktop obs
 
 ## Current work
 
+- New-graph manual testing found a numerical UI bug at 2f94df4: a Sphere default radius 25 becomes 25.1 on display, and typing 30 saves 30.1. The slider step is anchored to its 0.1 minimum and is applied during passive rendering. A focused fix and headless egui regression are in progress in app.rs/canvas.rs; do not call this precision issue resolved until source and actual GUI checks pass. See NUMERIC_INPUT_VALIDATION.json.
+
 - Preserve final CI/GUI/CLI evidence and update Draft PR #11. Current source is 2f94df4; subsequent evidence-only commits must not be described as separately tested source unless their own Check has finished.
 - Linux artifact 15134610988 was downloaded, its ZIP digest checked, and both executable hashes recorded. The repaired binaries rejected FIFO input through four entry points in 1.3–2.3 ms with preserved destination bytes. The older binary's bounded two-second blocking reproduction is retained in FIFO_VALIDATION.json.
 - `examples/interop/ai-vase.json` and `scripts/validate_cli_vase.py` passed eight commands again with the 2f94df4 console binary. An independent STL parser checked 5,906 unique positions, 11,808 nonzero triangles, 590,484 bytes and 104 mm height, plus determinant volume against the CLI within the documented tolerance. See CLI_VASE_VALIDATION.json.
-- GUI layout/focus correction is actually retested, not pending. Windows all-target tests/build/artifact remain the final current checkpoint to inspect.
+- GUI layout/focus correction is actually retested, not pending. Windows all-target tests/build/artifact also passed. Additional new-graph GUI testing then exposed the separate numeric input issue below.
 - Fresh dependency audit output from the verified artifact records 303 declarations, 226 matching text files across 122 packages, including the r-efi MIT notice. Distribution/runtime/font review remains incomplete.
 
 ## Build commands
@@ -100,7 +102,7 @@ The GUI binary is Morphlet; the console binary is nodes-cli. Cargo's default run
 
 ## Next files, commands and implementation steps
 
-1. Fetch `develop/nodes-ultimate`, inspect PR #11 and this file; do not restart the completed branch/Grasshopper inventory recovery. Verify the remote head and the exact source of the latest Check. Finish recording Windows run 45852634502 before marking its current checkpoint successful.
+1. Fetch `develop/nodes-ultimate`, inspect PR #11 and this file; do not restart the completed branch/Grasshopper inventory recovery. Verify the remote head and the exact source of the latest Check. Run 45852634502 is successful on Linux and Windows. Verify the next numeric-input fix at its own source SHA.
 2. Next substantial feature is backward-compatible multiple output endpoints; see MULTI_OUTPUT_MIGRATION.md for the reviewed contracts and Dispatch proof. Start with `src/model.rs`, `src/persistence.rs` and migration fixtures; keep old v1 single-output graphs readable and preserve connections. Then update `src/engine.rs`, `src/node_access.rs`, `src/graph_api.rs`, `src/canvas.rs` and cluster code together.
 3. Introduce runtime Null with explicit missing-input versus empty-branch semantics and independent matching fixtures; do not conflate it with the existing generic Slot type. Plan opaque unsupported-native-node storage before claiming unknown nodes round-trip safely.
 4. First commands: `git fetch origin develop/nodes-ultimate`, `git log -8 --oneline`, `cargo fmt --all -- --check`, `cargo test --locked --test cli_workflows`. Run the full normal Check after source changes. Rust is absent in the restored local container; use CI if that remains true.

@@ -38,7 +38,7 @@
     }
   },
   "windows_job_id": 140024871303,
-  "windows_result": "in_progress: Test all targets observed at 2026-11-26T15:58:40Z",
+  "windows_result": "success",
   "previous_committed_checkpoint": {
     "source_head": "c19dca185380391ad1c875e412529e22cae05ba6",
     "tested_merge_revision": "ca49e6c016c40f680117bac4dff8babe2dc2664a",
@@ -79,5 +79,25 @@
     ],
     "windows_result": "cancelled: superseded by follow-up source before completion",
     "merge_tree_equals_source_head": true
-  }
+  },
+  "windows_rust_tests": {
+    "passed": 432,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 35
+  },
+  "windows_gates": [
+    "all-target Rust tests",
+    "release --bins",
+    "Windows artifact upload"
+  ],
+  "windows_artifact": {
+    "artifact_id": 15135147943,
+    "name": "NODES-windows-x64-19717e70917718af1374e387720b29b619c1c1ed",
+    "size_in_bytes": 12704087,
+    "archive_sha256": "101b1603de3f994f11f35fa2e854f32f3574183c354f49d204fd67a56c3272f5",
+    "url": "https://github.com/07egta/NODES/actions/runs/45852634502/artifacts/15135147943",
+    "expires_at_utc": "2026-12-10T16:03:30Z"
+  },
+  "platform_test_difference": "One cfg(unix) FIFO process regression runs on Linux only; the Windows 432 tests include all other 35 test binaries."
 }

@@ -6,7 +6,7 @@
 
 Rust / egui の独立デスクトップ基盤へ、既存の core・Data Tree・数学・生成デザイン・メッシュ・UI・GHX/API・精密曲線・精密曲面ブランチを統合した。298種類をノード選択欄に登録し、Cluster は定義から作成する。登録数を完成率やGrasshopper互換率として扱わない。
 
-`6349577` はLinux/Windowsそれぞれ350テストを通過。その後の2f94df4は通常Linux CIで433テスト・厳格Clippy・GUI/CLI release buildを通過した。実GUIの編集/保存/再起動/STL、Inspector配置とエラー入力の修正、実CLIの花器作成/編集/書出し、4入口のFIFO拒否を確認した。最新Windowsの結果は別途記録する。作業環境停止に備え、専用ブランチへ意味のある単位で保存する運用を継続する。
+`6349577` はLinux/Windowsそれぞれ350テストを通過。その後の2f94df4は通常Linux CIで433テスト・厳格Clippy・GUI/CLI release buildを通過した。実GUIの編集/保存/再起動/STL、Inspector配置とエラー入力の修正、実CLIの花器作成/編集/書出し、4入口のFIFO拒否を確認した。同じsourceのWindows432テストと両バイナリrelease buildも成功した。作業環境停止に備え、専用ブランチへ意味のある単位で保存する運用を継続する。
 
 | 優先 | 開発項目 | 現状 | 完了条件 |
 |---|---|---|---|

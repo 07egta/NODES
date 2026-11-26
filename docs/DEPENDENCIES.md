@@ -140,7 +140,7 @@ Cargo manifest の license フィールドは上流作者の宣言であり、�
 
 [Integration recovery diagnostics](../.github/workflows/integration-recovery.yml) の run 45846736773 は、Linux 上で formatter / Clippy による修正を適用した作業ツリーを検証し、Rust テスト **431 passed / 0 failed / 2 ignored**、`cargo check --all-targets --locked`、fmt、strict Clippy（`-D warnings`）に成功した。依存監査・registry 生成・性能測定の step も成功し、その出力を回収した。2 件の ignored test は成功件数に含めていない。
 
-この診断runは修正済み作業ツリーに対する歴史的結果である。その後、2f94df4の未変更ソースは [通常の Check workflow](../.github/workflows/windows.yml) のLinuxで433 Rust tests、17 Python tests、fmt/check/strict Clippy、GUI/CLI release buildを通過した。Windowsの完了結果はTEST_RESULTS.mdで別途記録する。
+この診断runは修正済み作業ツリーに対する歴史的結果である。その後、2f94df4の未変更ソースは [通常の Check workflow](../.github/workflows/windows.yml) のLinuxで433 Rust tests、17 Python tests、fmt/check/strict Clippy、GUI/CLI release buildを通過した。同じsourceのWindowsも432 Rust testsと両バイナリrelease buildを通過した。詳細はTEST_RESULTS.mdに記録する。
 
 | Job | 環境・制限 | 内容 |
 |---|---|---|

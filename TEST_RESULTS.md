@@ -54,7 +54,7 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 
 実CLIでwriterのないFIFOを渡すと2秒のtimeoutで停止を再現した。`eefc9c1` に事前通常ファイル検査と回帰を保存したが、その [Check 45851162593](https://github.com/07egta/NODES/actions/runs/45851162593) はGHXの1箇所のfmt差分で停止した。差分をそのとおり修正し、GUIで発見した行間修正とともに2f94df4へ保存した。失敗したgateを成功へ読み替えていない。
 
-**最新ソース `2f94df459533774f83593835ba1e22d4924a3c42`** の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` は実行中で、完了結果を確認してから成功件数へ加える。
+**最新ソース `2f94df459533774f83593835ba1e22d4924a3c42`** の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` も **432 passed / 0 failed / 2 ignored、35 suites**、両バイナリrelease build・artifact uploadに成功した。Linuxとの差1件はUnix専用FIFO回帰である。
 
 配布用Linux ZIP artifact `15134610988` のSHA-256と展開バイナリを照合した上で、FIFO拒否を4入口で実行した。`nodes-cli validate` / `evaluate`、`Morphlet --build-graph` / `--inspect-ghx` は全てexit 1で通常ファイルを要求し、各1.3〜2.3msで終了、既存出力のbytesを保持した。修正前の2秒timeout、各コマンド・時刻・バイナリの根拠は [FIFO_VALIDATION.json](docs/development/FIFO_VALIDATION.json)。敵対的なファイル差し替え競合の完全防止を主張しない。
 
@@ -161,4 +161,4 @@ cargo test --all-targets --locked
 cargo build --release --locked --bins
 ```
 
-2f94df4についてLinuxで上記が成功した。Windowsの完了を確認し、以後のsource変更でも同じgateを再実行する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。
+2f94df4についてLinuxで上記、Windowsで全ターゲットtestとrelease buildが成功した。以後のsource変更でも同じgateを再実行する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。
