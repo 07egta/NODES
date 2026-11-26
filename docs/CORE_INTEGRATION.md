@@ -4,6 +4,7 @@ Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`. The initial in
 
 ## Node authoring contract
 
+- Implement standard nodes, shared types, evaluation, geometry, persistence and UI integration in Rust. The [language policy](LANGUAGE_POLICY.md) permits small supporting-language exceptions, including existing developer tooling and bounded user scripts; it does not move core node implementations into scripts or foreign runtimes.
 - Add a stable snake_case serialized NodeKind ID in `src/model.rs`; do not rename an existing ID or port key. Add it to `NodeKind::all()` (Cluster is intentionally not in the picker).
 - Define metadata in the owning category module: Japanese display label, category, description, Japanese/English search keywords, typed inputs, defaults/ranges/steps, and output type. Reuse InputSpec constructors.
 - For a normal item-wise node, dispatch its kernel through the existing evaluator, with cancellation and checked size. Whole-list or whole-tree operations belong in their respective modules, not a second independent tree implementation.

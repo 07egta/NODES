@@ -4,7 +4,13 @@
 
 現在の統合開発は [develop/nodes-ultimate](https://github.com/07egta/NODES/tree/develop/nodes-ultimate) と [Draft PR #11](https://github.com/07egta/NODES/pull/11) で進めています。**開発版であり、Grasshopperの完全互換版ではありません。** 最新の実行結果、既知の制限、再開手順は [TEST_RESULTS.md](TEST_RESULTS.md) と [開発チェックポイント](docs/development/STATUS.md) を参照してください。
 
-[使い方](docs/USER_GUIDE_JA.md) · [ノード対応表](NODE_COVERAGE.md) · [設計](docs/ARCHITECTURE.md) · [ロードマップ](ROADMAP.md) · [CI](https://github.com/07egta/NODES/actions)
+[使い方](docs/USER_GUIDE_JA.md) · [ノード対応表](NODE_COVERAGE.md) · [設計](docs/ARCHITECTURE.md) · [実装言語方針](docs/LANGUAGE_POLICY.md) · [ロードマップ](ROADMAP.md) · [CI](https://github.com/07egta/NODES/actions)
+
+## 実装言語
+
+**本体はRust。必要な補助部分にだけ、少量の他言語を使います。** GUI・ノード評価・Data Tree・幾何処理・保存・CLIはRustで開発し、既存のeframe/eguiによるネイティブUIを継続します。
+
+開発用のPython/PowerShellと、ユーザーが使う制限付きRhaiスクリプト機能は維持します。通常のアプリ利用にPython、Node.js、.NETのインストールは要求しません。適用範囲と例外の扱いは [実装言語方針](docs/LANGUAGE_POLICY.md)、開発エージェント向けの引き継ぎは [AGENTS.md](AGENTS.md) に記録しています。
 
 ## 入手する
 

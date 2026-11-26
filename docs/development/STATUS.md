@@ -8,6 +8,12 @@
 - State: integration preview; complete Grasshopper compatibility is not achieved.
 - Latest verified source: `c44a897a22072c6694d1dbf2233ae9557955f49e`; source tree `2285ea77c81898e6c43924bb09ab749355a8b612`. Later evidence/documentation commits are separate from this tested source checkpoint.
 
+## Implementation-language decision — 2026-11-27 JST
+
+The owner selected **Rust first, with a small amount of other languages where needed**. Read [AGENTS.md](../../AGENTS.md) and [LANGUAGE_POLICY.md](../LANGUAGE_POLICY.md) when resuming work, including work in parallel feature branches. Application/UI, graph and Data Tree evaluation, standard nodes, geometry, persistence and CLI stay in Rust. Existing Python/PowerShell developer tools and bounded Rhai user scripts are permitted supporting uses.
+
+The policy audit is based on `develop/nodes-ultimate@c52e850ed01a82461557fab9182778092151db2d`: application and Rust test sources already use `.rs`. This update aligns developer instructions and planning documents; it changes no runtime code, dependencies, saved-file schema or historical test results. Carry the policy forward when integrating feature branches, and preserve their independent implementation and verification records.
+
 ## Start here after an interruption
 
 Fetch the development branch and read its latest commits, this file and TEST_RESULTS.md. The original execution environment disappeared; its old checkout and compiled GUI must not be assumed to exist. A fresh source checkout now exists at `/workspace/scratch/a294e49d5e0f/NODES-recovered`. Git/Python work there, but Rust is absent and no approved installation source was found. Continue Rust validation in GitHub Actions unless a suitable toolchain becomes available.

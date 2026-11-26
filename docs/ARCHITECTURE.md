@@ -6,6 +6,8 @@
 
 Rustのライブラリがデータモデルと計算を提供し、同じpackageのeframe/eguiバイナリがUIを提供する。Rhino/Grasshopperのruntimeや商用SDKをロードしない。基本操作・計算・保存はオフラインで行える。
 
+共通の [実装言語方針](LANGUAGE_POLICY.md) は「Rust主体、必要な補助部分だけ少量の他言語」。本体・標準ノード・ネイティブUI・幾何・保存・CLIの実装責務はRustに置く。開発用Python/PowerShell、ユーザー記述のRhai、将来必要なシェーダーや小さな接続処理は、本体の責務から区別して管理する。
+
 | 責務 | 主なmodule |
 |---|---|
 | 登録・型・グラフ・上限 | `model`、カテゴリごとのNodeSpec |
@@ -79,6 +81,8 @@ project/API request/GHXの入力はopen前に通常ファイルか確認し、op
 JSON Graph APIはversion付き、transactional編集、型/循環/範囲検証を通る。Script、ImportMesh、Cluster、Expression、PathMapperをAPIの実行対象へ含めない。純粋なtree設定はnative graphと同じvalidatorを使う。任意のshell/file/network操作を提供しない。
 
 Rhaiは既存の制限付きscript nodeで、操作数200000、call depth16、script8KiB、文字列4096、時間2秒などの上限を持つ。module/time/custom-syntaxを無効にする。制限された組込関数の追加にも、割当・実行時間・キャンセル・能力の監査が必要。
+
+Rhaiホストと組込APIは `src/script.rs` のRust実装である。ユーザーのスクリプトは許可された拡張として維持し、Rust主体という理由で既存モデルから削除しない。標準ノードをRhaiへ移す方針ではない。
 
 ## 上限
 

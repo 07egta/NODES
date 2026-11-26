@@ -6,6 +6,12 @@
 
 本体の [MIT](../LICENSE-MIT) / [Apache-2.0](../LICENSE-APACHE) 方針は維持している。今回の依存監査・notice 追補では Cargo.toml、Cargo.lock、依存の機能フラグを変更していない。
 
+## 実装言語との関係
+
+[実装言語方針](LANGUAGE_POLICY.md) に従い、本体はRust、他言語は必要な補助用途に限定する。既存のPython監査・検証ツール、PowerShellビルド補助、Rust側に組み込んだRhaiユーザースクリプトは継続する。通常の本体利用に外部のPython/Node.js/.NET runtimeを要求しない。
+
+Rust製crateであることだけでは、依存先の言語や配布条件を確認したことにはならない。新しい他言語ライブラリやruntimeを使う場合は、Rustで代替しない理由、境界、Windows配布への影響と確認結果を記録する。言語方針の更新は、以下の既存監査の対象・ライセンス選択・未確認事項を変更しない。
+
 ## 最新の CI による宣言・同梱本文の確認
 
 [通常CI run 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502) のLinux依存監査は成功した。`cargo metadata --locked --format-version 1` の実データを [audit_dependencies.py](../scripts/audit_dependencies.py) で処理し、配布artifactに入った出力を [dependency-manifests.json](development/dependency-manifests.json) へそのまま保存した。対象sourceは `2f94df459533774f83593835ba1e22d4924a3c42`、実checkoutは `19717e70917718af1374e387720b29b619c1c1ed`。両者のtree一致とartifact ZIP SHA-256を確認している。出典は [CI_COMMITTED_VALIDATION.json](development/CI_COMMITTED_VALIDATION.json)。
