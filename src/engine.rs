@@ -320,12 +320,16 @@ pub(crate) fn evaluate_node(
         }
         result.branches.entry(path.clone()).or_default();
         let values = (|| -> Result<Vec<Value>, String> {
-        // List nodes see their whole first list (an empty one is a valid input, e.g. for
-        // リスト長 or 連結); their setting inputs still need at least one value.
+        // Empty lists are data, including non-leading lists such as cut parameters
+        // or edit indices. Only a missing FirstItem scalar setting suppresses a
+        // list adapter. SingleItem adapters must validate their exact cardinality.
         let skip = if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
             lists.iter().any(|v| v.is_empty())
         } else if list_kind {
-            node.kind != NodeKind::ConcatList && !crate::math_nodes::accepts_empty_second(node.kind) && lists.iter().skip(1).any(|v| v.is_empty())
+            lists.iter().enumerate().any(|(index, values)| {
+                values.is_empty() && crate::node_access::for_input(node.kind, index)
+                    == Some(crate::node_access::InputAccess::FirstItem)
+            })
         } else {
             lists.iter().any(|v| v.is_empty())
         };

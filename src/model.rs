@@ -1559,19 +1559,7 @@ impl Graph {
             }
             let specs = node.kind.spec().inputs;
             for (key, value) in &node.params {
-                if key == crate::data_tree::MATCH_PARAM {
-                    if !crate::data_tree_nodes::supports_matching(node.kind) {
-                        return Err("このノードはデータ照合を変更できません。".into());
-                    }
-                    crate::data_tree::MatchMode::from_number(*value)?;
-                    continue;
-                }
-                if let Some(port) = key.strip_prefix(crate::data_tree::PORT_PREFIX) {
-                    if !crate::data_tree_nodes::supports_transform(node.kind) ||
-                        !specs.iter().any(|s| s.key == port) {
-                        return Err("データツリー変換のポートが無効です。".into());
-                    }
-                    crate::data_tree::PortTransform::from_number(*value)?;
+                if crate::data_tree_nodes::validate_parameter(node.kind, key, *value)? {
                     continue;
                 }
                 if !value.is_finite() || !specs.iter().any(|s| s.key == key && s.default.is_some())

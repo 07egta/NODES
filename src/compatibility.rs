@@ -37,6 +37,19 @@ fn normalize(graph: &mut Graph, depth: usize) -> Result<(), String> {
             node.inputs.remove(&alias);
             node.inputs.insert(canonical, source);
         }
+        let transform_aliases: Vec<_> = node.params.keys().filter_map(|key| {
+            let port = key.strip_prefix(crate::data_tree::PORT_PREFIX)?;
+            let canonical = node.kind.canonical_input_key(port);
+            (canonical != port).then(|| (key.clone(), format!("{}{canonical}", crate::data_tree::PORT_PREFIX)))
+        }).collect();
+        for (alias, canonical) in transform_aliases {
+            let value = node.params[&alias];
+            if node.params.get(&canonical).is_some_and(|&existing| existing != value) {
+                return Err(format!("ノード {} の旧入力と入力のデータツリー設定が競合しています。", node.id));
+            }
+            node.params.remove(&alias);
+            node.params.insert(canonical, value);
+        }
     }
     for definition in &mut graph.clusters {
         normalize(&mut definition.graph, depth + 1)?;

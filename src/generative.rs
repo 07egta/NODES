@@ -520,6 +520,9 @@ pub(crate) fn run_list(kind:NodeKind,lists:&[&[Value]],cancel:&dyn Fn()->bool)->
     use NodeKind::*;
     cancelled(cancel)?;
     let input=points(list(lists,0)?)?;
+    if kind == PointArray && list(lists, 1)?.len() != 1 {
+        return Err("点配置にはブランチごとに元形状が 1 個必要です。".into());
+    }
     if input.is_empty(){return Ok(Vec::new());}
     match kind{
         Voronoi2d=>voronoi(&input,setting(lists,1)?,setting(lists,2)?,cancel),
@@ -548,7 +551,6 @@ pub(crate) fn run_list(kind:NodeKind,lists:&[&[Value]],cancel:&dyn Fn()->bool)->
         }
         PointArray=>{
             let shapes=list(lists,1)?;
-            if shapes.len()!=1 {return Err("点配置にはブランチごとに元形状が 1 個必要です。".into());}
             array_budget(&shapes[0],input.len())?;
             input.into_iter().map(|p|{cancelled(cancel)?;translated(&shapes[0],p,cancel)}).collect()
         }

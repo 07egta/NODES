@@ -1199,11 +1199,17 @@ impl MorphletApp {
             let label = cluster::input_label(&self.project.graph, &node, index, input);
             let needs_link = cluster::input_needs_link(&self.project.graph, &node, index, input);
             let optional = cluster::input_is_optional(&node, input);
-            ui.horizontal(|ui| {
+            // Stable widget IDs preserve text editing even when an error appears
+            // above this row while the user is still typing a multi-digit value.
+            ui.scope_builder(egui::UiBuilder::new()
+                .id(("inspector_parameter", id, input.key))
+                .layout(Layout::left_to_right(Align::Center)), |ui| {
                 ui.add_sized(
                     [100., 23.],
                     egui::Label::new(RichText::new(label).size(12.)),
-                );
+                ).on_hover_text(format!("{} · {}\n{}", input.kind.label(),
+                    morphlet::node_access::for_input(node.kind, index).map_or("Custom", |a| a.label()),
+                    morphlet::node_access::for_input(node.kind, index).map_or("", |a| a.description())));
                 if let Some(source) = linked {
                     let name = self
                         .project
@@ -1234,7 +1240,7 @@ impl MorphletApp {
                     ui.label(theme::small("つながなくても動きます（任意）"));
                 } else {
                     ui.label(
-                        RichText::new("形状を接続してください")
+                        RichText::new(format!("{}を接続してください", input.kind.label()))
                             .size(11.)
                             .color(theme::error()),
                     );

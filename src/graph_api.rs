@@ -15,7 +15,8 @@ pub const MAX_EDITS: usize = 8192;
 const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
 pub fn permitted(kind: NodeKind) -> bool {
-    // Positive allowlist: new node kinds cannot acquire capabilities accidentally.
+    // Only the explicitly listed primitives and reviewed pure kernel families
+    // are exposed. Executable/text/file adapters remain outside this API.
     use NodeKind::*;
     matches!(kind, Number | Add | Multiply | Divide | Subtract | Power | Abs |
         Min | Max | Modulo | Sine | Series | Range | Point | Circle | Polygon |
@@ -108,6 +109,9 @@ pub fn parse_request(bytes: &[u8]) -> Result<Request, String> {
 }
 
 fn validate_numeric(kind: NodeKind, key: &str, value: f64) -> Result<(), String> {
+    if crate::data_tree_nodes::validate_parameter(kind, key, value)? {
+        return Ok(());
+    }
     let spec = kind.spec().inputs.iter().find(|p| p.key == key && p.default.is_some())
         .ok_or("unknown numeric input")?;
     if !value.is_finite() || value < spec.min || value > spec.max ||
@@ -160,8 +164,10 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
             Edit::Connect { from, to, input } => {
                 let from = *names.get(from).ok_or("unknown source alias")?;
                 let to = *names.get(to).ok_or("unknown target alias")?;
-                if !touched.insert((to, input.clone())) { return Err("duplicate input connection edit".into()); }
-                candidate.connect(from, to, input)?;
+                let canonical = candidate.node(to).ok_or("missing target node")?
+                    .kind.canonical_input_key(input).to_owned();
+                if !touched.insert((to, canonical.clone())) { return Err("duplicate input connection edit".into()); }
+                candidate.connect(from, to, &canonical)?;
             }
             Edit::Set { node, input, value } => {
                 let id = *names.get(node).ok_or("unknown parameter alias")?;
@@ -207,8 +213,7 @@ pub fn load_safe(path: &Path) -> Result<Project, String> {
     let mut bytes = Vec::new();
     file.take((MAX_PROJECT_BYTES + 1) as u64).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
     if bytes.len() > MAX_PROJECT_BYTES { return Err("project exceeds size limit".into()); }
-    let p: Project = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-    p.validate()?;
+    let p = persistence::decode_project(&bytes)?;
     validate_safe(&p.graph)?;
     Ok(p)
 }

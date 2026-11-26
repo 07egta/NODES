@@ -97,7 +97,7 @@ fn main() -> eframe::Result<()> {
         .map(PathBuf::from);
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Morphlet · Geometry Studio")
+            .with_title("NODES · Geometry Studio")
             .with_inner_size([1380., 920.])
             .with_min_inner_size([1100., 720.])
             .with_icon(icon()),
