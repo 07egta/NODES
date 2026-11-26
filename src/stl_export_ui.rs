@@ -6,8 +6,9 @@ use eframe::egui::{self, Align2, Color32, RichText};
 use morphlet::model::{Mesh, Tree};
 use morphlet::stl_export::{
     BodyStats, Check, ExportOptions, Level, OutputFormat, RepairReport, StoredSettings,
-    WriteSummary, check_bodies, config_path, default_file_name, detect_slicer, gather_meshes,
-    launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored, write_bodies,
+    WriteFailure, WriteSummary, check_bodies, config_path, default_file_name, detect_slicer,
+    gather_meshes, launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored,
+    write_bodies_detailed,
 };
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -263,22 +264,33 @@ impl StlExportUi {
                 self.last_files = summary.files;
                 self.say(text, false);
             }
-            Err(error) => self.say(error, true),
+            Err(error) => {
+                let message = error.to_string();
+                if !error.completed.files.is_empty() {
+                    self.last_files = error.completed.files;
+                    self.remember_destination(base);
+                }
+                self.say(message, true);
+            }
         }
     }
 
-    fn write(&mut self, sources: &StlSources, base: &Path) -> Result<WriteSummary, String> {
+    fn remember_destination(&mut self, base: &Path) {
+        self.stored.last_dir = base.parent().map(Path::to_path_buf);
+        self.stored.last_base_file = Some(base.to_path_buf());
+        self.persist();
+    }
+
+    fn write(&mut self, sources: &StlSources, base: &Path) -> Result<WriteSummary, WriteFailure> {
         self.options.validate()?;
         let (bodies, _) = self.prepared(sources)?;
-        let summary = write_bodies(
+        let summary = write_bodies_detailed(
             self.options.format,
             base,
             &bodies,
             self.options.split_bodies,
         )?;
-        self.stored.last_dir = base.parent().map(Path::to_path_buf);
-        self.stored.last_base_file = Some(base.to_path_buf());
-        self.persist();
+        self.remember_destination(base);
         Ok(summary)
     }
 

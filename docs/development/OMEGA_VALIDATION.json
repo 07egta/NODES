@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:51:19.477862+00:00",
+  "updated_at_utc": "2026-11-26T23:53:09.281547+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -258,6 +258,35 @@
       "review": "Independent integration_audit review: metadata before open prevents an ordinary FIFO from blocking; descriptor check, byte limit and transactional import remain.",
       "reproduction": "Actual child test process blocked on FIFO and was killed/reaped at 2 seconds before the fix. After the fix it returned an error immediately and preserved graph state.",
       "limits": "Unix FIFO test is platform-specific. This matches existing project/GHX regular-file checks, not protection against hostile path replacement races."
+    },
+    {
+      "name": "Prepare all split exports before replacing destinations",
+      "files": [
+        "src/stl_export.rs",
+        "src/stl_export_ui.rs",
+        "tests/export_batch_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 4,
+        "scope": "initial five tests; four showed actual first-file sentinel replacement before later failure"
+      },
+      "after": {
+        "integration_passed": 6,
+        "partial_commit_unit_passed": 1,
+        "failed": 0
+      },
+      "related_suites": {
+        "lib": 101,
+        "gui_passed": 41,
+        "gui_ignored": 1,
+        "stl_export_tests": 13
+      },
+      "related_total_passed": 161,
+      "command": "cargo test --locked --offline --lib --bin Morphlet --test export_batch_regressions --test stl_export_tests",
+      "review": "Root inspected reservation via create_new, same-directory staging through existing serializers, cleanup on failure, no pre-delete of destinations and detailed completed-files reporting.",
+      "contract": "A preparation failure preserves every destination. Replacement failure returns successful paths/triangle count and the failed target. Existing write_bodies String-error wrapper remains; UI uses the detailed report.",
+      "limits": "A sequence of per-file atomic renames is not one atomic multi-file transaction. Split export needs staging disk space. Linux real I/O passed; Windows replacement and GUI follow-up remain pending."
     }
   ],
   "environment_events": [
