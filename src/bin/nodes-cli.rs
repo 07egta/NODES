@@ -5,6 +5,7 @@ use morphlet::engine::Evaluation;
 use morphlet::graph_api::{self, Request};
 use morphlet::model::{NodeKind, Tree, Value};
 use morphlet::persistence::{self, Project};
+use morphlet::project_diff;
 use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -25,6 +26,7 @@ Usage:
   nodes-cli validate PROJECT.morph
   nodes-cli evaluate PROJECT.morph
   nodes-cli diagnose PROJECT.morph
+  nodes-cli diff BEFORE.morph AFTER.morph [OFFSET]
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
@@ -34,6 +36,8 @@ Commands return one JSON document on stdout, including operational errors.
 Exit codes: 0 success, 1 project/evaluation/I/O failure, 2 invalid command usage.
 validate checks structure and the restricted capability policy without evaluation.
 diagnose evaluates once and reports root failure candidates and measured node costs.
+diff compares stored fields by node ID without evaluation or writes; pages contain 256 changes.
+OFFSET is a nonnegative integer. Differences still return exit code 0.
 Evaluation failures also include error.diagnostics; exit code remains 1.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
@@ -336,6 +340,8 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
         "catalog" => 0,
         "validate" | "evaluate" | "diagnose" => 1,
         "build" | "export-stl" => 2,
+        "diff" if arguments.len() == 3 => 3,
+        "diff" => 2,
         "apply" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
@@ -365,6 +371,29 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
                 "project": project_summary(&project),
                 "diagnostics": diagnostics::diagnose(&project.graph, &evaluation)
             }))
+        }
+        "diff" => {
+            let offset = if let Some(argument) = arguments.get(2) {
+                argument
+                    .to_str()
+                    .filter(|value| {
+                        !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+                    })
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .ok_or_else(|| {
+                        problem(
+                            "usage",
+                            "OFFSET must be a nonnegative integer that fits usize.",
+                        )
+                    })?
+            } else {
+                0
+            };
+            let before = load_project(Path::new(&arguments[0]))?;
+            let after = load_project(Path::new(&arguments[1]))?;
+            let diff = project_diff::compare(&before, &after, offset)
+                .map_err(|message| problem("diff_failed", message))?;
+            Ok(json!({"diff": diff}))
         }
         "build" => {
             let request = read_request(Path::new(&arguments[0]))?;
