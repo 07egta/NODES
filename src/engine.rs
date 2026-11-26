@@ -271,7 +271,7 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let list_kind = crate::gh_nodes::is_list_kind(node.kind) || crate::generative::is_list(node.kind);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -328,6 +328,8 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if crate::generative::is_list(node.kind) {
+            crate::generative::run_list(node.kind, &lists, cancel)?
         } else if list_kind {
             crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
@@ -446,6 +448,7 @@ fn preflight_run(
         NodeKind::NoiseDeform => (shape(args)?.weight(), 1),
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
+        k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         _ => (0, 1),
     };
     if weight > remaining_weight || items > remaining_items {
@@ -792,6 +795,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(values)
         }
+        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap => crate::generative::run_item(kind, a, cancel),
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength

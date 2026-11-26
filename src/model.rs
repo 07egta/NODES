@@ -184,6 +184,25 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    // Procedural design (append-only serialized kinds).
+    RectGrid,
+    TriangularGrid,
+    HexGrid,
+    RadialGrid,
+    HexPanels,
+    TriPanels,
+    Voronoi2d,
+    ConvexHull2d,
+    ClosestPoint,
+    MultiAttractor,
+    CurveAttractor,
+    GridArray,
+    PointArray,
+    Rotate3d,
+    Shear,
+    Taper,
+    FractalTree,
+    CylinderWrap,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +272,24 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::RectGrid,
+            Self::TriangularGrid,
+            Self::HexGrid,
+            Self::RadialGrid,
+            Self::HexPanels,
+            Self::TriPanels,
+            Self::Voronoi2d,
+            Self::ConvexHull2d,
+            Self::ClosestPoint,
+            Self::MultiAttractor,
+            Self::CurveAttractor,
+            Self::GridArray,
+            Self::PointArray,
+            Self::Rotate3d,
+            Self::Shear,
+            Self::Taper,
+            Self::FractalTree,
+            Self::CylinderWrap,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -863,6 +900,7 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            other if crate::generative::is_kind(other) => crate::generative::spec(other),
             other => crate::gh_nodes::spec(other),
         }
     }
