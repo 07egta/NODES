@@ -1,0 +1,15 @@
+Package: const-random 0.1.20
+Declared license: MIT OR Apache-2.0
+Registry source archive: https://static.crates.io/crates/const-random/const-random-0.1.20.crate
+Archive SHA-256 recorded by Cargo.lock: d38d4bb3e79c716fd0330d8da84171b0135e59e01076e99f22b75a64c56e952c
+Upstream repository: https://github.com/tkaitchuck/constrandom
+Upstream commit recorded before outage: b6876593f065c19478dd0a5da214c8d249b2755f
+Manifest: Cargo.toml
+
+Recovered notice sources:
+LICENSE-MIT: https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-MIT (SHA-256 ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2)
+LICENSE-APACHE: https://github.com/tkaitchuck/constrandom/blob/b6876593f065c19478dd0a5da214c8d249b2755f/LICENSE-APACHE (SHA-256 a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2)
+
+Recovered through the GitHub connector after the local execution environment became unavailable.
+Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.
+These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.

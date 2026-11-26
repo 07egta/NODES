@@ -21,6 +21,7 @@ const WELD_REPAIR_MM: f64 = 1.0e-4;
 const WELD_SPLIT_MM: f64 = 1.0e-6;
 const DEGENERATE_NORMAL_SQ: f64 = 1.0e-16;
 const MAX_HOLE_EDGES: usize = 64;
+const MAX_HOLE_LOOPS: usize = 256;
 const MIN_SIZE_MM: f64 = 1.0;
 const JST_OFFSET_SECS: i64 = 9 * 3600;
 
@@ -165,12 +166,32 @@ fn tri_points(mesh: &Mesh, tri: [u32; 3]) -> Option<([f64; 3], [f64; 3], [f64; 3
         *mesh.vertices.get(tri[2] as usize)?,
     ))
 }
+fn compensated_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let mut sum = 0.0;
+    let mut correction = 0.0;
+    for value in values {
+        let corrected = value - correction;
+        let next = sum + corrected;
+        correction = (next - sum) - corrected;
+        sum = next;
+    }
+    sum
+}
+
 fn signed_volume(body: &Mesh) -> f64 {
-    body.triangles
+    // A local origin avoids catastrophic cancellation for small parts far from
+    // the world origin. Unused vertices must not select the integration origin.
+    let origin = body
+        .triangles
         .iter()
-        .filter_map(|&t| tri_points(body, t))
-        .map(|(a, b, c)| dot(a, cross(b, c)) / 6.0)
-        .sum::<f64>()
+        .find_map(|&t| tri_points(body, t))
+        .map_or([0.0; 3], |(a, _, _)| a);
+    compensated_sum(
+        body.triangles
+            .iter()
+            .filter_map(|&t| tri_points(body, t))
+            .map(|(a, b, c)| dot(sub(a, origin), cross(sub(b, origin), sub(c, origin))) / 6.0),
+    )
 }
 fn bounds(bodies: &[Mesh]) -> Option<([f64; 3], [f64; 3])> {
     let mut lo = [f64::INFINITY; 3];
@@ -200,6 +221,9 @@ pub struct RepairReport {
     pub filled_holes: usize,
     pub added_triangles: usize,
     pub kept_open_holes: usize,
+    /// Shells whose global direction was retained because nesting or closure
+    /// could not be established. Local winding repair may still have occurred.
+    pub unresolved_shells: usize,
 }
 
 impl RepairReport {
@@ -237,8 +261,14 @@ impl RepairReport {
         }
         if self.kept_open_holes > 0 {
             lines.push(format!(
-                "大きい・複雑な穴 {} か所は、そのまま残しました",
+                "大きい・非平面・重なる境界など、安全に埋められない穴 {} か所は残しました",
                 self.kept_open_holes
+            ));
+        }
+        if self.unresolved_shells > 0 {
+            lines.push(format!(
+                "殻 {} 個の内外は未判定です。空洞を埋めないよう全体の向きを保持しました",
+                self.unresolved_shells
             ));
         }
         if lines.is_empty() {
@@ -248,17 +278,24 @@ impl RepairReport {
     }
 }
 
-/// Repairs each mesh independently. The input is never modified.
+/// Repairs local topology without mutating the input. Global winding is only
+/// changed for a single closed shell in a single input mesh. Multiple shells may
+/// bound a cavity; their existing global directions are retained because shell
+/// nesting is not classified here.
 pub fn repair_meshes(meshes: &[Mesh]) -> Result<(Vec<Mesh>, RepairReport), String> {
     let mut report = RepairReport::default();
     let mut out = Vec::with_capacity(meshes.len());
     for mesh in meshes {
-        out.push(repair_one(mesh, &mut report)?);
+        out.push(repair_one(mesh, &mut report, meshes.len() == 1)?);
     }
     Ok((out, report))
 }
 
-fn repair_one(mesh: &Mesh, report: &mut RepairReport) -> Result<Mesh, String> {
+fn repair_one(
+    mesh: &Mesh,
+    report: &mut RepairReport,
+    allow_global_flip: bool,
+) -> Result<Mesh, String> {
     if mesh.vertices.iter().any(|p| p.iter().any(|v| !v.is_finite())) {
         return Err("無限大または非数の座標があるため、自動修復できません。".into());
     }
@@ -311,10 +348,11 @@ fn repair_one(mesh: &Mesh, report: &mut RepairReport) -> Result<Mesh, String> {
         }
         tris.push([a, b, c]);
     }
-    // 3. Make neighbouring faces agree, then point each closed part outward.
-    orient_faces(&mut tris, &points, report);
-    // 4. Fill small simple holes with a fan from the loop centroid.
-    fill_small_holes(&mut points, &mut tris, report);
+    // 3. Make neighbouring faces agree. A disconnected negative shell can be
+    // the inside boundary of a hollow solid, so do not flip it independently.
+    orient_faces(&mut tris, &points, report, allow_global_flip);
+    // 4. Triangulate only simple planar holes, preserving existing vertices.
+    fill_small_holes(&points, &mut tris, report);
     let triangles: Vec<[u32; 3]> = tris
         .iter()
         .map(|&t| t.map(|i| i as u32))
@@ -325,7 +363,12 @@ fn repair_one(mesh: &Mesh, report: &mut RepairReport) -> Result<Mesh, String> {
     })
 }
 
-fn orient_faces(tris: &mut [[usize; 3]], points: &[[f64; 3]], report: &mut RepairReport) {
+fn orient_faces(
+    tris: &mut [[usize; 3]],
+    points: &[[f64; 3]],
+    report: &mut RepairReport,
+    allow_global_flip: bool,
+) {
     let mut faces_of_edge: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
     for (index, &tri) in tris.iter().enumerate() {
         for (a, b) in edges_of(tri) {
@@ -333,6 +376,7 @@ fn orient_faces(tris: &mut [[usize; 3]], points: &[[f64; 3]], report: &mut Repai
         }
     }
     let mut visited = vec![false; tris.len()];
+    let mut components = Vec::new();
     for start in 0..visited.len() {
         if visited.get(start) != Some(&false) {
             continue;
@@ -369,32 +413,34 @@ fn orient_faces(tris: &mut [[usize; 3]], points: &[[f64; 3]], report: &mut Repai
                 }
             }
         }
-        let volume: f64 = component
-            .iter()
-            .filter_map(|&i| tris.get(i))
-            .map(|t| signed_tri(*t, points))
-            .sum();
-        if volume < 0.0 {
-            for &i in &component {
-                if let Some(tri) = tris.get_mut(i) {
-                    tri.swap(1, 2);
-                }
-            }
-            report.flipped_bodies += 1;
-            report.flipped_faces += component.len();
-        }
+        components.push(component);
     }
-}
-
-fn signed_tri(t: [usize; 3], points: &[[f64; 3]]) -> f64 {
-    match (points.get(t[0]), points.get(t[1]), points.get(t[2])) {
-        (Some(&a), Some(&b), Some(&c)) => dot(a, cross(b, c)) / 6.0,
-        _ => 0.0,
+    // Only a single closed shell has an unambiguous global sign under the
+    // non-self-intersection assumption. An open patch has no enclosed volume.
+    let closed = faces_of_edge.values().all(|faces| faces.len() == 2);
+    if !allow_global_flip || components.len() != 1 || !closed {
+        report.unresolved_shells += components.len();
+        return;
+    }
+    let component = &components[0];
+    let origin = points[tris[component[0]][0]];
+    let volume = compensated_sum(component.iter().map(|&i| {
+        let [a, b, c] = tris[i].map(|v| sub(points[v], origin));
+        dot(a, cross(b, c)) / 6.0
+    }));
+    if volume < 0.0 {
+        for &i in component {
+            tris[i].swap(1, 2);
+        }
+        report.flipped_bodies += 1;
+        report.flipped_faces += component.len();
+    } else if volume == 0.0 || !volume.is_finite() {
+        report.unresolved_shells += 1;
     }
 }
 
 fn fill_small_holes(
-    points: &mut Vec<[f64; 3]>,
+    points: &[[f64; 3]],
     tris: &mut Vec<[usize; 3]>,
     report: &mut RepairReport,
 ) {
@@ -406,24 +452,28 @@ fn fill_small_holes(
     }
     // A boundary edge a->b is left by the hole in the direction b->a.
     let mut hole_out: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut hole_in: HashMap<usize, usize> = HashMap::new();
     for &tri in tris.iter() {
         for (a, b) in edges_of(tri) {
             if count_of_edge.get(&undirected(a, b)) == Some(&1) {
                 hole_out.entry(b).or_default().push(a);
+                *hole_in.entry(a).or_insert(0) += 1;
             }
         }
     }
     let mut starts: Vec<usize> = hole_out.keys().copied().collect();
     starts.sort_unstable();
     let mut done: HashSet<usize> = HashSet::new();
+    let mut rings = Vec::new();
+    let mut overflow = 0;
+    let mut incomplete_boundary = false;
     for start in starts {
-        if done.contains(&start) {
-            continue;
-        }
+        if done.contains(&start) { continue; }
         let mut ring = vec![start];
         let mut current = start;
         let mut closed = false;
         loop {
+            if hole_in.get(&current) != Some(&1) { break; }
             let to = match hole_out.get(&current).map(Vec::as_slice) {
                 Some([only]) => *only,
                 _ => break,
@@ -432,7 +482,7 @@ fn fill_small_holes(
                 closed = ring.len() >= 3;
                 break;
             }
-            if ring.contains(&to) || ring.len() >= MAX_HOLE_EDGES {
+            if done.contains(&to) || ring.contains(&to) || ring.len() >= MAX_HOLE_EDGES {
                 break;
             }
             ring.push(to);
@@ -441,24 +491,61 @@ fn fill_small_holes(
         done.extend(ring.iter().copied());
         if !closed {
             report.kept_open_holes += 1;
-            continue;
+            incomplete_boundary = true;
+        } else if rings.len() < MAX_HOLE_LOOPS {
+            rings.push(ring);
+        } else {
+            overflow += 1;
         }
-        let count = ring.len();
-        let mut sum = [0.0f64; 3];
-        for &v in &ring {
-            if let Some(p) = points.get(v) {
-                sum = [sum[0] + p[0], sum[1] + p[1], sum[2] + p[2]];
+    }
+    if overflow > 0 || incomplete_boundary {
+        // An unclassified loop might lie inside another opening. Do not fill
+        // the enclosing ring while silently ignoring a large/branched hole.
+        // Also bound pair work for hundreds of independent openings.
+        report.kept_open_holes += rings.len() + overflow;
+        return;
+    }
+    let boxes: Vec<([f64; 3], [f64; 3])> = rings.iter().map(|ring| {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for &v in ring {
+            for axis in 0..3 {
+                lo[axis] = lo[axis].min(points[v][axis]);
+                hi[axis] = hi[axis].max(points[v][axis]);
             }
         }
-        let apex = sum.map(|s| s / count as f64);
-        let apex_index = points.len();
-        points.push(apex);
-        for (index, &from) in ring.iter().enumerate() {
-            let to = ring.get((index + 1) % count).copied().unwrap_or(from);
-            tris.push([from, to, apex_index]);
+        (lo, hi)
+    }).collect();
+    let mut ambiguous = vec![false; rings.len()];
+    for i in 0..boxes.len() {
+        for j in i + 1..boxes.len() {
+            let (a, b) = boxes[i];
+            let (c, d) = boxes[j];
+            let scale = (0..3).map(|axis| (b[axis] - a[axis]).max(d[axis] - c[axis]))
+                .fold(0., f64::max);
+            let tolerance = 1.0e-9 * scale + 1.0e-12;
+            if (0..3).all(|axis| a[axis] <= d[axis] + tolerance && c[axis] <= b[axis] + tolerance) {
+                // Conservative: nested coplanar loops can describe a face with
+                // a hole. Filling each independently would erase that hole.
+                // Disjoint polygons with overlapping boxes are also left open.
+                ambiguous[i] = true;
+                ambiguous[j] = true;
+            }
         }
-        report.filled_holes += 1;
-        report.added_triangles += count;
+    }
+    for (index, ring) in rings.iter().enumerate() {
+        if ambiguous[index] {
+            report.kept_open_holes += 1;
+            continue;
+        }
+        match crate::polygon_triangulation::triangulate_indexed(points, ring, &|| false) {
+            Ok(caps) if tris.len().saturating_add(caps.len()) <= MAX_TRIANGLES => {
+                report.filled_holes += 1;
+                report.added_triangles += caps.len();
+                tris.extend(caps);
+            }
+            _ => report.kept_open_holes += 1,
+        }
     }
 }
 
@@ -636,13 +723,13 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
     }
     let report = persistence::mesh_stats(&to_trees(bodies))?;
     let mut checks = Vec::with_capacity(7);
-    checks.push(if report.open_edges == 0 {
-        check(Level::Ok, "閉じている（水密）", "すべての辺が 2 枚の面で囲まれています。")
+    checks.push(if report.open_edges == 0 && report.non_manifold_edges == 0 {
+        check(Level::Ok, "閉じている（水密）", "座標の結合後、すべての辺が 2 枚の面で囲まれています。頂点の多様体性と自己交差は未検査です。")
     } else {
         check(
             Level::Error,
             "閉じている（水密）",
-            format!("面がつながっていない辺が {} 本あります。「自動修復」で小さな穴はふさげます。", report.open_edges),
+            format!("境界辺 {} 本、3 枚以上の面が共有する辺 {} 本があります。水密な多様体メッシュとは判定できません。", report.open_edges, report.non_manifold_edges),
         )
     });
     let inside_out = bodies.iter().filter(|b| signed_volume(b) < 0.0).count();
@@ -652,14 +739,16 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
             "面の向きがそろっている",
             format!("向きが食い違う辺が {} 本あります。「自動修復」で直せます。", report.inconsistent_edges),
         )
+    } else if report.open_edges > 0 || report.non_manifold_edges > 0 || report.degenerate_triangles > 0 {
+        check(Level::Warn, "面の向きがそろっている", "閉じた有効な面構成ではないため、体積の符号による内外の判定は行いません。")
     } else if inside_out > 0 {
         check(
             Level::Error,
             "面の向きがそろっている",
-            format!("内側を向いた部品が {inside_out} 個あります。「自動修復」で直せます。"),
+            format!("負の符号付き体積を持つ入力メッシュが {inside_out} 個あります。内側の空洞の殻でないか確認してください。複数の殻の内外は自動判定しません。"),
         )
     } else {
-        check(Level::Ok, "面の向きがそろっている", "表面はすべて外側を向いています。")
+        check(Level::Ok, "面の向きがそろっている", "隣接面の向きは一貫しています。殻の内外・入れ子・自己交差は未検査です。")
     });
     checks.push(if report.non_manifold_edges == 0 {
         check(Level::Ok, "3つ以上の面が共有する辺がない", "辺ごとの面の数は正常です。")

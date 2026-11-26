@@ -1,6 +1,6 @@
 # NODES development checkpoint
 
-- Updated: 2026-11-26 23:00 JST / 14:00 UTC.
+- Updated: 2026-11-26 23:08 JST / 14:08 UTC.
 - Branch: `develop/nodes-ultimate`.
 - Original base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`.
 - Main inspected at `79f32745923adfa9e3de05ef4683b6e3b5f4948f`; no direct main push or force push.
@@ -23,18 +23,18 @@ The local execution environment became unavailable during the next GitHub tree c
 
 The local source checkout was `/workspace/scratch/a294e49d5e0f/NODES`, with last local commit `7f59add921ed21769e693e147358828e1657777a`. Inspect it if the environment returns; do not overwrite it.
 
-Recovery uses exact source patches from recorded authoring calls against fetched GitHub blobs. This checkpoint restores empty-list/SingleItem behavior, shared native/API tree-setting validation, canonical duplicate-wire rejection, legacy port-transform migration and stable inspector parameter IDs. The per-node timing UI will be restored with its engine dependency.
+Recovery uses exact source patches from recorded authoring calls against fetched GitHub blobs. This checkpoint restores empty-list/SingleItem behavior, shared native/API tree-setting validation, canonical duplicate-wire rejection, legacy port-transform migration and stable inspector parameter IDs. The per-node timing UI and engine dependency have been restored in `326162ec`; timing regressions were recreated where exact source was unavailable and require CI.
 
-Separate recovery branches are being saved and must be integrated:
-- `recovery/metrics-ci`: node timings, 16384 capacity, CI and dependency records.
-- `recovery/mesh-review`: cavity winding, robust volume/orientation diagnostics, concave planar OBJ/hole triangulation, curvature edge case and sample.
-- `recovery/coverage-workflows`: regression tests, GH2 generator/provenance and editable-example workflows.
+The following recovery heads are incorporated by this checkpoint (histories retained as parents):
+- `recovery/metrics-ci` at `27092a9719ff5a40b99c96f24677d65cc271024a`: CI and dependency records. Node timings/capacity were restored separately by the integration branch.
+- `recovery/mesh-review` at `2a66b5fa6e19c3a62358eb6fe19c68a239931a9c`: cavity winding, robust volume/orientation diagnostics, concave planar OBJ/hole triangulation, newly reimplemented curvature edge case and study.
+- `recovery/coverage-workflows` at `881e3c221cbb1e18ff59a79e6c04b24c85e629c9`: regression tests, GH2 generator/provenance and editable-example workflows.
 
 These are recovery branches, not independent product releases. Preserve their commits when integrating. No unavailable artifact or generated inventory should be fabricated.
 
 ## Validation performed before interruption
 
-- A 10000-node scalar chain passed initial evaluation, full cache reuse, middle edit with only 5000 descendants recomputed, and serialization/reload equality. Optimized-debug Linux elapsed: 48.370 / 23.725 / 33.476 ms. The capacity change is in recovery until merged.
+- A 10000-node scalar chain passed initial evaluation, full cache reuse, middle edit with only 5000 descendants recomputed, and serialization/reload equality. Optimized-debug Linux elapsed: 48.370 / 23.725 / 33.476 ms. The restored node bound is now 16384, with item/geometry budgets unchanged.
 - Node timings + large graph + surface curvature: 16 tests passed.
 - Four empty-list/API regressions failed as expected, then passed after fixes.
 - Focused common-access, API-tree, fabrication, sample and print-repair suites: 42 passed / 0 failed / 1 opt-in ignored.
@@ -61,9 +61,9 @@ cargo run --locked --example coverage_inventory -- --source-revision <full-sourc
 cargo run --release --locked --example coverage_perf
 ```
 
-1. Fetch this branch and the recovery branches; inspect PR #11 and their exact trees.
-2. Integrate recovery files, resolving engine/model overlaps without reverting these access/API fixes.
-3. Run full Linux and Windows CI. Existing format/lint warnings remain; no clean-Clippy claim.
+1. Fetch this branch and inspect PR #11, its exact HEAD and CI runs; recovery heads above are already integrated.
+2. Complete the read-only CI diagnostic workflow, regenerate inventory/performance files, inspect and apply formatter/lint candidate patches.
+3. Run full Linux and Windows CI on the resulting exact tree. Existing format/lint warnings remain; no clean-Clippy claim.
 4. Next files: `src/engine.rs`, `src/model.rs`, `src/app.rs`, `.github/workflows/windows.yml`, coverage output and development documents.
 5. Revalidate the numeric-focus scenario, then complete GUI reopen/export/light-theme/DPI workflows.
 6. Generate the compiled registry and GH2 inventory from their scripts, recording source revision and official export provenance.
@@ -71,3 +71,7 @@ cargo run --release --locked --example coverage_perf
 ## Known limits
 
 One output per node, no general mixed-access scheduler or native Null value; sequential kernels on one asynchronous worker; general B-rep booleans/trimmed surfaces, STEP/IGES/3DM, binary GH, full GHX, plugin ABI and complete GH1/GH2 semantics remain unfinished. General printing success, shell containment, minimum-wall and self-intersection completeness are not certified. Windows GUI/Intel Arc, startup/idle/RAM/frame time and 10000-node GUI use remain unmeasured.
+
+## Documentation and remaining validation
+
+ROADMAP.md, NODE_COVERAGE.md, TEST_RESULTS.md and docs/ARCHITECTURE.md now describe the combined implementation and its limits. CI is strict; formatting and Clippy findings are expected to remain visible until repaired. The separate diagnostic workflow may prepare reviewable patches in its checkout with contents:read, but never pushes source itself. Only the integration process updates this branch with an expected-SHA lease.

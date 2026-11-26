@@ -153,7 +153,9 @@ fn repair_fills_a_missing_triangle_hole() {
     assert!(stats_of(&mesh).open_edges > 0);
     let (repaired, report) = repair_meshes(&[mesh]).unwrap();
     assert_eq!(report.filled_holes, 1);
-    assert_eq!(repaired[0].triangles.len(), 11 + 3);
+    assert_eq!(repaired[0].triangles.len(), 12);
+    assert_eq!(repaired[0].vertices.len(), 8, "repair must preserve the original vertices");
+    assert_eq!(report.added_triangles, 1);
     let after = stats_of(&repaired[0]);
     assert_eq!(after.open_edges, 0);
     assert_eq!(after.inconsistent_edges, 0);
