@@ -1,21 +1,21 @@
 # NODES Omega geometry and correctness checkpoint
 
-- Updated: 2026-11-27 08:15 JST.
+- Updated: 2026-11-27 08:32 JST.
 - Active branch: `feat/nodes-omega-geometry`.
 - Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR #15; includes #12 structural API edits and previous c52e850 integration).
 - Scope: independent curve/surface/mesh/data correctness fixes and reproducible performance evidence; preserve concurrent multi-port work.
 - Baseline CI: Check 45907598179, Linux 448 passed / Windows 447 passed, 0 failed, 3 opt-in ignored, 35 suites. Linux fmt/check/strict Clippy/Python17/audit and both release binaries succeeded.
 - Current local checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust 1.100.0 is available at `/home/agent/.cargo/bin` (the old absence recorded below is historical).
 - Other active work: PR #14 and #13 multi-port, `fix/omega-multiport-ci` formatting repair created during initial inspection; no overlapping edits will be pushed to those branches.
-- Confirmed issue to reproduce: exact curve closest-point search omits endpoint sample cells; line [0,1], query 0.001 can return parameter 0.
+- Saved checkpoints: e7ecc750 (initial state), 829982f6 (legacy aggregates), 77a3e788 (curve endpoint/closure and signed-zero editing/history).
 - Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
 - First implementation: legacy MassAddition/MassMultiplication share the bounded numerical math aggregation path. Six new regressions went from 1 pass / 5 fail to 6 pass / 0 fail; 17 existing tree/precision regressions also passed. See OMEGA_VALIDATION.json.
 - Curve endpoint/closure fixes: 9 new + 11 existing regressions pass. Bounded closure probes avoid an initial O(knot-count) performance regression.
 - Signed-zero UI/history fixes: 5 new regressions pass, related GUI41/persistence44 pass. Native GUI and full combined gates are pending.
-- Surface numerical fixes are undergoing independent review, which found additional cross-product and translated rational-derivative cancellation cases.
+- Surface numerical fixes now pass 11 new + 25 existing regressions and independent review. Area covers native knot cells with bounded adaptive integration; skew-plane closest points and translated rational derivatives are corrected. Extreme unresolved cases return an error, not a false finite area.
 - Disk-full interruption: this checkout target was cleaned, source retained; use CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 locally to bound build artifacts.
-- Next commands: `cargo test --locked --offline --lib`, focused curve regressions, then full fmt/check/clippy/test gates.
-- Next files: `src/curve_geometry.rs` and independent curve regressions; additional non-overlapping modules after audit.
+- Current work: exact fixed-point binary64 sum/mean has passed 9 new regressions (including 128 independent Fraction cases in both orders) and 12 related regressions in the working tree. Commit this separate unit next. Geometry/aggregation benchmarks are in progress.
+- Next files: `src/number_aggregates.rs`, `src/math_nodes.rs`, `src/lib.rs`, `tests/sum_rounding_regressions.rs`, its fixture/generator and CI check; then mesh closed/manifold diagnostics and OBJ precision after audit. Next commands: focused tests, `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked`, release binaries and native GUI.
 - Draft PR: https://github.com/07egta/NODES/pull/16 (targets PR #15 branch, avoiding duplicate review scope).
 - Registry: 298 picker kinds + Cluster = 299; completely verified node count remains unestablished, external GH oracle VERIFIED = 0.
 - Remaining: fully verified multi-port integration is being repaired elsewhere; general trimmed B-rep, robust general Boolean, complete interchange, runtime Null and Windows GUI/Intel Arc remain incomplete.

@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:25:39.985060+00:00",
+  "updated_at_utc": "2026-11-26T23:32:16.050701+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -93,6 +93,40 @@
       "review": "Root inspected bit comparison alongside structural equality and direct DragValue binding; preserves existing four numeric editor regressions.",
       "independent_expected_value": "Atan2(y=+0,x=-1)=+pi; Atan2(y=-0,x=-1)=-pi. Includes undo/redo, cluster definition, JSON and actual key events.",
       "native_gui_status": "pending combined native GUI check"
+    },
+    {
+      "name": "NURBS area and ill-conditioned planar geometry",
+      "files": [
+        "src/surface_kernel.rs",
+        "src/surface_nodes.rs",
+        "tests/surface_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 2,
+        "failed": 6,
+        "scope": "initial eight Rust regressions; three reviewer cases used independent Python/rational arithmetic before the fix"
+      },
+      "after": {
+        "passed": 11,
+        "failed": 0
+      },
+      "related_suites": {
+        "surface_kernel_tests": 5,
+        "surface_curvature_tests": 9,
+        "surface_knot_roundoff_regressions": 3,
+        "surface_curvature_study": 1,
+        "curve_surface_integration": 7
+      },
+      "related_total_passed": 36,
+      "review": "Independent kernel_research agent reproduced FMA cross-product and translated rational-derivative failures; root reviewed final diff. No blocking findings remain.",
+      "method": "Adaptive tensor GL3/5 over every nonzero native knot cell; local homogeneous origin; orthogonal planar projection; compensated difference of products.",
+      "bounds": {
+        "max_depth": 12,
+        "max_surface_evaluations": 262144,
+        "relative_convergence_indicator": "1e-3 / steps^2, steps in [4,128]"
+      },
+      "limits": "Gauss-rule difference is a convergence indicator, not a rigorous error certificate. Extreme rational boundary layers can return explicit convergence/precision errors.",
+      "metadata": "SurfaceArea description and precision label synchronized; compiled 299-record inventory regenerated without inventing a verified-node count."
     }
   ],
   "environment_events": [
