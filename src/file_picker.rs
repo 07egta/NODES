@@ -72,6 +72,9 @@ impl FileTask {
             Self::ExportObj => ".obj",
             Self::SavePart | Self::LoadPart => ".morphpart",
             Self::ImportMesh => ".stl / .obj",
+            Self::ExportGcode => ".gcode",
+            Self::ExportThreeMf => ".3mf",
+            Self::PickSlicer => ".exe",
         }
     }
 
