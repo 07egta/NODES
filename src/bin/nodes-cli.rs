@@ -23,6 +23,7 @@ Usage:
   nodes-cli catalog
   nodes-cli validate PROJECT.morph
   nodes-cli evaluate PROJECT.morph
+  nodes-cli diagnose PROJECT.morph
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
@@ -31,6 +32,7 @@ Usage:
 Commands return one JSON document on stdout, including operational errors.
 Exit codes: 0 success, 1 project/evaluation/I/O failure, 2 invalid command usage.
 validate checks structure and the restricted capability policy without evaluation.
+diagnose evaluates a safe graph and reports failures, dependencies and timings.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
 export-stl requires explicit, enabled, nonempty Output nodes containing only Mesh.
@@ -327,7 +329,7 @@ fn export_stl(project_path: &Path, destination: &Path) -> Result<Json, CliError>
 fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
-        "validate" | "evaluate" => 1,
+        "validate" | "evaluate" | "diagnose" => 1,
         "build" | "export-stl" => 2,
         "apply" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
@@ -350,6 +352,14 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             Ok(
                 json!({"project": project_summary(&project), "evaluation": evaluation_summary(&project, &evaluation)}),
             )
+        }
+        "diagnose" => {
+            let project = load_project(Path::new(&arguments[0]))?;
+            let evaluation = graph_api::evaluate(&project.graph, &|| false)
+                .map_err(|message| problem("invalid_graph", message))?;
+            let report = morphlet::graph_diagnostics::diagnose(&project.graph, &evaluation)
+                .map_err(|message| problem("diagnostic_failed", message))?;
+            Ok(json!({"project": project_summary(&project), "diagnostics": report}))
         }
         "build" => {
             let request = read_request(Path::new(&arguments[0]))?;
