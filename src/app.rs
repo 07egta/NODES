@@ -1086,11 +1086,11 @@ impl MorphletApp {
                             ui.label(
                                 RichText::new(format!("!  {} 個の入力を確認", errors))
                                     .size(11.)
-                                    .color(theme::ERROR),
+                                    .color(theme::error()),
                             );
                             if let Some(line) = self.error_line(e) {
                                 let short = ui_polish::one_line(&line, if ui.available_width() > 700. { 42 } else { 12 });
-                                ui.label(RichText::new(short).size(11.).color(theme::ERROR)).on_hover_text(line);
+                                ui.label(RichText::new(short).size(11.).color(theme::error())).on_hover_text(line);
                             }
                         }
                         if ui.available_width() > 460. {
@@ -1172,7 +1172,7 @@ impl MorphletApp {
         ui.label(theme::small(spec.description));
         if node.off {
             ui.colored_label(
-                theme::ERROR,
+                theme::error(),
                 "このノードは無効です（出力なし）。Ctrl+E または下の設定で戻せます。",
             );
         }
@@ -1182,7 +1182,7 @@ impl MorphletApp {
                 .corner_radius(6)
                 .inner_margin(8)
                 .show(ui, |ui| {
-                    ui.label(RichText::new(message).size(12.).color(theme::ERROR));
+                    ui.label(RichText::new(message).size(12.).color(theme::error()));
                 });
         }
         ui.add_space(9.);
@@ -1230,7 +1230,7 @@ impl MorphletApp {
                     ui.label(
                         RichText::new("形状を接続してください")
                             .size(11.)
-                            .color(theme::ERROR),
+                            .color(theme::error()),
                     );
                 }
             });
@@ -1274,7 +1274,7 @@ impl MorphletApp {
                 match evaluation.and_then(|e| e.outputs.get(&id)) {
                     Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
                     Some(Err(e)) => {
-                        ui.colored_label(theme::ERROR, e);
+                        ui.colored_label(theme::error(), e);
                     }
                     None => {
                         ui.label(theme::small("未計算"));
@@ -1399,7 +1399,16 @@ impl MorphletApp {
                             if ui.small_button("全体").clicked() { self.canvas.fit_requested = true; }
                             if ui.small_button("選択").on_hover_text("選択にズーム · Shift+F").clicked() { self.canvas.fit_selection_requested = true; }
                             ui.menu_button("操作", |ui| {
-                                if ui.button("整列").clicked() { self.canvas.auto_arrange(&mut self.project); ui.close(); }
+                                if ui.button("全体を自動整列").clicked() { self.canvas.auto_arrange(&mut self.project); ui.close(); }
+                                ui.separator();
+                                let n = self.canvas.selected.len();
+                                if ui.add_enabled(n >= 2, egui::Button::new("選択：左端を揃える")).clicked() { self.canvas.align_selected(&mut self.project, 0); ui.close(); }
+                                if ui.add_enabled(n >= 2, egui::Button::new("選択：上端を揃える")).clicked() { self.canvas.align_selected(&mut self.project, 1); ui.close(); }
+                                if ui.add_enabled(n >= 3, egui::Button::new("選択：横方向の均等間隔")).clicked() { self.canvas.distribute_selected(&mut self.project, 0); ui.close(); }
+                                if ui.add_enabled(n >= 3, egui::Button::new("選択：縦方向の均等間隔")).clicked() { self.canvas.distribute_selected(&mut self.project, 1); ui.close(); }
+                                ui.separator();
+                                let mut minimap = !self.canvas.hide_minimap;
+                                if ui.checkbox(&mut minimap, "ミニマップ（10ノード以上）").changed() { self.canvas.hide_minimap = !minimap; }
                                 ui.checkbox(&mut self.canvas.snap, "格子に吸着");
                                 if ui.button("メモ").clicked() {
                                     let at = self.canvas.center_for_add(&self.project);
@@ -1819,7 +1828,7 @@ impl MorphletApp {
                         data_view::show_tree(ui, tree, "window", h);
                     }
                     Some(Err(e)) => {
-                        ui.colored_label(theme::ERROR, e);
+                        ui.colored_label(theme::error(), e);
                     }
                     None => {
                         ui.label(theme::small("未計算"));
@@ -1934,7 +1943,7 @@ impl eframe::App for MorphletApp {
                         .show(ui, |ui| {
                             ui.set_max_width(650.);
                             ui.label(RichText::new(text).size(12.).color(if *error {
-                                theme::ERROR
+                                theme::error()
                             } else {
                                 Color32::WHITE
                             }));
