@@ -83,6 +83,8 @@ def normalize_node(node):
             uint(source["node"], 64, "source node")
             uint(source["port"], 32, "source port")
         wires[key] = sources
+    if "wires" in node:
+        raise ValueError("reserved node field: wires")
     node["wires"] = wires
     # Missing optional fields are equivalent to the Rust serde defaults.
     node.setdefault("script", "")
