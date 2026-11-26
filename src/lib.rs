@@ -7,6 +7,7 @@ pub mod gh_nodes;
 pub mod import;
 pub mod model;
 pub mod mesh_fabrication;
+pub mod mesh_geometry_checks;
 pub mod persistence;
 pub mod print_info;
 pub mod raster;
