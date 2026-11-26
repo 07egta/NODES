@@ -10,6 +10,7 @@ pub mod generative;
 pub mod gh_nodes;
 pub mod ghx;
 pub mod graph_api;
+pub mod graph_diagnostics;
 pub mod import;
 pub mod latest_channel;
 pub mod mesh_fabrication;
