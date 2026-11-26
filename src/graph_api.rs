@@ -13,7 +13,9 @@ use std::path::Path;
 
 pub const API_VERSION: u32 = 1;
 pub const MULTI_PORT_API_VERSION: u32 = 2;
-fn supported_version(version: u32) -> bool { matches!(version, API_VERSION | MULTI_PORT_API_VERSION) }
+fn supported_version(version: u32) -> bool {
+    matches!(version, API_VERSION | MULTI_PORT_API_VERSION)
+}
 pub const MAX_EDITS: usize = 8192;
 const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
@@ -110,8 +112,14 @@ pub fn permitted(kind: NodeKind) -> bool {
             | MeshThicknessSample
             | MeshCompact
             | MeshNonManifold
-            | DeconstructPoint | DeconstructVector | DeconstructDomain | DeconstructMesh
-            | Dispatch | SortListPaired | StreamGate | StreamMerge
+            | DeconstructPoint
+            | DeconstructVector
+            | DeconstructDomain
+            | DeconstructMesh
+            | Dispatch
+            | SortListPaired
+            | StreamGate
+            | StreamMerge
     ) || crate::math_nodes::spec(kind).is_some()
         || crate::curve_nodes::is_curve_kind(kind)
         || crate::surface_nodes::KINDS.contains(&kind)
@@ -186,7 +194,8 @@ pub fn catalog() -> Catalog {
                             min: p.min,
                             max: p.max,
                             integer: p.integer,
-                            optional: p.default.is_some() || multi_port::optional_input(kind,p.key),
+                            optional: p.default.is_some()
+                                || multi_port::optional_input(kind, p.key),
                             access: crate::node_access::for_input(kind, index)
                                 .map_or("Unknown", |a| a.label()),
                             access_description: crate::node_access::for_input(kind, index)
@@ -340,18 +349,36 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                 }
                 candidate.connect(from, to, &canonical)?;
             }
-            Edit::ConnectPort { from, port, to, input, append } => {
+            Edit::ConnectPort {
+                from,
+                port,
+                to,
+                input,
+                append,
+            } => {
                 if request.api_version != MULTI_PORT_API_VERSION {
                     return Err("connect_port requires graph API v2".into());
                 }
                 let from = *names.get(from).ok_or("unknown source alias")?;
                 let to = *names.get(to).ok_or("unknown target alias")?;
-                let canonical = candidate.node(to).ok_or("missing target node")?
-                    .kind.canonical_input_key(input).to_owned();
+                let canonical = candidate
+                    .node(to)
+                    .ok_or("missing target node")?
+                    .kind
+                    .canonical_input_key(input)
+                    .to_owned();
                 if !touched.insert((to, canonical.clone())) && !*append {
                     return Err("duplicate input connection edit".into());
                 }
-                candidate.connect_port(PortRef { node: from, port: *port }, to, &canonical, *append)?;
+                candidate.connect_port(
+                    PortRef {
+                        node: from,
+                        port: *port,
+                    },
+                    to,
+                    &canonical,
+                    *append,
+                )?;
             }
             Edit::Set { node, input, value } => {
                 let id = *names.get(node).ok_or("unknown parameter alias")?;

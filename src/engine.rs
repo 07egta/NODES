@@ -2,7 +2,7 @@
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
 use crate::data_tree as dt;
 use crate::model::*;
-use crate::multi_port::{self, PortId, PortRef, PortResults, PRIMARY_PORT};
+use crate::multi_port::{self, PRIMARY_PORT, PortId, PortRef, PortResults};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
@@ -41,13 +41,19 @@ pub struct Evaluation {
 }
 impl Evaluation {
     pub fn output(&self, source: PortRef) -> Option<&Result<Tree, String>> {
-        if source.port == PRIMARY_PORT { self.outputs.get(&source.node) }
-        else { self.port_outputs.get(&source) }
+        if source.port == PRIMARY_PORT {
+            self.outputs.get(&source.node)
+        } else {
+            self.port_outputs.get(&source)
+        }
     }
     pub(crate) fn put_component(&mut self, id: NodeId, results: PortResults) {
         for (port, result) in results {
-            if port == PRIMARY_PORT { self.outputs.insert(id, result); }
-            else { self.port_outputs.insert(PortRef { node: id, port }, result); }
+            if port == PRIMARY_PORT {
+                self.outputs.insert(id, result);
+            } else {
+                self.port_outputs.insert(PortRef { node: id, port }, result);
+            }
         }
     }
 }
@@ -165,11 +171,24 @@ impl Evaluator {
                     .iter()
                     .map(|(k, v)| (k.clone(), v.to_bits()))
                     .collect(),
-                inputs: node.all_links().into_iter()
-                    .map(|(k, sources)| (k, sources.into_iter()
-                        .map(|s| (s, *revisions.get(&s.node).unwrap_or(&0))).collect()))
+                inputs: node
+                    .all_links()
+                    .into_iter()
+                    .map(|(k, sources)| {
+                        (
+                            k,
+                            sources
+                                .into_iter()
+                                .map(|s| (s, *revisions.get(&s.node).unwrap_or(&0)))
+                                .collect(),
+                        )
+                    })
                     .collect(),
-                input_order: node.evaluation_inputs().iter().map(|s| s.key.to_owned()).collect(),
+                input_order: node
+                    .evaluation_inputs()
+                    .iter()
+                    .map(|s| s.key.to_owned())
+                    .collect(),
                 output_order: node.output_ports().iter().map(|p| p.id).collect(),
                 extra: self.cluster_keys.key_for(graph, node),
             };
@@ -197,8 +216,14 @@ impl Evaluator {
                 self.remove_cached(id);
                 self.revision = self.revision.wrapping_add(1).max(1);
                 revisions.insert(id, self.revision);
-                out.put_component(id, multi_port::failed(node,
-                    "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。".into()));
+                out.put_component(
+                    id,
+                    multi_port::failed(
+                        node,
+                        "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
+                            .into(),
+                    ),
+                );
                 out.node_timings
                     .insert(id, NodeTiming::since(node_start, is_cached));
                 continue;
@@ -1936,10 +1961,7 @@ mod tests {
         assert_eq!(engine.cache_order.len(), engine.cache.len());
         for (id, cached) in &engine.cache {
             assert!(engine.cache_order.contains(&(cached.revision, *id)));
-            assert_eq!(
-                cached.weight,
-                multi_port::result_weight(&cached.result)
-            );
+            assert_eq!(cached.weight, multi_port::result_weight(&cached.result));
         }
         assert_eq!(
             engine.cache_weight,

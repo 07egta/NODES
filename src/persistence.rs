@@ -150,8 +150,13 @@ impl<W: Write> Write for ProjectWriter<W> {
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     project.validate()?;
     let upgraded;
-    let project = if project.schema_version == SCHEMA_VERSION { project } else {
-        upgraded = Project { schema_version: SCHEMA_VERSION, ..project.clone() };
+    let project = if project.schema_version == SCHEMA_VERSION {
+        project
+    } else {
+        upgraded = Project {
+            schema_version: SCHEMA_VERSION,
+            ..project.clone()
+        };
         &upgraded
     };
     atomic_write(path, |file| {
