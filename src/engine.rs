@@ -1879,6 +1879,31 @@ mod tests {
         assert!(!t.branches.contains_key(&vec![0]));
     }
     #[test]
+    fn graft_preserves_value_when_deeper_empty_path_collides() {
+        // Construct a valid mixed-depth tree at the evaluator boundary; do not
+        // depend on a particular graph's path-matching rules to create it.
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let graft = graph.add(NodeKind::Graft, [0., 0.]).unwrap();
+        graph.connect(source, graft, "geometry").unwrap();
+        let input = Tree {
+            branches: BTreeMap::from([
+                (vec![0], vec![Value::Number(42.), Value::Number(17.)]),
+                (vec![0, 0], vec![]),
+                (vec![3], vec![]),
+                (vec![4, 2], vec![Value::Number(8.)]),
+            ]),
+        };
+        let outputs = BTreeMap::from([(source, Ok(input.clone()))]);
+        let result = evaluate_node(graph.node(graft).unwrap(), &outputs, &|| false).unwrap();
+        assert_eq!(result.item_count(), input.item_count());
+        assert_eq!(result.branches[&vec![0, 0]], vec![Value::Number(42.)]);
+        assert_eq!(result.branches[&vec![0, 1]], vec![Value::Number(17.)]);
+        assert_eq!(result.branches[&vec![3]], Vec::<Value>::new());
+        assert_eq!(result.branches[&vec![4, 2, 0]], vec![Value::Number(8.)]);
+    }
+
+    #[test]
     fn singleton_grafted_branch_is_not_duplicated_by_constants() {
         let mut g = Graph::default();
         let n = add(&mut g, NodeKind::Number);
