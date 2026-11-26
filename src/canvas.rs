@@ -23,6 +23,7 @@ pub struct GraphCanvas {
     pub selected: BTreeSet<NodeId>,
     pub connecting: Option<NodeId>,
     pub fit_requested: bool,
+    pub fit_selection_requested: bool,
     pub last_rect: Option<Rect>,
     /// 格子に吸着: nodes snap to the grid when a drag ends.
     pub snap: bool,
@@ -30,6 +31,7 @@ pub struct GraphCanvas {
     /// A wire was pulled out of an output port and the mouse button is still held.
     wire_drag: bool,
     box_start: Option<Pos2>,
+    box_base: BTreeSet<NodeId>,
     /// Note being edited in place, and whether its text box still needs focus.
     editing_note: Option<usize>,
     note_focus: bool,
@@ -144,6 +146,9 @@ impl GraphCanvas {
         }
     }
     pub fn fit(&self, project: &mut Project, rect: Rect) {
+        self.fit_nodes(project, rect, false);
+    }
+    fn fit_nodes(&self, project: &mut Project, rect: Rect, selected_only: bool) {
         if project.graph.nodes.is_empty() {
             project.pan = [40., 60.];
             project.zoom = 1.;
@@ -151,16 +156,15 @@ impl GraphCanvas {
         }
         let mut bounds = Rect::NOTHING;
         for n in &project.graph.nodes {
+            if selected_only && !self.selected.contains(&n.id) { continue; }
             bounds = bounds.union(Rect::from_min_size(
                 egui::pos2(n.position[0], n.position[1]),
                 egui::vec2(WIDTH, height(n)),
             ));
         }
-        project.zoom = ((rect.width() - 80.) / bounds.width().max(1.))
-            .min((rect.height() - 110.) / bounds.height().max(1.))
-            .clamp(0.35, 1.15);
-        let p = rect.size() / 2. - bounds.center().to_vec2() * project.zoom;
-        project.pan = [p.x, p.y];
+        if bounds.is_positive() {
+            (project.pan, project.zoom) = fit_transform(bounds, rect);
+        }
     }
     pub fn auto_arrange(&mut self, p: &mut Project) {
         let Ok(order) = p.graph.topological_order() else {
@@ -200,9 +204,31 @@ impl GraphCanvas {
         let mut out = CanvasOutcome::default();
         let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
         self.last_rect = Some(rect);
-        if self.fit_requested {
+        if self.fit_selection_requested {
+            self.fit_nodes(p, rect, true);
+            self.fit_selection_requested = false;
+            self.fit_requested = false;
+        } else if self.fit_requested {
             self.fit(p, rect);
             self.fit_requested = false;
+        }
+        let pointer = ui.input(|i| i.pointer.hover_pos());
+        if response.hovered() && !ui.ctx().wants_keyboard_input() {
+            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+            if scroll.abs() > 0.1
+                && let Some(pos) = pointer
+            {
+                zoom_about(p, rect, pos, scroll);
+            }
+        }
+        let pan_active = ui.input(|i| {
+            i.pointer.middle_down() || (i.key_down(egui::Key::Space) && i.pointer.primary_down())
+        });
+        if response.hovered() && pan_active {
+            let d = ui.input(|i| i.pointer.delta());
+            p.pan[0] = (p.pan[0] + d.x).clamp(-1.0e7, 1.0e7);
+            p.pan[1] = (p.pan[1] + d.y).clamp(-1.0e7, 1.0e7);
+            ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::Grabbing);
         }
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 0, theme::canvas_bg());
@@ -221,7 +247,6 @@ impl GraphCanvas {
                 x += spacing;
             }
         }
-        let pointer = ui.input(|i| i.pointer.hover_pos());
         let mut card_under = false;
         if let Some(pos) = pointer {
             card_under = p.graph.nodes.iter().any(|n| {
@@ -232,26 +257,6 @@ impl GraphCanvas {
                 .expand(12.)
                 .contains(pos)
             });
-        }
-        if response.hovered() && !ui.ctx().wants_keyboard_input() {
-            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-            if scroll.abs() > 0.1
-                && let Some(pos) = pointer
-            {
-                let old = to_world(pos, rect, p.pan, p.zoom);
-                p.zoom = (p.zoom * (scroll * 0.002).exp()).clamp(0.3, 1.65);
-                let v = pos - rect.min - egui::vec2(old[0], old[1]) * p.zoom;
-                p.pan = [v.x, v.y];
-            }
-        }
-        let pan_active = ui.input(|i| {
-            i.pointer.middle_down() || (i.key_down(egui::Key::Space) && i.pointer.primary_down())
-        });
-        if response.hovered() && pan_active {
-            let d = ui.input(|i| i.pointer.delta());
-            p.pan[0] += d.x;
-            p.pan[1] += d.y;
-            ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::Grabbing);
         }
         if response.double_clicked()
             && !card_under
@@ -296,6 +301,7 @@ impl GraphCanvas {
         }
         if response.drag_started_by(egui::PointerButton::Primary) && !card_under && !pan_active {
             self.box_start = pointer;
+            self.box_base = if ui.input(|i| i.modifiers.shift) { self.selected.clone() } else { BTreeSet::new() };
         }
         if let (Some(a), Some(b)) = (self.box_start, pointer) {
             if ui.input(|i| i.pointer.primary_down()) {
@@ -311,9 +317,7 @@ impl GraphCanvas {
                     Stroke::new(1_f32, theme::TEAL),
                     egui::StrokeKind::Inside,
                 );
-                if !ui.input(|i| i.modifiers.shift) {
-                    self.selected.clear();
-                }
+                self.selected.clone_from(&self.box_base);
                 for n in &p.graph.nodes {
                     let nr = Rect::from_min_size(
                         to_screen(n.position, rect, p.pan, zoom),
@@ -329,15 +333,19 @@ impl GraphCanvas {
         }
         let mut to_connect = None;
         let mut to_disconnect = None;
-        // Curves stay behind the cards. Their shape is independent of graph evaluation.
+        // Index the endpoints once instead of searching the entire graph for each wire.
+        let sources: BTreeMap<_, _> = p.graph.nodes.iter().map(|n| (n.id, n)).collect();
         for n in &p.graph.nodes {
             for (key, from) in &n.inputs {
                 if let (Some(src), Some(index)) = (
-                    p.graph.node(*from),
+                    sources.get(from).copied(),
                     n.kind.spec().inputs.iter().position(|s| s.key == key),
                 ) {
                     let a = output_pos(src, rect, p.pan, p.zoom);
                     let b = input_pos(n, index, rect, p.pan, p.zoom);
+                    if !wire_bounds(a, b).intersects(rect) {
+                        continue;
+                    }
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
                     let color = if selected {
                         theme::teal()
@@ -352,16 +360,22 @@ impl GraphCanvas {
                 }
             }
         }
-        let nodes = p.graph.nodes.clone();
+        // Avoid cloning invisible nodes, including potentially large script strings.
+        let nodes: Vec<_> = p.graph.nodes.iter().filter(|n| {
+            Rect::from_min_size(
+                to_screen(n.position, rect, p.pan, p.zoom),
+                egui::vec2(WIDTH, height(n)) * p.zoom,
+            ).expand(28.).intersects(rect)
+        }).cloned().collect();
         for n in &nodes {
             let pos = to_screen(n.position, rect, p.pan, p.zoom);
             let nr = Rect::from_min_size(pos, egui::vec2(WIDTH, height(n)) * p.zoom);
-            if !rect.intersects(nr.expand(15.)) {
+            if !rect.intersects(nr.expand(28.)) {
                 continue;
             }
             let selected = self.selected.contains(&n.id);
             let col = theme::category_color(n.kind.spec().category);
-            let error = evaluation
+            let error = evaluation.filter(|_| !stale && !n.off)
                 .and_then(|e| e.outputs.get(&n.id))
                 .and_then(|r| r.as_ref().err());
             painter.rect_filled(
@@ -417,11 +431,7 @@ impl GraphCanvas {
             painter.text(
                 pos + egui::vec2(31., 19.) * p.zoom,
                 Align2::LEFT_CENTER,
-                if n.off {
-                    format!("{}（無効）", n.name)
-                } else {
-                    n.name.clone()
-                },
+                ui_polish::one_line(&n.name, 10),
                 FontId::proportional(13.5 * p.zoom),
                 if n.off { theme::muted() } else { theme::ink() },
             );
@@ -458,6 +468,7 @@ impl GraphCanvas {
             if hr.drag_stopped() && self.dragging == Some(n.id) && self.snap {
                 self.snap_selected(p);
             }
+            hr.clone().on_hover_text(format!("{} · {}", n.name, n.kind.spec().description));
             hr.context_menu(|ui| {
                 if ui.button("このノードを選択").clicked() {
                     self.select_only(n.id);
@@ -561,22 +572,25 @@ impl GraphCanvas {
                 let can = self
                     .connecting
                     .and_then(|id| p.graph.node(id))
-                    .map(|v| spec.kind.accepts(v.kind.spec().output));
+                    .map(|v| v.id != n.id && spec.kind.accepts(v.kind.spec().output));
                 let port_col = if can == Some(false) {
-                    Color32::from_gray(195)
+                    theme::muted()
                 } else if can == Some(true) {
-                    theme::TEAL
+                    theme::teal()
                 } else {
                     col
                 };
                 painter.circle_filled(
                     ip,
                     5. * p.zoom,
-                    if linked { port_col } else { Color32::WHITE },
+                    if linked { port_col } else { theme::card_bg() },
                 );
                 painter.circle_stroke(ip, 5. * p.zoom, Stroke::new(1.6_f32, port_col));
+                if can == Some(true) {
+                    painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4, theme::teal()));
+                }
                 let pr = ui.interact(
-                    Rect::from_center_size(ip, egui::vec2(22., 24.) * p.zoom),
+                    Rect::from_center_size(ip, egui::vec2((22. * p.zoom).max(12.), (24. * p.zoom).max(12.))),
                     Id::new(("in", n.id, spec.key)),
                     Sense::click_and_drag(),
                 );
@@ -589,9 +603,10 @@ impl GraphCanvas {
                     to_disconnect = Some((n.id, spec.key));
                 }
                 pr.on_hover_text(format!(
-                    "{} · {}{}",
+                    "{} · {}{}{}",
                     spec.label,
                     spec.kind.label(),
+                    if can == Some(false) { "\n現在の出力と型が合わないか、同じノードです。" } else if can == Some(true) { "\n接続候補（循環の有無は接続時に確認）" } else { "" },
                     if linked {
                         "\n右クリックで切断"
                     } else {
@@ -601,7 +616,7 @@ impl GraphCanvas {
                 painter.text(
                     ip + egui::vec2(13., 0.) * p.zoom,
                     Align2::LEFT_CENTER,
-                    spec.label,
+                    ui_polish::one_line(spec.label, 6),
                     FontId::proportional(11. * p.zoom),
                     if linked { theme::teal() } else { theme::muted() },
                 );
@@ -805,9 +820,10 @@ impl GraphCanvas {
         // and the chosen node gets connected to the wire's source.
         if self.wire_drag && !ui.input(|i| i.pointer.primary_down()) {
             self.wire_drag = false;
+            let source = self.connecting.take();
             if !card_under
-                && let Some(at) = pointer
-                && let Some(from) = self.connecting.take()
+                && let Some(at) = pointer.filter(|pos| rect.contains(*pos))
+                && let Some(from) = source
             {
                 out.drop_wire = Some((from, to_world(at, rect, p.pan, p.zoom)));
             }
@@ -861,7 +877,9 @@ impl GraphCanvas {
         painter.text(
             rect.left_bottom() + egui::vec2(16., -15.),
             Align2::LEFT_CENTER,
-            hint,
+            if rect.width() < 520. {
+                if self.connecting.is_some() { "入力へ接続 · Esc で中止" } else { "Tab: 追加 · ?: 操作一覧" }
+            } else { hint },
             FontId::proportional(10.5),
             theme::muted(),
         );
@@ -1095,6 +1113,26 @@ fn short(text: &str, max: usize) -> String {
     out
 }
 
+fn fit_transform(bounds: Rect, rect: Rect) -> ([f32; 2], f32) {
+    let zoom = ((rect.width() - 48.).max(1.) / bounds.width().max(1.))
+        .min((rect.height() - 64.).max(1.) / bounds.height().max(1.))
+        .clamp(0.1, 1.15);
+    let pan = rect.size() / 2. - bounds.center().to_vec2() * zoom;
+    ([pan.x.clamp(-1.0e7, 1.0e7), pan.y.clamp(-1.0e7, 1.0e7)], zoom)
+}
+
+fn zoom_about(p: &mut Project, rect: Rect, pos: Pos2, scroll: f32) {
+    let old = to_world(pos, rect, p.pan, p.zoom);
+    p.zoom = (p.zoom * (scroll.clamp(-500., 500.) * 0.002).exp()).clamp(0.1, 2.5);
+    let v = pos - rect.min - egui::vec2(old[0], old[1]) * p.zoom;
+    p.pan = [v.x.clamp(-1.0e7, 1.0e7), v.y.clamp(-1.0e7, 1.0e7)];
+}
+
+// A cubic Bezier lies inside the bounding box of its four control points.
+fn wire_bounds(a: Pos2, b: Pos2) -> Rect {
+    Rect::from_two_pos(a, b).expand2(egui::vec2(165., 8.))
+}
+
 fn cubic(a: Pos2, b: Pos2, samples: usize) -> Vec<Pos2> {
     let handle = ((b.x - a.x).abs() * 0.5).clamp(40., 160.);
     let (p0, p1, p2, p3) = (a, a + Vec2::new(handle, 0.), b - Vec2::new(handle, 0.), b);
@@ -1160,4 +1198,40 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
             stroke,
         ),
     ));
+}
+
+#[cfg(test)]
+mod premium_tests {
+    use super::*;
+
+    #[test]
+    fn fit_is_finite_for_narrow_and_large_graphs() {
+        let bounds = Rect::from_min_size(egui::pos2(-200., -400.), egui::vec2(8000., 6000.));
+        for size in [[640., 360.], [1280., 720.], [1920., 1080.], [2560., 1600.]] {
+            let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(size[0], size[1]));
+            let (pan, zoom) = fit_transform(bounds, rect);
+            assert!((0.1..=1.15).contains(&zoom));
+            assert!(pan.iter().all(|v| v.is_finite()));
+        }
+    }
+
+    #[test]
+    fn zoom_preserves_the_world_point_under_the_pointer() {
+        let mut p = Project::new("test", Default::default());
+        let r = Rect::from_min_size(egui::pos2(40., 20.), egui::vec2(900., 700.));
+        let point = egui::pos2(300., 320.);
+        let old = to_world(point, r, p.pan, p.zoom);
+        zoom_about(&mut p, r, point, 123.);
+        let new = to_world(point, r, p.pan, p.zoom);
+        assert!((old[0] - new[0]).abs() < 0.001);
+        assert!((old[1] - new[1]).abs() < 0.001);
+    }
+
+    #[test]
+    fn wire_culling_preserves_reverse_and_crossing_curves() {
+        for (a, b) in [(egui::pos2(500., 100.), egui::pos2(-500., 400.)), (egui::pos2(-900., -10.), egui::pos2(900., 10.))] {
+            let bounds = wire_bounds(a, b);
+            assert!(cubic(a, b, 80).iter().all(|p| bounds.contains(*p)));
+        }
+    }
 }
