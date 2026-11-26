@@ -243,6 +243,13 @@ pub(crate) fn evaluate_node(
             cancel,
         );
     }
+    // The 式 node parses its text once; every list item then reuses the parsed formula.
+    let formula = if node.kind == NodeKind::Expression {
+        Some(crate::expr::parse(&node.script)?)
+    } else {
+        None
+    };
+    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -279,7 +286,14 @@ pub(crate) fn evaluate_node(
             })
             .collect();
         result.branches.entry(path.clone()).or_default();
-        if lists.iter().any(|v| v.is_empty()) {
+        // List nodes see their whole first list (an empty one is a valid input, e.g. for
+        // リスト長 or 連結); their setting inputs still need at least one value.
+        let skip = if list_kind {
+            node.kind != NodeKind::ConcatList && lists.iter().skip(1).any(|v| v.is_empty())
+        } else {
+            lists.iter().any(|v| v.is_empty())
+        };
+        if skip {
             continue;
         }
         let values = if node.kind == NodeKind::Merge {
@@ -292,6 +306,8 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if list_kind {
+            crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
             let count = lists.iter().map(|v| v.len()).max().unwrap_or(0);
             let mut values = Vec::new();
@@ -307,7 +323,15 @@ pub(crate) fn evaluate_node(
                     (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
                     MAX_ITEMS.saturating_sub(total_items.saturating_add(values.len())),
                 )?;
-                let made = run(node.kind, &args, cancel)?;
+                let made = match &formula {
+                    Some(f) => vec![Value::Number(f.eval([
+                        num(&args, 0)?,
+                        num(&args, 1)?,
+                        num(&args, 2)?,
+                        num(&args, 3)?,
+                    ])?)],
+                    None => run(node.kind, &args, cancel)?,
+                };
                 if values.len().saturating_add(made.len()) > MAX_ITEMS {
                     return Err(
                         "生成データが多すぎます。数列や配列の個数を減らしてください。".into(),
@@ -326,7 +350,7 @@ pub(crate) fn evaluate_node(
             }
             values
         };
-        if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
+        if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) || list_kind {
             for value in &values {
                 total_weight = total_weight.saturating_add(value.weight());
             }
@@ -393,6 +417,13 @@ fn preflight_run(
             let count = num(args, 2)? as usize;
             (count, count)
         }
+        NodeKind::Random | NodeKind::Populate => {
+            let count = num(args, 0)? as usize;
+            (count, count)
+        }
+        NodeKind::NoiseDeform => (shape(args)?.weight(), 1),
+        // Outer and inner copies plus the stitched rim.
+        NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
         _ => (0, 1),
     };
     if weight > remaining_weight || items > remaining_items {
@@ -400,17 +431,17 @@ fn preflight_run(
     }
     Ok(())
 }
-fn cancelled(stop: &dyn Fn() -> bool) -> Result<(), String> {
+pub(crate) fn cancelled(stop: &dyn Fn() -> bool) -> Result<(), String> {
     if stop() {
         Err("計算を停止しました。".into())
     } else {
         Ok(())
     }
 }
-fn num(a: &[&Value], i: usize) -> Result<f64, String> {
+pub(crate) fn num(a: &[&Value], i: usize) -> Result<f64, String> {
     a.get(i).ok_or("数値の入力がありません。")?.number()
 }
-fn shape<'a>(a: &[&'a Value]) -> Result<&'a Value, String> {
+pub(crate) fn shape<'a>(a: &[&'a Value]) -> Result<&'a Value, String> {
     a.first()
         .copied()
         .ok_or_else(|| "形状を接続してください。".into())
@@ -421,7 +452,7 @@ fn curve(a: &[&Value]) -> Result<Arc<Curve>, String> {
         _ => Err("曲線を接続してください。".into()),
     }
 }
-fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
+pub(crate) fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     validate_mesh(&mesh, cancel)?;
     Ok(vec![Value::Mesh(Arc::new(mesh))])
 }
@@ -731,32 +762,34 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(values)
         }
-        Loft | Merge | Flatten | Graft | Output | Script | Cluster => {
-            Err("このノードはリスト評価が必要です。".into())
-        }
+        Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
+        | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
+        Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
+        | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
+        | Remap | Expression | GraphProfile => Err("このノードはリスト評価が必要です。".into()),
     }
 }
 
-fn finite_point(p: [f64; 3]) -> bool {
+pub(crate) fn finite_point(p: [f64; 3]) -> bool {
     p.into_iter().all(|v| v.is_finite() && v.abs() <= 1e9)
 }
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
         a[0] * b[1] - a[1] * b[0],
     ]
 }
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+pub(crate) fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
-fn length(a: [f64; 3]) -> f64 {
+pub(crate) fn length(a: [f64; 3]) -> f64 {
     dot(a, a).sqrt()
 }
-fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
+pub(crate) fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
     if m.vertices.len() > MAX_VERTICES || m.triangles.len() > MAX_TRIANGLES {
         return Err("メッシュが上限を超えています。分割数を減らしてください。".into());
     }
@@ -779,7 +812,7 @@ fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
     }
     Ok(())
 }
-fn map_shape(
+pub(crate) fn map_shape(
     v: &Value,
     f: impl Fn([f64; 3]) -> [f64; 3],
     cancel: &dyn Fn() -> bool,
@@ -845,7 +878,7 @@ fn z_bounds(v: &Value) -> Result<(f64, f64), String> {
             (a.min(p[2]), b.max(p[2]))
         }))
 }
-fn checked_size(vertices: usize, triangles: usize) -> Result<(), String> {
+pub(crate) fn checked_size(vertices: usize, triangles: usize) -> Result<(), String> {
     if vertices > MAX_VERTICES || triangles > MAX_TRIANGLES {
         Err("形状が大きすぎます。分割数を減らしてください。".into())
     } else {
@@ -1362,7 +1395,7 @@ fn revolve(
     validate_mesh(&m, cancel)?;
     Ok(m)
 }
-fn orient_outward(m: &mut Mesh) {
+pub(crate) fn orient_outward(m: &mut Mesh) {
     let volume = m
         .triangles
         .iter()

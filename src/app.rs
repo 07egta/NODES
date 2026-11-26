@@ -998,6 +998,9 @@ impl MorphletApp {
         if node.kind == NodeKind::Script {
             crate::script_ui::script_editor(ui, &mut self.project.graph, id);
         }
+        if node.kind == NodeKind::Expression {
+            crate::script_ui::expression_editor(ui, &mut self.project.graph, id);
+        }
         if node.kind == NodeKind::Cluster
             && let Some(action) = crate::script_ui::cluster_panel(ui, &mut self.project.graph, id)
         {

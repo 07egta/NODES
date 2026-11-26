@@ -50,7 +50,28 @@ pub const TEMPLATES: &[Template] = &[
         description: "べき乗で高さを変えた円錐を並べ、ミラーで反対側にも写します。",
         tag: "数式と対称",
     },
+    Template {
+        name: "ノイズの花器（厚みつき）",
+        description: "式で決めた半径のグラフから器を作り、ノイズとねじりを加えて、印刷できる厚みをつけます。",
+        tag: "3D プリント",
+    },
+    Template {
+        name: "引力点のパターン",
+        description: "ばらまいた点と引力点の距離を再マップして、近いほど高い柱を並べます。",
+        tag: "パターン",
+    },
 ];
+
+fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
+    if let Some(node) = graph.node_mut(id) {
+        node.script = text.to_string();
+    }
+}
+fn rename(graph: &mut Graph, id: NodeId, name: &str) {
+    if let Some(node) = graph.node_mut(id) {
+        node.name = name.to_string();
+    }
+}
 
 pub fn create(index: usize) -> Project {
     match build(index) {
@@ -272,6 +293,120 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(sine, moved, "x")?;
             graph.connect(heights, moved, "z")?;
             finish(&mut graph, moved, [746.0, 30.0])?;
+        }
+        8 => {
+            let t = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 0.0), ("end", 1.0), ("count", 7.0)],
+            )?;
+            rename(&mut graph, t, "下から上へ (0〜1)");
+            let radii = add(&mut graph, NodeKind::Expression, [262.0, 30.0], &[])?;
+            set_script(&mut graph, radii, "30 + 10 * sin(x * pi * 1.5) - 6 * x");
+            rename(&mut graph, radii, "半径の式");
+            graph.connect(t, radii, "x")?;
+            let body = add(
+                &mut graph,
+                NodeKind::GraphProfile,
+                [504.0, 30.0],
+                &[
+                    ("height", 120.0),
+                    ("rows", 60.0),
+                    ("segments", 96.0),
+                    ("top", 0.0),
+                ],
+            )?;
+            graph.connect(radii, body, "radii")?;
+            let noise = add(
+                &mut graph,
+                NodeKind::NoiseDeform,
+                [20.0, 310.0],
+                &[("amp", 1.5), ("size", 18.0), ("seed", 7.0), ("mode", 0.0)],
+            )?;
+            graph.connect(body, noise, "geometry")?;
+            let twist = add(
+                &mut graph,
+                NodeKind::Twist,
+                [262.0, 310.0],
+                &[("angle", 60.0)],
+            )?;
+            graph.connect(noise, twist, "geometry")?;
+            let shell = add(
+                &mut graph,
+                NodeKind::Shell,
+                [504.0, 310.0],
+                &[("thickness", 2.0)],
+            )?;
+            graph.connect(twist, shell, "geometry")?;
+            let check = add(
+                &mut graph,
+                NodeKind::OverhangCheck,
+                [746.0, 310.0],
+                &[("angle", 45.0)],
+            )?;
+            graph.connect(shell, check, "geometry")?;
+            finish(&mut graph, shell, [746.0, 30.0])?;
+        }
+        9 => {
+            let points = add(
+                &mut graph,
+                NodeKind::Populate,
+                [20.0, 30.0],
+                &[
+                    ("count", 60.0),
+                    ("width", 160.0),
+                    ("depth", 160.0),
+                    ("height", 0.0),
+                    ("seed", 3.0),
+                ],
+            )?;
+            let attractor = add(
+                &mut graph,
+                NodeKind::Point,
+                [20.0, 310.0],
+                &[("x", 30.0), ("y", -20.0), ("z", 0.0)],
+            )?;
+            rename(&mut graph, attractor, "引力点");
+            let distance = add(&mut graph, NodeKind::Distance, [262.0, 310.0], &[])?;
+            graph.connect(points, distance, "a")?;
+            graph.connect(attractor, distance, "b")?;
+            let heights = add(
+                &mut graph,
+                NodeKind::Remap,
+                [504.0, 310.0],
+                &[("target_min", 24.0), ("target_max", 4.0)],
+            )?;
+            rename(&mut graph, heights, "近いほど高く");
+            graph.connect(distance, heights, "values")?;
+            let column = add(
+                &mut graph,
+                NodeKind::Cylinder,
+                [746.0, 310.0],
+                &[("radius", 4.0), ("segments", 24.0)],
+            )?;
+            graph.connect(heights, column, "height")?;
+            let x = add(
+                &mut graph,
+                NodeKind::PointComponent,
+                [262.0, 30.0],
+                &[("axis", 0.0)],
+            )?;
+            rename(&mut graph, x, "点の X");
+            graph.connect(points, x, "point")?;
+            let y = add(
+                &mut graph,
+                NodeKind::PointComponent,
+                [504.0, 30.0],
+                &[("axis", 1.0)],
+            )?;
+            rename(&mut graph, y, "点の Y");
+            graph.connect(points, y, "point")?;
+            let moved = add(&mut graph, NodeKind::Move, [988.0, 310.0], &[])?;
+            graph.connect(column, moved, "geometry")?;
+            graph.connect(x, moved, "x")?;
+            graph.connect(y, moved, "y")?;
+            finish(&mut graph, moved, [988.0, 30.0])?;
         }
         _ => {
             let base = add(

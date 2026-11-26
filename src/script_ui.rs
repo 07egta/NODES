@@ -81,6 +81,49 @@ pub fn script_editor(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) {
     ui.data_mut(|d| d.insert_temp(key, (buffer, base)));
 }
 
+/// One-line formula editor for the 式 node. Applied on Enter, focus loss or the button.
+pub fn expression_editor(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) {
+    let Some(node) = graph.node_mut(id) else {
+        return;
+    };
+    ui.add_space(6.);
+    ui.label(RichText::new("式").strong());
+    ui.label(theme::small(
+        "x・y・z・w は左の入力です。例: sin(x) * 10 + y、(x - 5) ^ 2、max(x, y)。\n\
+         関数: sin cos tan sqrt abs min max floor ceil round ln exp、定数: pi e。角度はラジアンです。",
+    ));
+    let key = egui::Id::new(("expression_buffer", id));
+    let (mut buffer, mut base): (String, String) = ui
+        .data_mut(|d| d.get_temp::<(String, String)>(key))
+        .unwrap_or_else(|| (node.script.clone(), node.script.clone()));
+    if base != node.script {
+        buffer = node.script.clone();
+        base = node.script.clone();
+    }
+    let mut apply = false;
+    ui.horizontal(|ui| {
+        let response = ui.add(
+            egui::TextEdit::singleline(&mut buffer)
+                .code_editor()
+                .desired_width(220.)
+                .char_limit(morphlet::expr::MAX_EXPR_LEN)
+                .hint_text(morphlet::expr::DEFAULT_EXPRESSION),
+        );
+        apply = response.lost_focus();
+        if ui.button("適用").clicked() {
+            apply = true;
+        }
+    });
+    if let Err(e) = morphlet::expr::parse(&buffer) {
+        ui.label(RichText::new(e).size(11.).color(theme::ERROR));
+    }
+    if apply && buffer != node.script {
+        node.script = buffer.clone();
+        base = buffer.clone();
+    }
+    ui.data_mut(|d| d.insert_temp(key, (buffer, base)));
+}
+
 /// Cluster node details. Returns an action for the app to carry out.
 pub fn cluster_panel(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) -> Option<PartAction> {
     let def_id = graph.node(id)?.cluster?;

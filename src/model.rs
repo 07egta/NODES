@@ -60,7 +60,7 @@ pub struct NodeSpec {
     pub inputs: &'static [InputSpec],
     pub output: DataType,
 }
-const fn n(
+pub(crate) const fn n(
     key: &'static str,
     label: &'static str,
     default: f64,
@@ -79,7 +79,13 @@ const fn n(
         integer: false,
     }
 }
-const fn i(key: &'static str, label: &'static str, default: f64, min: f64, max: f64) -> InputSpec {
+pub(crate) const fn i(
+    key: &'static str,
+    label: &'static str,
+    default: f64,
+    min: f64,
+    max: f64,
+) -> InputSpec {
     InputSpec {
         key,
         label,
@@ -91,7 +97,7 @@ const fn i(key: &'static str, label: &'static str, default: f64, min: f64, max: 
         integer: true,
     }
 }
-const fn g(key: &'static str, label: &'static str, kind: DataType) -> InputSpec {
+pub(crate) const fn g(key: &'static str, label: &'static str, kind: DataType) -> InputSpec {
     InputSpec {
         key,
         label,
@@ -153,6 +159,29 @@ pub enum NodeKind {
     Script,
     /// Instance of a cluster definition stored in `Graph::clusters` (see `cluster.rs`).
     Cluster,
+    // List, number, pattern and print-checking nodes (see `gh_nodes.rs`). Appended at the
+    // end so the serde names and the order of the older kinds stay as they were.
+    ListItem,
+    ListLength,
+    ReverseList,
+    SortList,
+    CullPattern,
+    ShiftList,
+    ConcatList,
+    SubList,
+    Bounds,
+    Remap,
+    /// Typed formula of x, y, z, w; its text is kept in `Node::script`.
+    Expression,
+    Random,
+    Populate,
+    Noise,
+    NoiseDeform,
+    GraphProfile,
+    Shell,
+    OverhangCheck,
+    Distance,
+    PointComponent,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -201,6 +230,26 @@ impl NodeKind {
             Self::Output,
             Self::Script,
             // `Cluster` is intentionally not listed: it is created from a definition.
+            Self::ListItem,
+            Self::ListLength,
+            Self::ReverseList,
+            Self::SortList,
+            Self::CullPattern,
+            Self::ShiftList,
+            Self::ConcatList,
+            Self::SubList,
+            Self::Bounds,
+            Self::Remap,
+            Self::Expression,
+            Self::Random,
+            Self::Populate,
+            Self::Noise,
+            Self::NoiseDeform,
+            Self::GraphProfile,
+            Self::Shell,
+            Self::OverhangCheck,
+            Self::Distance,
+            Self::PointComponent,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -811,6 +860,7 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            other => crate::gh_nodes::spec(other),
         }
     }
 }
@@ -869,7 +919,11 @@ impl Graph {
                 .collect(),
             inputs: BTreeMap::new(),
             preview: true,
-            script: String::new(),
+            script: if kind == NodeKind::Expression {
+                crate::expr::DEFAULT_EXPRESSION.into()
+            } else {
+                String::new()
+            },
             cluster: None,
         });
         self.next_id = next;
