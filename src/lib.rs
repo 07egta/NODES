@@ -6,4 +6,5 @@ pub mod gh_nodes;
 pub mod model;
 pub mod persistence;
 pub mod script;
+pub mod stl_export;
 pub mod templates;

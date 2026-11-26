@@ -5,6 +5,7 @@ mod data_view;
 mod file_picker;
 mod help;
 mod script_ui;
+mod stl_export_ui;
 mod theme;
 mod viewport;
 

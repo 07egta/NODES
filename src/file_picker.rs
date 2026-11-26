@@ -15,6 +15,8 @@ pub enum FileTask {
     Save,
     ExportStl,
     ExportObj,
+    ExportThreeMf,
+    PickSlicer,
     SavePart,
     LoadPart,
 }
@@ -22,7 +24,7 @@ pub enum FileTask {
 impl FileTask {
     /// Tasks that pick an existing file (the others name a file to write).
     fn picks_existing(self) -> bool {
-        matches!(self, Self::Open | Self::LoadPart)
+        matches!(self, Self::Open | Self::LoadPart | Self::PickSlicer)
     }
     fn title(self) -> &'static str {
         match self {
@@ -30,6 +32,8 @@ impl FileTask {
             Self::Save => "作品を保存",
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
+            Self::ExportThreeMf => "3MF に書き出す",
+            Self::PickSlicer => "スライサーを選ぶ",
             Self::SavePart => "部品を書き出す",
             Self::LoadPart => "部品を読み込む",
         }
@@ -40,6 +44,8 @@ impl FileTask {
             Self::Open | Self::Save => "morph",
             Self::ExportStl => "stl",
             Self::ExportObj => "obj",
+            Self::ExportThreeMf => "3mf",
+            Self::PickSlicer => "exe",
             Self::SavePart | Self::LoadPart => "morphpart",
         }
     }
@@ -49,7 +55,8 @@ impl FileTask {
             Self::Open => "開く",
             Self::Save => "保存",
             Self::LoadPart => "読み込む",
-            Self::ExportStl | Self::ExportObj | Self::SavePart => "書き出す",
+            Self::PickSlicer => "選ぶ",
+            Self::ExportStl | Self::ExportObj | Self::ExportThreeMf | Self::SavePart => "書き出す",
         }
     }
 }
