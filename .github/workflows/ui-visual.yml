@@ -1,0 +1,35 @@
+name: NODES visual smoke
+on:
+  pull_request:
+    branches: ["evolve/all"]
+    paths:
+      - "src/**"
+      - "scripts/capture_ui.py"
+      - ".github/workflows/ui-visual.yml"
+permissions:
+  contents: read
+concurrency:
+  group: nodes-visual-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  screenshot:
+    if: github.head_ref == 'feat/nodes-premium-interface'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install virtual display and Mesa
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dev libgl1-mesa-dri libxkbcommon-x11-0
+      - name: Build app
+        run: cargo build --locked --bin Morphlet
+      - name: Capture representative frames
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 2560x1600x24" python3 scripts/capture_ui.py --binary target/debug/Morphlet --out ui-captures --quick --strict-pixels
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nodes-visual-smoke
+          path: ui-captures/
+          if-no-files-found: warn

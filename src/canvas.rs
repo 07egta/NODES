@@ -1350,6 +1350,44 @@ mod premium_tests {
     }
 
     #[test]
+    fn logical_canvas_size_matrix_draws_without_panics() {
+        for count in [10, 100, 1000] {
+            let base = crate::ui_fixture::make(count).unwrap();
+            for (w, h) in [(1280., 720.), (1920., 1080.), (2560., 1600.)] {
+                for scale in [1.0, 1.5, 2.0] {
+                    let mut project = base.clone();
+                    let mut canvas = GraphCanvas { fit_requested: true, ..Default::default() };
+                    let ctx = egui::Context::default();
+                    let logical = Rect::from_min_size(Pos2::ZERO, egui::vec2(w / scale, h / scale));
+                    let output = ctx.run(egui::RawInput { screen_rect: Some(logical), ..Default::default() }, |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            canvas.show(ui, &mut project, None, false);
+                        });
+                    });
+                    assert!(!output.shapes.is_empty(), "{count} nodes at {w}x{h}, scale {scale}");
+                    assert_eq!(project.graph.nodes.len(), count);
+                    project.validate().unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn selected_alignment_and_spacing_preserve_unselected_cards() {
+        let mut project = Project::new("test", Default::default());
+        let a = project.graph.add(NodeKind::Number, [0., 40.]).unwrap();
+        let b = project.graph.add(NodeKind::Number, [270., 20.]).unwrap();
+        let c = project.graph.add(NodeKind::Number, [900., 80.]).unwrap();
+        let d = project.graph.add(NodeKind::Number, [1200., 120.]).unwrap();
+        let canvas = GraphCanvas { selected: [a,b,c].into_iter().collect(), ..Default::default() };
+        canvas.align_selected(&mut project, 1);
+        canvas.distribute_selected(&mut project, 0);
+        for id in [a,b,c] { assert_eq!(project.graph.node(id).unwrap().position[1], 20.); }
+        assert_eq!(project.graph.node(b).unwrap().position[0], 450.);
+        assert_eq!(project.graph.node(d).unwrap().position, [1200., 120.]);
+    }
+
+    #[test]
     fn fit_is_finite_for_narrow_and_large_graphs() {
         let bounds = Rect::from_min_size(egui::pos2(-200., -400.), egui::vec2(8000., 6000.));
         for size in [[640., 360.], [1280., 720.], [1920., 1080.], [2560., 1600.]] {

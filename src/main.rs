@@ -9,6 +9,7 @@ mod script_ui;
 mod stl_export_ui;
 mod theme;
 mod ui_polish;
+mod ui_fixture;
 mod viewport;
 
 use morphlet::{engine::Evaluator, model::NodeKind, persistence, templates};
@@ -22,6 +23,14 @@ fn main() -> eframe::Result<()> {
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("examples"));
         if let Err(e) = export_demos(&path) {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+    if args.first().is_some_and(|a| a == "--ui-fixtures") {
+        let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("ui-fixtures"));
+        if let Err(e) = ui_fixture::export(&path) {
             eprintln!("{e}");
             std::process::exit(1);
         }
@@ -65,11 +74,21 @@ fn main() -> eframe::Result<()> {
         .iter()
         .find(|a| a.ends_with(".morph"))
         .map(PathBuf::from);
+    let value = |flag: &str| args.windows(2).find(|a| a[0] == flag).map(|a| a[1].as_str());
+    let size = value("--ui-size").and_then(|s| {
+        let (w, h) = s.split_once('x')?;
+        let size = [w.parse::<f32>().ok()?, h.parse::<f32>().ok()?];
+        size.iter().all(|v| (640.0..=7680.0).contains(v)).then_some(size)
+            .or_else(|| (size[0] >= 640. && size[0] <= 7680. && size[1] >= 360. && size[1] <= 4320.).then_some(size))
+    }).unwrap_or([1380., 920.]);
+    let scale = value("--ui-scale").and_then(|s| s.parse::<f32>().ok())
+        .filter(|v| (0.75..=2.0).contains(v));
+    let dark = match value("--ui-theme") { Some("light") => Some(false), Some("dark") => Some(true), _ => None };
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Morphlet · Geometry Studio")
-            .with_inner_size([1380., 920.])
-            .with_min_inner_size([1100., 720.])
+            .with_title("NODES · Geometry Studio")
+            .with_inner_size(size)
+            .with_min_inner_size([640., 360.])
             .with_icon(icon()),
         renderer: eframe::Renderer::Glow,
         multisampling: 0,
@@ -79,7 +98,11 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Morphlet",
         options,
-        Box::new(move |cc| Ok(Box::new(app::MorphletApp::new(cc, open_file, screenshot)))),
+        Box::new(move |cc| {
+            let mut app = app::MorphletApp::new(cc, open_file, screenshot);
+            app.configure_capture(&cc.egui_ctx, scale, dark);
+            Ok(Box::new(app))
+        }),
     )
 }
 

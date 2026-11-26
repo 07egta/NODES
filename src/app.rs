@@ -244,6 +244,18 @@ impl MorphletApp {
         }
         app
     }
+    /// Optional launch-time display overrides; do not persist them to user settings.
+    pub fn configure_capture(&mut self, ctx: &egui::Context, scale: Option<f32>, dark: Option<bool>) {
+        if let Some(scale) = scale {
+            self.ui_scale = scale;
+            ctx.set_zoom_factor(scale);
+        }
+        if let Some(dark) = dark {
+            self.dark = dark;
+            theme::set_dark(dark);
+            theme::apply_style(ctx);
+        }
+    }
     fn notify(&mut self, message: impl Into<String>, error: bool) {
         self.toast = Some((message.into(), error, Instant::now()));
     }
@@ -1711,7 +1723,7 @@ impl MorphletApp {
             });
             ui.add_space(8.);if ui.button("ノード辞典を開く（全ノードの説明）").clicked(){self.help_window.open_index();}
             ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
-            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
+            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.75..=2.0).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
         });
         self.help_open = open;
     }
@@ -1985,11 +1997,8 @@ impl eframe::App for MorphletApp {
     }
 }
 
-/// Copies the chosen subgraph atomically. A duplicate retains upstream links;
-/// a paste only retains links inside the copied selection. Cluster definitions remain
-/// document-local, so a stale/missing definition causes validation to fail.
 /// Insert a node into a specific existing edge, or append one to a source.
-//// Work on a candidate graph so failures also leave the ID counter unchanged.
+/// Work on a candidate graph so failures also leave the ID counter unchanged.
 fn add_on_wire(graph: &mut Graph, source: NodeId, insert: Option<&WireLink>, kind: NodeKind, at: [f32; 2]) -> Result<NodeId, String> {
     let source_type = graph.node(source).ok_or("接続元が見つかりません。")?.kind.spec().output;
     let port = ui_polish::first_compatible_input(kind, source_type)
@@ -2010,6 +2019,8 @@ fn add_on_wire(graph: &mut Graph, source: NodeId, insert: Option<&WireLink>, kin
     Ok(id)
 }
 
+/// Copies the chosen subgraph atomically. A duplicate retains upstream links;
+/// a paste only retains links inside the copied selection.
 fn insert_nodes(graph: &mut Graph, nodes: &[Node], offset: [f32; 2], retain_external: bool) -> Result<BTreeSet<NodeId>, String> {
     if nodes.len() > morphlet::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
         return Err("ノード数の上限を超えるため追加できません。".into());
