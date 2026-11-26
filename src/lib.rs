@@ -6,6 +6,7 @@ pub mod gcode;
 pub mod gh_nodes;
 pub mod import;
 pub mod model;
+pub mod mesh_fabrication;
 pub mod persistence;
 pub mod print_info;
 pub mod raster;
