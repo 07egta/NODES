@@ -348,6 +348,11 @@ fn editing_the_definition_invalidates_the_cache() {
     let first = evaluator.evaluate(&graph, &|| false);
     let second = evaluator.evaluate(&graph, &|| false);
     assert_eq!(second.computed, 0);
+    // `factor` is exposed on the cluster node, whose own slot value would override an inner edit.
+    // Un-expose it so the edit below changes what the definition computes.
+    graph.clusters[0]
+        .inputs
+        .retain(|p| !(p.node == s && p.key == "factor"));
     graph.clusters[0]
         .graph
         .node_mut(s)
