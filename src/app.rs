@@ -1285,6 +1285,56 @@ impl MorphletApp {
         if let Some(key) = disconnect {
             self.project.graph.disconnect(id, key);
         }
+        if morphlet::data_tree_nodes::supports_transform(node.kind) {
+            egui::CollapsingHeader::new("データツリー設定")
+                .id_salt(("tree_settings", id))
+                .show(ui, |ui| {
+                    use morphlet::data_tree::{MATCH_PARAM, PORT_PREFIX};
+                    if let Some(n) = self.project.graph.node_mut(id) {
+                        if morphlet::data_tree_nodes::supports_matching(node.kind) {
+                            let mut choice = n.params.get(MATCH_PARAM).copied().unwrap_or(-1.) as i32;
+                            let previous = choice;
+                            let names = ["旧互換（同じパス）", "Longest", "Shortest", "Cross"];
+                            egui::ComboBox::from_id_salt(("matching",id))
+                                .selected_text(names[(choice+1).clamp(0,3) as usize])
+                                .show_ui(ui, |ui| {
+                                    for (i,name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice,i as i32-1,*name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice < 0 { n.params.remove(MATCH_PARAM); }
+                                else { n.params.insert(MATCH_PARAM.into(),choice as f64); }
+                            }
+                        }
+                        for (index,input) in spec.inputs.iter().enumerate().take(shown) {
+                            let key = format!("{PORT_PREFIX}{}",input.key);
+                            let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
+                            let previous = choice;
+                            let names = ["そのまま","Flatten","Graft","Simplify"];
+                            ui.label(format!("{} · {} · {}", input.label,input.kind.label(),
+                                morphlet::data_tree_nodes::access_label(node.kind,index)));
+                            egui::ComboBox::from_id_salt(("tree_port",id,input.key))
+                                .selected_text(names[choice.min(3)])
+                                .show_ui(ui,|ui| {
+                                    for (i,name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice,i,*name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice == 0 { n.params.remove(&key); }
+                                else { n.params.insert(key,choice as f64); }
+                            }
+                        }
+                    }
+                });
+        }
+        if node.kind == NodeKind::PathMapper {
+            ui.label(theme::small("例: {A;B}->{B;A}（変数・非負整数のみ）"));
+            if let Some(n) = self.project.graph.node_mut(id) {
+                ui.add(egui::TextEdit::singleline(&mut n.script).char_limit(1024));
+            }
+        }
         if node.kind == NodeKind::Script {
             crate::script_ui::script_editor(ui, &mut self.project.graph, id);
         }
