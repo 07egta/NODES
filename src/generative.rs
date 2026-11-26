@@ -742,55 +742,94 @@ fn delaunay(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
     }
     let n=p.len();
     if n<3{return Err("異なる 3 点以上が必要です。".into());}
-    p.extend([[-32.,-16.],[32.,-16.],[0.,32.]]);
-    let mut tris=vec![[n,n+1,n+2]];
-    for i in 0..n{
-        cancelled(cancel)?;
-        let mut keep=Vec::new();
-        let mut boundary=std::collections::BTreeMap::<(usize,usize),usize>::new();
-        for t in tris{
-            let det=incircle(p[t[0]],p[t[1]],p[t[2]],p[i]);
-            if det>0. {
-                for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
-                    *boundary.entry((a.min(b),a.max(b))).or_default()+=1;
-                }
-            }else{keep.push(t);}
-        }
-        if boundary.is_empty(){return Err("数値的に不安定な点配置です。".into());}
-        for ((a,b),count) in boundary{
-            if count>2{return Err("分割の境界が不正です。".into());}
-            if count!=1{continue;}
-            let sign=side(p[a],p[b],p[i]);
-            if sign>1e-14{keep.push([a,b,i]);}
-            else if sign < -1e-14{keep.push([b,a,i]);}
-        }
-        if keep.len()>MAX_SITES*8{return Err("三角形数が上限を超えました。".into());}
-        tris=keep;
+    // A finite supertriangle can steal an almost-collinear hull facet. Verify coverage
+    // against the real convex hull and retry with a larger supertriangle if necessary.
+    let mut sorted=p.clone();
+    sorted.sort_by(|a,b|a[0].total_cmp(&b[0]).then(a[1].total_cmp(&b[1])));
+    let mut lower:Vec<P2>=Vec::new();
+    let mut upper:Vec<P2>=Vec::new();
+    for &q in &sorted {
+        while lower.len()>=2 && side(lower[lower.len()-2],lower[lower.len()-1],q)<=0. {lower.pop();}
+        lower.push(q);
     }
-    tris.retain(|t|t.iter().all(|&i|i<n));
-    if tris.is_empty(){return Err("点がほぼ同一直線上にあります。".into());}
-    let mut used=vec![false;n];
-    let mut edges=std::collections::BTreeMap::<(usize,usize),usize>::new();
-    let mut unique=std::collections::BTreeSet::new();
-    for t in &tris{
+    for &q in sorted.iter().rev() {
+        while upper.len()>=2 && side(upper[upper.len()-2],upper[upper.len()-1],q)<=0. {upper.pop();}
+        upper.push(q);
+    }
+    lower.pop(); upper.pop(); lower.extend(upper);
+    let expected=area(&lower);
+    if expected<=1e-14{return Err("点がほぼ同一直線上にあります。".into());}
+    let area_tol=(expected*1e-10).max(1e-14);
+
+    'attempt: for radius in [32.,128.,512.,2048.,8192.,32768.] {
         cancelled(cancel)?;
-        let mut key=*t;key.sort_unstable();
-        if !unique.insert(key){return Err("重複した三角形ができました。".into());}
-        for &i in t{used[i]=true;}
-        for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
-            *edges.entry((a.min(b),a.max(b))).or_default()+=1;
+        p.truncate(n);
+        p.extend([[-radius,-radius*0.5],[radius,-radius*0.5],[0.,radius]]);
+        let mut tris=vec![[n,n+1,n+2]];
+        for i in 0..n{
+            cancelled(cancel)?;
+            let mut keep=Vec::new();
+            let mut boundary=std::collections::BTreeMap::<(usize,usize),usize>::new();
+            for (k,t) in tris.into_iter().enumerate(){
+                if k%128==0{cancelled(cancel)?;}
+                let det=incircle(p[t[0]],p[t[1]],p[t[2]],p[i]);
+                if det>0. {
+                    for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
+                        *boundary.entry((a.min(b),a.max(b))).or_default()+=1;
+                    }
+                }else{keep.push(t);}
+            }
+            if boundary.is_empty(){continue 'attempt;}
+            for ((a,b),count) in boundary{
+                if count>2{continue 'attempt;}
+                if count!=1{continue;}
+                let sign=side(p[a],p[b],p[i]);
+                if sign>1e-14{keep.push([a,b,i]);}
+                else if sign < -1e-14{keep.push([b,a,i]);}
+            }
+            if keep.len()>MAX_SITES*8{continue 'attempt;}
+            tris=keep;
         }
-        // Check empty circumcircle on normalized positions, with a small roundoff allowance.
-        for (k,&q) in p[..n].iter().enumerate(){
-            if !t.contains(&k)&&incircle(p[t[0]],p[t[1]],p[t[2]],q)>1e-12{
-                return Err("ドロネー条件を満たせません。点の間隔を調整してください。".into());
+        tris.retain(|t|t.iter().all(|&i|i<n));
+        if tris.is_empty(){continue 'attempt;}
+        let got=tris.iter().map(|t|side(p[t[0]],p[t[1]],p[t[2]])*0.5).sum::<f64>();
+        if (got-expected).abs()>area_tol {continue 'attempt;}
+        let mut used=vec![false;n];
+        let mut edges=std::collections::BTreeMap::<(usize,usize),usize>::new();
+        let mut unique=std::collections::BTreeSet::new();
+        for t in &tris{
+            cancelled(cancel)?;
+            let mut key=*t;key.sort_unstable();
+            if !unique.insert(key){continue 'attempt;}
+            for &i in t{used[i]=true;}
+            for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])]{
+                *edges.entry((a.min(b),a.max(b))).or_default()+=1;
+            }
+            // Check empty circumcircle on normalized positions, with roundoff allowance.
+            for (k,&q) in p[..n].iter().enumerate(){
+                if !t.contains(&k)&&incircle(p[t[0]],p[t[1]],p[t[2]],q)>1e-12{
+                    continue 'attempt;
+                }
             }
         }
+        if used.iter().any(|v|!*v)||edges.values().any(|&v|v>2)||n+tris.len()!=edges.len()+1{
+            continue 'attempt;
+        }
+        // Boundary edges must lie on supporting lines of the point set. This guards
+        // against an inward indentation that might otherwise satisfy Euler's relation.
+        for (&(a,b),&count) in &edges {
+            if count!=1{continue;}
+            let mut pos=false;
+            let mut neg=false;
+            for &q in &p[..n] {
+                let v=side(p[a],p[b],q);
+                pos|=v>1e-12; neg|=v< -1e-12;
+                if pos&&neg {continue 'attempt;}
+            }
+        }
+        return crate::engine::as_mesh(Mesh{vertices,triangles:tris.into_iter().map(|t|t.map(|i|i as u32)).collect()},cancel);
     }
-    if used.iter().any(|v|!*v)||edges.values().any(|&v|v>2)||n+tris.len()!=edges.len()+1{
-        return Err("退化した分割です。点の間隔を広げてください。".into());
-    }
-    crate::engine::as_mesh(Mesh{vertices,triangles:tris.into_iter().map(|t|t.map(|i|i as u32)).collect()},cancel)
+    Err("凸包を完全に覆うドロネー分割を作れません。点の間隔を調整してください。".into())
 }
 
 #[cfg(test)]
