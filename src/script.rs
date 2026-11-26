@@ -222,6 +222,9 @@ pub fn run_script(
     result.unwrap_or_else(|| Err("スクリプトの実行中に内部エラーが起きました。".into()))
 }
 
+type UnaryFn = fn(f64) -> f64;
+type BinaryFn = fn(f64, f64) -> f64;
+
 fn execute(source: &str, inputs: &ScriptInputs, stop: Arc<AtomicBool>) -> Result<Tree, String> {
     let engine = build_engine(stop);
     let ast = engine.compile(source).map_err(|e| {
@@ -364,7 +367,7 @@ fn register_api(engine: &mut Engine) {
     engine.register_get("z", |p: &mut SPoint| p.0[2]);
 
     // Math. Arguments may be integers or floats (Rhai itself is strict about that).
-    let unary: [(&str, fn(f64) -> f64); 15] = [
+    let unary: [(&str, UnaryFn); 15] = [
         ("sin", f64::sin),
         ("cos", f64::cos),
         ("tan", f64::tan),
@@ -386,7 +389,7 @@ fn register_api(engine: &mut Engine) {
             finite(f(num(&x)?))
         });
     }
-    let binary: [(&str, fn(f64, f64) -> f64); 4] = [
+    let binary: [(&str, BinaryFn); 4] = [
         ("atan2", f64::atan2),
         ("pow", f64::powf),
         ("min", f64::min),

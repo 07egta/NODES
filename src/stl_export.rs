@@ -423,11 +423,8 @@ fn fill_small_holes(
         let mut ring = vec![start];
         let mut current = start;
         let mut closed = false;
-        loop {
-            let to = match hole_out.get(&current).map(Vec::as_slice) {
-                Some([only]) => *only,
-                _ => break,
-            };
+        while let Some([only]) = hole_out.get(&current).map(Vec::as_slice) {
+            let to = *only;
             if to == start {
                 closed = ring.len() >= 3;
                 break;
