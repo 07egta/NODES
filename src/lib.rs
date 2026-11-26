@@ -12,3 +12,5 @@ pub mod raster;
 pub mod script;
 pub mod stl_export;
 pub mod templates;
+pub mod surface_kernel;
+pub mod surface_nodes;

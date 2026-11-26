@@ -196,6 +196,7 @@ pub fn category_color(category: &str) -> Color32 {
         "数値" => Color32::from_rgb(176, 128, 52),
         "曲線" => Color32::from_rgb(88, 142, 200),
         "立体" => Color32::from_rgb(34, 150, 128),
+        "精密曲面" => Color32::from_rgb(42, 145, 175),
         "変形" => Color32::from_rgb(146, 116, 196),
         "配列" => Color32::from_rgb(208, 128, 92),
         "データ" => Color32::from_rgb(120, 138, 160),

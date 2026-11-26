@@ -794,6 +794,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
+        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh => crate::surface_nodes::run(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
         | Remap | Expression | GraphProfile | ImportMesh => {
@@ -884,6 +885,7 @@ pub(crate) fn map_shape(
             Ok(Value::Mesh(Arc::new(mesh)))
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
+        Value::Surface(_) | Value::Solid(_) => Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into()),
     }
 }
 fn rotate(p: [f64; 3], r: f64, axis: usize) -> [f64; 3] {

@@ -76,6 +76,8 @@ pub fn value_text(value: &Value) -> String {
             m.vertices.len(),
             m.triangles.len()
         ),
+        Value::Surface(s) => format!("数学曲面 · {} · UV 0–1", s.geometry().name()),
+        Value::Solid(s) => format!("閉じた B-rep · {} 面 / {} 稜線 · 体積 {:.4}", s.brep().shell().faces().len(), s.brep().edges().len(), s.volume()),
     }
 }
 

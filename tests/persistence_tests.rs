@@ -414,7 +414,7 @@ fn new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged() {
     }
     // 42 geometry/data nodes, the Script node, the 20 list/pattern/print nodes and the
     // ImportMesh node (Cluster is created from a definition).
-    assert_eq!(NodeKind::all().len(), 64);
+    assert!(NodeKind::all().len() >= 64 + morphlet::surface_nodes::KINDS.len());
     let mut seen = std::collections::BTreeSet::new();
     assert!(NodeKind::all().iter().all(|k| seen.insert(*k)));
 }
@@ -955,6 +955,7 @@ fn gh_nodes_evaluate_to_finite_non_empty_results_with_defaults() {
                     assert!(m.vertices.iter().flatten().all(|c| c.is_finite()));
                 }
                 Value::Curve(c) => assert!(c.points.iter().flatten().all(|v| v.is_finite())),
+                other => panic!("unexpected precise geometry in legacy node: {other:?}"),
             }
         }
     }

@@ -19,6 +19,9 @@ pub enum DataType {
     Mesh,
     Geometry,
     Any,
+    Surface,
+    Solid,
+    DisplayGeometry,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
@@ -29,6 +32,9 @@ impl DataType {
             Self::Mesh => "メッシュ",
             Self::Geometry => "形状",
             Self::Any => "データ",
+            Self::Surface => "数学曲面",
+            Self::Solid => "B-rep 立体",
+            Self::DisplayGeometry => "表示形状",
         }
     }
     pub fn accepts(self, source: Self) -> bool {
@@ -37,6 +43,8 @@ impl DataType {
             || self == source
             || (self == Self::Geometry && matches!(source, Self::Point | Self::Curve | Self::Mesh))
             || (source == Self::Geometry && matches!(self, Self::Point | Self::Curve | Self::Mesh))
+            || (self == Self::DisplayGeometry && matches!(source, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
+            || (source == Self::DisplayGeometry && matches!(self, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
     }
 }
 
@@ -184,6 +192,31 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    // Mathematical geometry, appended for stable old node ordering and names.
+    PlaneSurface,
+    NurbsPanel,
+    BilinearSurface,
+    CylinderSurface,
+    FrustumSurface,
+    SphereSurface,
+    TorusSurface,
+    EvaluateSurface,
+    SurfaceDirection,
+    SurfaceNormalLine,
+    SurfaceArea,
+    SurfaceClosestPoint,
+    SurfaceIsoCurve,
+    DivideSurface,
+    SurfaceMesh,
+    BrepBox,
+    BrepVolume,
+    BrepArea,
+    BrepIntersection,
+    BrepMove,
+    BrepFaces,
+    BrepEdges,
+    BrepVertices,
+    BrepMesh,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +286,30 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::PlaneSurface,
+            Self::NurbsPanel,
+            Self::BilinearSurface,
+            Self::CylinderSurface,
+            Self::FrustumSurface,
+            Self::SphereSurface,
+            Self::TorusSurface,
+            Self::EvaluateSurface,
+            Self::SurfaceDirection,
+            Self::SurfaceNormalLine,
+            Self::SurfaceArea,
+            Self::SurfaceClosestPoint,
+            Self::SurfaceIsoCurve,
+            Self::DivideSurface,
+            Self::SurfaceMesh,
+            Self::BrepBox,
+            Self::BrepVolume,
+            Self::BrepArea,
+            Self::BrepIntersection,
+            Self::BrepMove,
+            Self::BrepFaces,
+            Self::BrepEdges,
+            Self::BrepVertices,
+            Self::BrepMesh,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -856,13 +913,14 @@ impl NodeKind {
                     category: "出力",
                     description: "完成した形状を表示・書き出しの対象にします。",
                     keywords: "output preview export 出力 完成 表示 STL",
-                    inputs: &[g("geometry", "形状", DataType::Geometry)],
-                    output: DataType::Geometry,
+                    inputs: &[g("geometry", "形状", DataType::DisplayGeometry)],
+                    output: DataType::DisplayGeometry,
                 };
                 &SPEC
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            other if crate::surface_nodes::KINDS.contains(&other) => crate::surface_nodes::spec(other),
             other => crate::gh_nodes::spec(other),
         }
     }
@@ -1095,6 +1153,8 @@ pub enum Value {
     Point([f64; 3]),
     Curve(Arc<Curve>),
     Mesh(Arc<Mesh>),
+    Surface(Arc<crate::surface_kernel::SurfaceValue>),
+    Solid(Arc<crate::surface_kernel::ClosedSolid>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
@@ -1103,6 +1163,8 @@ impl Value {
             Self::Point(_) => DataType::Point,
             Self::Curve(_) => DataType::Curve,
             Self::Mesh(_) => DataType::Mesh,
+            Self::Surface(_) => DataType::Surface,
+            Self::Solid(_) => DataType::Solid,
         }
     }
     pub fn weight(&self) -> usize {
@@ -1113,6 +1175,8 @@ impl Value {
                 .vertices
                 .len()
                 .saturating_add(m.triangles.len().saturating_mul(3)),
+            Self::Surface(s) => s.weight(),
+            Self::Solid(s) => s.weight(),
         }
     }
     pub fn number(&self) -> Result<f64, String> {

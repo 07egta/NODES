@@ -1036,6 +1036,7 @@ impl MorphletApp {
                             "数値",
                             "曲線",
                             "立体",
+                            "精密曲面",
                             "変形",
                             "配列",
                             "データ",
@@ -2174,7 +2175,7 @@ fn ordered_kinds() -> Vec<NodeKind> {
     ordered
 }
 fn category_rank(category: &str) -> usize {
-    ["立体", "曲線", "変形", "配列", "数値", "データ", "出力"]
+    ["立体", "精密曲面", "曲線", "変形", "配列", "数値", "データ", "出力"]
         .iter()
         .position(|s| *s == category)
         .unwrap_or(99)
