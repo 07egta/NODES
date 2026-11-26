@@ -217,6 +217,12 @@ pub enum NodeKind {
     BrepEdges,
     BrepVertices,
     BrepMesh,
+    NurbsVase,
+    RuledSurface,
+    SurfaceExtrude,
+    BrepUnion,
+    BrepDifference,
+    BrepOffset,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -310,6 +316,12 @@ impl NodeKind {
             Self::BrepEdges,
             Self::BrepVertices,
             Self::BrepMesh,
+            Self::NurbsVase,
+            Self::RuledSurface,
+            Self::SurfaceExtrude,
+            Self::BrepUnion,
+            Self::BrepDifference,
+            Self::BrepOffset,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

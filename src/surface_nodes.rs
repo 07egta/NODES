@@ -11,6 +11,7 @@ pub const KINDS:&[K]=&[
     K::SurfaceNormalLine,K::SurfaceArea,K::SurfaceClosestPoint,K::SurfaceIsoCurve,
     K::DivideSurface,K::SurfaceMesh,K::BrepBox,K::BrepVolume,K::BrepArea,
     K::BrepIntersection,K::BrepMove,K::BrepFaces,K::BrepEdges,K::BrepVertices,K::BrepMesh,
+    K::NurbsVase,K::RuledSurface,K::SurfaceExtrude,K::BrepUnion,K::BrepDifference,K::BrepOffset,
 ];
 const S:crate::model::InputSpec=g("surface","曲面",D::Surface);
 const B:crate::model::InputSpec=g("solid","閉じた立体",D::Solid);
@@ -52,6 +53,12 @@ pub fn spec(kind:K)->&'static NodeSpec {
         K::BrepFaces=>spec!("B-rep の面","箱の6つの支持平面曲面を外向きの順序で取り出します。","brep faces deconstruct 面",Surface,[B]),
         K::BrepEdges=>spec!("B-rep の稜線","箱の12本の共有稜線を取り出します。","brep edges deconstruct wireframe 稜線",Curve,[B]),
         K::BrepVertices=>spec!("B-rep の頂点","箱の8つの共有頂点を取り出します。","brep vertices deconstruct 頂点",Point,[B]),
+        K::NurbsVase=>spec!("NURBS 回転花器","正確な有理円と二次ベジェ断面の回転曲面。中央半径は制御値。開いた側面です。","nurbs vase revolve rational surface 花器 回転",Surface,[R,n("middle","中央制御半径",36.,0.001,1e6,0.5),n("top","上半径",24.,0.001,1e6,0.5),H]),
+        K::RuledSurface=>spec!("線織曲面（2断面）","同じ点数と開閉状態の2曲線間を直線補間。閉曲線は開始点を揃えて接続。滑らかなロフトではありません。","ruled surface linear loft 曲面 線織",Surface,[g("a","断面A",D::Curve),g("b","断面B",D::Curve),i("reverse","Bの方向反転",0.,0.,1.)]),
+        K::SurfaceExtrude=>spec!("曲面を押し出す","点列曲線をZ方向に押し出す数学的な線織側面。蓋なし、最大32点（閉曲線31点）。","extrude surface ruled 押し出し",Surface,[g("curve","曲線",D::Curve),H]),
+        K::BrepUnion=>spec!("B-rep 結合（箱）","軸平行な箱の和が単一の直方体になる場合のみ実行します。","solid union boolean brep 和",Solid,[B,g("other","もう一つの立体",D::Solid)]),
+        K::BrepDifference=>spec!("B-rep 差（箱）","軸平行な箱の差が単一の直方体になる場合のみ実行します。穴や分離はエラー。","solid difference subtract brep 差",Solid,[B,g("other","切り取る立体",D::Solid)]),
+        K::BrepOffset=>spec!("B-rep オフセット（箱）","箱の6支持平面を外向きに移動。負は内側へ。消滅はエラー。","offset brep box オフセット",Solid,[B,n("distance","距離",2.,-1e6,1e6,0.5)]),
         K::BrepMesh=>spec!("B-rep をメッシュ化","閉じた箱の境界を三角形メッシュに変換して書き出せるようにします。","brep mesh tessellate stl export",Mesh,[B]),
         _=>unreachable!("non-surface node"),
     }
@@ -61,6 +68,9 @@ fn surface<'a>(a:&[&'a Value])->Result<&'a Surface,String>{
 }
 fn solid<'a>(a:&[&'a Value],at:usize)->Result<&'a ClosedSolid,String>{
     match a.get(at).copied(){Some(Value::Solid(s))=>Ok(s.as_ref()),_=>Err("B-rep の閉じた立体を接続してください。".into())}
+}
+fn curve<'a>(a:&[&'a Value],at:usize)->Result<&'a crate::model::Curve,String>{
+    match a.get(at).copied(){Some(Value::Curve(c))=>Ok(c.as_ref()),_=>Err("曲線を接続してください。".into())}
 }
 fn point(a:&[&Value],at:usize)->Result<[f64;3],String>{
     match a.get(at).copied(){Some(Value::Point(p))=>Ok(*p),_=>Err("点を接続してください。".into())}
@@ -122,6 +132,16 @@ pub fn run(kind:K,a:&[&Value],stop:&dyn Fn()->bool)->Result<Vec<Value>,String>{
             }))).collect())
         }
         K::BrepVertices=>Ok(solid(a,0)?.brep().vertices().iter().map(|v|Value::Point(v.position)).collect()),
+        K::NurbsVase=>made(Surface::nurbs(NurbsSurface::vase(num(a,0)?,num(a,1)?,num(a,2)?,num(a,3)?)?),stop),
+        K::RuledSurface=>made(Surface::nurbs(NurbsSurface::ruled(curve(a,0)?,curve(a,1)?,num(a,2)?!=0.)?),stop),
+        K::SurfaceExtrude=>{
+            let a_curve=curve(a,0)?;let h=num(a,1)?;
+            let mut b=a_curve.clone();for p in &mut b.points{p[2]+=h;}
+            made(Surface::nurbs(NurbsSurface::ruled(a_curve,&b,false)?),stop)
+        }
+        K::BrepUnion=>Ok(body(solid(a,0)?.union_box(solid(a,1)?)?)),
+        K::BrepDifference=>Ok(body(solid(a,0)?.difference_box(solid(a,1)?)?)),
+        K::BrepOffset=>Ok(body(solid(a,0)?.offset_box(num(a,1)?)?)),
         K::BrepMesh=>Ok(vec![Value::Mesh(solid(a,0)?.preview().clone())]),
         _=>Err("未対応の曲面ノードです。".into()),
     }

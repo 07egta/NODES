@@ -794,7 +794,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
-        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh => crate::surface_nodes::run(kind, a, cancel),
+        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh | NurbsVase | RuledSurface | SurfaceExtrude | BrepUnion | BrepDifference | BrepOffset => crate::surface_nodes::run(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
         | Remap | Expression | GraphProfile | ImportMesh => {

@@ -58,6 +58,7 @@ impl Sample {
 pub struct NurbsSurface {
     nu: usize, nv: usize, pu: usize, pv: usize,
     ku: Vec<f64>, kv: Vec<f64>, points: Vec<Point3>, weights: Vec<f64>,
+    closed_u: bool,
 }
 fn check_knots(n: usize, p: usize, k: &[f64])->R<()> {
     if p==0 || p>MAX_DEGREE || n<=p || n>MAX_CONTROL || k.len()!=n+p+1
@@ -116,7 +117,7 @@ impl NurbsSurface {
             || weights.iter().any(|w| !(1e-6..=1e6).contains(w)) {
             return fail("NURBS の制御格子または正の重みが無効です。");
         }
-        Ok(Self{nu,nv,pu,pv,ku,kv,points,weights})
+        Ok(Self{nu,nv,pu,pv,ku,kv,points,weights,closed_u:false})
     }
     pub fn bilinear(p00:Point3,p01:Point3,p10:Point3,p11:Point3)->R<Self> {
         Self::new(2,2,1,1,vec![0.,0.,1.,1.],vec![0.,0.,1.,1.],
@@ -131,6 +132,52 @@ impl NurbsSurface {
                 if i==1 && j==1 {rise} else {0.}]);
         }}
         Self::new(3,3,2,2,vec![0.,0.,0.,1.,1.,1.],vec![0.,0.,0.,1.,1.,1.],p,vec![1.;9])
+    }
+    /// Revolve a quadratic Bezier radius/height profile about Z.
+    /// The U circle is exact rational quadratic (four quarter arcs).
+    /// The middle radius is a control value, not the radius at mid-height.
+    pub fn vase(r0:f64,rm:f64,r1:f64,h:f64)->R<Self>{
+        for r in [r0,rm,r1,h]{size(r)?;}
+        let ring=[[1.,0.],[1.,1.],[0.,1.],[-1.,1.],[-1.,0.],[-1.,-1.],[0.,-1.],[1.,-1.],[1.,0.]];
+        let mut points=Vec::new();let mut weights=Vec::new();
+        for (i,[x,y]) in ring.into_iter().enumerate(){
+            for (r,z) in [(r0,0.),(rm,h/2.),(r1,h)] {
+                points.push([r*x,r*y,z]);
+                weights.push(if i%2==0 {1.} else {0.5f64.sqrt()});
+            }
+        }
+        let mut s=Self::new(9,3,2,2,vec![0.,0.,0.,0.25,0.25,0.5,0.5,0.75,0.75,1.,1.,1.],
+            vec![0.,0.,0.,1.,1.,1.],points,weights)?;
+        s.closed_u=true;
+        Ok(s)
+    }
+    /// Linear interpolation between two matching polyline control sections.
+    /// Piecewise linear in U, linear in V. No smooth loft is implied.
+    pub fn ruled(a:&Curve,b:&Curve,reverse:bool)->R<Self>{
+        let n=a.points.len();
+        if a.closed!=b.closed||n!=b.points.len()||n<2||n+usize::from(a.closed)>MAX_CONTROL
+            || (a.closed && n<3) {
+            return fail("同じ点数・開閉状態の曲線2本が必要です（開2〜32点、閉3〜31点）。");
+        }
+        let mut right=b.points.clone();
+        if reverse {
+            if b.closed { right[1..].reverse(); } else { right.reverse(); }
+        }
+        for points in [&a.points,&right] {
+            if points.windows(2).any(|p|norm(sub(p[1],p[0]))<1e-9)
+                || (a.closed && norm(sub(points[0],points[n-1]))<1e-9) {
+                return fail("断面に重複する隣接点があります。");
+            }
+        }
+        let nu=n+usize::from(a.closed);
+        let mut points=Vec::with_capacity(nu*2);
+        for i in 0..nu {points.push(a.points[i%n]);points.push(right[i%n]);}
+        let mut ku=vec![0.,0.];
+        for i in 1..nu-1 {ku.push(i as f64/(nu-1) as f64);}
+        ku.extend([1.,1.]);
+        let mut s=Self::new(nu,2,1,1,ku,vec![0.,0.,1.,1.],points,vec![1.;nu*2])?;
+        s.closed_u=a.closed;
+        Ok(s)
     }
     pub fn native_domain(&self)->[[f64;2];2] {
         [[self.ku[self.pu],self.ku[self.nu]],[self.kv[self.pv],self.kv[self.nv]]]
@@ -223,7 +270,7 @@ impl Surface {
     pub fn domain(&self)->[[f64;2];2] {[[0.,1.],[0.,1.]]}
     fn periodic(&self)->(bool,bool) {
         match &self.0 {Geometry::Frustum{..}|Geometry::Sphere{..}=>(true,false),
-            Geometry::Torus{..}=>(true,true),_=>(false,false)}
+            Geometry::Torus{..}=>(true,true),Geometry::Nurbs(n)=>(n.closed_u,false),_=>(false,false)}
     }
     pub fn evaluate(&self,u:f64,v:f64)->R<Sample>{
         let (u,v)=(uv(u)?,uv(v)?);
@@ -303,7 +350,11 @@ impl Surface {
             }
             crate::engine::validate_mesh(&m,stop)?;return Ok(m);
         }
-        let (nu,nv)=if matches!(&self.0,Geometry::Plane(_)){(1,1)}else{(nu,nv)};
+        let (nu,nv)=if matches!(&self.0,Geometry::Plane(_)){(1,1)}else if let Geometry::Nurbs(n)=&self.0 {
+            if n.pu==1 && n.pv==1 && n.nu>2 {
+                let spans=n.nu-1; (spans*(nu/spans).max(1),nv)
+            } else {(nu,nv)}
+        }else{(nu,nv)};
         let (uc,vc)=(nu+usize::from(!pu),nv+usize::from(!pv));
         let mut m=Mesh::default();
         for j in 0..vc {check_cancel(stop)?;for i in 0..uc{
@@ -454,6 +505,48 @@ impl ClosedSolid {
         }
         Self::box_bounds(lo,hi)
     }
+    fn contains(&self,other:&Self)->bool{
+        (0..3).all(|i|self.min[i]<=other.min[i]&&self.max[i]>=other.max[i])
+    }
+    /// The union is supported only when it is itself one rectangular box.
+    pub fn union_box(&self,other:&Self)->R<Self>{
+        if self.contains(other){return Ok(self.clone());}
+        if other.contains(self){return Ok(other.clone());}
+        for axis in 0..3 {
+            if (0..3).filter(|i|*i!=axis).all(|i|self.min[i]==other.min[i]&&self.max[i]==other.max[i])
+                && self.max[axis]>=other.min[axis]&&other.max[axis]>=self.min[axis] {
+                let lo=std::array::from_fn(|i|self.min[i].min(other.min[i]));
+                let hi=std::array::from_fn(|i|self.max[i].max(other.max[i]));
+                return Self::box_bounds(lo,hi);
+            }
+        }
+        fail("結合結果が単一の直方体になる場合のみ対応しています。")
+    }
+    /// Difference is supported only for a single surviving rectangular slab,
+    /// including unchanged disjoint input. Cavities and multiple pieces fail.
+    pub fn difference_box(&self,other:&Self)->R<Self>{
+        if (0..3).any(|i| self.max[i]<=other.min[i]||other.max[i]<=self.min[i]) {
+            return Ok(self.clone());
+        }
+        for axis in 0..3 {
+            if !(0..3).filter(|i|*i!=axis).all(|i|other.min[i]<=self.min[i]&&other.max[i]>=self.max[i]) {
+                continue;
+            }
+            let (mut lo,mut hi)=(self.min,self.max);
+            if other.min[axis]<=lo[axis]&&other.max[axis]<hi[axis] {
+                lo[axis]=other.max[axis];return Self::box_bounds(lo,hi);
+            }
+            if other.max[axis]>=hi[axis]&&other.min[axis]>lo[axis] {
+                hi[axis]=other.min[axis];return Self::box_bounds(lo,hi);
+            }
+        }
+        fail("差が単一の直方体となる場合のみ対応しています。空・穴・分離形状は未対応です。")
+    }
+    /// Parallel offset of each of the six supporting planes.
+    pub fn offset_box(&self,d:f64)->R<Self>{
+        if !d.is_finite()||d.abs()>MAX_SIZE{return fail("オフセット距離が無効です。");}
+        Self::box_bounds(self.min.map(|x|x-d),self.max.map(|x|x+d))
+    }
     pub fn translated(&self,delta:Point3)->R<Self>{
         if !finite(delta){return fail("移動ベクトルが無効です。");}
         Self::box_bounds(add(self.min,delta),add(self.max,delta))
@@ -524,6 +617,30 @@ mod tests {
             }
             assert!(e.values().all(|&v|v==(2,0)));assert!(volume>0.);
         }
+    }
+    #[test] fn exact_revolved_profile_and_ruled_sections(){
+        let s=Surface::nurbs(NurbsSurface::vase(2.,6.,4.,8.).unwrap());
+        for i in 0..=32{
+            let p=s.evaluate(i as f64/32.,0.5).unwrap().point;
+            near((p[0]*p[0]+p[1]*p[1]).sqrt(),4.5);
+            near(p[2],4.);
+        }
+        xyz(s.evaluate(0.,0.5).unwrap().point,s.evaluate(1.,0.5).unwrap().point);
+        let a=Curve{points:vec![[0.,0.,0.],[2.,0.,0.]],closed:false};
+        let b=Curve{points:vec![[0.,0.,4.],[2.,0.,4.]],closed:false};
+        let s=Surface::nurbs(NurbsSurface::ruled(&a,&b,false).unwrap());
+        xyz(s.evaluate(0.25,0.5).unwrap().point,[0.5,0.,2.]);
+        near(s.area(8,&||false).unwrap(),8.);
+    }
+    #[test] fn box_restricted_booleans_and_offset(){
+        let a=ClosedSolid::centered_box(4.,6.,8.).unwrap();
+        let b=a.translated([2.,0.,0.]).unwrap();
+        near(a.union_box(&b).unwrap().volume(),288.);
+        near(a.difference_box(&b).unwrap().volume(),96.);
+        near(a.offset_box(1.).unwrap().volume(),480.);
+        assert!(a.union_box(&a.translated([1.,1.,0.]).unwrap()).is_err());
+        assert!(a.difference_box(&a).is_err());
+        assert!(a.offset_box(-2.).is_err());
     }
     #[test] fn closed_box_topology_volume_and_intersection(){
         let a=ClosedSolid::centered_box(4.,6.,8.).unwrap();
