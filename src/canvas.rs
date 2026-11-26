@@ -6,6 +6,7 @@ use morphlet::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
     model::{Node, NodeId, NodeKind},
+    multi_port::PortRef,
     persistence::Project,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,7 +22,7 @@ const CARD_SLIDERS: usize = 3;
 #[derive(Default)]
 pub struct GraphCanvas {
     pub selected: BTreeSet<NodeId>,
-    pub connecting: Option<NodeId>,
+    pub connecting: Option<PortRef>,
     pub fit_requested: bool,
     pub fit_selection_requested: bool,
     pub last_rect: Option<Rect>,
@@ -60,7 +61,7 @@ pub struct CanvasOutcome {
     /// Add an empty note at this world position.
     pub add_note_at: Option<[f32; 2]>,
     /// A wire was dropped on empty canvas: the source node and the world position.
-    pub drop_wire: Option<(NodeId, [f32; 2])>,
+    pub drop_wire: Option<(PortRef, [f32; 2])>,
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
@@ -93,7 +94,7 @@ fn note_fill() -> Color32 {
 }
 
 fn height(node: &Node) -> f32 {
-    HEADER + ROW * node.kind.spec().inputs.len() as f32 + 27.0
+    HEADER + ROW * node.input_ports().len().max(node.output_ports().len()) as f32 + 27.0
 }
 fn to_screen(world: [f32; 2], rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     rect.min + egui::vec2(world[0] * zoom + pan[0], world[1] * zoom + pan[1])
@@ -102,9 +103,9 @@ fn to_world(screen: Pos2, rect: Rect, pan: [f32; 2], zoom: f32) -> [f32; 2] {
     let p = (screen - rect.min - egui::vec2(pan[0], pan[1])) / zoom;
     [p.x, p.y]
 }
-fn output_pos(n: &Node, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
+fn output_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     to_screen(
-        [n.position[0] + WIDTH, n.position[1] + HEADER + 14.],
+        [n.position[0] + WIDTH, n.position[1] + HEADER + 14. + index as f32 * ROW],
         rect,
         pan,
         zoom,
@@ -179,9 +180,9 @@ impl GraphCanvas {
                 .graph
                 .node(id)
                 .map(|n| {
-                    n.inputs
-                        .values()
-                        .filter_map(|s| depth.get(s))
+                    n.all_links()
+                        .values().flatten()
+                        .filter_map(|s| depth.get(&s.node))
                         .copied()
                         .max()
                         .map_or(0, |d| d + 1)
@@ -372,26 +373,19 @@ impl GraphCanvas {
         // Index the endpoints once instead of searching the entire graph for each wire.
         let sources: BTreeMap<_, _> = p.graph.nodes.iter().map(|n| (n.id, n)).collect();
         for n in &p.graph.nodes {
-            for (key, from) in &n.inputs {
-                if let (Some(src), Some(index)) = (
-                    sources.get(from).copied(),
-                    n.kind.spec().inputs.iter().position(|s| s.key == key),
-                ) {
-                    let a = output_pos(src, rect, p.pan, p.zoom);
-                    let b = input_pos(n, index, rect, p.pan, p.zoom);
-                    if !wire_bounds(a, b).intersects(rect) {
-                        continue;
-                    }
-                    let selected = self.selected.contains(&n.id) || self.selected.contains(from);
-                    let color = if selected {
-                        theme::teal()
-                    } else {
-                        theme::wire_idle()
-                    };
-                    let shape = evaluation
-                        .and_then(|e| e.outputs.get(from))
-                        .and_then(|r| r.as_ref().ok())
-                        .map(data_view::shape_of);
+            let inputs = n.input_ports();
+            for (key, links) in n.all_links() {
+                let Some(index) = inputs.iter().position(|s| s.key == key) else { continue; };
+                let b = input_pos(n, index, rect, p.pan, p.zoom);
+                for from in links {
+                    let Some(src) = sources.get(&from.node).copied() else { continue; };
+                    let Some(output_index) = src.output_ports().iter().position(|p| p.id == from.port) else { continue; };
+                    let a = output_pos(src, output_index, rect, p.pan, p.zoom);
+                    if !wire_bounds(a, b).intersects(rect) { continue; }
+                    let selected = self.selected.contains(&n.id) || self.selected.contains(&from.node);
+                    let color = if selected { theme::teal() } else { theme::wire_idle() };
+                    let shape = evaluation.and_then(|e| e.output(from))
+                        .and_then(|r| r.as_ref().ok()).map(data_view::shape_of);
                     wire(&painter, a, b, shape, color, selected, p.zoom);
                 }
             }
@@ -413,8 +407,8 @@ impl GraphCanvas {
             let col = theme::category_color(n.kind.spec().category);
             let overview = p.zoom < 0.38 && self.connecting.is_none();
             let error = evaluation.filter(|_| !stale && !n.off)
-                .and_then(|e| e.outputs.get(&n.id))
-                .and_then(|r| r.as_ref().err());
+                .and_then(|e| n.output_ports().into_iter().find_map(|port|
+                    e.output(PortRef { node: n.id, port: port.id }).and_then(|r| r.as_ref().err())));
             painter.rect_filled(
                 nr.translate(egui::vec2(0., 3.)),
                 9,
@@ -601,22 +595,21 @@ impl GraphCanvas {
             {
                 m.preview = !m.preview;
             }
-            let slider_keys: Vec<&str> = n
-                .kind
-                .spec()
-                .inputs
-                .iter()
-                .filter(|s| s.default.is_some() && !n.inputs.contains_key(s.key))
+            let inputs = n.input_ports();
+            let outputs = n.output_ports();
+            let slider_keys: Vec<&str> = inputs.iter()
+                .filter(|s| s.default.is_some() && !n.has_link(s.key))
                 .take(CARD_SLIDERS)
                 .map(|s| s.key)
                 .collect();
-            for (index, spec) in n.kind.spec().inputs.iter().enumerate() {
+            for (index, spec) in inputs.iter().copied().enumerate() {
                 let ip = input_pos(n, index, rect, p.pan, p.zoom);
-                let linked = n.inputs.contains_key(spec.key);
-                let can = self
-                    .connecting
-                    .and_then(|id| p.graph.node(id))
-                    .map(|v| v.id != n.id && spec.kind.accepts(v.kind.spec().output));
+                let links = n.sources(spec.key);
+                let linked = !links.is_empty();
+                let can = self.connecting.and_then(|source| {
+                    p.graph.node(source.node).and_then(|v| v.output_port(source.port))
+                        .map(|port| source.node != n.id && spec.kind.accepts(port.kind))
+                });
                 let port_col = if can == Some(false) {
                     theme::muted()
                 } else if can == Some(true) {
@@ -641,30 +634,32 @@ impl GraphCanvas {
                 if !over_map && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
                     && self.connecting.is_some()
                 {
-                    to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
+                    let append = ui.input(|i| i.modifiers.shift);
+                    to_connect = self.connecting.take().map(|from| (from, n.id, spec.key, append));
                 }
                 if pr.secondary_clicked() && linked && !over_map {
                     to_disconnect = Some((n.id, spec.key));
                 }
                 pr.on_hover_text(format!(
                     "{} · {}{}{}",
-                    spec.label,
+                    n.input_name(spec),
                     spec.kind.label(),
                     if can == Some(false) { "\n現在の出力と型が合わないか、同じノードです。" } else if can == Some(true) { "\n接続候補（循環の有無は接続時に確認）" } else { "" },
                     if linked {
-                        "\n右クリックで切断"
+                        "\nShiftで追加接続・右クリックで全切断"
                     } else {
-                        "\n出力からドラッグ、または出力→入力の順にクリック"
+                        "\n出力からドラッグ、または出力→入力の順にクリック（Shiftで追加）"
                     }
                 ));
                 painter.text(
                     ip + egui::vec2(13., 0.) * p.zoom,
                     Align2::LEFT_CENTER,
-                    ui_polish::one_line(spec.label, 6),
+                    ui_polish::one_line(n.input_name(spec), 6),
                     FontId::proportional(11. * p.zoom),
                     if linked { theme::teal() } else { theme::muted() },
                 );
                 if p.zoom > 0.62
+                    && outputs.len() == 1
                     && let Some(default) = spec.default
                     && slider_keys.contains(&spec.key)
                     && !linked
@@ -705,6 +700,7 @@ impl GraphCanvas {
                         theme::ink(),
                     );
                 } else if p.zoom > 0.62
+                    && outputs.len() == 1
                     && let Some(default) = spec.default
                 {
                     let vr = Rect::from_min_size(
@@ -712,10 +708,9 @@ impl GraphCanvas {
                         egui::vec2(77., 22.) * p.zoom,
                     );
                     if linked {
-                        let value = n
-                            .inputs
-                            .get(spec.key)
-                            .and_then(|id| evaluation.and_then(|e| e.outputs.get(id)))
+                        let value = links.first()
+                            .filter(|_| links.len() == 1)
+                            .and_then(|source| evaluation.and_then(|e| e.output(*source)))
                             .and_then(|r| r.as_ref().ok())
                             .map(|t| {
                                 if t.item_count() == 1 {
@@ -734,7 +729,7 @@ impl GraphCanvas {
                                     format!("{} 個", t.item_count())
                                 }
                             })
-                            .unwrap_or_else(|| "接続済み".into());
+                            .unwrap_or_else(|| format!("{} 接続", links.len()));
                         painter.text(
                             vr.center(),
                             Align2::CENTER_CENTER,
@@ -754,32 +749,33 @@ impl GraphCanvas {
                     }
                 }
             }
-            let op = output_pos(n, rect, p.pan, p.zoom);
-            painter.circle_filled(op, 6. * p.zoom, theme::port_color(n.kind.spec().output));
-            painter.circle_filled(op, 2. * p.zoom, Color32::WHITE);
-            let or = ui.interact(
-                Rect::from_center_size(op, egui::vec2(24., 24.) * p.zoom),
-                Id::new(("out", n.id)),
-                Sense::click_and_drag(),
-            );
-            if !over_map && (or.clicked() || or.drag_started()) {
-                self.connecting = Some(n.id);
+            for (index, port) in outputs.iter().enumerate() {
+                let source = PortRef { node: n.id, port: port.id };
+                let op = output_pos(n, index, rect, p.pan, p.zoom);
+                let result = evaluation.and_then(|e| e.output(source));
+                let failed = !stale && result.is_some_and(Result::is_err);
+                let color = if failed { theme::error() } else { theme::port_color(port.kind) };
+                painter.circle_filled(op, 6. * p.zoom, color);
+                painter.circle_filled(op, 2. * p.zoom, Color32::WHITE);
+                if outputs.len() > 1 {
+                    painter.with_clip_rect(nr).text(
+                        op - egui::vec2(13., 0.) * p.zoom, Align2::RIGHT_CENTER,
+                        ui_polish::one_line(&port.label, 8), FontId::proportional(11. * p.zoom), color);
+                }
+                let response = ui.interact(
+                    Rect::from_center_size(op, egui::vec2((24. * p.zoom).max(12.), (24. * p.zoom).max(12.))),
+                    Id::new(("out", n.id, port.id)), Sense::click_and_drag());
+                if !over_map && (response.clicked() || response.drag_started()) {
+                    self.connecting = Some(source);
+                }
+                if !over_map && response.drag_started() { self.wire_drag = true; }
+                let detail = match result {
+                    Some(Ok(tree)) => format!("\n形: {}", data_view::shape_of(tree).describe()),
+                    Some(Err(e)) => format!("\n{e}"),
+                    None => String::new(),
+                };
+                response.on_hover_text(format!("{} / {} · {}{}", n.name, port.label, port.kind.label(), detail));
             }
-            if !over_map && or.drag_started() {
-                self.wire_drag = true;
-            }
-            let shape = evaluation
-                .and_then(|e| e.outputs.get(&n.id))
-                .and_then(|r| r.as_ref().ok())
-                .map(data_view::shape_of);
-            or.on_hover_text(format!(
-                "{}の出力 · {}{}",
-                n.name,
-                n.kind.spec().output.label(),
-                shape
-                    .map(|s| format!("\n形: {}", s.describe()))
-                    .unwrap_or_default()
-            ));
             let text = if stale {
                 "更新中".to_owned()
             } else if n.off {
@@ -811,8 +807,8 @@ impl GraphCanvas {
                 .on_hover_text(message);
             }
         }
-        if let Some((from, to, key)) = to_connect
-            && let Err(e) = p.graph.connect(from, to, key)
+        if let Some((from, to, key, append)) = to_connect
+            && let Err(e) = p.graph.connect_port(from, to, key, append)
         {
             out.error = Some(e);
         }
@@ -831,17 +827,18 @@ impl GraphCanvas {
                 out.drop_wire = Some((from, to_world(at, rect, p.pan, p.zoom)));
             }
         }
-        if let (Some(id), Some(pointer)) = (self.connecting, pointer)
-            && let Some(n) = p.graph.node(id)
+        if let (Some(source), Some(pointer)) = (self.connecting, pointer)
+            && let Some(n) = p.graph.node(source.node)
+            && let Some((index, port)) = n.output_ports().into_iter().enumerate().find(|(_, p)| p.id == source.port)
         {
             bezier(
                 &painter,
-                output_pos(n, rect, p.pan, p.zoom),
+                output_pos(n, index, rect, p.pan, p.zoom),
                 pointer,
                 Stroke::new(2_f32, theme::teal()),
             );
             painter.text(pointer + egui::vec2(12., -10.), Align2::LEFT_BOTTOM,
-                n.kind.spec().output.label(), FontId::proportional(12.), theme::port_color(n.kind.spec().output));
+                port.label, FontId::proportional(12.), theme::port_color(port.kind));
         }
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.connecting = None;
