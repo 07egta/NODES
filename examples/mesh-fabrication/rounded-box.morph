@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "name": "SubD・丸みのある箱",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "箱",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "width": 50,
+          "depth": 50,
+          "height": 50
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "mesh_catmull_clark",
+        "name": "SubD近似",
+        "position": [
+          260,
+          20
+        ],
+        "params": {
+          "levels": 2
+        },
+        "inputs": {
+          "mesh": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "mesh_on_bed",
+        "name": "床置き",
+        "position": [
+          500,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          740,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "mesh_audit",
+        "name": "健全性",
+        "position": [
+          500,
+          220
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "mesh_volume",
+        "name": "符号付き体積",
+        "position": [
+          740,
+          220
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 2
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 6
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}
