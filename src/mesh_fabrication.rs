@@ -453,6 +453,10 @@ specs!{
     MeshCatmullClark => ("SubD Catmull–Clark近似","三角形制御メッシュから有限回の四角形細分化。境界ルールあり。極限曲面・内部クリースは未実装。","subd catmull clark subdivision 細分化",Mesh,[M,i("levels","段数",1.,0.,5.)]);
     MeshOnBed => ("メッシュ床置き","XY外接箱の中心を原点、最低Zを0に移動。配置同士の衝突は未検査。","mesh bed center placement 造形台",Mesh,[M]);
     MeshDeleteFace => ("メッシュ面削除","0始まりの面番号を1枚削除します。穴が開く可能性があります。","mesh delete face cull 面削除",Mesh,[M,i("index","面番号",0.,0.,499999.)]);
+    MeshSelfContact => ("メッシュ自己接触候補","共有頂点のない面同士の接触ペア数。近似判定。隣接面の重なりは未検査。上限超過はエラー。","mesh self intersection contact 自己交差",Number,[M]);
+    MeshThicknessSample => ("肉厚サンプル推定","面中心から内向き法線に沿った出口距離の最小サンプル値と実サンプル数。真の最小肉厚ではありません。","mesh thickness thin wall sample 肉厚",Number,[M,i("samples","サンプル数",64.,1.,512.)]);
+    MeshCompact => ("未使用頂点削除","面が参照しない頂点を削除して面番号を更新します。","mesh compact cull unused vertices 整理",Mesh,[M]);
+    MeshNonManifold => ("メッシュ非多様体辺","3枚以上の面が共有する辺を線分で出力（8192本まで）。","mesh non manifold edges 非多様体 辺",Curve,[M]);
     MeshConstruct => ("メッシュ構築","各枝の点リストと0始まりの三角形番号列（3個ずつ）を使用。","construct mesh from points indices 構築",Mesh,[g("vertices","頂点リスト",DataType::Point),g("faces","面番号リスト",DataType::Number)]);
 }
 pub fn run_list(lists:&[&[Value]],stop:&dyn Fn()->bool)->Result<Vec<Value>,String>{
@@ -497,11 +501,22 @@ pub fn run_item(kind:NodeKind,a:&[&Value],stop:&dyn Fn()->bool)->Result<Vec<Valu
                 let [a,b,c]=t.map(|v|m.vertices[v as usize]);let n=cross(sub(b,a),sub(c,a));let l=length(n);
                 if l<1e-12{return Err("退化面の法線は未定義です。".into());}values.push(Value::Point(mul(n,1./l)));
             }Ok(values)}
-        MeshEdges|MeshBoundary=>{let es=topology(m,stop)?;
-            let total=es.values().filter(|us|kind==MeshEdges||us.len()==1).count();count(total)?;
+        MeshEdges|MeshBoundary|MeshNonManifold=>{let es=topology(m,stop)?;
+            let select=|uses:&Vec<(usize,bool)>|kind==MeshEdges||(kind==MeshBoundary&&uses.len()==1)||(kind==MeshNonManifold&&uses.len()>2);
+            let total=es.values().filter(|us|select(us)).count();count(total)?;
             let mut values=Vec::new();for(i,(&(a,b),us))in es.iter().enumerate(){tick(i,stop)?;
-                if kind==MeshEdges||us.len()==1{values.push(Value::Curve(Arc::new(Curve{points:vec![m.vertices[a as usize],m.vertices[b as usize]],closed:false})));}
+                if select(us){values.push(Value::Curve(Arc::new(Curve{points:vec![m.vertices[a as usize],m.vertices[b as usize]],closed:false})));}
             }Ok(values)}
+        MeshSelfContact=>Ok(numbers([crate::mesh_geometry_checks::nonadjacent_contacts(m,stop)? as f64])),
+        MeshThicknessSample=>{let (w,n)=crate::mesh_geometry_checks::sampled_thickness(m,num(a,1)? as usize,stop)?;Ok(numbers([w,n as f64]))}
+        MeshCompact=>{
+            let mut used=vec![false;m.vertices.len()];
+            for(i,t)in m.triangles.iter().enumerate(){tick(i,stop)?;for &v in t{used[v as usize]=true;}}
+            let mut out=Mesh::default();let mut map=vec![0u32;m.vertices.len()];
+            for(i,&p)in m.vertices.iter().enumerate(){tick(i,stop)?;if used[i]{map[i]=out.vertices.len() as u32;out.vertices.push(p);}}
+            for(i,t)in m.triangles.iter().enumerate(){tick(i,stop)?;out.triangles.push(t.map(|v|map[v as usize]));}
+            as_mesh(out,stop)
+        }
         MeshClosest=>{let Some(Value::Point(p))=a.get(1)else{return Err("点を接続してください。".into());};Ok(vec![Value::Point(closest_point(m,*p,stop)?)])}
         MeshFlip=>{let mut out=m.clone();for(i,t)in out.triangles.iter_mut().enumerate(){tick(i,stop)?;t.swap(1,2);}as_mesh(out,stop)}
         MeshWeldExact=>as_mesh(weld_exact(m,stop)?,stop),
