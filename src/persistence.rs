@@ -528,7 +528,9 @@ pub fn export_obj(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
         for (object, mesh) in all_meshes.iter().enumerate() {
             writeln!(file, "o Morphlet_{}", object + 1)?;
             for point in &mesh.vertices {
-                writeln!(file, "v {:.9} {:.9} {:.9}", point[0], point[1], point[2])?;
+                // Preserve the validated binary64 coordinates on text round-trip.
+                // Fixed decimals can flatten valid thin triangles after checking.
+                writeln!(file, "v {} {} {}", point[0], point[1], point[2])?;
             }
             for t in &mesh.triangles {
                 writeln!(

@@ -7,7 +7,7 @@
 - Baseline CI: Check 45907598179, Linux 448 passed / Windows 447 passed, 0 failed, 3 opt-in ignored, 35 suites. Linux fmt/check/strict Clippy/Python17/audit and both release binaries succeeded.
 - Current local checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust 1.100.0 is available at `/home/agent/.cargo/bin` (the old absence recorded below is historical).
 - Other active work: PR #14 and #13 multi-port, `fix/omega-multiport-ci` formatting repair created during initial inspection; no overlapping edits will be pushed to those branches.
-- Saved checkpoints: e7ecc750 (initial state), 829982f6 (legacy aggregates), 77a3e788 (curve endpoint/closure and signed-zero editing/history), 996d76de (surface integration/projection).
+- Saved checkpoints: e7ecc750 (initial state), 829982f6 (legacy aggregates), 77a3e788 (curve endpoint/closure and signed-zero editing/history), 996d76de (surface integration/projection), cd8caac9 (exact binary64 sum/mean).
 - Team: kernel correctness/research, multi-port audit, integration/performance audit, root implementation/review/preservation.
 - First implementation: legacy MassAddition/MassMultiplication share the bounded numerical math aggregation path. Six new regressions went from 1 pass / 5 fail to 6 pass / 0 fail; 17 existing tree/precision regressions also passed. See OMEGA_VALIDATION.json.
 - Curve endpoint/closure fixes: 9 new + 11 existing regressions pass. Bounded closure probes avoid an initial O(knot-count) performance regression.
@@ -15,6 +15,8 @@
 - Surface numerical fixes now pass 11 new + 25 existing regressions and independent review. Area covers native knot cells with bounded adaptive integration; skew-plane closest points and translated rational derivatives are corrected. Extreme unresolved cases return an error, not a false finite area.
 - Disk-full interruption: this checkout target was cleaned, source retained; use CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 locally to bound build artifacts.
 - Exact fixed-point binary64 sum/mean passes 9 new regressions (128 independent Fraction cases, both orders, sum and mean) plus 12 existing regressions. Normal CI checks fixture reproducibility. See NUMERICAL_CONTRACTS.md. Geometry/aggregation benchmarks and export correctness work are in progress.
+- OBJ coordinate preservation: two new independent parse regressions went from 0/2 to 2/0. Fixed decimal output could flatten a validated thin triangle; output now preserves represented coordinates.
+- Performance finding: large NURBS knot-grid area regressed about 25x after mandatory knot-cell coverage. Local-support optimization is in progress, preserving the initial measurement as evidence.
 - Next files: `src/number_aggregates.rs`, `src/math_nodes.rs`, `src/lib.rs`, `tests/sum_rounding_regressions.rs`, its fixture/generator and CI check; then mesh closed/manifold diagnostics and OBJ precision after audit. Next commands: focused tests, `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo test --all-targets --locked`, release binaries and native GUI.
 - Draft PR: https://github.com/07egta/NODES/pull/16 (targets PR #15 branch, avoiding duplicate review scope).
 - Registry: 298 picker kinds + Cluster = 299; completely verified node count remains unestablished, external GH oracle VERIFIED = 0.

@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:34:35.853420+00:00",
+  "updated_at_utc": "2026-11-26T23:37:34.593491+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -163,6 +163,28 @@
       "review": "integration_audit independently checked carry, borrow, long division, subnormal and normal rounding, remainder/sticky logic and call sites; no blocking finding. Requested remainder/limb/Fraction cases passed.",
       "scope": "Summation, Average, MassAddition; other statistics retain their separate algorithms.",
       "limits": "Finite binary64 values; existing node list and evaluation budgets. Empty mean remains an empty output. No external GH oracle comparison."
+    },
+    {
+      "name": "OBJ binary64 coordinate preservation",
+      "files": [
+        "src/persistence.rs",
+        "tests/export_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 0,
+        "failed": 2
+      },
+      "after": {
+        "passed": 2,
+        "failed": 0
+      },
+      "command": "cargo test --locked --offline --test export_numeric_regressions",
+      "review": "Root inspected writer diff and independent OBJ vertex-record parser. Tests compare every decoded coordinate bit and preserve face indices.",
+      "examples": [
+        "Valid triangle of height 4e-10 previously flattened by nine decimal places",
+        "Coordinates near 1e8 mixed with sub-nanometer offsets retain represented binary64 values"
+      ],
+      "limits": "Preserves writer text round-trip; does not establish an external OBJ consumer tolerance or physical printability."
     }
   ],
   "environment_events": [
