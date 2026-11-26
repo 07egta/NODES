@@ -1080,7 +1080,7 @@ impl MorphletApp {
                     } else if let Some(e) = &self.evaluation {
                         let errors = e.outputs.values().filter(|r| r.is_err()).count();
                         if errors == 0 {
-                            ui.label(RichText::new("●").size(9.).color(theme::TEAL));
+                            ui.label(RichText::new("●").size(9.).color(theme::teal()));
                             ui.label(theme::small("更新済み"));
                         } else {
                             ui.label(
@@ -1089,19 +1089,23 @@ impl MorphletApp {
                                     .color(theme::ERROR),
                             );
                             if let Some(line) = self.error_line(e) {
-                                ui.label(RichText::new(line).size(11.).color(theme::ERROR));
+                                let short = ui_polish::one_line(&line, if ui.available_width() > 700. { 42 } else { 12 });
+                                ui.label(RichText::new(short).size(11.).color(theme::ERROR)).on_hover_text(line);
                             }
                         }
-                        ui.label(theme::small(format!(
-                            "  {:.1} ms  ·  計算 {} / 再利用 {}",
-                            e.elapsed_ms, e.computed, e.cached
-                        )));
+                        if ui.available_width() > 460. {
+                            ui.label(theme::small(format!("{:.1} ms · 計算 {} / 再利用 {}", e.elapsed_ms, e.computed, e.cached)));
+                        } else {
+                            ui.label(theme::small(format!("{:.1} ms", e.elapsed_ms)));
+                        }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small("mm  /  °"));
-                        ui.separator();
-                        ui.label(theme::small("オフライン"));
-                        ui.separator();
+                        if ui.available_width() > 260. {
+                            ui.label(theme::small("mm / °"));
+                            ui.separator();
+                            ui.label(theme::small("オフライン"));
+                            ui.separator();
+                        }
                         ui.label(theme::small(format!(
                             "{} ノード",
                             self.project.graph.nodes.len()
@@ -1316,10 +1320,12 @@ impl MorphletApp {
             });
     }
     fn right_panel(&mut self, ctx: &egui::Context) {
+        let remaining = ctx.available_rect().width();
+        let maximum = (remaining - 220.).clamp(150., 850.);
         egui::SidePanel::right("workspace")
-            .default_width(485.)
-            .min_width(390.)
-            .max_width(850.)
+            .default_width((remaining * 0.42).clamp(150., maximum))
+            .min_width(150.)
+            .max_width(maximum)
             .resizable(true)
             .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
@@ -1333,7 +1339,7 @@ impl MorphletApp {
                                 ui.label(theme::small("LIVE"));
                             });
                         });
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.selectable_value(&mut self.preview_mode, 0, "完成形");
                             ui.selectable_value(&mut self.preview_mode, 1, "選択ノード");
                             ui.selectable_value(&mut self.preview_mode, 2, "表示中");
@@ -1346,7 +1352,7 @@ impl MorphletApp {
                             }
                         });
                     });
-                let h = (ui.available_height() * 0.51).max(220.);
+                let h = (ui.available_height() * 0.48).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
@@ -1364,18 +1370,14 @@ impl MorphletApp {
                     }
                 });
                 ui.add_space(2.);
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(14, 7))
-                    .show(ui, |ui| {
-                        self.viewport.controls(ui);
-                    });
-                ui.separator();
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        egui::Frame::new()
-                            .inner_margin(14)
-                            .show(ui, |ui| self.inspector(ui));
+                        egui::Frame::new().inner_margin(8).show(ui, |ui| {
+                            egui::CollapsingHeader::new("ビュー設定").default_open(true).show(ui, |ui| self.viewport.controls(ui));
+                            ui.separator();
+                            self.inspector(ui);
+                        });
                     });
             });
     }
@@ -1387,56 +1389,26 @@ impl MorphletApp {
                     .fill(theme::toolbar_bg())
                     .inner_margin(egui::Margin::symmetric(15, 10))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("ノードキャンバス").size(13.).strong());
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .button("＋ 追加")
-                                    .on_hover_text("Tab またはダブルクリック")
-                                    .clicked()
-                                {
-                                    self.open_palette(self.canvas.center_for_add(&self.project), None);
-                                }
-                                if ui
-                                    .small_button("メモ")
-                                    .on_hover_text(
-                                        "キャンバスにメモを置きます（右クリックでも追加）",
-                                    )
-                                    .clicked()
-                                {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(RichText::new("キャンバス").size(13.).strong());
+                            if ui.small_button("＋").on_hover_text("ノード追加 · Tab").clicked() {
+                                self.open_palette(self.canvas.center_for_add(&self.project), None);
+                            }
+                            if ui.add_enabled(self.history.can_undo(), egui::Button::new("↩")).on_hover_text("元に戻す · Ctrl+Z").clicked() { self.undo(); }
+                            if ui.add_enabled(self.history.can_redo(), egui::Button::new("↪")).on_hover_text("やり直す · Ctrl+Y").clicked() { self.redo(); }
+                            if ui.small_button("全体").clicked() { self.canvas.fit_requested = true; }
+                            if ui.small_button("選択").on_hover_text("選択にズーム · Shift+F").clicked() { self.canvas.fit_selection_requested = true; }
+                            ui.menu_button("操作", |ui| {
+                                if ui.button("整列").clicked() { self.canvas.auto_arrange(&mut self.project); ui.close(); }
+                                ui.checkbox(&mut self.canvas.snap, "格子に吸着");
+                                if ui.button("メモ").clicked() {
                                     let at = self.canvas.center_for_add(&self.project);
                                     self.add_note(at);
+                                    ui.close();
                                 }
-                                if ui
-                                    .small_button("値を見る")
-                                    .on_hover_text("選択中のノードの出力を一覧表示")
-                                    .clicked()
-                                {
-                                    self.values_open = !self.values_open;
-                                }
-                                if ui.small_button("整列").clicked() {
-                                    self.canvas.auto_arrange(&mut self.project);
-                                }
-                                ui.toggle_value(&mut self.canvas.snap, "格子")
-                                    .on_hover_text("格子に吸着: ノードを離すと格子点に揃います · Ctrl+Shift+G");
-                                if ui.small_button("全体").clicked() {
-                                    self.canvas.fit_requested = true;
-                                }
-                                if ui
-                                    .add_enabled(self.history.can_redo(), egui::Button::new("↪"))
-                                    .on_hover_text("やり直す · Ctrl+Y")
-                                    .clicked()
-                                {
-                                    self.redo();
-                                }
-                                if ui
-                                    .add_enabled(self.history.can_undo(), egui::Button::new("↩"))
-                                    .on_hover_text("元に戻す · Ctrl+Z")
-                                    .clicked()
-                                {
-                                    self.undo();
-                                }
+                                if ui.button("値を見る").clicked() { self.values_open = !self.values_open; ui.close(); }
                             });
+                            ui.label(theme::small(format!("{:.0}%", self.project.zoom * 100.)));
                         });
                     });
                 let stale = self.stale();
@@ -1895,8 +1867,10 @@ impl eframe::App for MorphletApp {
         }
         self.topbar(ctx);
         self.statusbar(ctx);
-        self.library(ctx);
-        self.right_panel(ctx);
+        if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
+            self.library(ctx);
+        }
+        if self.show_workspace { self.right_panel(ctx); }
         self.center_panel(ctx);
         self.palette(ctx);
         self.shortcuts_dialog(ctx);
