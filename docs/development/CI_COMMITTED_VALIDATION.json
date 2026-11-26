@@ -1,0 +1,41 @@
+{
+  "source_head": "c19dca185380391ad1c875e412529e22cae05ba6",
+  "tested_merge_revision": "ca49e6c016c40f680117bac4dff8babe2dc2664a",
+  "tree": "85ace7c2d427696547619de5c4dfaec4ecf9eeb0",
+  "run_id": 45849521685,
+  "artifact_id": 15132917546,
+  "archive_sha256": "8a6c61dbfbd02752036fa35a9df9e0922ee6e2678707b718525beab6322124d1",
+  "binaries": {
+    "Morphlet": {
+      "bytes": 19220832,
+      "sha256": "d515bdcfd38ad5efe29953f925756a518c16285a87ddc6f715731458325611be"
+    },
+    "nodes-cli": {
+      "bytes": 5451592,
+      "sha256": "742fae491446aa1339f1428eed03add2d36cd6e246e4e564a7bf896b6866fb3b"
+    }
+  },
+  "schema_version": 1,
+  "linux_job_id": 140011951495,
+  "linux_result": "success",
+  "rust_tests": {
+    "passed": 431,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 35
+  },
+  "python_tests": {
+    "passed": 17
+  },
+  "gates": [
+    "fmt",
+    "check all targets",
+    "strict Clippy",
+    "all-target Rust tests",
+    "dependency audit",
+    "release --bins",
+    "Linux artifact upload"
+  ],
+  "windows_result": "cancelled: superseded by follow-up source before completion",
+  "merge_tree_equals_source_head": true
+}

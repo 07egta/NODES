@@ -1424,58 +1424,58 @@ impl MorphletApp {
             // Stable widget IDs preserve text editing even when an error appears
             // above this row while the user is still typing a multi-digit value.
             ui.scope_builder(
-                egui::UiBuilder::new()
-                    .id(("inspector_parameter", id, input.key))
-                    .layout(Layout::left_to_right(Align::Center)),
+                egui::UiBuilder::new().id(("inspector_parameter", id, input.key)),
                 |ui| {
-                    ui.add_sized(
-                        [100., 23.],
-                        egui::Label::new(RichText::new(label).size(12.)),
-                    )
-                    .on_hover_text(format!(
-                        "{} · {}\n{}",
-                        input.kind.label(),
-                        morphlet::node_access::for_input(node.kind, index)
-                            .map_or("Custom", |a| a.label()),
-                        morphlet::node_access::for_input(node.kind, index)
-                            .map_or("", |a| a.description())
-                    ));
-                    if let Some(source) = linked {
-                        let name = self
-                            .project
-                            .graph
-                            .node(source)
-                            .map(|n| n.name.as_str())
-                            .unwrap_or("不明");
-                        ui.label(
-                            RichText::new(format!("← {name}"))
-                                .size(11.)
-                                .color(theme::TEAL),
-                        );
-                        if ui.small_button("切断").clicked() {
-                            disconnect = Some(input.key);
-                        }
-                    } else if let (Some(default), false) = (input.default, needs_link) {
-                        if let Some(n) = self.project.graph.node_mut(id) {
-                            let value = n.params.entry(input.key.into()).or_insert(default);
-                            let (low, high) =
-                                friendly_range(input.key, input.min, input.max, *value);
-                            let slider = egui::Slider::new(value, low..=high)
-                                .step_by(input.step)
-                                .max_decimals(if input.integer { 0 } else { 3 });
-                            if ui.add(slider).changed() && input.integer {
-                                *value = value.round();
+                    ui.horizontal(|ui| {
+                        ui.add_sized(
+                            [100., 23.],
+                            egui::Label::new(RichText::new(label).size(12.)),
+                        )
+                        .on_hover_text(format!(
+                            "{} · {}\n{}",
+                            input.kind.label(),
+                            morphlet::node_access::for_input(node.kind, index)
+                                .map_or("Custom", |a| a.label()),
+                            morphlet::node_access::for_input(node.kind, index)
+                                .map_or("", |a| a.description())
+                        ));
+                        if let Some(source) = linked {
+                            let name = self
+                                .project
+                                .graph
+                                .node(source)
+                                .map(|n| n.name.as_str())
+                                .unwrap_or("不明");
+                            ui.label(
+                                RichText::new(format!("← {name}"))
+                                    .size(11.)
+                                    .color(theme::TEAL),
+                            );
+                            if ui.small_button("切断").clicked() {
+                                disconnect = Some(input.key);
                             }
+                        } else if let (Some(default), false) = (input.default, needs_link) {
+                            if let Some(n) = self.project.graph.node_mut(id) {
+                                let value = n.params.entry(input.key.into()).or_insert(default);
+                                let (low, high) =
+                                    friendly_range(input.key, input.min, input.max, *value);
+                                let slider = egui::Slider::new(value, low..=high)
+                                    .step_by(input.step)
+                                    .max_decimals(if input.integer { 0 } else { 3 });
+                                if ui.add(slider).changed() && input.integer {
+                                    *value = value.round();
+                                }
+                            }
+                        } else if optional {
+                            ui.label(theme::small("つながなくても動きます（任意）"));
+                        } else {
+                            ui.label(
+                                RichText::new(format!("{}を接続してください", input.kind.label()))
+                                    .size(11.)
+                                    .color(theme::error()),
+                            );
                         }
-                    } else if optional {
-                        ui.label(theme::small("つながなくても動きます（任意）"));
-                    } else {
-                        ui.label(
-                            RichText::new(format!("{}を接続してください", input.kind.label()))
-                                .size(11.)
-                                .color(theme::error()),
-                        );
-                    }
+                    });
                 },
             );
         }

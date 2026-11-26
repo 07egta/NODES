@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "validated_utc": "2026-11-26T15:46:30.662744+00:00",
+  "source_head": "c19dca185380391ad1c875e412529e22cae05ba6",
+  "tested_merge_revision": "ca49e6c016c40f680117bac4dff8babe2dc2664a",
+  "gui_binary_sha256": "d515bdcfd38ad5efe29953f925756a518c16285a87ddc6f715731458325611be",
+  "environment": "Linux native desktop, 1364x1024, isolated XDG_DATA_HOME; actual rendered UI and input",
+  "observations": [
+    "Opened examples/01.morph: 3 nodes and Japanese labels; shaded vase with bounds/volume.",
+    "Inspector text entry 32 -> 3 triggered an actual thickness error; typing 6 without another click yielded 36 and restored geometry.",
+    "Keyboard Undo restored 36 -> 3 -> 32; two Redo steps restored 36.",
+    "Saved gui-vase-36.morph through the native in-app picker; save confirmation observed.",
+    "Changed dark to light; labels, wires and shaded geometry remained visible.",
+    "Exported Output-node binary STL at scale 1 with bed placement and XY centering; completion reported 11808 faces.",
+    "Closed app; reopened saved graph; radius 36, 3 nodes, wires and light theme persisted.",
+    "Dragged radius after restart from 36 to 67; Undo restored 36; saved again and closed app."
+  ],
+  "saved_project": {
+    "nodes": 3,
+    "radius": 36,
+    "height": 104
+  },
+  "stl": {
+    "triangles": 11808,
+    "bytes": 590484,
+    "printability_verified": false
+  },
+  "files": {
+    "gui-vase-36.morph": {
+      "bytes": 1144,
+      "sha256": "c05642262e376413ebc16f0a37835b03ecf23e28ba465abae59ec2ea4869cc99"
+    },
+    "gui-vase-36.stl": {
+      "bytes": 590484,
+      "sha256": "39118654d03a8b8b8cb7ced0337bc47e3a66618087ededfb8cd64d0bd3e9296b"
+    },
+    "gui-32-dark.png": {
+      "bytes": 482859,
+      "sha256": "3e961aafb8160607624b773869496155aaf61a9843e166bed783880720234fbb"
+    },
+    "gui-36-light-reopened.png": {
+      "bytes": 495722,
+      "sha256": "33c4696f742f0944fda02f5f949ed157afb4a0e235e341ecc0bbd23df98ed677"
+    }
+  },
+  "new_issue": {
+    "description": "Explicit Inspector row scope used remaining vertical space; excessive blank area and inflated row heights were visibly observed.",
+    "source_fix": "Keep stable scope ID and place contents inside ui.horizontal.",
+    "verification": "new binary GUI check pending"
+  },
+  "not_verified": [
+    "Windows GUI / Intel Arc",
+    "broad high-DPI and low-resolution coverage",
+    "physical printing",
+    "complete editor workflows or complete component compatibility"
+  ]
+}

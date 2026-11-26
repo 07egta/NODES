@@ -1,6 +1,6 @@
 # NODES development checkpoint
 
-- Updated: 2026-11-27 00:34 JST / 2026-11-26 15:34 UTC.
+- Updated: 2026-11-27 00:46 JST / 2026-11-26 15:46 UTC.
 - Development branch: `develop/nodes-ultimate`.
 - Original base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`.
 - Main initially inspected: `79f32745923adfa9e3de05ef4683b6e3b5f4948f`. No direct main push, force push or release promotion.
@@ -49,22 +49,21 @@ All material recovery branches are on GitHub. [recovery-parents.json](recovery-p
    https://github.com/07egta/NODES/actions/runs/45846736773
 6. Current Python checks executed locally after environment recovery: GH2 parser 3/3, checkpoint exporter 6/6, dependency auditor 8/8. `git -c core.whitespace=cr-at-eol diff --check` passed.
 
-The diagnostic workflow's repaired working tree is not the same as an unmodified commit. Final committed-source Check must pass after importing this candidate. The Rust changes being imported are formatting only. The recovery workflow is now manual-only; normal Check validates committed source and builds both desktop/console binaries for Linux and Windows.
+The diagnostic workflow's repaired working tree is not the same as an unmodified commit. The imported c19dca1 source passed the normal Linux Check; subsequent file-input and layout fixes require their own Check. The Rust changes being imported are formatting only. The recovery workflow is now manual-only; normal Check validates committed source and builds both desktop/console binaries for Linux and Windows.
 
 ## Measurements and GUI evidence
 
 The latest release benchmark on a Linux x86_64 GitHub runner measured 10,000 scalar nodes at 16.363 ms cold and 12.604 ms warm; 50 full-chain slider edits had p50 23.632 ms and p95 24.151 ms. A 12,288-item Data Tree preserved every value/path and eight empty branches. Midpoint subdivision expanded 32,768 to 131,072 triangles in 16.687 ms while retaining analytical area/centroid. A 2,000-node native project saved in 3.531 ms and reloaded in 2.193 ms, including complete project equivalence checks. Raw scope/counts/results are in performance.json and TEST_RESULTS.md. Separate CI runs are not controlled speedup comparisons. These are not Intel Arc, GUI frame-time, startup, idle-CPU or memory measurements.
 
-Before environment loss, the Linux GUI was actually launched: Japanese text, the 298-node library, vase preview, parameter dragging, Ctrl+Z/Ctrl+Y, error recovery and saving a .morph project were observed. Typing into the inspector exposed an unstable-widget-ID bug; source was fixed. **The fixed GUI has not yet been exercised.** The old saved file and binary were in the lost filesystem. Latest Windows GUI, light theme, DPI layouts, restart/reopen and GUI STL export remain unverified.
+Before environment loss, the Linux GUI was actually launched: Japanese text, the 298-node library, vase preview, parameter dragging, Ctrl+Z/Ctrl+Y, error recovery and saving a .morph project were observed. Typing into the inspector exposed an unstable-widget-ID bug; source was fixed. The old saved file and binary were in the lost filesystem. After recovery, the c19dca1 Linux artifact was downloaded and SHA-256 verified. Its actual GUI retained focus through 32→3(error)→36, preserved keyboard/drag undo and redo, saved a native file, exported an 11,808-triangle STL, restarted with radius 36 and the light theme, and allowed another drag/undo/save. A new excessive Inspector row-height issue was observed; the current source fixes row layout while preserving the stable ID, pending a fresh GUI check. Windows GUI and broad DPI/resolution coverage remain unverified.
 
 ## Current work
 
-- Reviewed formatter candidate, actual measurements and dependency evidence are saved at `c19dca185380391ad1c875e412529e22cae05ba6`; normal Check run `45849521685` has passed fmt/check/strict Clippy and is still running tests/builds.
-- Independent review found that opening a FIFO before checking its type could block project/API/GHX reads. A follow-up on `recovery/file-input-guards` adds pre-open regular-file checks, keeps descriptor checks and byte budgets, and adds a bounded Unix process regression plus cross-platform directory rejection. These new Rust edits await CI. This does not claim to eliminate hostile path-replacement races.
-- `examples/interop/ai-vase.json` constructs an editable vase/twist/output graph through the safe API. JSON/source equivalence checks passed; actual console build/edit/STL validation awaits the binary.
-- Require committed-source formatting, check, strict Clippy, all tests and Linux/Windows release binaries.
-- Obtain a Linux CI build for native GUI revalidation if the restored desktop can execute it.
-- Update the PR and this checkpoint with the exact committed-source results and GUI scope.
+- c19dca1 normal Linux Check run `45849521685` / job `140011951495` passed fmt/check/strict Clippy, 431 Rust tests (0 failed, 2 opt-in ignored), 17 Python tests and release desktop/console build. Its PR merge `ca49e6c016c40f680117bac4dff8babe2dc2664a` has the same tree as c19dca1. The run's Windows job was superseded when the next source was queued; do not call that Windows checkpoint successful.
+- The downloaded CLI reproduced the FIFO blocking bug with a bounded two-second timeout. `eefc9c1` saved pre-open regular-file guards and bounded regression tests. Check `45851162593` stopped at one GHX rustfmt diff; this checkpoint applies that exact formatting correction.
+- Actual GUI testing found excessive Inspector spacing. An explicit stable-ID scope now contains a standard horizontal row; verify the new artifact's row density and 32→3→36 focus behavior next.
+- `examples/interop/ai-vase.json` has passed eight actual CLI commands: build, validate/evaluate, STL export, radius edit, validate/evaluate and second export. `scripts/validate_cli_vase.py` independently reads all STL facets, checks 5,906 unique positions / 11,808 nonzero triangles / 590,484 bytes / height 104 mm, and compares determinant volume to CLI output. See CLI_VASE_VALIDATION.json; this uses the c19dca1 binary, not an unbuilt newer source.
+- Require the current committed-source Check on Linux and Windows, then re-run the bounded FIFO case with the repaired executable. Update TEST_RESULTS.md and PR #11 with exact results.
 
 ## Build commands
 

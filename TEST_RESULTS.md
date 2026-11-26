@@ -8,7 +8,7 @@
 |---|---|---|---|
 | `6349577399dd484a90fde5afe77ee173f8f9444a` | Linux x86_64 / Rust 1.100 | `cargo test --all-targets --locked` | 350 passed、0 failed、2 ignored、24 suites |
 | 同じSHA | GitHub Actions Windows / Rust 1.100.0 | 同じコマンド | 350 passed、0 failed、2 ignored、24 suites |
-| 同じSHA | 同じWindows runner | `cargo build --release --locked --bins` | 成功 |
+| 同じSHA | 同じWindows runner | GUI release build | 成功 |
 
 Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs/45822273755)、job 139917295799 の Test / Build Morphlet。ログ上のtest buildは4m11s、release buildは1m42s。これは起動時間やユーザーPCの性能ではない。
 
@@ -45,6 +45,20 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 候補の299個のログ断片、9ファイルのSHA-256・UTF-8バイト数と元のblobを照合した。Rustの変更はformatterによる整形のみ。詳細は [CI_INTEGRATION_VALIDATION.json](docs/development/CI_INTEGRATION_VALIDATION.json)。**この成功はCIの整形済み作業ツリーに対するもの。取り込んだコミットそのもののLinux/Windows Checkは次の必須ゲート**として区別する。
 
 復帰したローカル環境では、PythonのGH2 parser 3件、checkpoint exporter 6件、依存監査8件、合計 **17件が成功**。Rustは未インストールのため、最新Rust検証はCIへ委ねている。
+
+### コミット済みソースの通常CI
+
+`c19dca185380391ad1c875e412529e22cae05ba6` の [Check 45849521685](https://github.com/07egta/NODES/actions/runs/45849521685)、Linux job `140011951495` は **431 passed / 0 failed / 2 ignored、35 suites**、fmt/check/strict Clippy、Python17件、`cargo build --release --locked --bins`、Linux artifact upload に成功した。PRの実際のcheckout `ca49e6c016c40f680117bac4dff8babe2dc2664a` のtreeがc19dca1と一致することも確認した。
+
+このrunのWindows jobは次のソース更新で中止されたため、Windows成功には数えない。artifact 15132917546 のZIP SHA-256、展開したGUI/CLIのハッシュは [CI_COMMITTED_VALIDATION.json](docs/development/CI_COMMITTED_VALIDATION.json) に保存した。
+
+実CLIでwriterのないFIFOを渡すと2秒のtimeoutで停止を再現した。`eefc9c1` に事前通常ファイル検査と回帰を保存したが、その [Check 45851162593](https://github.com/07egta/NODES/actions/runs/45851162593) はGHXの1箇所のfmt差分で停止した。差分をそのとおり修正し、GUIで発見した行間修正とともに再検証する。失敗したgateを成功へ読み替えていない。
+
+### 実CLIの花器ワークフロー
+
+上記c19dca1の配布用CLIを使い、`scripts/validate_cli_vase.py` で作成→validate/evaluate→STL→半径変更→validate/evaluate→STLの **8コマンドが成功**。全projectフィールドの保持、元ファイルのbytes不変、半径32→36を検査した。
+
+STLをPythonの独立したparserで読み、両方とも5,906個の一意な頂点座標、11,808三角形、590,484 bytes、高さ104 mm、全座標・法線の有限性、全三角形の非ゼロ面積を確認。f32座標から行列式で求めた体積は52,430.418306→59,967.823772 mm³となり、CLI報告との差はそれぞれ0.000751846 / 0.000629314 mm³。相対公差1e-5・絶対公差1e-3 mm³に収まった。生データは [CLI_VASE_VALIDATION.json](docs/development/CLI_VASE_VALIDATION.json)。自己交差や実機造形の独立検証を意味しない。
 
 ## その後のローカル検証
 
@@ -113,7 +127,17 @@ Linuxネイティブ版を起動し、1364px幅のデスクトップ上で確認
 
 半径32を36へ入力する途中で3になるとエラーメッセージが追加され、暗黙のwidget IDが変化して入力フォーカスが失われた。エラーが消えたときには別のパラメータ欄へフォーカスが移ることも確認した。ノードID/port keyで一意なwidget IDを与える修正はビルド済み。
 
-**修正後の実操作、保存ファイルのGUI再オープン、GUIでのSTL出力、Light/Darkの両テーマ、DPI・低解像度の検査は未完了。** 実行環境停止後はネイティブ操作が利用不能となった。モックアップを実画面と扱っていない。
+### 復旧後の実GUI検証
+
+ハッシュを照合したc19dca1のLinux artifactを、1364×1024のネイティブデスクトップと専用設定ディレクトリで実行した。
+
+- **32→3（肉厚エラー）→36**を、途中で入力欄を再クリックせず入力し、フォーカス保持と形状復帰を確認。
+- キーボードUndoで36→3→32、Redoで32→3→36を確認。テキスト入力の1編集単位への履歴統合は未対応。
+- GUIで `.morph` 保存、ライトテーマへ変更、STL出力完了表示を確認。保存した作品は3ノード・半径36、STLは11,808三角形・590,484 bytesだった。
+- アプリを閉じて保存済み作品を指定して再起動し、半径36、接続、ライトテーマの保持を確認。
+- 再起動後に半径スライダーを36→67へ動かし、Undoで36へ戻して再保存した。
+
+実画面で新たに、Inspectorの最初の入力まで約100pxの余白と、過大な行高を確認した。明示IDのscope内を通常のhorizontal行にする修正を追加した。**この配置修正後の新バイナリ確認は次のゲート**。出典・観測・ファイルハッシュは [GUI_VALIDATION.json](docs/development/GUI_VALIDATION.json)。Windows GUI、広いDPI・低解像度、実機造形は未検証。
 
 ## 次の必須ゲート
 
