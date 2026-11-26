@@ -269,6 +269,7 @@ pub struct BranchMatch<'a> {
 /// Topology selection is a NODES policy: greatest branch count, then deepest
 /// path, then first port. Exact GH1 mixed-depth topology needs oracle tests.
 pub fn match_branches(inputs: &[Tree]) -> Result<Vec<BranchMatch<'_>>, String> {
+    if inputs.len() > 64 { return Err("入力数の上限を超えました。".into()); }
     for t in inputs { validate_topology(t)?; }
     let mut master = None;
     let mut best = (0, 0);
@@ -313,7 +314,7 @@ impl<'a> ItemMatches<'a> {
         }
         Ok(Self { lists: lists.to_vec(), mode, next: 0, count })
     }
-    pub fn count(&self) -> usize { self.count }
+    pub fn cardinality(&self) -> usize { self.count }
 }
 impl<'a> Iterator for ItemMatches<'a> {
     type Item = Vec<&'a Value>;
@@ -338,14 +339,20 @@ impl<'a> Iterator for ItemMatches<'a> {
 
 /// Return one tree per input, preserving the same matched paths and item indices.
 pub fn cross_reference(inputs: &[Tree]) -> Result<Vec<Tree>, String> {
+    if inputs.len() > 64 { return Err("入力数の上限を超えました。".into()); }
     let mut builders: Vec<Builder> = inputs.iter().map(|_| Builder::default()).collect();
+    let mut total_weight = 0usize;
     let mut remaining = MAX_ITEMS;
     for m in match_branches(inputs)? {
         let matches = ItemMatches::new(&m.lists, MatchMode::Cross, remaining)?;
-        remaining -= matches.count();
+        remaining -= matches.cardinality();
+        total_weight = total_weight.saturating_add((m.path.len() + 1).saturating_mul(inputs.len()));
+        if total_weight > MAX_TOTAL_WEIGHT { return Err("クロス参照が大きすぎます。".into()); }
         for b in &mut builders { b.append(m.path.clone(), &[])?; }
         for args in matches {
             for (b, v) in builders.iter_mut().zip(args) {
+                total_weight = total_weight.saturating_add(v.weight());
+                if total_weight > MAX_TOTAL_WEIGHT { return Err("クロス参照が大きすぎます。".into()); }
                 b.append(m.path.clone(), std::slice::from_ref(v))?;
             }
         }
