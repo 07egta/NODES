@@ -9,12 +9,15 @@ Only the following GUIDs are candidates for scalar conversion:
 | GH name | Component GUID | Native kind | Limits |
 | --- | --- | --- | --- |
 | Number Slider | 57da07bd-ecab-415d-9d86-af36d7073abc | number | Current value only, native range; GH min/max/step UI retained in inspection, not .morph |
-| Construct Point | 3581f42a-9592-4549-bd6b-1c0fc39d067b | point | XYZ scalar inputs, path {0}, explicit defaults or one slider source |
+| Addition (new / legacy) | a0d62394-a118-422d-abb3-6af115c75b25 / d18db32b-7099-4eea-85c4-8ba675ee8ec3 | add | Numeric scalar inputs only |
+| Subtraction (legacy) | 2c56ab33-c7cc-4129-886c-d5856b714010 | subtract | Numeric scalar inputs only |
+| Multiplication (legacy) | b8963bb1-aa57-476e-a20e-ed6cf635a49c | multiply | Numeric scalar inputs only |
+| Construct Point | 3581f42a-9592-4549-bd6b-1c0fc39d067b | point | XYZ scalar inputs, path {0}, explicit defaults or one scalar numeric source |
 | Panel | 59e0b89a-e487-49f8-bab8-b5bab16be14c | none | inspect only |
 | Boolean Toggle | 2e78987b-9dfb-42a2-8b76-3923ac8bd91a | none | inspect only |
 | Group | c552a431-af5b-46a9-a8a4-0fcbc27ef596 | none | inspect only |
 
-Unknown components and source references stay in the report; conversion refuses them rather than creating a misleading executable .morph. No canvas placeholder UI yet. GH binary, multi-output and multi-source conversion, nontrivial tree matching, embedded clusters, GH export, native Boolean/string/vector/plane types, exact NURBS conversion and Rhino differential tests remain unsupported. Scalar arithmetic and geometry beyond the two mappings are available through the independent graph API, not GHX conversion.
+Unknown components and source references stay in the report; conversion refuses them rather than creating a misleading executable .morph. No canvas placeholder UI yet. GH binary, multi-output and multi-source conversion, nontrivial tree matching, embedded clusters, GH export, native Boolean/string/vector/plane types, exact NURBS conversion and Rhino differential tests remain unsupported. Only the listed component GUIDs are mapped; other arithmetic and geometry are available through the independent graph API, not GHX conversion. Both legacy direct parameter chunks and ParameterData/InputParam/OutputParam layouts are inspected; conversion validates port counts and IDs.
 
 ## Commands
 
@@ -22,12 +25,13 @@ From the project root (dedicated console binary for Windows and other platforms)
 
     cargo run --bin nodes-interop -- inspect-ghx examples/interop/scalar-point.ghx report.json
     cargo run --bin nodes-interop -- convert-ghx examples/interop/scalar-point.ghx sample.morph
+    cargo run --bin nodes-interop -- convert-ghx examples/interop/scalar-add.ghx add.morph
     cargo run --bin nodes-interop -- catalog
     cargo run --bin nodes-interop -- build-graph examples/interop/ai-add.json sum.morph
     cargo run --bin nodes-interop -- instantiate-pack examples/interop/offset-pack.json examples/interop/offset-pack.morphpart offset.morph
     cargo run --bin Morphlet -- --validate sum.morph
 
-The GHX fixture is synthetic (no McNeel code or third-party archive copied). Expected point: (7,2,3); graph API fixture: 7+5=12. These are analytically derived test expectations; not Grasshopper runtime recordings.
+The GHX fixture is synthetic (no McNeel code or third-party archive copied). Expected point: (7,2,3); synthetic modern GHX addition: 7+7=14; graph API fixture: 7+5=12. These are analytically derived test expectations; not Grasshopper runtime recordings.
 
 ## Local graph API
 
@@ -46,6 +50,8 @@ Implemented declarative node packs backed by existing .morphpart definitions: ve
 ## Sources (public behavior/structure only)
 
 - McNeel GH_Archive methods: https://developer.rhino3d.com/api/grasshopper/html/Methods_T_GH_IO_Serialization_GH_Archive.htm
+- Modern Addition ParameterData layout: https://amdlaboratory.com/amdblog/grasshopper%E3%82%92%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%83%87%E3%83%BC%E3%82%BF%E3%81%A7%E8%AA%AD%E3%82%80/
+- Legacy arithmetic GUIDs: https://discourse.mcneel.com/t/grasshopper-unrecognized-objects-problem/52199/21
 - Public component GUIDs: https://discourse.mcneel.com/t/rhino-inside-plagiarism-check-for-grasshopper-files/142581
 - Public GHX structural example: https://github.com/jhorikawa/GrasshopperProgrammingTutorials/blob/master/0004%20Load%20Grasshopper%20file%20with%20compute.rhino3d%20Python/voronoi.ghx
 - Panel, toggle, group structural example: https://github.com/architecture-building-systems/dewbee/blob/main/installer.ghx

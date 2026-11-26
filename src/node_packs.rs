@@ -213,6 +213,11 @@ fn read_limited(path: &Path, max: usize) -> Res<Vec<u8>> {
 
 /// Console import is an explicit one-shot enablement and placement into a fresh work.
 pub fn instantiate_file(manifest: &Path, part: &Path, destination: &Path) -> Res<()> {
+    let ext = |path: &Path, expected: &str| path.extension().and_then(|v| v.to_str())
+        .is_some_and(|v| v.eq_ignore_ascii_case(expected));
+    if !ext(manifest, "json") || !ext(part, "morphpart") || !ext(destination, "morph") {
+        return Err("expected .json manifest, .morphpart part and .morph output".into());
+    }
     let mut registry = Registry::default();
     registry.register(&read_limited(manifest, MAX_MANIFEST_BYTES)?, &read_limited(part, MAX_PART_BYTES)?)?;
     let id = registry.list().next().ok_or("empty pack registry")?.manifest.id.clone();

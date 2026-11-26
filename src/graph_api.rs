@@ -169,6 +169,10 @@ pub fn save(graph: &Graph, destination: &Path) -> Result<(), String> {
 }
 
 pub fn build_file(input: &Path, destination: &Path) -> Result<(), String> {
+    if !input.extension().and_then(|v| v.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("json")) ||
+        !destination.extension().and_then(|v| v.to_str()).is_some_and(|s| s.eq_ignore_ascii_case("morph")) {
+        return Err("expected .json input and .morph output".into());
+    }
     let file = File::open(input).map_err(|e| e.to_string())?;
     if !file.metadata().map_err(|e| e.to_string())?.is_file() { return Err("request must be a regular file".into()); }
     let mut bytes = Vec::new();
