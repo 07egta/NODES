@@ -110,7 +110,15 @@ pub enum NodeKind {
     Add,
     Multiply,
     Divide,
+    Subtract,
+    Power,
+    Abs,
+    Min,
+    Max,
+    Modulo,
+    Sine,
     Series,
+    Range,
     Point,
     Circle,
     Polygon,
@@ -123,9 +131,15 @@ pub enum NodeKind {
     Vase,
     Sphere,
     Box,
+    Cylinder,
+    Cone,
+    Torus,
+    Plane,
     Move,
     Rotate,
     Scale,
+    ScaleXyz,
+    Mirror,
     Twist,
     Wave,
     LinearArray,
@@ -142,7 +156,15 @@ impl NodeKind {
             Self::Add,
             Self::Multiply,
             Self::Divide,
+            Self::Subtract,
+            Self::Power,
+            Self::Abs,
+            Self::Min,
+            Self::Max,
+            Self::Modulo,
+            Self::Sine,
             Self::Series,
+            Self::Range,
             Self::Point,
             Self::Circle,
             Self::Polygon,
@@ -155,9 +177,15 @@ impl NodeKind {
             Self::Vase,
             Self::Sphere,
             Self::Box,
+            Self::Cylinder,
+            Self::Cone,
+            Self::Torus,
+            Self::Plane,
             Self::Move,
             Self::Rotate,
             Self::Scale,
+            Self::ScaleXyz,
+            Self::Mirror,
             Self::Twist,
             Self::Wave,
             Self::LinearArray,
@@ -223,6 +251,103 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Subtract => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "引き算",
+                    category: "数値",
+                    description: "A − B を計算します。リストは順に対応し、短い側の最後の値を繰り返します。",
+                    keywords: "subtract minus difference 差 減算 引く マイナス",
+                    inputs: &[
+                        n("a", "A", 10., -1e6, 1e6, 0.1),
+                        n("b", "B", 3., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Power => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "べき乗",
+                    category: "数値",
+                    description: "底を指数で累乗します。0 の負の指数、負の数の小数乗、結果が大きすぎる場合はエラーを表示します。",
+                    keywords: "power pow exponent square 累乗 べき乗 二乗 指数 冪",
+                    inputs: &[
+                        n("base", "底", 2., -1e6, 1e6, 0.1),
+                        n("exponent", "指数", 2., -64., 64., 0.5),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Abs => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "絶対値",
+                    category: "数値",
+                    description: "値の符号を取り除き、0 以上の値にします。",
+                    keywords: "abs absolute magnitude 絶対値 符号 正の数",
+                    inputs: &[n("value", "値", -1., -1e6, 1e6, 0.1)],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Min => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "最小",
+                    category: "数値",
+                    description: "A と B の小さい方を返します。",
+                    keywords: "min minimum smaller lower 最小 小さい方 下限 クランプ",
+                    inputs: &[
+                        n("a", "A", 0., -1e6, 1e6, 0.1),
+                        n("b", "B", 10., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Max => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "最大",
+                    category: "数値",
+                    description: "A と B の大きい方を返します。",
+                    keywords: "max maximum larger upper 最大 大きい方 上限 クランプ",
+                    inputs: &[
+                        n("a", "A", 0., -1e6, 1e6, 0.1),
+                        n("b", "B", 10., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Modulo => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "剰余",
+                    category: "数値",
+                    description: "A を B で割った余りを 0 以上 |B| 未満で返します。B が 0 のときはエラーを表示します。",
+                    keywords: "modulo mod remainder wrap 剰余 余り 割った余り 繰り返し",
+                    inputs: &[
+                        n("a", "A", 10., -1e6, 1e6, 0.1),
+                        n("b", "B", 3., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Sine => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "三角関数",
+                    category: "数値",
+                    description: "振幅 × sin(2π × 周波数 × 入力 + 位相) を計算します。位相は度。範囲や数列をつなぐと波の値のリストになります。",
+                    keywords: "sine sin cosine trig wave oscillate 三角関数 サイン 正弦 波 周期",
+                    inputs: &[
+                        n("x", "入力", 0.25, -1e6, 1e6, 0.05),
+                        n("amp", "振幅", 1., -1e6, 1e6, 0.5),
+                        n("frequency", "周波数", 1., -1000., 1000., 0.1),
+                        n("phase", "位相", 0., -3600., 3600., 5.),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
             Self::Series => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "数列",
@@ -233,6 +358,21 @@ impl NodeKind {
                         n("start", "開始", 0., -1e5, 1e5, 1.),
                         n("step", "間隔", 10., -1e4, 1e4, 0.1),
                         i("count", "個数", 8., 0., 512.),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Range => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "範囲",
+                    category: "データ",
+                    description: "開始値から終了値までを等間隔に分けた数値リストを作ります。個数が 1 のときは開始値だけを返します。",
+                    keywords: "range domain linspace interval divide 範囲 区間 等分 リスト 分割",
+                    inputs: &[
+                        n("start", "開始", 0., -1e5, 1e5, 1.),
+                        n("end", "終了", 100., -1e5, 1e5, 1.),
+                        i("count", "個数", 11., 1., 512.),
                     ],
                     output: DataType::Number,
                 };
@@ -419,6 +559,67 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Cylinder => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "円柱",
+                    category: "立体",
+                    description: "底面 Z=0 から上へ伸びる、底と蓋のある閉じた円柱を作ります。",
+                    keywords: "cylinder tube column pillar 円柱 円筒 柱 シリンダー",
+                    inputs: &[
+                        n("radius", "半径", 20., 0.1, 1000., 0.5),
+                        n("height", "高さ", 40., 0.1, 2000., 1.),
+                        i("segments", "周の分割", 48., 3., 256.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Cone => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "円錐 / 角錐",
+                    category: "立体",
+                    description: "底面 Z=0、頂点が上の閉じた円錐を作ります。分割数 3 で三角錐、4 で四角錐になります。",
+                    keywords: "cone pyramid tetrahedron 円錐 角錐 三角錐 四角錐 コーン ピラミッド",
+                    inputs: &[
+                        n("radius", "半径", 20., 0.1, 1000., 0.5),
+                        n("height", "高さ", 40., 0.1, 2000., 1.),
+                        i("segments", "周の分割 (3:三角錐 4:四角錐)", 48., 3., 256.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Torus => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "トーラス",
+                    category: "立体",
+                    description: "Z 軸まわりの輪を断面の円で作る、閉じたドーナツ形を作ります。副半径は主半径より小さくしてください。",
+                    keywords: "torus donut ring doughnut 輪 ドーナツ トーラス 環",
+                    inputs: &[
+                        n("major", "主半径", 30., 0.2, 1000., 0.5),
+                        n("minor", "副半径", 8., 0.1, 500., 0.5),
+                        i("segments", "輪の分割", 64., 3., 192.),
+                        i("tube", "断面の分割", 24., 3., 96.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Plane => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "平面",
+                    category: "立体",
+                    description: "XY の中心を原点とする、Z=0 の格子状の平面メッシュを作ります。閉じていない面なので、そのままでは書き出し検査で開いた辺が出ます。",
+                    keywords: "plane grid sheet surface 平面 格子 板 グリッド 面",
+                    inputs: &[
+                        n("width", "幅", 100., 0.1, 2000., 1.),
+                        n("depth", "奥行", 100., 0.1, 2000., 1.),
+                        i("divisions", "分割数", 8., 1., 128.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
             Self::Move => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "移動",
@@ -459,6 +660,37 @@ impl NodeKind {
                     inputs: &[
                         g("geometry", "形状", DataType::Geometry),
                         n("factor", "倍率", 1.2, 0.01, 100., 0.05),
+                    ],
+                    output: DataType::Geometry,
+                };
+                &SPEC
+            }
+            Self::ScaleXyz => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "非一様スケール",
+                    category: "変形",
+                    description: "原点を基準に、X・Y・Z をそれぞれ別の倍率で伸縮します。倍率は 0.01〜100。",
+                    keywords: "scale non-uniform nonuniform stretch xyz 非一様 軸別 縦横 引き伸ばし 伸縮 倍率",
+                    inputs: &[
+                        g("geometry", "形状", DataType::Geometry),
+                        n("sx", "X 倍率", 1., 0.01, 100., 0.05),
+                        n("sy", "Y 倍率", 1., 0.01, 100., 0.05),
+                        n("sz", "Z 倍率", 1., 0.01, 100., 0.05),
+                    ],
+                    output: DataType::Geometry,
+                };
+                &SPEC
+            }
+            Self::Mirror => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "ミラー",
+                    category: "変形",
+                    description: "原点を通り、指定した軸に垂直な平面で反転します。元も残すと元の形と反転した形を 1 つにまとめます（メッシュの場合）。軸: 0=X、1=Y、2=Z。",
+                    keywords: "mirror reflect symmetry flip 鏡 反転 対称 左右 ミラー",
+                    inputs: &[
+                        g("geometry", "形状", DataType::Geometry),
+                        i("axis", "軸 (0:X 1:Y 2:Z)", 0., 0., 2.),
+                        i("keep", "元も残す", 1., 0., 1.),
                     ],
                     output: DataType::Geometry,
                 };

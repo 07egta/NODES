@@ -1584,12 +1584,15 @@ fn value_summary(value: &Value) -> String {
 }
 fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
-        "radius" | "inner_radius" => (min, 120.),
+        "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
         "height" => (min, 240.),
         "width" | "depth" => (min, 180.),
         "thickness" => (min, 12.),
         "angle" => (min.max(-360.), 360.),
-        "value" | "a" | "b" => (min.max(-100.), 100.),
+        "value" | "a" | "b" | "base" | "amp" | "start" | "end" => (min.max(-100.), 100.),
+        "exponent" | "frequency" => (min.max(-10.), 10.),
+        "sx" | "sy" | "sz" => (min, 5.),
+        "divisions" => (min, 32.),
         "x" | "y" | "z" => (min.max(-200.), 200.),
         "count" => (min, 32.),
         "segments" => (min, 128.),

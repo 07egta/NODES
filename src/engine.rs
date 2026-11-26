@@ -378,10 +378,15 @@ fn preflight_run(
             let count = num(args, 1)? as usize;
             (shape(args)?.weight().saturating_mul(count), count)
         }
-        NodeKind::Move | NodeKind::Rotate | NodeKind::Scale | NodeKind::Twist | NodeKind::Wave => {
-            (shape(args)?.weight(), 1)
-        }
-        NodeKind::Series => {
+        NodeKind::Move
+        | NodeKind::Rotate
+        | NodeKind::Scale
+        | NodeKind::ScaleXyz
+        | NodeKind::Twist
+        | NodeKind::Wave => (shape(args)?.weight(), 1),
+        // A mirror that keeps the original can double the shape.
+        NodeKind::Mirror => (shape(args)?.weight().saturating_mul(2), 1),
+        NodeKind::Series | NodeKind::Range => {
             let count = num(args, 2)? as usize;
             (count, count)
         }
@@ -443,6 +448,71 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 return Err("計算結果が大きすぎます。".into());
             }
             Ok(vec![Value::Number(v)])
+        }
+        Subtract | Power | Min | Max | Modulo => {
+            let x = num(a, 0)?;
+            let y = num(a, 1)?;
+            let v = match kind {
+                Subtract => x - y,
+                Min => x.min(y),
+                Max => x.max(y),
+                Modulo => {
+                    if y == 0. {
+                        return Err(
+                            "ゼロでの剰余は計算できません。B を 0 以外にしてください。".into()
+                        );
+                    }
+                    x.rem_euclid(y)
+                }
+                _ => {
+                    if x == 0. && y < 0. {
+                        return Err(
+                            "0 を負の指数でべき乗できません。底か指数を変えてください。".into()
+                        );
+                    }
+                    if x < 0. && (y - y.round()).abs() > 1e-9 {
+                        return Err("負の数は整数の指数でだけ累乗できます。".into());
+                    }
+                    x.powf(y)
+                }
+            };
+            if !v.is_finite() {
+                return Err("計算結果が大きすぎます。".into());
+            }
+            Ok(vec![Value::Number(v)])
+        }
+        Abs => Ok(vec![Value::Number(num(a, 0)?.abs())]),
+        Sine => {
+            let x = num(a, 0)?;
+            let amp = num(a, 1)?;
+            let frequency = num(a, 2)?;
+            let phase = num(a, 3)?.to_radians();
+            let v = amp * (TAU * frequency * x + phase).sin();
+            if !v.is_finite() {
+                return Err("計算結果が大きすぎます。".into());
+            }
+            Ok(vec![Value::Number(v)])
+        }
+        Range => {
+            let start = num(a, 0)?;
+            let end = num(a, 1)?;
+            let count = num(a, 2)? as usize;
+            if count == 0 {
+                return Ok(Vec::new());
+            }
+            if count == 1 {
+                return Ok(vec![Value::Number(start)]);
+            }
+            let span = end - start;
+            Ok((0..count)
+                .map(|i| {
+                    if i + 1 == count {
+                        Value::Number(end)
+                    } else {
+                        Value::Number(start + span * i as f64 / (count - 1) as f64)
+                    }
+                })
+                .collect())
         }
         Series => {
             let start = num(a, 0)?;
@@ -534,6 +604,28 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             cancel,
         ),
         Box => as_mesh(box_mesh(num(a, 0)?, num(a, 1)?, num(a, 2)?), cancel),
+        Cylinder => as_mesh(
+            cylinder(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
+        Cone => as_mesh(
+            cone(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
+        Torus => as_mesh(
+            torus(
+                num(a, 0)?,
+                num(a, 1)?,
+                num(a, 2)? as usize,
+                num(a, 3)? as usize,
+                cancel,
+            )?,
+            cancel,
+        ),
+        Plane => as_mesh(
+            plane(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
         Move => {
             let d = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
             Ok(vec![map_shape(
@@ -559,6 +651,15 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 cancel,
             )?])
         }
+        ScaleXyz => {
+            let f = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
+            Ok(vec![map_shape(
+                shape(a)?,
+                |p| [p[0] * f[0], p[1] * f[1], p[2] * f[2]],
+                cancel,
+            )?])
+        }
+        Mirror => mirror(shape(a)?, num(a, 1)? as usize, num(a, 2)? != 0., cancel),
         Twist => {
             let value = shape(a)?;
             let (lo, hi) = z_bounds(value)?;
@@ -744,6 +845,197 @@ fn checked_size(vertices: usize, triangles: usize) -> Result<(), String> {
         Err("形状が大きすぎます。分割数を減らしてください。".into())
     } else {
         Ok(())
+    }
+}
+fn cylinder(
+    radius: f64,
+    height: f64,
+    segments: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 {
+        return Err("周の分割は 3 以上にしてください。".into());
+    }
+    checked_size(
+        segments.saturating_mul(2).saturating_add(2),
+        segments.saturating_mul(4),
+    )?;
+    let mut m = Mesh::default();
+    for z in [0., height] {
+        cancelled(cancel)?;
+        for j in 0..segments {
+            let angle = TAU * j as f64 / segments as f64;
+            m.vertices
+                .push([radius * angle.cos(), radius * angle.sin(), z]);
+        }
+    }
+    let bottom = (segments * 2) as u32;
+    m.vertices.push([0., 0., 0.]);
+    let top = bottom + 1;
+    m.vertices.push([0., 0., height]);
+    for j in 0..segments {
+        let a = j as u32;
+        let b = ((j + 1) % segments) as u32;
+        let c = a + segments as u32;
+        let d = b + segments as u32;
+        m.triangles.extend([[a, b, c], [b, d, c]]);
+        m.triangles.push([bottom, b, a]);
+        m.triangles.push([top, c, d]);
+    }
+    Ok(m)
+}
+fn cone(
+    radius: f64,
+    height: f64,
+    segments: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 {
+        return Err("周の分割は 3 以上にしてください。".into());
+    }
+    checked_size(segments.saturating_add(2), segments.saturating_mul(2))?;
+    cancelled(cancel)?;
+    let mut m = Mesh::default();
+    for j in 0..segments {
+        let angle = TAU * j as f64 / segments as f64;
+        m.vertices
+            .push([radius * angle.cos(), radius * angle.sin(), 0.]);
+    }
+    let apex = segments as u32;
+    m.vertices.push([0., 0., height]);
+    let center = apex + 1;
+    m.vertices.push([0., 0., 0.]);
+    for j in 0..segments {
+        let a = j as u32;
+        let b = ((j + 1) % segments) as u32;
+        m.triangles.push([a, b, apex]);
+        m.triangles.push([center, b, a]);
+    }
+    Ok(m)
+}
+fn torus(
+    major: f64,
+    minor: f64,
+    segments: usize,
+    tube: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 || tube < 3 {
+        return Err("分割数は 3 以上にしてください。".into());
+    }
+    if minor >= major {
+        return Err("副半径は主半径より小さくしてください。".into());
+    }
+    let count = segments.saturating_mul(tube);
+    checked_size(count, count.saturating_mul(2))?;
+    let mut m = Mesh::default();
+    for i in 0..segments {
+        cancelled(cancel)?;
+        let u = TAU * i as f64 / segments as f64;
+        for j in 0..tube {
+            let v = TAU * j as f64 / tube as f64;
+            let ring = major + minor * v.cos();
+            m.vertices
+                .push([ring * u.cos(), ring * u.sin(), minor * v.sin()]);
+        }
+    }
+    let index = |i: usize, j: usize| ((i % segments) * tube + (j % tube)) as u32;
+    for i in 0..segments {
+        for j in 0..tube {
+            let a = index(i, j);
+            let b = index(i + 1, j);
+            let c = index(i, j + 1);
+            let d = index(i + 1, j + 1);
+            m.triangles.extend([[a, b, c], [b, d, c]]);
+        }
+    }
+    Ok(m)
+}
+fn plane(
+    width: f64,
+    depth: f64,
+    divisions: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if divisions < 1 {
+        return Err("分割数は 1 以上にしてください。".into());
+    }
+    let side = divisions.saturating_add(1);
+    checked_size(
+        side.saturating_mul(side),
+        divisions.saturating_mul(divisions).saturating_mul(2),
+    )?;
+    let mut m = Mesh::default();
+    for iy in 0..side {
+        cancelled(cancel)?;
+        for ix in 0..side {
+            m.vertices.push([
+                -width / 2. + width * ix as f64 / divisions as f64,
+                -depth / 2. + depth * iy as f64 / divisions as f64,
+                0.,
+            ]);
+        }
+    }
+    for iy in 0..divisions {
+        for ix in 0..divisions {
+            let a = (iy * side + ix) as u32;
+            let b = a + 1;
+            let c = a + side as u32;
+            let d = c + 1;
+            m.triangles.extend([[a, b, c], [b, d, c]]);
+        }
+    }
+    Ok(m)
+}
+fn reflect(p: [f64; 3], axis: usize) -> [f64; 3] {
+    let mut q = p;
+    let k = axis.min(2);
+    q[k] = -q[k];
+    q
+}
+// A reflection reverses the triangle winding, so the mirrored copy swaps two indices to
+// keep outward normals. With `keep`, a mesh becomes one merged mesh (the two halves are
+// not welded); points and curves return the original and the mirrored copy.
+fn mirror(
+    source: &Value,
+    axis: usize,
+    keep: bool,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Vec<Value>, String> {
+    match source {
+        Value::Mesh(m) => {
+            let mut mesh = Mesh::default();
+            if keep {
+                checked_size(
+                    m.vertices.len().saturating_mul(2),
+                    m.triangles.len().saturating_mul(2),
+                )?;
+                mesh.vertices.extend(&m.vertices);
+                mesh.triangles.extend(&m.triangles);
+            }
+            let offset = mesh.vertices.len() as u32;
+            for (i, p) in m.vertices.iter().enumerate() {
+                if i % 256 == 0 {
+                    cancelled(cancel)?;
+                }
+                mesh.vertices.push(reflect(*p, axis));
+            }
+            mesh.triangles.extend(
+                m.triangles
+                    .iter()
+                    .map(|t| [t[0] + offset, t[2] + offset, t[1] + offset]),
+            );
+            as_mesh(mesh, cancel)
+        }
+        Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
+        other => {
+            let mirrored = map_shape(other, |p| reflect(p, axis), cancel)?;
+            if keep {
+                Ok(vec![other.clone(), mirrored])
+            } else {
+                Ok(vec![mirrored])
+            }
+        }
     }
 }
 fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {

@@ -40,6 +40,16 @@ pub const TEMPLATES: &[Template] = &[
         description: "数列で大きさと高さを変えた円をつなぎ、面を作ります。",
         tag: "データを使う",
     },
+    Template {
+        name: "サイン波の塔",
+        description: "範囲と三角関数でずらした円柱を積み重ね、波打つ塔にします。",
+        tag: "数式で形を作る",
+    },
+    Template {
+        name: "べき乗の山脈",
+        description: "べき乗で高さを変えた円錐を並べ、ミラーで反対側にも写します。",
+        tag: "数式と対称",
+    },
 ];
 
 pub fn create(index: usize) -> Project {
@@ -185,7 +195,7 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(array, wave, "geometry")?;
             finish(&mut graph, wave, [290.0, 385.0])?;
         }
-        _ => {
+        5 => {
             let radii = add(
                 &mut graph,
                 NodeKind::Series,
@@ -218,12 +228,107 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(moved, loft, "curves")?;
             finish(&mut graph, loft, [504.0, 340.0])?;
         }
+        6 => {
+            let t = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 0.0), ("end", 1.0), ("count", 10.0)],
+            )?;
+            if let Some(n) = graph.node_mut(t) {
+                n.name = "波の位置".into();
+            }
+            let heights = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 310.0],
+                &[("start", 0.0), ("end", 90.0), ("count", 10.0)],
+            )?;
+            if let Some(n) = graph.node_mut(heights) {
+                n.name = "段の高さ".into();
+            }
+            let sine = add(
+                &mut graph,
+                NodeKind::Sine,
+                [262.0, 30.0],
+                &[("amp", 12.0), ("frequency", 1.0), ("phase", 0.0)],
+            )?;
+            graph.connect(t, sine, "x")?;
+            let cylinder = add(
+                &mut graph,
+                NodeKind::Cylinder,
+                [262.0, 310.0],
+                &[("radius", 6.0), ("height", 9.0), ("segments", 40.0)],
+            )?;
+            let stretched = add(
+                &mut graph,
+                NodeKind::ScaleXyz,
+                [504.0, 310.0],
+                &[("sx", 1.6), ("sy", 0.8), ("sz", 1.0)],
+            )?;
+            graph.connect(cylinder, stretched, "geometry")?;
+            let moved = add(&mut graph, NodeKind::Move, [504.0, 30.0], &[])?;
+            graph.connect(stretched, moved, "geometry")?;
+            graph.connect(sine, moved, "x")?;
+            graph.connect(heights, moved, "z")?;
+            finish(&mut graph, moved, [746.0, 30.0])?;
+        }
+        _ => {
+            let base = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 1.0), ("end", 5.0), ("count", 5.0)],
+            )?;
+            if let Some(n) = graph.node_mut(base) {
+                n.name = "1 から 5".into();
+            }
+            let squared = add(
+                &mut graph,
+                NodeKind::Power,
+                [262.0, 30.0],
+                &[("exponent", 2.0)],
+            )?;
+            graph.connect(base, squared, "base")?;
+            let heights = add(&mut graph, NodeKind::Multiply, [504.0, 30.0], &[("b", 3.0)])?;
+            graph.connect(squared, heights, "a")?;
+            if let Some(n) = graph.node_mut(heights) {
+                n.name = "高さ（3 倍）".into();
+            }
+            let cone = add(
+                &mut graph,
+                NodeKind::Cone,
+                [262.0, 310.0],
+                &[("radius", 8.0), ("segments", 4.0)],
+            )?;
+            graph.connect(heights, cone, "height")?;
+            let spacing = add(
+                &mut graph,
+                NodeKind::Series,
+                [20.0, 310.0],
+                &[("start", 0.0), ("step", 22.0), ("count", 5.0)],
+            )?;
+            if let Some(n) = graph.node_mut(spacing) {
+                n.name = "並べる間隔".into();
+            }
+            let moved = add(&mut graph, NodeKind::Move, [504.0, 310.0], &[("y", 20.0)])?;
+            graph.connect(cone, moved, "geometry")?;
+            graph.connect(spacing, moved, "x")?;
+            let mirrored = add(
+                &mut graph,
+                NodeKind::Mirror,
+                [746.0, 310.0],
+                &[("axis", 1.0), ("keep", 1.0)],
+            )?;
+            graph.connect(moved, mirrored, "geometry")?;
+            finish(&mut graph, mirrored, [746.0, 30.0])?;
+        }
     }
     graph.validate()?;
     let mut project = Project::new(TEMPLATES[index].name, graph);
     project.pan = [24.0, 80.0];
     // Two-column examples stay readable in a laptop-sized graph panel. The
     // canvas fits these bounds to its actual size on the first visible frame.
-    project.zoom = if index == 5 { 0.86 } else { 1.1 };
+    project.zoom = if index >= 5 { 0.86 } else { 1.1 };
     Ok(project)
 }
