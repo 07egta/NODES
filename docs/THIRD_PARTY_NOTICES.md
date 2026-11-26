@@ -28,6 +28,17 @@ cargo metadata --locked --offline --format-version 1 --filter-platform x86_64-pc
 
 Cargo の情報形式: [公式 cargo metadata ドキュメント](https://doc.rust-lang.org/cargo/commands/cargo-metadata.html)。依存のバージョンや機能設定を変えた場合は、この一覧を再生成してください。
 
+## 追加した依存（一覧は未再生成）
+
+次の7件は、上記の114件の確認後に追加しました（`rhai` を使うスクリプトノード用。理由は [実装構成](ARCHITECTURE.md) の第10章）。ライセンスは crates.io の宣言で確認しただけで、ライセンス本文の同梱・監査データの更新は**まだ行っていません**。
+
+| パッケージ | ライセンス宣言 |
+|---|---|
+| rhai 1.27.0 / rhai_codegen 3.3.0 | MIT OR Apache-2.0 |
+| thin-vec 0.2.21 / const-random 0.1.20 / const-random-macro 0.1.18 | MIT OR Apache-2.0 |
+| tiny-keccak 2.0.2 | CC0-1.0 |
+| smartstring 1.0.1 | **MPL-2.0+**（ファイル単位の弱いコピーレフト。配布に含めるなら本文とソース入手先の表示が必要） |
+
 ## フォント
 
 ### Morphlet JP

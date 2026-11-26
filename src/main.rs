@@ -2,6 +2,7 @@
 mod app;
 mod canvas;
 mod file_picker;
+mod script_ui;
 mod theme;
 mod viewport;
 

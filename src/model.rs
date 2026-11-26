@@ -1,4 +1,5 @@
 //! Serializable, renderer-independent graph model. Geometry is evaluated separately.
+use crate::cluster::ClusterDef;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
@@ -148,6 +149,10 @@ pub enum NodeKind {
     Flatten,
     Graft,
     Output,
+    /// User script (see `script.rs`). Added after `Output` to ease merging.
+    Script,
+    /// Instance of a cluster definition stored in `Graph::clusters` (see `cluster.rs`).
+    Cluster,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -194,6 +199,8 @@ impl NodeKind {
             Self::Flatten,
             Self::Graft,
             Self::Output,
+            Self::Script,
+            // `Cluster` is intentionally not listed: it is created from a definition.
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -802,6 +809,8 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Script => &crate::script::SCRIPT_SPEC,
+            Self::Cluster => &crate::cluster::CLUSTER_SPEC,
         }
     }
 }
@@ -816,12 +825,21 @@ pub struct Node {
     pub params: BTreeMap<String, f64>,
     pub inputs: BTreeMap<String, NodeId>,
     pub preview: bool,
+    /// Script source of a `Script` node. Empty (and not saved) for other nodes.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub script: String,
+    /// Definition id (`Graph::clusters`) of a `Cluster` node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<u64>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub next_id: NodeId,
+    /// Cluster definitions stored inside the work (empty in old files).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub clusters: Vec<ClusterDef>,
 }
 impl Graph {
     pub fn add(&mut self, kind: NodeKind, position: [f32; 2]) -> Result<NodeId, String> {
@@ -851,6 +869,8 @@ impl Graph {
                 .collect(),
             inputs: BTreeMap::new(),
             preview: true,
+            script: String::new(),
+            cluster: None,
         });
         self.next_id = next;
         Ok(id)
@@ -915,7 +935,8 @@ impl Graph {
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        self.topological_order().map(|_| ())
+        self.topological_order()?;
+        crate::cluster::validate_graph(self)
     }
     pub fn topological_order(&self) -> Result<Vec<NodeId>, String> {
         if self.nodes.len() > MAX_NODES {

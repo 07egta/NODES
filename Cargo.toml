@@ -11,6 +11,9 @@ eframe = { version = "=0.33.3", default-features = false, features = ["default_f
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Sandboxed user scripts (スクリプトノード). Exact pin; see docs/ARCHITECTURE.md section 10.
+# No "sync" (the engine lives on one helper thread) and no "unchecked" (limits must stay on).
+rhai = { version = "=1.27.0", default-features = false, features = ["std", "no_module", "no_time", "no_custom_syntax"] }
 
 [profile.release]
 opt-level = 3

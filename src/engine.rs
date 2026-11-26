@@ -20,6 +20,8 @@ struct Key {
     kind: NodeKind,
     params: BTreeMap<String, f64>,
     inputs: BTreeMap<String, (NodeId, u64)>,
+    /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
+    extra: String,
 }
 struct Cache {
     key: Key,
@@ -106,12 +108,13 @@ impl Evaluator {
                     .iter()
                     .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
                     .collect(),
+                extra: crate::cluster::key_extra(graph, node),
             };
             let (result, revision, is_cached) =
                 if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
                     (c.result.clone(), c.revision, true)
                 } else {
-                    let result = evaluate_node(node, &out.outputs, &stop);
+                    let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
                     if stop() {
                         out.cancelled = true;
                         break;
@@ -157,7 +160,7 @@ impl Evaluator {
     }
 }
 
-fn evaluate_node(
+pub(crate) fn evaluate_node(
     node: &Node,
     outputs: &BTreeMap<NodeId, Result<Tree, String>>,
     cancel: &dyn Fn() -> bool,
@@ -339,7 +342,7 @@ fn evaluate_node(
     }
     checked_tree(result, cancel)
 }
-fn checked_tree(tree: Tree, cancel: &dyn Fn() -> bool) -> Result<Tree, String> {
+pub(crate) fn checked_tree(tree: Tree, cancel: &dyn Fn() -> bool) -> Result<Tree, String> {
     if tree.branches.len() > MAX_ITEMS || tree.branches.keys().any(|p| p.len() > 32) {
         return Err(
             "データツリーが大きすぎるか深すぎます。フラット化で階層を整理してください。".into(),
@@ -728,7 +731,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(values)
         }
-        Loft | Merge | Flatten | Graft | Output => Err("このノードはリスト評価が必要です。".into()),
+        Loft | Merge | Flatten | Graft | Output | Script | Cluster => {
+            Err("このノードはリスト評価が必要です。".into())
+        }
     }
 }
 

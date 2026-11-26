@@ -15,15 +15,23 @@ pub enum FileTask {
     Save,
     ExportStl,
     ExportObj,
+    SavePart,
+    LoadPart,
 }
 
 impl FileTask {
+    /// Tasks that pick an existing file (the others name a file to write).
+    fn picks_existing(self) -> bool {
+        matches!(self, Self::Open | Self::LoadPart)
+    }
     fn title(self) -> &'static str {
         match self {
             Self::Open => "作品を開く",
             Self::Save => "作品を保存",
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
+            Self::SavePart => "部品を書き出す",
+            Self::LoadPart => "部品を読み込む",
         }
     }
 
@@ -32,6 +40,7 @@ impl FileTask {
             Self::Open | Self::Save => "morph",
             Self::ExportStl => "stl",
             Self::ExportObj => "obj",
+            Self::SavePart | Self::LoadPart => "morphpart",
         }
     }
 
@@ -39,7 +48,8 @@ impl FileTask {
         match self {
             Self::Open => "開く",
             Self::Save => "保存",
-            Self::ExportStl | Self::ExportObj => "書き出す",
+            Self::LoadPart => "読み込む",
+            Self::ExportStl | Self::ExportObj | Self::SavePart => "書き出す",
         }
     }
 }
@@ -216,7 +226,7 @@ impl FilePicker {
                                     ui.label(
                                         RichText::new("この場所に対応ファイルはありません").weak(),
                                     );
-                                    if self.task != FileTask::Open {
+                                    if !self.task.picks_existing() {
                                         ui.label(
                                             RichText::new(
                                                 "下の欄にファイル名を入力して保存できます。",
@@ -384,7 +394,7 @@ impl FilePicker {
                 self.selected_file = None;
                 self.error = None;
                 self.overwrite = None;
-                if self.task == FileTask::Open {
+                if self.task.picks_existing() {
                     self.filename.clear();
                 }
             }
@@ -446,8 +456,8 @@ impl FilePicker {
         }
         let extension = self.task.extension();
         if !has_extension(&path, extension) {
-            if self.task == FileTask::Open && path.extension().is_some() {
-                self.error = Some("開ける作品は .morph ファイルです。".into());
+            if self.task.picks_existing() && path.extension().is_some() {
+                self.error = Some(format!("開けるファイルは .{extension} です。"));
                 return None;
             }
             path.set_extension(extension);
@@ -456,7 +466,7 @@ impl FilePicker {
             self.error = Some("ファイル名を指定してください。".into());
             return None;
         }
-        if self.task == FileTask::Open {
+        if self.task.picks_existing() {
             if !path.is_file() {
                 self.error =
                     Some("この作品ファイルが見つかりません。名前と場所を確認してください。".into());

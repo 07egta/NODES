@@ -6,6 +6,7 @@ use crate::{
 };
 use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
 use morphlet::{
+    cluster,
     engine::{Evaluation, Evaluator},
     model::{Graph, NodeKind, Tree, Value},
     persistence::{self, History, Project},
@@ -113,6 +114,8 @@ pub struct MorphletApp {
     started: Instant,
     screenshot_requested: bool,
     suppress_history: bool,
+    /// Cluster definition waiting for a `.morphpart` file name.
+    part_target: Option<u64>,
 }
 
 impl MorphletApp {
@@ -185,6 +188,7 @@ impl MorphletApp {
             started: Instant::now(),
             screenshot_requested: false,
             suppress_history: false,
+            part_target: None,
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -408,6 +412,32 @@ impl MorphletApp {
                             self.after_save = None;
                         }
                     }
+                    FileTask::SavePart => {
+                        let result = self
+                            .part_target
+                            .take()
+                            .ok_or_else(|| "書き出す部品が選ばれていません。".to_string())
+                            .and_then(|id| cluster::save_part(&path, &self.project.graph, id));
+                        match result {
+                            Ok(()) => self.notify("部品を書き出しました", false),
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
+                    FileTask::LoadPart => {
+                        match cluster::load_part(&path, &mut self.project.graph) {
+                            Ok(def_id) => {
+                                let at = self.canvas.center_for_add(&self.project);
+                                match cluster::instantiate(&mut self.project.graph, def_id, at) {
+                                    Ok(id) => {
+                                        self.canvas.select_only(id);
+                                        self.notify("部品を読み込みました", false);
+                                    }
+                                    Err(e) => self.notify(e, true),
+                                }
+                            }
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
                     FileTask::ExportStl | FileTask::ExportObj => {
                         let result = self.result_trees().and_then(|trees| {
                             if task == FileTask::ExportStl {
@@ -463,6 +493,52 @@ impl MorphletApp {
             Err(e) => self.notify(e, true),
         }
     }
+    fn group_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        let name = format!("部品 {}", self.project.graph.clusters.len() + 1);
+        match cluster::group_nodes(&mut self.project.graph, &ids, &name) {
+            Ok(id) => {
+                self.canvas.select_only(id);
+                self.notify("選択したノードを 1 つの部品にまとめました", false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn part_action(&mut self, action: crate::script_ui::PartAction) {
+        use crate::script_ui::PartAction;
+        match action {
+            PartAction::Add(def_id) => {
+                let at = self.canvas.center_for_add(&self.project);
+                match cluster::instantiate(&mut self.project.graph, def_id, at) {
+                    Ok(id) => self.canvas.select_only(id),
+                    Err(e) => self.notify(e, true),
+                }
+            }
+            PartAction::Export(def_id) => {
+                let name = self
+                    .project
+                    .graph
+                    .clusters
+                    .iter()
+                    .find(|d| d.id == def_id)
+                    .map(|d| safe_name(&d.name))
+                    .unwrap_or_else(|| "部品".into());
+                self.part_target = Some(def_id);
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::SavePart,
+                    self.start_directory(),
+                    format!("{name}.morphpart"),
+                ));
+            }
+            PartAction::Import => {
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::LoadPart,
+                    self.start_directory(),
+                    String::new(),
+                ));
+            }
+        }
+    }
     fn delete_selected(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         for id in ids {
@@ -493,6 +569,8 @@ impl MorphletApp {
                         n.params = old.params.clone();
                         n.name = format!("{} コピー", old.name);
                         n.preview = old.preview;
+                        n.script = old.script.clone();
+                        n.cluster = old.cluster;
                     }
                 }
                 Err(e) => {
@@ -776,6 +854,9 @@ impl MorphletApp {
                 if let Some(kind) = add {
                     self.add_node(kind, None);
                 }
+                if let Some(action) = crate::script_ui::library_parts(ui, &self.project.graph) {
+                    self.part_action(action);
+                }
                 ui.add_space(12.);
                 ui.separator();
                 ui.add_space(8.);
@@ -863,12 +944,16 @@ impl MorphletApp {
         ui.label(theme::small(spec.description));
         ui.add_space(9.);
         let mut disconnect = None;
-        for input in spec.inputs {
+        let shown = cluster::real_input_count(&self.project.graph, &node);
+        for (index, input) in spec.inputs.iter().enumerate().take(shown) {
             let linked = node.inputs.get(input.key).copied();
+            let label = cluster::input_label(&self.project.graph, &node, index, input);
+            let needs_link = cluster::input_needs_link(&self.project.graph, &node, index, input);
+            let optional = cluster::input_is_optional(&node, input);
             ui.horizontal(|ui| {
                 ui.add_sized(
                     [100., 23.],
-                    egui::Label::new(RichText::new(input.label).size(12.)),
+                    egui::Label::new(RichText::new(label).size(12.)),
                 );
                 if let Some(source) = linked {
                     let name = self
@@ -885,7 +970,7 @@ impl MorphletApp {
                     if ui.small_button("切断").clicked() {
                         disconnect = Some(input.key);
                     }
-                } else if let Some(default) = input.default {
+                } else if let (Some(default), false) = (input.default, needs_link) {
                     if let Some(n) = self.project.graph.node_mut(id) {
                         let value = n.params.entry(input.key.into()).or_insert(default);
                         let (low, high) = friendly_range(input.key, input.min, input.max, *value);
@@ -896,6 +981,8 @@ impl MorphletApp {
                             *value = value.round();
                         }
                     }
+                } else if optional {
+                    ui.label(theme::small("つながなくても動きます（任意）"));
                 } else {
                     ui.label(
                         RichText::new("形状を接続してください")
@@ -907,6 +994,14 @@ impl MorphletApp {
         }
         if let Some(key) = disconnect {
             self.project.graph.disconnect(id, key);
+        }
+        if node.kind == NodeKind::Script {
+            crate::script_ui::script_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::Cluster
+            && let Some(action) = crate::script_ui::cluster_panel(ui, &mut self.project.graph, id)
+        {
+            self.part_action(action);
         }
         ui.add_space(9.);
         egui::CollapsingHeader::new("データを見る")
@@ -968,6 +1063,13 @@ impl MorphletApp {
                     }
                     if ui.button("削除").clicked() {
                         self.delete_selected();
+                    }
+                    if ui
+                        .button("まとめる")
+                        .on_hover_text("選択中のノードを 1 つの部品（まとめノード）にします")
+                        .clicked()
+                    {
+                        self.group_selected();
                     }
                 });
             });
@@ -1512,8 +1614,14 @@ fn document_changed(a: &Project, b: &Project) -> bool {
 }
 fn same_calculation(a: &Graph, b: &Graph) -> bool {
     a.nodes.len() == b.nodes.len()
+        && a.clusters == b.clusters
         && a.nodes.iter().zip(&b.nodes).all(|(x, y)| {
-            x.id == y.id && x.kind == y.kind && x.params == y.params && x.inputs == y.inputs
+            x.id == y.id
+                && x.kind == y.kind
+                && x.params == y.params
+                && x.inputs == y.inputs
+                && x.script == y.script
+                && x.cluster == y.cluster
         })
 }
 fn matches_search(kind: NodeKind, query: &str) -> bool {

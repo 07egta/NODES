@@ -412,7 +412,8 @@ fn new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged() {
         assert_eq!(back, *kind);
         assert!(NodeKind::all().contains(kind), "{name} missing from all()");
     }
-    assert_eq!(NodeKind::all().len(), 42);
+    // 42 geometry/data nodes plus the Script node (Cluster is created from a definition).
+    assert_eq!(NodeKind::all().len(), 43);
     let mut seen = std::collections::BTreeSet::new();
     assert!(NodeKind::all().iter().all(|k| seen.insert(*k)));
 }
