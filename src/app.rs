@@ -14,10 +14,11 @@ use morphlet::{
     annotations, cluster,
     engine::{Evaluation, Evaluator},
     gcode,
-    model::{DataType, Graph, NodeId, NodeKind, Tree},
+    model::{DataType, Graph, Node, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
@@ -100,7 +101,14 @@ pub struct MorphletApp {
     after_save: Option<PendingAction>,
     dirty: bool,
     search: String,
+    palette_query: String,
+    palette_ime: bool,
     category: String,
+    library_filter: u8,
+    favorites: BTreeSet<NodeKind>,
+    show_library: bool,
+    show_workspace: bool,
+    clipboard: Vec<Node>,
     palette_open: bool,
     palette_focus: bool,
     palette_position: [f32; 2],
@@ -192,6 +200,13 @@ impl MorphletApp {
             after_save: None,
             dirty: false,
             search: String::new(),
+            palette_query: String::new(),
+            palette_ime: false,
+            library_filter: 0,
+            favorites: ui_polish::load_favorites(),
+            show_library: true,
+            show_workspace: true,
+            clipboard: Vec::new(),
             category: "すべて".into(),
             palette_open: false,
             palette_focus: false,
@@ -378,6 +393,9 @@ impl MorphletApp {
         };
         if let Some((project, path)) = new {
             self.project = project;
+            self.clipboard.clear();
+            self.wire_source = None;
+            self.palette_open = false;
             self.file_path = path;
             self.dirty = false;
             self.history = History::default();
@@ -561,7 +579,6 @@ impl MorphletApp {
         });
         match self.project.graph.add(kind, at) {
             Ok(id) => {
-                let mut connected = true;
                 if let Some(source) = wire {
                     let output = self
                         .project
@@ -570,9 +587,20 @@ impl MorphletApp {
                         .map(|n| n.kind.spec().output);
                     match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
                         Some(key) => {
-                            let _ = self.project.graph.connect(source, id, key);
+                            if let Err(e) = self.project.graph.connect(source, id, key) {
+                                // Keep a wire-drop operation transactional: never leave a half-added node.
+                                self.project.graph.remove(id);
+                                self.notify(e, true);
+                                self.palette_open = false;
+                                return;
+                            }
                         }
-                        None => connected = false,
+                        None => {
+                            self.project.graph.remove(id);
+                            self.notify("接続できる入力がありません。別のノードを選んでください。", true);
+                            self.palette_open = false;
+                            return;
+                        }
                     }
                 } else if let Some(source) = selected {
                     let output = self
@@ -591,15 +619,8 @@ impl MorphletApp {
                 self.recent.push(kind);
                 self.canvas.select_only(id);
                 self.palette_open = false;
-                self.search.clear();
-                if connected {
-                    self.notify(format!("「{}」を追加しました", kind.spec().label), false);
-                } else {
-                    self.notify(
-                        format!("「{}」を追加しましたが、線をつなげる入力がありません", kind.spec().label),
-                        true,
-                    );
-                }
+                self.palette_query.clear();
+                self.notify(format!("「{}」を追加しました", kind.spec().label), false);
             }
             Err(e) => self.notify(e, true),
         }
@@ -661,48 +682,51 @@ impl MorphletApp {
         self.canvas.selected.clear();
         self.canvas.connecting = None;
     }
+    fn selected_nodes(&self) -> Vec<Node> {
+        self.project.graph.nodes.iter().filter(|n| self.canvas.selected.contains(&n.id)).cloned().collect()
+    }
+    fn copy_selected(&mut self) {
+        let nodes = self.selected_nodes();
+        if !nodes.is_empty() {
+            self.clipboard = nodes;
+            self.notify(format!("{} ノードをコピーしました", self.clipboard.len()), false);
+        }
+    }
+    fn paste_selected(&mut self) {
+        if self.clipboard.is_empty() { return; }
+        let at = self.canvas.center_for_add(&self.project);
+        let min_x = self.clipboard.iter().map(|n| n.position[0]).fold(f32::INFINITY, f32::min);
+        let min_y = self.clipboard.iter().map(|n| n.position[1]).fold(f32::INFINITY, f32::min);
+        match insert_nodes(&mut self.project.graph, &self.clipboard, [at[0]-min_x, at[1]-min_y], false) {
+            Ok(ids) => {
+                self.canvas.selected = ids;
+                self.notify(format!("{} ノードを貼り付けました", self.canvas.selected.len()), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
     fn duplicate_selected(&mut self) {
-        let nodes: Vec<_> = self
-            .project
-            .graph
-            .nodes
-            .iter()
-            .filter(|n| self.canvas.selected.contains(&n.id))
-            .cloned()
-            .collect();
-        let mut map = std::collections::BTreeMap::new();
-        for old in &nodes {
-            match self
-                .project
-                .graph
-                .add(old.kind, [old.position[0] + 35., old.position[1] + 40.])
-            {
-                Ok(id) => {
-                    map.insert(old.id, id);
-                    if let Some(n) = self.project.graph.node_mut(id) {
-                        n.params = old.params.clone();
-                        n.name = format!("{} コピー", old.name);
-                        n.preview = old.preview;
-                        n.script = old.script.clone();
-                        n.cluster = old.cluster;
-                        n.off = old.off;
-                    }
-                }
-                Err(e) => {
-                    self.notify(e, true);
-                    return;
-                }
-            }
+        let nodes = self.selected_nodes();
+        if nodes.is_empty() { return; }
+        match insert_nodes(&mut self.project.graph, &nodes, [35., 40.], true) {
+            Ok(ids) => self.canvas.selected = ids,
+            Err(e) => self.notify(e, true),
         }
-        for old in &nodes {
-            if let Some(id) = map.get(&old.id) {
-                for (key, source) in &old.inputs {
-                    let from = *map.get(source).unwrap_or(source);
-                    let _ = self.project.graph.connect(from, *id, key);
-                }
-            }
+    }
+    fn open_palette(&mut self, at: [f32; 2], source: Option<NodeId>) {
+        self.wire_source = source;
+        self.palette_open = true;
+        self.palette_focus = true;
+        self.palette_position = at;
+        self.palette_query.clear();
+        self.palette_ime = false;
+        self.palette_cursor = 0;
+    }
+    fn toggle_favorite(&mut self, kind: NodeKind) {
+        if !self.favorites.remove(&kind) { self.favorites.insert(kind); }
+        if let Err(e) = ui_polish::save_favorites(&self.favorites) {
+            self.notify(e, true);
         }
-        self.canvas.selected = map.values().copied().collect();
     }
     /// Toggle 無効 on the selection: if any selected node is on, turn all off; else on.
     fn toggle_off_selected(&mut self) {
@@ -825,6 +849,12 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::D)) {
                 self.duplicate_selected();
             }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::C)) {
+                self.copy_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::V)) {
+                self.paste_selected();
+            }
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
                 self.toggle_off_selected();
             }
@@ -858,7 +888,9 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A)) {
                 self.canvas.selected = self.project.graph.nodes.iter().map(|n| n.id).collect();
             }
-            if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F)) {
+                self.canvas.fit_selection_requested = true;
+            } else if ctx.input(|i| i.key_pressed(egui::Key::F)) {
                 let items = self.previews();
                 self.viewport.fit(&items);
                 self.canvas.fit_requested = true;
@@ -866,10 +898,7 @@ impl MorphletApp {
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
                 || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::K))
             {
-                self.palette_open = true;
-                self.palette_focus = true;
-                self.palette_position = self.canvas.center_for_add(&self.project);
-                self.search.clear();
+                self.open_palette(self.canvas.center_for_add(&self.project), None);
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
@@ -1446,11 +1475,7 @@ impl MorphletApp {
                                     .on_hover_text("Tab またはダブルクリック")
                                     .clicked()
                                 {
-                                    self.palette_open = true;
-                                    self.palette_focus = true;
-                                    self.palette_position =
-                                        self.canvas.center_for_add(&self.project);
-                                    self.search.clear();
+                                    self.open_palette(self.canvas.center_for_add(&self.project), None);
                                 }
                                 if ui
                                     .small_button("メモ")
@@ -1526,20 +1551,11 @@ impl MorphletApp {
                     self.add_note(at);
                 }
                 if let Some(at) = outcome.add_at {
-                    self.palette_open = true;
-                    self.palette_focus = true;
-                    self.palette_position = at;
-                    self.search.clear();
-                    self.palette_cursor = 0;
+                    self.open_palette(at, None);
                 }
                 if let Some((from, at)) = outcome.drop_wire {
                     // Released on empty canvas: search, then connect the chosen node to `from`.
-                    self.wire_source = Some(from);
-                    self.palette_open = true;
-                    self.palette_focus = true;
-                    self.palette_position = at;
-                    self.search.clear();
-                    self.palette_cursor = 0;
+                    self.open_palette(at, Some(from));
                 }
             });
     }
@@ -1884,6 +1900,7 @@ impl MorphletApp {
             ui.horizontal(|ui| {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
+                    self.clipboard.clear();
                     self.recovery = None;
                     self.dirty = true;
                     self.suppress_history = true;
@@ -2110,6 +2127,40 @@ impl eframe::App for MorphletApp {
     }
 }
 
+/// Copies the chosen subgraph atomically. A duplicate retains upstream links;
+/// a paste only retains links inside the copied selection. Cluster definitions remain
+/// document-local, so a stale/missing definition causes validation to fail.
+fn insert_nodes(graph: &mut Graph, nodes: &[Node], offset: [f32; 2], retain_external: bool) -> Result<BTreeSet<NodeId>, String> {
+    if nodes.len() > morphlet::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
+        return Err("ノード数の上限を超えるため追加できません。".into());
+    }
+    let mut candidate = graph.clone();
+    let mut mapping = BTreeMap::new();
+    for old in nodes {
+        let id = candidate.add(old.kind, [
+            (old.position[0] + offset[0]).clamp(-1e6, 1e6),
+            (old.position[1] + offset[1]).clamp(-1e6, 1e6),
+        ])?;
+        mapping.insert(old.id, id);
+        let n = candidate.node_mut(id).ok_or("追加したノードが見つかりません。")?;
+        n.name = old.name.clone();
+        n.params = old.params.clone();
+        n.preview = old.preview;
+        n.script = old.script.clone();
+        n.cluster = old.cluster;
+        n.off = old.off;
+    }
+    for old in nodes {
+        let new = candidate.node_mut(mapping[&old.id]).ok_or("追加したノードが見つかりません。")?;
+        new.inputs = old.inputs.iter().filter_map(|(key, source)| {
+            mapping.get(source).copied().or_else(|| retain_external.then_some(*source)).map(|id| (key.clone(), id))
+        }).collect();
+    }
+    candidate.validate()?;
+    *graph = candidate;
+    Ok(mapping.values().copied().collect())
+}
+
 fn collect_export_trees(
     graph: &Graph,
     evaluation: &Evaluation,
@@ -2231,6 +2282,36 @@ mod tests {
         assert!(matches_search(NodeKind::LinearArray, "並べる"));
         assert!(!matches_search(NodeKind::Circle, "box"));
     }
+    #[test]
+    fn copy_paste_remaps_internal_edges_and_drops_external_links() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let c = graph.add(NodeKind::Multiply, [600., 0.]).unwrap();
+        graph.connect(a, b, "a").unwrap();
+        graph.connect(b, c, "a").unwrap();
+        let nodes = vec![graph.node(b).unwrap().clone(), graph.node(c).unwrap().clone()];
+        let ids = insert_nodes(&mut graph, &nodes, [0., 300.], false).unwrap();
+        let pasted: Vec<_> = ids.iter().copied().collect();
+        assert!(graph.node(pasted[0]).unwrap().inputs.is_empty());
+        assert_eq!(graph.node(pasted[1]).unwrap().inputs["a"], pasted[0]);
+        let duplicates: Vec<_> = insert_nodes(&mut graph, &nodes, [0., 600.], true).unwrap().into_iter().collect();
+        assert_eq!(graph.node(duplicates[0]).unwrap().inputs["a"], a);
+        assert_eq!(graph.node(duplicates[1]).unwrap().inputs["a"], duplicates[0]);
+        graph.validate().unwrap();
+    }
+
+    #[test]
+    fn failed_paste_is_atomic() {
+        let mut graph = Graph::default();
+        let id = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let mut node = graph.node(id).unwrap().clone();
+        node.params.insert("value".into(), f64::NAN);
+        let before = graph.clone();
+        assert!(insert_nodes(&mut graph, &[node], [0., 0.], false).is_err());
+        assert_eq!(graph, before);
+    }
+
     #[test]
     fn layout_changes_do_not_trigger_geometry() {
         let a = templates::create(0);
