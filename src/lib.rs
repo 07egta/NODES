@@ -14,3 +14,4 @@ pub mod stl_export;
 pub mod templates;
 pub mod curve_geometry;
 pub mod curve_nodes;
+pub mod curve_intersections;

@@ -167,3 +167,43 @@ fn tree_branches_preserved_and_examples_round_trip(){
         assert_eq!(again.outputs,ev.outputs);
     }
 }
+
+#[test]
+fn composite_join_explode_extend_and_approximation_flags(){
+    let g=CurveGeometry::nurbs(NurbsCurve::polyline(vec![[0.,0.,0.],[3.,0.,0.]],false).unwrap());
+    let h=CurveGeometry::nurbs(NurbsCurve::polyline(vec![[3.,0.,0.],[3.,4.,0.]],false).unwrap());
+    let c=CurveGeometry::join_ordered(&[g.clone(),h.clone()],1e-9,&||false).unwrap();
+    assert!(c.is_composite());assert!(!c.is_approximate());
+    close(c.length_table(&||false).unwrap().total(),7.,1e-9);
+    near(c.point(0.5).unwrap(),[3.,0.,0.],1e-12);
+    let parts=c.reversed().explode().unwrap();
+    assert_eq!(parts.len(),2);
+    near(parts[0].point(0.).unwrap(),[3.,4.,0.],1e-12);
+    near(parts[1].point(1.).unwrap(),[0.,0.,0.],1e-12);
+    let v=val(c);let args=[&v,&Value::Number(5.),&Value::Number(3.),&Value::Number(32.)];
+    let rebuilt=curve_nodes::run_item(NodeKind::CurveRebuildApprox,&args,&||false).unwrap();
+    if let Value::Curve(c)=&rebuilt[0]{assert!(c.geometry.as_ref().unwrap().is_approximate());}
+    else{panic!("curve expected");}
+}
+#[test]
+fn approximate_intersections_and_chord_distance(){
+    use morphlet::curve_intersections as ci;
+    let line=|a,b|CurveGeometry::nurbs(NurbsCurve::polyline(vec![a,b],false).unwrap());
+    let a=line([0.,0.,0.],[4.,0.,0.]);let b=line([2.,-1.,0.],[2.,1.,0.]);
+    let p=ci::intersect(&a,&b,32,1e-8,&||false).unwrap();assert_eq!(p.len(),1);near(p[0],[2.,0.,0.],1e-8);
+    close(ci::distance(&a,&line([0.,3.,0.],[4.,3.,0.]),32,&||false).unwrap(),3.,1e-10);
+    assert!(ci::intersect(&a,&a,32,1e-8,&||false).is_err());
+    let x=CurveGeometry::nurbs(NurbsCurve::polyline(vec![[0.,0.,0.],[2.,2.,0.],[0.,2.,0.],[2.,0.,0.]],false).unwrap());
+    let p=ci::self_intersect(&x,32,1e-8,&||false).unwrap();assert_eq!(p.len(),1);near(p[0],[1.,1.,0.],1e-8);
+    let circle=CurveGeometry::circle([0.;3],[0.,0.,1.],1.).unwrap();
+    let p=ci::plane(&circle,[0.;3],[1.,0.,0.],32,1e-8,&||false).unwrap();assert_eq!(p.len(),2);
+    let p=ci::plane(&circle,[0.,1.,0.],[0.,1.,0.],32,1e-8,&||false).unwrap();assert!(!p.is_empty());
+    assert!(ci::plane(&circle,[0.;3],[0.,0.,1.],32,1e-8,&||false).is_err());
+    let p=ci::circle_circle_xy([0.;3],1.,[1.,0.,0.],1.,1e-8).unwrap();assert_eq!(p.len(),2);
+    for x in p{close(cg::norm(x),1.,1e-12);close(cg::norm(cg::sub(x,[1.,0.,0.])),1.,1e-12);}
+    assert_eq!(ci::circle_circle_xy([0.;3],1.,[2.,0.,0.],1.,1e-8).unwrap().len(),1);
+    assert!(ci::circle_circle_xy([0.;3],1.,[0.;3],1.,1e-8).is_err());
+    let p=ci::divide_chord(&a,1.5,32,&||false).unwrap();assert_eq!(p.len(),3);
+    near(p[2],[3.,0.,0.],1e-10);
+    assert!(ci::intersect(&a,&b,32,1e-8,&||true).is_err());
+}

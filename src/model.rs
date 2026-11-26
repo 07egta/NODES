@@ -234,6 +234,13 @@ pub enum NodeKind {
     CurveOrientationXy,
     CurvePlanarityApprox,
     CurvePlaneNormalApprox,
+    CurveIntersectApprox,
+    CurvePlaneIntersectApprox,
+    CurveSelfIntersectApprox,
+    CurveDistanceApprox,
+    CurveCircleCircleXy,
+    CurveFrameCircle,
+    CurveDivideDistanceApprox,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -352,6 +359,13 @@ impl NodeKind {
             Self::CurveOrientationXy,
             Self::CurvePlanarityApprox,
             Self::CurvePlaneNormalApprox,
+            Self::CurveIntersectApprox,
+            Self::CurvePlaneIntersectApprox,
+            Self::CurveSelfIntersectApprox,
+            Self::CurveDistanceApprox,
+            Self::CurveCircleCircleXy,
+            Self::CurveFrameCircle,
+            Self::CurveDivideDistanceApprox,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

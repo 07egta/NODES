@@ -103,9 +103,28 @@
           "t": 1
         },
         "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "curve_frame_circle",
+        "name": "垂直断面円",
+        "position": [
+          550,
+          225
+        ],
+        "params": {
+          "t": 0.5,
+          "radius": 8,
+          "segments": 48
+        },
+        "inputs": {
+          "curve": 0,
+          "t": 1
+        },
+        "preview": true
       }
     ],
-    "next_id": 6
+    "next_id": 7
   },
   "pan": [
     24,

@@ -2,6 +2,7 @@
 //! The geometry module is independent of the renderer. Only explicitly marked preview operations
 //! use sampled polylines. Node labels and semantics are original, not GH file compatibility.
 use crate::curve_geometry::{self as cg, CurveGeometry, NurbsCurve, Point3};
+use crate::curve_intersections as ci;
 use crate::engine::{cancelled, num};
 use crate::model::*;
 use std::{f64::consts::TAU, sync::Arc};
@@ -26,7 +27,7 @@ macro_rules! spec {
 }
 pub fn is_curve_kind(k:NodeKind)->bool {
     use NodeKind::*;
-    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane | CurveJoin | CurveExplode | CurveExtend | CurveBlend | CurveRebuildApprox | CurveDeviationApprox | CurveOrientationXy | CurvePlanarityApprox | CurvePlaneNormalApprox)
+    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane | CurveJoin | CurveExplode | CurveExtend | CurveBlend | CurveRebuildApprox | CurveDeviationApprox | CurveOrientationXy | CurvePlanarityApprox | CurvePlaneNormalApprox | CurveIntersectApprox | CurvePlaneIntersectApprox | CurveSelfIntersectApprox | CurveDistanceApprox | CurveCircleCircleXy | CurveFrameCircle | CurveDivideDistanceApprox)
 }
 pub fn is_list_kind(k:NodeKind)->bool {
     use NodeKind::*;
@@ -84,6 +85,13 @@ pub fn spec(k:NodeKind)->&'static NodeSpec {
         CurveOrientationXy=>spec!("閉曲線の向き XY（近似）","curve orientation clockwise counterclockwise","XYに平行な閉曲線のサンプル符号付き面積。+1は反時計回り、-1は時計回り、0は面積ほぼゼロ。自己交差は未検査。",Number,[C,TOL,SEG]),
         CurvePlanarityApprox=>spec!("平面性判定（近似）","curve planar planarity","サンプル点の平面からの最大偏差を調べる。許容距離以下なら1。直線も1。保証付き判定ではない。",Number,[C,TOL,SEG]),
         CurvePlaneNormalApprox=>spec!("曲線の平面法線（近似）","curve plane normal","サンプル点で平面法線を求める。非平面または直線の場合はエラー。",Point,[C,TOL,SEG]),
+        CurveIntersectApprox=>spec!("曲線同士の交点（近似）","curve curve intersection ccx","数学曲線を計算用にサンプルし、線分同士の交差・近接点を計算する。接触や重複の完全検出は保証しない。",Point,[g("a","曲線 A",DataType::Curve),g("b","曲線 B",DataType::Curve),TOL,i("samples","計算分割数",128.,8.,512.)]),
+        CurvePlaneIntersectApprox=>spec!("曲線と平面の交点（近似）","curve plane intersection cpx","符号の変化を探索し、数学曲線のパラメータで二分探索。接線接触はサンプル近傍のみ。",Point,[C,g("origin","平面上の点",DataType::Point),g("normal","平面法線 XYZ",DataType::Point),TOL,i("samples","計算分割数",128.,8.,512.)]),
+        CurveSelfIntersectApprox=>spec!("曲線の自己交点（近似）","self intersection","隣接線分と閉曲線の継ぎ目を除外して計算用折れ線の自己交差を探索。",Point,[C,TOL,i("samples","計算分割数",128.,8.,512.)]),
+        CurveDistanceApprox=>spec!("曲線間の最短距離（近似）","curve curve distance closest","計算用折れ線同士の最小距離。滑らかな曲線に対する保証付き距離ではない。",Number,[g("a","曲線 A",DataType::Curve),g("b","曲線 B",DataType::Curve),i("samples","計算分割数",128.,8.,512.)]),
+        CurveCircleCircleXy=>spec!("2円の交点 XY","circle circle intersection","XYに平行な同一平面上の2円を中心・半径から解析的に交差。重複はエラー。",Point,[g("a","中心 A",DataType::Point),n("ra","半径 A",30.,0.000001,1000000.,0.5),g("b","中心 B",DataType::Point),n("rb","半径 B",30.,0.000001,1000000.,0.5),TOL]),
+        CurveFrameCircle=>spec!("曲線の垂直断面円","perpendicular frame circle section","指定パラメータの曲線点を中心、接線を法線とする正確な有理円。",Curve,[C,T,RAD,SEG]),
+        CurveDivideDistanceApprox=>spec!("直線距離で分割（近似）","divide distance chord","直前の点からの直線距離が指定値になる最初のパラメータをサンプル探索する。弧長分割とは異なる。",Point,[C,n("distance","直線距離",10.,0.000001,1000000000.,0.1),i("samples","計算分割数",256.,8.,512.)]),
         _=>unreachable!("curve node dispatch"),
     }
 }
@@ -273,6 +281,9 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
         }
         CurveLineLine=>return line_line(curve(a,0)?,curve(a,1)?,num(a,2)?),
         CurveLinePlane=>return line_plane(curve(a,0)?,arg(a,1)?,arg(a,2)?,num(a,3)?),
+        CurveIntersectApprox=>return Ok(ci::intersect(&geometry(curve(a,0)?)?,&geometry(curve(a,1)?)?,num(a,3)? as usize,num(a,2)?,cancel)?.into_iter().map(Value::Point).collect()),
+        CurveDistanceApprox=>Value::Number(ci::distance(&geometry(curve(a,0)?)?,&geometry(curve(a,1)?)?,num(a,2)? as usize,cancel)?),
+        CurveCircleCircleXy=>return Ok(ci::circle_circle_xy(arg(a,0)?,num(a,1)?,arg(a,2)?,num(a,3)?,num(a,4)?)?.into_iter().map(Value::Point).collect()),
         CurveOffsetPreview=>offset(curve(a,0)?,num(a,1)?,cancel)?,
         CurveBlend=>{
             let ga=geometry(curve(a,0)?)?;let gb=geometry(curve(a,1)?)?;
@@ -304,6 +315,13 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
                     let t=g.closest_parameter(arg(a,1)?,cancel)?;
                     if k==CurveClosestParameter{Value::Number(t)}else{Value::Point(g.point(t)?)}
                 }
+                CurvePlaneIntersectApprox=>return Ok(ci::plane(&g,arg(a,1)?,arg(a,2)?,num(a,4)? as usize,num(a,3)?,cancel)?.into_iter().map(Value::Point).collect()),
+                CurveSelfIntersectApprox=>return Ok(ci::self_intersect(&g,num(a,2)? as usize,num(a,1)?,cancel)?.into_iter().map(Value::Point).collect()),
+                CurveFrameCircle=>{
+                    let t=num(a,1)?;
+                    preview(CurveGeometry::circle(g.point(t)?,g.tangent(t)?,num(a,2)?)?,num(a,3)? as usize,cancel)?
+                }
+                CurveDivideDistanceApprox=>return Ok(ci::divide_chord(&g,num(a,1)?,num(a,2)? as usize,cancel)?.into_iter().map(Value::Point).collect()),
                 CurveStart=>Value::Point(g.point(0.)?),
                 CurveEnd=>Value::Point(g.point(1.)?),
                 CurveTangent=>Value::Point(g.tangent(num(a,1)?)?),

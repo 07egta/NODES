@@ -24,7 +24,7 @@ Rhino/Grasshopperのコード・バイナリ・UI素材は取得・コピーし�
 - 既存メッシュLoft/Extrude/Revolveは引き続きpointsを使用するため精密B-repではない。表示用サンプリングはノットを含む均等パラメータ分割で、弦誤差の保証なし。
 - 既存保存形式v1は計算結果を保存せずノードとパラメータを保存するため、新フィールドはファイル形式に追加しない。新ノードのファイルを旧アプリが読む前方互換性はない。
 
-## ノード対応表（今回追加49種＋既存曲線ノード）
+## ノード対応表（今回追加56種＋既存曲線ノード）
 | 要求 | 状態 / 制限 |
 |---|---|
 | Line, Line SDL, Polyline, Rectangle, Polygon, Circle, Circle CNR, Circle 3Pt, Arc, Arc 3Pt, Ellipse | 実装。既存Rectangle/Polygon/CircleはXY、円弧/楕円もXY（3点円弧/法線指定円は3D）。GHのPlane型・全既定値互換なし |
@@ -32,13 +32,13 @@ Rhino/Grasshopperのコード・バイナリ・UI素材は取得・コピーし�
 | Length, Evaluate Curve, Evaluate Length, Point on Curve, Middle, Tangent, Curvature, End Points, Domain, Closed, Control Points | 実装。端点や制御点などを別単一出力ノードに分ける。長さは数値積分。角の微分は片側評価。 |
 | Closest Point | 近似、全局最小保証なし。パラメータ用ノードも用意。 |
 | Divide Curve, Divide Length, Shatter, Sub Curve, Reverse | 実装。分割最大512区間。閉曲線の分割点は終点を重複させない。Shatterはパラメータ分割。 |
-| Perpendicular Frame | 直交XYZ軸のみ。安定した平行移動フレーム・Plane型・Horizontal Frameは未対応。 |
+| Perpendicular Frame | 直交XYZ軸と曲線接線を法線とする正確な断面円。安定した平行移動フレーム・Plane型・Horizontal Frameは未対応。 |
 | Offset | XYに平行な表示点列のマイター近似。自己交差解消・厳密NURBSオフセットなし。 |
 | Line-Line / Line-Plane | 有限線分に限定。空交点は空リスト、重複やほぼ平行な線分の非一意解はエラー。許容距離付き。 |
-| Curve–Curve / Curve–Plane / Circle–Circle / Self Intersection / 最短距離 | 一般形未対応。 |
+| Curve–Curve / Curve–Plane / Circle–Circle / Self Intersection / 最短距離 | 計算用折れ線の交点・最短距離、曲線と平面の符号探索＋局所接触探索、自己交差のサンプル近似。XY円同士は中心と半径から解析解。曲線入力の任意3D円同士・一般NURBSの保証付き交差は未対応。 |
 | Join / Explode / Polycurve / Extend / Blend | 順序付き連結、隙間の許容差内の線分補完、複合基底、次数1/複合曲線の分解、接線直線延長、G1 Bezierブレンド。自動並べ替えとG2ブレンドは未対応。 |
-| Rebuild / deviation / Orientation / Planarity / Curve Plane | サンプル再補間による近似再構築、両方向サンプル偏差、XYの向き、サンプル平面性・平面法線。真の最小二乗Fit、保証付き最大偏差、自己交差の判定、Plane型は未対応。 |
-| Fillet / Chamfer / Fit / Divide Distance | 未対応。Shatter / Sub Curveは一部のSplit/Trim用途を満たすが交差ベースのトリムではない。 |
+| Rebuild / deviation / Orientation / Planarity / Curve Plane | サンプル再補間による近似再構築、両方向サンプル偏差、XYの向き、サンプル平面性・平面法線。真の最小二乗Fit、保証付き最大偏差、保証付き自己交差判定、Plane型は未対応。 |
+| Fillet / Chamfer / Fit | 未対応。Divide Distanceは直線距離のサンプル探索＋二分法で追加。Shatter / Sub Curveは一部のSplit/Trim用途を満たすが交差ベースのトリムではない。 |
 
 ## 数値と制約
 弧長はノットスパンごとの適応5点Gauss-Legendre（局所推定差1e-9基準、最大20万評価）。弧長逆算は同じ積分表と二分探索。証明された誤差上限ではなく、収束しない入力は拒否。
@@ -51,3 +51,5 @@ tests/curve_geometry_tests.rs: 有理1/4円の点・接線・曲率・弧長、�
 ローカルのRust環境なし。CIの実行結果は別途確認が必要。Windows画面操作は未確認。
 
 複合曲線は構成要素を保持するため、弧長と評価は表示点列に依存しない。構成要素に等しいパラメータ幅を割り当てる（等弧長幅ではない）。端点間隔が非ゼロかつ許容差以内の場合は明示的な直線を追加し、近似由来フラグを設定する。Rebuildと既存折れ線からの変換にも近似由来フラグを付け、部分曲線・反転・アフィン変形・ノット挿入でも伝える。値ビューで近似由来を表示する。
+
+交差と直線距離分割は描画の分割数と独立した計算用分割数（8〜512）とノット等の必須区間を使う。最大1025点・約100万線分組。線分近接距離で交差候補とし、重複らしい区間はエラー。滑らかな曲線の接触や細かい振動は見逃すことがある。交点出力は計算用線分上の近接点の中点で、元のNURBS上に正確にあるとは保証しない。平面交差は元の曲線で探索するが、区間内の全根や部分重複の完全検出は保証しない。直線距離分割は弧長分割とは別で、局所的に距離が増減する細かい区間を見逃し得る。端点の余りは出力しない。
