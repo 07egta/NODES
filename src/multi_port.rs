@@ -25,7 +25,7 @@ impl PortRef {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Access { Item, List, Tree, Custom }
+pub enum Access { Item, List, Tree, FirstItem, SingleItem, Custom }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OutputPort {
     pub id: PortId,
@@ -120,9 +120,18 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
 pub fn optional_input(kind: NodeKind, key: &str) -> bool {
     kind == NodeKind::StreamMerge || (kind == NodeKind::SortListPaired && key == "values")
 }
+pub fn declares_input(kind: NodeKind, key: &str) -> bool {
+    if kind == NodeKind::StreamMerge { MERGE_BANK.iter().any(|p| p.key == key) }
+    else { kind.spec().inputs.iter().any(|p| p.key == key) }
+}
 pub fn input_access(kind: NodeKind, index: usize) -> Access {
-    match crate::data_tree_nodes::access_label(kind,index) {
-        "List" => Access::List, "Tree" => Access::Tree, "Custom" => Access::Custom, _ => Access::Item
+    match crate::node_access::for_input(kind,index) {
+        Some(crate::node_access::InputAccess::Item) => Access::Item,
+        Some(crate::node_access::InputAccess::List) => Access::List,
+        Some(crate::node_access::InputAccess::Tree) => Access::Tree,
+        Some(crate::node_access::InputAccess::FirstItem) => Access::FirstItem,
+        Some(crate::node_access::InputAccess::SingleItem) => Access::SingleItem,
+        _ => Access::Custom,
     }
 }
 pub fn declared_outputs(kind: NodeKind) -> Vec<OutputPort> {
@@ -254,6 +263,7 @@ impl Graph {
     pub fn connect_port(&mut self, source: PortRef, to: NodeId, input: &str, append: bool) -> Result<(), String> {
         let out = self.node(source.node).and_then(|n| n.output_port(source.port)).ok_or("接続元ポートがありません。")?;
         let target = self.node(to).ok_or("接続先ノードがありません。")?;
+        let input = target.kind.canonical_input_key(input);
         let spec = target.input_spec(input).ok_or("接続先ポートがありません。")?;
         if !spec.kind.accepts(out.kind) { return Err(format!("{} には {} を接続できません。", spec.kind.label(),out.kind.label())); }
         let legacy = target.inputs.get(input).copied();
@@ -273,6 +283,7 @@ impl Graph {
     }
     pub fn disconnect_port(&mut self, source: PortRef, to: NodeId, input: &str) -> Result<(), String> {
         let node = self.node_mut(to).ok_or("接続先がありません。")?;
+        let input = node.kind.canonical_input_key(input);
         let mut sources = node.sources(input);
         if !sources.contains(&source) { return Err("接続がありません。".into()); }
         sources.retain(|s| *s != source);

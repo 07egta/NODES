@@ -1,0 +1,15 @@
+Package: thin-vec 0.2.21
+Declared license: MIT OR Apache-2.0
+Registry source archive: https://static.crates.io/crates/thin-vec/thin-vec-0.2.21.crate
+Archive SHA-256 recorded by Cargo.lock: d6a4b9ba8738cb4a4f399d37e266becfd475e75eb73425b87a05a2f2039ba63e
+Upstream repository: https://github.com/mozilla/thin-vec
+Upstream commit recorded before outage: 326a2260b184146bbc3f12653993a115f7ec7d5e
+Manifest: Cargo.toml
+
+Recovered notice sources:
+LICENSE-MIT: https://github.com/mozilla/thin-vec/blob/326a2260b184146bbc3f12653993a115f7ec7d5e/LICENSE-MIT (SHA-256 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3)
+LICENSE-APACHE: https://github.com/mozilla/thin-vec/blob/326a2260b184146bbc3f12653993a115f7ec7d5e/LICENSE-APACHE (SHA-256 62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a)
+
+Recovered through the GitHub connector after the local execution environment became unavailable.
+Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.
+These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes.

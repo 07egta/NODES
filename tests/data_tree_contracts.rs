@@ -219,7 +219,7 @@ fn item_matching_rejects_overflow_before_enumeration_and_is_empty_if_any_port_em
     let many = vec![pair.as_slice(); usize::BITS as usize];
     assert!(ItemMatches::new(&many, MatchMode::Cross, MAX_ITEMS).is_err());
     let mut empty = many;
-    empty.push(&[]);
+    empty[0] = &[];
     assert_eq!(
         ItemMatches::new(&empty, MatchMode::Cross, MAX_ITEMS)
             .unwrap()
@@ -234,7 +234,7 @@ fn member_search_budgets_geometry_comparison_work() {
     use std::sync::Arc;
     let shape = Value::Curve(Arc::new(Curve {
         points: vec![[1., 2., 3.]; 200],
-        closed: false,
+        ..Curve::default()
     }));
     let list = vec![shape.clone(); 100];
     let members = vec![shape; 100];
@@ -270,5 +270,52 @@ fn singleton_simplification_follows_documented_nodes_api_policy() {
     assert_eq!(
         data_tree::simplify(&input).unwrap().branches,
         [(vec![9], values(&[1., 2.]))].into()
+    );
+}
+
+#[test]
+fn public_tree_combinators_limit_ports_and_logical_payload_weight() {
+    use morphlet::model::Curve;
+    use std::sync::Arc;
+    let one = values(&[1.]);
+    let too_many = vec![one.as_slice(); 65];
+    assert!(ItemMatches::new(&too_many, MatchMode::Longest, MAX_ITEMS).is_err());
+    let shape = Value::Curve(Arc::new(Curve {
+        points: vec![[0.; 3]; 16_000],
+        ..Curve::default()
+    }));
+    assert!(data_tree::dispatch(&vec![shape; 100], &[true, false]).is_err());
+    assert_eq!(
+        data_tree::dispatch(&values(&[1., 2., 3., 4., 5.]), &[true, false]).unwrap(),
+        (values(&[1., 3., 5.]), values(&[2., 4.]))
+    );
+}
+
+#[test]
+fn matrix_flip_preserves_parent_and_reindexes_sparse_siblings() {
+    let input = Tree {
+        branches: [
+            (vec![3, 2], values(&[1., 2.])),
+            (vec![3, 5], values(&[3., 4.])),
+        ]
+        .into(),
+    };
+    let flipped = data_tree::flip_matrix(&input).unwrap();
+    assert_eq!(
+        flipped.branches,
+        [
+            (vec![3, 0], values(&[1., 3.])),
+            (vec![3, 1], values(&[2., 4.])),
+        ]
+        .into()
+    );
+    let twice = data_tree::flip_matrix(&flipped).unwrap();
+    assert_eq!(
+        twice.branches,
+        [
+            (vec![3, 0], values(&[1., 2.])),
+            (vec![3, 1], values(&[3., 4.])),
+        ]
+        .into()
     );
 }

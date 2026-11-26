@@ -1,8 +1,28 @@
 //! Single-output graph adapters for the data-tree API.
-//! Multiple-output operations remain in the public API until graph wiring has port IDs.
+//! Multi-output adapters are implemented separately in multi_port.rs.
 use crate::data_tree as dt;
 use crate::engine::cancelled;
 use crate::model::*;
+
+/// Validate the reserved, non-executable tree settings shared by native graphs
+/// and the structured API. `false` means that this is an ordinary parameter.
+pub fn validate_parameter(kind: NodeKind, key: &str, value: f64) -> Result<bool, String> {
+    if key == dt::MATCH_PARAM {
+        if !supports_matching(kind) {
+            return Err("このノードはデータ照合を変更できません。".into());
+        }
+        dt::MatchMode::from_number(value)?;
+        return Ok(true);
+    }
+    if let Some(port) = key.strip_prefix(dt::PORT_PREFIX) {
+        if !supports_transform(kind) || !crate::multi_port::declares_input(kind, port) {
+            return Err("データツリー変換のポートが無効です。".into());
+        }
+        dt::PortTransform::from_number(value)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
 
 macro_rules! node {
     ($name:ident,$label:literal,$description:literal,$keywords:literal,$inputs:expr,$output:expr) => {
@@ -290,54 +310,12 @@ pub fn supports_transform(kind: NodeKind) -> bool {
     !matches!(kind, NodeKind::Script | NodeKind::Cluster)
 }
 pub fn supports_matching(kind: NodeKind) -> bool {
-    supports_transform(kind)
-        && !is_tree_kind(kind)
-        && !is_list_kind(kind)
-        && !crate::gh_nodes::is_list_kind(kind)
-        && !matches!(
-            kind,
-            NodeKind::Flatten
-                | NodeKind::Graft
-                | NodeKind::Output
-                | NodeKind::Merge
-                | NodeKind::Loft
-                | NodeKind::ImportMesh
-                | NodeKind::Number
-                | NodeKind::Dispatch
-                | NodeKind::SortListPaired
-                | NodeKind::DeconstructDomain
-                | NodeKind::StreamGate
-                | NodeKind::StreamMerge
-        )
-        && kind.spec().inputs.len() > 1
+    crate::node_access::supports_item_matching(kind)
 }
 
-/// Access labels are explicit. Existing special nodes retain their original access policy.
+/// Shared inspector metadata; never infer list access from a data type.
 pub fn access_label(kind: NodeKind, index: usize) -> &'static str {
-    use NodeKind::*;
-    match kind {
-        Flatten | Graft | SimplifyTree | TrimTree | PruneTree | FlipMatrix | PathMapper
-        | TreeStatistics | PartitionList
-            if index == 0 =>
-        {
-            "Tree"
-        }
-        MergeTree | EntwineTree | UnflattenTree => "Tree",
-        TreeItem | TreeBranch if index == 0 => "Tree",
-        TreeItem | TreeBranch if index == 1 => "List",
-        Merge | Loft if index == 0 => "List",
-        ListItem | CullPattern | CullIndex | ReplaceItems | InsertItems if index == 1 => "List",
-        ReplaceItems | InsertItems if index == 2 => "List",
-        ConcatList => "List",
-        MemberIndex if index == 1 => "List",
-        k if index == 0 && (is_list_kind(k) || crate::gh_nodes::is_list_kind(k)) => "List",
-        DeconstructDomain | Dispatch | SortListPaired => "List",
-        StreamGate if index == 0 => "Item",
-        StreamGate | StreamMerge => "Tree",
-        Script | Cluster => "Custom",
-        Output => "Tree",
-        _ => "Item",
-    }
+    crate::node_access::for_input(kind, index).map_or("Unknown", |a| a.label())
 }
 
 // These adapters are public API entry points as well as evaluator helpers.

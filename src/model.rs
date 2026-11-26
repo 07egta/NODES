@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 
 pub type NodeId = u64;
-pub const MAX_NODES: usize = 2_048;
+pub const MAX_NODES: usize = 16_384;
 pub const MAX_ITEMS: usize = 16_384;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;
@@ -43,8 +43,26 @@ impl DataType {
             || self == source
             || (self == Self::Geometry && matches!(source, Self::Point | Self::Curve | Self::Mesh))
             || (source == Self::Geometry && matches!(self, Self::Point | Self::Curve | Self::Mesh))
-            || (self == Self::DisplayGeometry && matches!(source, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
-            || (source == Self::DisplayGeometry && matches!(self, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
+            || (self == Self::DisplayGeometry
+                && matches!(
+                    source,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
+            || (source == Self::DisplayGeometry
+                && matches!(
+                    self,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
     }
 }
 
@@ -428,6 +446,9 @@ pub enum NodeKind {
     BrepUnion,
     BrepDifference,
     BrepOffset,
+    SurfaceGaussianCurvature,
+    SurfaceMeanCurvature,
+    SurfacePrincipalCurvatures,
     DeconstructPoint,
     DeconstructVector,
     DeconstructDomain,
@@ -438,6 +459,17 @@ pub enum NodeKind {
     StreamMerge,
 }
 impl NodeKind {
+    /// Preserve the input keys used by the independent generative-design mission.
+    /// ClosestPoint is one operation in the unified registry; canonical keys are
+    /// candidates/queries. Unknown keys remain unknown and are still rejected.
+    pub fn canonical_input_key(self, key: &str) -> &str {
+        match (self, key) {
+            (Self::ClosestPoint, "points") => "candidates",
+            (Self::ClosestPoint, "targets") => "queries",
+            _ => key,
+        }
+    }
+
     pub fn all() -> &'static [Self] {
         &[
             Self::Number,
@@ -736,6 +768,9 @@ impl NodeKind {
             Self::BrepUnion,
             Self::BrepDifference,
             Self::BrepOffset,
+            Self::SurfaceGaussianCurvature,
+            Self::SurfaceMeanCurvature,
+            Self::SurfacePrincipalCurvatures,
             Self::DeconstructPoint,
             Self::DeconstructVector,
             Self::DeconstructDomain,
@@ -1356,7 +1391,9 @@ impl NodeKind {
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
             other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
-            other if crate::surface_nodes::KINDS.contains(&other) => crate::surface_nodes::spec(other),
+            other if crate::surface_nodes::KINDS.contains(&other) => {
+                crate::surface_nodes::spec(other)
+            }
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1385,7 +1422,9 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
-                .or_else(|| crate::generative::is_kind(other).then(|| crate::generative::spec(other)))
+                .or_else(|| {
+                    crate::generative::is_kind(other).then(|| crate::generative::spec(other))
+                })
                 .unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }
     }
@@ -1399,7 +1438,6 @@ pub struct Node {
     pub name: String,
     pub position: [f32; 2],
     pub params: BTreeMap<String, f64>,
-    /// Legacy single wire: implicitly references output port 0.
     pub inputs: BTreeMap<String, NodeId>,
     /// Explicit, ordered sources for non-primary or multiple wires. A key must
     /// not occur in both maps. The legacy form is retained for unchanged files.
@@ -1500,6 +1538,7 @@ impl Graph {
     }
     pub fn disconnect(&mut self, to: NodeId, input: &str) {
         if let Some(n) = self.node_mut(to) {
+            let input = n.kind.canonical_input_key(input);
             n.set_sources(input, Vec::new());
         }
     }
@@ -1536,19 +1575,12 @@ impl Graph {
             node.validate_ports()?;
             let specs = node.input_ports();
             for (key, value) in &node.params {
-                if key == crate::data_tree::MATCH_PARAM {
-                    if !crate::data_tree_nodes::supports_matching(node.kind) {
-                        return Err("このノードはデータ照合を変更できません。".into());
+                if crate::data_tree_nodes::validate_parameter(node.kind, key, *value)? {
+                    if let Some(port) = key.strip_prefix(crate::data_tree::PORT_PREFIX) {
+                        if node.input_spec(port).is_none() {
+                            return Err("データツリー変換のポートが存在しません。".into());
+                        }
                     }
-                    crate::data_tree::MatchMode::from_number(*value)?;
-                    continue;
-                }
-                if let Some(port) = key.strip_prefix(crate::data_tree::PORT_PREFIX) {
-                    if !crate::data_tree_nodes::supports_transform(node.kind) ||
-                        !specs.iter().any(|s| s.key == port) {
-                        return Err("データツリー変換のポートが無効です。".into());
-                    }
-                    crate::data_tree::PortTransform::from_number(*value)?;
                     continue;
                 }
                 if !value.is_finite() || !specs.iter().any(|s| s.key == key && s.default.is_some())
@@ -1641,7 +1673,11 @@ impl Value {
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
-            Self::Curve(c) => c.points.len().max(1).saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
+            Self::Curve(c) => c
+                .points
+                .len()
+                .max(1)
+                .saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
             Self::Mesh(m) => m
                 .vertices
                 .len()

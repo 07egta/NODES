@@ -5,7 +5,8 @@
 //! `get`, and every failure is a Japanese message. Nothing here panics.
 //!
 //! Vertices of both formats are welded by position (quantized to 0.000001 mm), so a closed
-//! source becomes a closed indexed mesh. Degenerate triangles are dropped.
+//! source becomes a closed indexed mesh. STL degenerate triangles are dropped;
+//! invalid or degenerate OBJ polygons are rejected instead of partly imported.
 use crate::engine::{cancelled, cross, length, sub};
 use crate::model::{MAX_TRIANGLES, MAX_VERTICES, Mesh};
 use std::collections::HashMap;
@@ -179,8 +180,10 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
     builder.finish()
 }
 
-/// Parses OBJ `v` and `f` lines only. Polygons are fan-triangulated; negative indices count
-/// back from the last vertex defined so far. Other lines (vt, vn, g, usemtl...) are ignored.
+/// Parses OBJ `v` and `f` lines only. Simple planar polygons are ear-clipped with
+/// their original winding; self-crossing, nonplanar and degenerate faces fail.
+/// Negative indices count back from the last vertex defined so far. Other lines
+/// (vt, vn, g, usemtl...) are ignored. Holes in a single face are unsupported.
 pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
     let text = String::from_utf8_lossy(bytes);
     let mut raw: Vec<[f64; 3]> = Vec::new();
@@ -200,6 +203,9 @@ pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String
             Some("f") => {
                 let mut corners: Vec<[f64; 3]> = Vec::new();
                 for word in words {
+                    if corners.len() >= crate::polygon_triangulation::MAX_POLYGON_VERTICES {
+                        return Err("OBJ の1面の頂点数が上限（2048）を超えています。".into());
+                    }
                     let head = word.split('/').next().unwrap_or("");
                     let index: i64 = head
                         .parse()
@@ -221,14 +227,16 @@ pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String
                         .ok_or("面が存在しない頂点を参照しています。")?;
                     corners.push(point);
                 }
-                if corners.len() < 3 {
-                    return Err("面の頂点は 3 つ以上必要です。".into());
-                }
-                if let Some((first, rest)) = corners.split_first() {
-                    for pair in rest.windows(2) {
-                        if let [second, third] = pair {
-                            builder.triangle([*first, *second, *third])?;
-                        }
+                let triangles = crate::polygon_triangulation::triangulate(&corners, cancel)
+                    .map_err(|error| format!("OBJ の {} 行目: {error}", line_no + 1))?;
+                for triangle in triangles {
+                    let before = builder.triangles.len();
+                    builder.triangle(triangle.map(|index| corners[index]))?;
+                    if builder.triangles.len() == before {
+                        return Err(format!(
+                            "OBJ の {} 行目: 頂点の結合後に退化する面があります。",
+                            line_no + 1
+                        ));
                     }
                 }
             }

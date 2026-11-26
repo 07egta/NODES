@@ -183,3 +183,23 @@ fn cluster_internal_and_external_secondary_links() {
     g.validate().unwrap();
     assert_eq!(nums(&Evaluator::default().evaluate(&g,&||false),p(instance,0)),vec![10.]);
 }
+
+#[test]
+fn graph_api_v2_connects_secondary_and_v1_rejects_new_operation() {
+    use morphlet::graph_api;
+    let mut request=serde_json::json!({"api_version":2,"edits":[
+        {"op":"add","alias":"point","kind":"point","position":[0,0]},
+        {"op":"set","node":"point","input":"y","value":17},
+        {"op":"add","alias":"split","kind":"deconstruct_point","position":[0,0]},
+        {"op":"connect","from":"point","to":"split","input":"point"},
+        {"op":"add","alias":"sink","kind":"number","position":[0,0]},
+        {"op":"connect_port","from":"split","port":1,"to":"sink","input":"value"}
+    ]});
+    let parsed=graph_api::parse_request(&serde_json::to_vec(&request).unwrap()).unwrap();
+    let project=graph_api::build(&parsed).unwrap();
+    let sink=project.graph.nodes.last().unwrap().id;
+    assert_eq!(nums(&graph_api::evaluate(&project.graph,&||false).unwrap(),p(sink,0)),vec![17.]);
+    request["api_version"]=1.into();
+    let parsed=graph_api::parse_request(&serde_json::to_vec(&request).unwrap()).unwrap();
+    assert!(graph_api::build(&parsed).is_err());
+}

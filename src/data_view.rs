@@ -36,6 +36,7 @@ pub fn shape_of(tree: &Tree) -> DataShape {
 
 impl DataShape {
     /// Short text for the badge next to an output port: "1", "12", "{3}×12".
+    #[cfg(test)]
     pub fn badge(self) -> String {
         match self {
             Self::Empty => "0".into(),
@@ -68,7 +69,11 @@ pub fn value_text(value: &Value) -> String {
         Value::Point(p) => format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2]),
         Value::Curve(c) => format!(
             "{} · 表示 {} 点 · {}",
-            match c.geometry.as_ref() { Some(g) if g.as_nurbs().is_some() => "NURBS", Some(_) => "解析曲線", None => "折れ線（近似を含む）" },
+            match c.geometry.as_ref() {
+                Some(g) if g.as_nurbs().is_some() => "NURBS",
+                Some(_) => "解析曲線",
+                None => "折れ線（近似を含む）",
+            },
             c.points.len(),
             if c.closed { "閉じた" } else { "開いた" }
         ),
@@ -78,11 +83,17 @@ pub fn value_text(value: &Value) -> String {
             m.triangles.len()
         ),
         Value::Surface(s) => format!("数学曲面 · {} · UV 0–1", s.geometry().name()),
-        Value::Solid(s) => format!("閉じた B-rep · {} 面 / {} 稜線 · 体積 {:.4}", s.brep().shell().faces().len(), s.brep().edges().len(), s.volume()),
+        Value::Solid(s) => format!(
+            "閉じた B-rep · {} 面 / {} 稜線 · 体積 {:.4}",
+            s.brep().shell().faces().len(),
+            s.brep().edges().len(),
+            s.volume()
+        ),
     }
 }
 
 /// One row of the viewer: branch path, item index (None for an empty branch), text.
+#[cfg(test)]
 pub struct Row {
     pub path: String,
     pub index: Option<usize>,
@@ -90,6 +101,7 @@ pub struct Row {
 }
 
 /// The first `limit` rows and the number of rows left out.
+#[cfg(test)]
 pub fn rows(tree: &Tree, limit: usize) -> (Vec<Row>, usize) {
     let mut out = Vec::new();
     let mut hidden = 0usize;
@@ -133,7 +145,11 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
         ui.label(theme::small("値はありません。"));
         return;
     }
-    ui.label(theme::small(format!("{} 枝 · {} 要素",tree.branches.len(),tree.item_count())));
+    ui.label(theme::small(format!(
+        "{} 枝 · {} 要素",
+        tree.branches.len(),
+        tree.item_count()
+    )));
     egui::ScrollArea::vertical()
         .id_salt(("data_view_scroll", salt))
         .max_height(max_height)
@@ -143,22 +159,26 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
             let mut hidden_branches = 0;
             for (p, values) in tree.branches.iter().take(MAX_ROWS) {
                 egui::CollapsingHeader::new(format!("{} · {} 件", path_text(p), values.len()))
-                    .id_salt((salt,p))
+                    .id_salt((salt, p))
                     .default_open(tree.branches.len() == 1)
                     .show(ui, |ui| {
                         if values.is_empty() {
                             ui.label(theme::small("（空の枝）"));
                         }
                         let limit = MAX_ROWS.saturating_sub(shown_rows).min(values.len());
-                        for (i,v) in values.iter().take(limit).enumerate() {
+                        for (i, v) in values.iter().take(limit).enumerate() {
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new(format!("[{i}]")).size(11.).color(theme::MUTED));
+                                ui.label(
+                                    RichText::new(format!("[{i}]"))
+                                        .size(11.)
+                                        .color(theme::MUTED),
+                                );
                                 ui.label(RichText::new(value_text(v)).size(11.).monospace());
                             });
                         }
                         shown_rows += limit;
                         if limit < values.len() {
-                            ui.label(theme::small(format!("…ほか {} 件",values.len()-limit)));
+                            ui.label(theme::small(format!("…ほか {} 件", values.len() - limit)));
                         }
                     });
             }
@@ -207,5 +227,7 @@ mod tests {
         assert_eq!(hidden, 101);
         assert_eq!(rows[0].text, "0.0000");
         assert_eq!(rows[0].path, "{0}");
+        assert_eq!(rows[0].index, Some(0));
+        assert_eq!(rows[MAX_ROWS - 1].index, Some(MAX_ROWS - 1));
     }
 }

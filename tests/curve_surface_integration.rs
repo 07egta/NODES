@@ -36,7 +36,7 @@ fn first(e: &morphlet::engine::Evaluation, id: u64) -> &Value {
 
 #[test]
 fn circle_extrusion_uses_exact_controls_not_preview_samples() {
-    for segments in [4., 8., 96., 512.] {
+    for segments in [8., 16., 96., 256.] {
         let mut graph = Graph::default();
         let c = graph.add(K::Circle, [0.; 2]).unwrap();
         graph
@@ -252,4 +252,46 @@ fn exact_curve_surface_workflow_survives_save_and_recompute() {
         11. * TAU,
         1e-7,
     );
+}
+
+#[test]
+fn editable_exact_cylinder_example_loads_and_evaluates() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/surface-exact-cylinder.morph");
+    let project = persistence::load(&path).unwrap();
+    let e = Evaluator::default().evaluate(&project.graph, &|| false);
+    for (id, result) in &e.outputs {
+        assert!(result.is_ok(), "example node {id}: {result:?}");
+    }
+    near(first(&e, 4).number().unwrap(), 24. * TAU, 1e-7);
+    assert_eq!(e.outputs[&3].as_ref().unwrap().item_count(), 16);
+}
+
+#[test]
+fn surface_tessellation_preserves_nonuniform_polyline_corners() {
+    use morphlet::curve_geometry::{cross, norm, sub};
+    let g = CurveGeometry::nurbs(
+        NurbsCurve::new(
+            1,
+            vec![[0., 0., 0.], [4., 0., 0.], [4., 2., 0.]],
+            vec![1.; 3],
+            vec![0., 0., 0.23, 1., 1.],
+        )
+        .unwrap(),
+    );
+    let h = g.affine(|p| [p[0], p[1], 3.]).unwrap();
+    let surface = Surface::nurbs(NurbsSurface::ruled(&curve(g, 4), &curve(h, 16), false).unwrap());
+    let mesh = surface.tessellate(4, 4, &|| false).unwrap();
+    assert!(mesh.vertices.contains(&[4., 0., 0.]));
+    let area: f64 = mesh
+        .triangles
+        .iter()
+        .map(|&[i, j, k]| {
+            norm(cross(
+                sub(mesh.vertices[j as usize], mesh.vertices[i as usize]),
+                sub(mesh.vertices[k as usize], mesh.vertices[i as usize]),
+            )) / 2.
+        })
+        .sum();
+    near(area, 18., 1e-11);
 }

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "新しい作品",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "sphere",
+        "name": "球",
+        "position": [
+          43.0,
+          162.0
+        ],
+        "params": {
+          "radius": 30.0,
+          "rings": 24.0,
+          "segments": 48.0
+        },
+        "inputs": {},
+        "preview": true
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          323.0,
+          202.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    0.3093872,
+    125.149994
+  ],
+  "zoom": 1.15
+}

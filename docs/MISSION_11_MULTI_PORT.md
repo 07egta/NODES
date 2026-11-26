@@ -1,7 +1,7 @@
 # Mission 11 — stable port architecture (draft)
  
 ## Scope
-Independent Rust implementation, without Rhino runtime or SDK. Base integration checkpoint: `2e6534f6fd9e4358ea330e5f1f0ff27e9a7274cb`. This branch is not a claim of Grasshopper parity.
+Independent Rust implementation, without Rhino runtime or SDK. Initial integration checkpoint: `2e6534f6fd9e4358ea330e5f1f0ff27e9a7274cb`; reconciled with newer integrated source `c52e850ed01a82461557fab9182778092151db2d` without reverting its verified UI, CLI, file guards or shared access contracts. This reconciliation has not been compiled. This branch is not a claim of Grasshopper parity.
 
 GH1 public API references:
 - [IGH_DataAccess](https://developer.rhino3d.com/api/grasshopper/html/T_Grasshopper_Kernel_IGH_DataAccess.htm): read/write by parameter, including individual item, list and tree.
@@ -31,7 +31,7 @@ Fixed ports may be renamed/reordered, not deleted. StreamMerge has dynamic input
 - StreamGate: persistent-ID routing, unselected ports empty.
 - StreamMerge: ordered variable input trees.
 
-DeconstructPlane, distinct vector/domain/face types, further GH output variants (e.g. curve angle and surface frame), arbitrary variable ports for custom components and true multi-output cluster interfaces remain out of scope of this checkpoint. Cluster inner graphs support secondary wiring; legacy grouping refuses selections it cannot preserve. Legacy script still returns one output. GH/GHX export/import mappings require a later update.
+DeconstructPlane, distinct vector/domain/face types, further GH output variants (e.g. curve angle and surface frame), arbitrary variable ports for custom components and true multi-output cluster interfaces remain out of scope of this checkpoint. Cluster inner graphs support secondary wiring; legacy grouping refuses selections it cannot preserve. Legacy script still returns one output. GH/GHX export/import mappings require a later update. Graph API v1 continues to connect primary outputs; v2 additionally supports `connect_port` with an output ID and optional append. CLI summaries retain primary `data` and add per-port summaries.
 
 ## Persistence/UI
 Schema 1 files load with implicit primary port 0. Schema 2 saves preserve the compact primary-wire form and explicitly encode nonprimary/multiple wires and port layouts. Unknown future versions and unknown endpoints are rejected. Undo/redo checkpoints and copy/paste retain the layout and wire data. Canvas supports per-port wire drag, Shift-append, output row labeling, per-wire removal in inspector and port edits. Use a downstream Output node for secondary output preview/export; old direct node export remains primary-oriented.

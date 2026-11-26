@@ -83,7 +83,18 @@ fn parse_error(e: serde_json::Error) -> String {
 
 /// Read into a separate value. The caller only replaces its open project on success.
 pub fn load(path: &Path) -> Result<Project, String> {
+    let metadata = fs::metadata(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !metadata.is_file() {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let file = File::open(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !file
+        .metadata()
+        .map_err(|e| format!("作品を開けませんでした: {e}"))?
+        .is_file()
+    {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let mut bytes = Vec::new();
     file.take((MAX_PROJECT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
@@ -91,7 +102,7 @@ pub fn load(path: &Path) -> Result<Project, String> {
     decode_project(&bytes)
 }
 
-/// Decode a bounded v1 project without silently discarding unknown fields.
+/// Decode bounded v1/v2 projects without silently discarding unknown fields.
 /// Future versions are reported before interpreting their graph; callers must
 /// leave the original file untouched on error.
 pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
@@ -106,8 +117,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
     let header: Header = serde_json::from_slice(bytes).map_err(parse_error)?;
     check_schema_version(header.schema_version)?;
     let mut project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
-    // A legacy node-only connection implicitly identifies primary port 0.
-    // Unknown endpoint IDs are rejected by validation, never silently redirected.
+    crate::compatibility::normalize_legacy_inputs(&mut project.graph)?;
     project.validate()?;
     project.schema_version = SCHEMA_VERSION;
     Ok(project)

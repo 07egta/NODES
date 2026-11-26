@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "name": "ねじれの花器",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "vase",
+        "name": "花器",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "amplitude": 0.18,
+          "height": 104.0,
+          "layers": 40.0,
+          "lobes": 7.0,
+          "radius": 36.0,
+          "segments": 72.0,
+          "thickness": 2.4000000000000004
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          290.0,
+          85.0
+        ],
+        "params": {
+          "angle": 110.0
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          290.0,
+          300.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    32.50937,
+    153.90001
+  ],
+  "zoom": 1.15
+}

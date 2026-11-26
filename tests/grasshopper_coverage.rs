@@ -56,7 +56,12 @@ fn every_registered_kind_has_unique_id_and_complete_metadata() {
             );
             assert!(!input.label.trim().is_empty(), "{id}: missing port label");
             if let Some(default) = input.default {
-                assert_eq!(input.kind, DataType::Number, "{id}: non-number default");
+                // A polymorphic port (e.g. a cluster input) can accept a numeric
+                // default without having the narrow Number type itself.
+                assert!(
+                    input.kind.accepts(DataType::Number),
+                    "{id}: incompatible numeric default"
+                );
                 assert!(default.is_finite() && input.min.is_finite() && input.max.is_finite());
                 assert!((input.min..=input.max).contains(&default));
                 assert!(input.step.is_finite() && input.step > 0.);
@@ -290,7 +295,7 @@ fn node_budget_is_a_rejection_not_a_false_large_graph_success() {
     // Hostile deserialized input that bypassed Graph::add is also rejected.
     let mut oversized = graph;
     let template = oversized.nodes[0].clone();
-    while oversized.nodes.len() < 10_000 {
+    while oversized.nodes.len() <= MAX_NODES {
         let mut node = template.clone();
         node.id = oversized.next_id;
         oversized.next_id += 1;

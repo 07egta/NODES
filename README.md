@@ -1,141 +1,88 @@
 # NODES
 
-**ノードをつないで、形を作る。** 日本語を中心にした、独立したデスクトップ用ノードモデラです。Rhinoのインストールやログインは不要で、モデリング・保存・書き出しをオフラインで行えます。
+**ノードをつないで、形を作る。** 日本語を中心にした、独立型デスクトップのパラメトリックCADです。Rhino・Grasshopperのインストールやログインは不要で、基本のモデリング、保存、書き出しはオフラインで利用できます。
 
-[Windows版をダウンロード（ZIP・10.5 MiB）](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip) · [使い方](docs/USER_GUIDE_JA.md) · [開発に参加する](CONTRIBUTING.md)
+現在の統合開発は [develop/nodes-ultimate](https://github.com/07egta/NODES/tree/develop/nodes-ultimate) と [Draft PR #11](https://github.com/07egta/NODES/pull/11) で進めています。**開発版であり、Grasshopperの完全互換版ではありません。** 最新の実行結果、既知の制限、再開手順は [TEST_RESULTS.md](TEST_RESULTS.md) と [開発チェックポイント](docs/development/STATUS.md) を参照してください。
 
-最初の公開版は Morphlet 0.1.0 です。展開したフォルダーで `Morphlet.exe` を開いてください。
+[使い方](docs/USER_GUIDE_JA.md) · [ノード対応表](NODE_COVERAGE.md) · [設計](docs/ARCHITECTURE.md) · [ロードマップ](ROADMAP.md) · [CI](https://github.com/07egta/NODES/actions)
 
-![Windowsで花器とねじりをつなぎ、右に完成形を表示した画面](docs/windows-vase.png)
+## 入手する
 
-## まず使ってみる
+- **検証済み開発版:** ソース `c44a897a22072c6694d1dbf2233ae9557955f49e` の [Windows ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15135989980) / [Linux ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15137335621) を取得できます。CI成果物は安定リリースではありません。最新Windowsの実画面操作と実機造形は未検証です。
+- **旧公開版:** [Morphlet 0.1.0 Windows ZIP](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip)。この旧版には現在の開発ブランチで追加した機能は含まれません。
+- **ソースから:** 下記のビルド手順を使います。実行ファイル名は互換性のため `Morphlet.exe` を維持しています。
 
-1. **Windows用ZIPをすべて展開**し、展開先の **`Morphlet.exe`** を起動します。配布版を使うだけならRustのインストールは不要です。
-2. 最初に開く **「ねじれの花器」** で、中央の **花器** ノードをクリックします。
-3. 右下の設定で **高さ・半径・凹凸** を変更します。**ねじり** ノードを選び、ねじり角を変えると形が変わります。
-4. **保存**から名前とフォルダーを選び、編集できる **`.morph`** ファイルを残します。
-5. **書き出し ↗** で印刷用の **STL**（既定）・3MF（試験的）・OBJ を選びます。STL は mm で書き出し、検査と自動修復を行ってから、スライサーで開けます。手順は [使い方](docs/USER_GUIDE_JA.md#stlで書き出して印刷する) を参照してください。
+[Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) はLinux **437 passed**、Windows **436 passed**、各0 failed / 2 ignoredで成功しました。両OSのGUI/CLI release buildと、Linuxのfmt/check/strict Clippy・Python17件・依存監査も成功しています。件数差はUnix限定FIFO回帰1件です。この結果はc44a897aのソースに対するもので、後続の証拠文書更新とは区別します。[ソース・配布物の検証記録](docs/development/CI_NUMERIC_VALIDATION.json)
 
-3D画面は左ドラッグで回転、ホイールで拡大・縮小できます。形やノードが見切れたら **全体** または `F`、操作を戻すには `Ctrl+Z`。左の検索欄では「箱」「ねじり」「花器」や `box`・`twist`・`vase` を探せます。
+## 最初のモデルを編集する
 
-詳しい作り方と操作は **[はじめての使い方](docs/USER_GUIDE_JA.md)** にまとめています。
+1. ZIPを展開し、`Morphlet.exe` を起動します。
+2. 「ねじれの花器」の花器ノードを選び、高さ・半径・凹凸を変更します。ねじりノードでねじり角を調整できます。
+3. 左の検索で「円」「点を並べたい」「ねじり」や `circle`、`array`、`twist` を探し、必要なノードを追加します。
+4. 保存操作から編集可能な `.morph` グラフを残します。配布サンプルとは別名で保存すると元の作例を維持できます。
+5. メッシュをSTLで書き出し、外部スライサーで寸法・向き・造形条件を確認します。
 
-Windowsで配布版を起動し、花器の3D表示と付属の6作品の読み込み・計算を確認しました。[検証記録](docs/VERIFICATION.md)
+3D画面はドラッグで回転、ホイールでズームします。全体表示は `F`、操作を戻すには `Ctrl+Z`、やり直すには `Ctrl+Y`。ノードごとの表示切り替え、値・データツリーの確認、エラー表示、辞典も利用できます。詳細は [日本語操作ガイド](docs/USER_GUIDE_JA.md) を参照してください。
 
-## この版でできること
+![c44a897aのLinux実画面: 半径30のSphereを保存して再起動し、数値と接続を確認](docs/development/screenshots/linux-exact-radius-reopened.png)
 
-| 分野 | 内容 |
-|---|---|
-| ノード編集 | 63種類のノード（28種類に14種類、リスト・式・ノイズ・印刷向けの20種類、さらにファイル読み込み1種類を追加）とスクリプトノード、日本語・英語検索、追加、配線、自動接続、複製、複数選択、整列 |
-| ファイル読み込み（未検証） | **STL**（バイナリ・ASCII）と**OBJ**（頂点と面のみ）を読み込み、倍率・XY中心・床置きを指定。「ファイルを選ぶ」またはウィンドウへのドラッグで追加 |
-| 形状生成 | 箱・球・花器・円柱・円錐/角錐・トーラス・平面、円・星形・らせん、押し出し、ロフト、回転面 |
-| 形状の調整 | 移動、回転、拡大縮小、非一様スケール、ミラー、ねじり、波形変形、直線配列・円形配列 |
-| データ | 数値、演算（足し算・引き算・掛け算・割り算・べき乗・絶対値・最小・最大・剰余）、三角関数、数列、範囲、データツリー、フラット化、枝分け |
-| リスト・式・パターン（未検証） | リスト項目、リスト長、反転、並べ替え、間引きパターン、シフト、連結、部分リスト、範囲を調べる、再マップ、**式**（x・y・z・w の数式）、乱数、ランダムな点、ノイズ、距離、点の成分 |
-| 3Dプリント向け（未検証） | **グラフで形を決める**（半径のリストから器）、**ノイズ変形**、**厚みをつける**（面を印刷できる壁に）、**張り出しチェック**（下向きの急な面の割合） |
-| 自由に作る（未検証） | **スクリプトノード**（Rhai。数値・リスト・点・メッシュを返す）、**まとめノード**（複数ノードを1つの部品に。`.morph`に保存、`.morphpart`で書き出し・読み込み） |
-| 迷わないために（未検証） | 線と札でデータの形（1個・リスト・ツリー）を表示、**値を見る**（枝・番号・値の表）、オフラインの**ノード辞典**（`F1`）、ノードの**無効化**（`Ctrl+E`）、**グループ**（`Ctrl+G`）と**メモ**、エラー理由をノード下とステータス行に表示 |
-| 3D表示 | 完成形・選択ノード・表示中の結果、回転・平行移動・ズーム、グリッド・ワイヤー表示 |
-| 3Dプリント向けの表示（未検証） | 造形台（Bambu A1・A1 mini・Adventurer 5M・カスタム）と、はみ出しの赤表示、寸法・体積・PLAの重さの目安・閉じたメッシュの確認、張り出し（45°など）のオレンジ表示、上・前・横・斜め・全体の視点、正投影/透視の切り替え、交差部分も正しく描く奥行き処理 |
-| 保存 | `.morph`形式、Undo/Redo、復旧用の自動保存、アプリ内のファイル選択 |
-| 書き出し | 三角形メッシュのバイナリSTL・OBJ。境界辺や面方向などの検査。その他の書き出しから **G-code（花瓶モード・未検証）** |
-| 編集可能な作品例 | 花器、球のリング、星のトーテム、らせん、波打つブロック、数列からのロフト、サイン波の塔、べき乗の山脈、ノイズの花器（厚みつき）、引力点のパターンの10種類 |
+上の画像はc44a897aのLinuxバイナリを実行して撮影しました。新規Sphereの半径25、直接入力30で寸法60 × 60 × 60 mm、30.123456のフォーカス離脱後の保持、半径500、Undo、保存・終了・再起動・再編集・STL出力を確認しています。表示だけで25を25.1へ変えてしまう不具合を修正し、実画面と4件のheadless egui回帰で再検証しました。以前のInspectorフォーカス・行間修正の実画面も [保存](docs/development/screenshots/linux-after-inspector-layout.png) しています。最新Windowsの画面操作と広いDPIの検証は残っています。[数値入力の実操作記録](docs/development/NUMERIC_INPUT_VALIDATION.json) / [検証結果](TEST_RESULTS.md)
 
-> **自由に作る機能（スクリプトノード・まとめノード・`.morphpart`）の確認状況：** コンパイルもテスト実行もしていません。CIが最初の確認になります。追加した依存 `rhai` に合わせて `Cargo.lock` を手で書き足しました（`--locked` が通るかは未確認です。失敗したら `cargo update -p rhai` で更新してください）。実際の使い方は [使い方](docs/USER_GUIDE_JA.md)、制限と設計は [実装構成](docs/ARCHITECTURE.md) の第10章を参照してください。上の表の「配布版0.1.0」の確認記録には含まれません。
+## 現在の実装範囲
 
-> **ファイル読み込み（STL・OBJ）の確認状況：** コンパイルもテスト実行もしていません。`tests/import_tests.rs` の小さな標本（立方体のバイナリ・ASCII STL、OBJ、壊れたファイル、NaN）を含め、CIが最初の確認になります。読み込み時の上限は 64 MiB・25万頂点・50万三角形です。使い方は [使い方](docs/USER_GUIDE_JA.md) の「ファイルを読み込む」を参照してください。
-> **G-code（花瓶モード）の確認状況：** コンパイルもテスト実行もしていません。実機での印刷確認もしていません。STLが主な書き出しで、G-codeは補助機能です。詳しくは [保存・出力の仕様](docs/IO_NOTES.md) の第12章を参照してください。
+選択欄に **298種類**、定義から作るClusterを含めて **299種類の登録**があります。登録数は完全実装数・Grasshopper互換性の検証数ではありません。機能ごとの範囲は [ノード対応表](NODE_COVERAGE.md) に記載しています。
 
-> **リスト・式・印刷向けノード（20種類）の確認状況：** 作品例09・10、関連テストを含め、コンパイルもテスト実行もしていません。CIが最初の確認になります。対応表は [Grasshopperとの対応](docs/GH_COVERAGE.md) を参照してください。
+| 分野 | 実装した機能 | 主な制限 |
+|---|---|---|
+| グラフ評価 | 型付き入力、循環検出、決定的な順序、増分再計算、キャッシュ、キャンセル、古い結果の破棄、ノード別時間 | 単一出力モデル。計算ワーカーは1本で、ノードの並列実行は未対応 |
+| Data Tree | Path・枝、Flatten/Graft/Simplify、リスト演算、Path Mapper制限構文、Shortest/Longest/Cross | native Null、一般の混合アクセス、GH全件の期待値比較が未完了 |
+| 数学・ベクトル | 四則、三角/指数/対数、統計、集合、補間、行列、点と座標変換 | Boolean・Vector・Domainは専用の値型へ移行予定 |
+| 曲線 | 解析曲線、Bezier/B-spline/NURBS、評価、導関数、長さ、分割、変換 | 数学的な曲線と表示点列を分離。一般交差・オフセット・フィレットの対応は限定 |
+| 曲面・ソリッド | NURBS・解析曲面、押し出し、ルールド面、回転面、Iso Curve、法線、曲率 | B-rep演算は箱などの限定ケース。一般のトリム・Boolean・Fillet・Shellは未完成 |
+| Mesh / SubD | 構築、面積・体積、境界/非多様体診断、溶接、平滑化、細分化、限定修復 | 永続SubD/Crease、一般メッシュBoolean、完全な自己交差・肉厚判定は未完成 |
+| 生成デザイン | グリッド、2D Voronoi/Delaunay/Convex Hull、配置、場、ノイズ、変形 | 3D Voronoi、一般Morph/Flow/最適化は未完成 |
+| 編集・表示 | 日本語/英語検索、最近使ったノード、Undo/Redo、複数選択、整列、グループ、注釈、ツリー表示、ライト/ダーク | 大規模画面のフレーム時間、各DPI、Intel Arc、最新Windows GUIの計測は未実施 |
+| ファイル | native JSON、STL/OBJ、試験的3MF、限定GHX解析/変換 | GH binary、STEP/IGES/3DM/glTFは未対応。未知nativeノードは読み込み拒否で元ファイルを保護 |
+| 拡張・自動化 | 制限付きRhai、数式、Cluster、安全なJSONグラフAPI | 外部プラグインABI、GH Script互換、一般MCPサーバーは未完成 |
 
-> **3Dプリント向けの表示（造形台・寸法・張り出し表示・奥行きバッファ）の確認状況：** コンパイルもテスト実行もしていません。CIが最初の確認になります。純粋関数（体積・重さ・寸法・はみ出し・張り出しの判定・奥行きバッファの描画）の単体テストを `src/print_info.rs`・`src/raster.rs` に追加しました。使い方は [使い方](docs/USER_GUIDE_JA.md) の「3Dプリント向けの表示」を参照してください。
+精密なNURBSデータ、限定B-rep、近似メッシュは別の型として扱います。「メッシュをまとめる」はBoolean Unionではありません。STL出力とメッシュ診断は、実機での造形成功を保証するものではありません。G-codeの花瓶モードは実機未検証の補助機能です。
 
-> **この追加分の確認状況：** 追加した14種類のノード、作品例07・08、関連テストは、コンパイルもテスト実行もしていません。ビルドできる環境でのレビューが必要です。上記の「Windowsで…確認しました」は配布版0.1.0（28種類・6作品）についての記録です。
+## 編集できる作例
 
-> **画面と操作の改善（暗い画面・明るい画面の切り替え、カード上のスライダー、検索の並び替えと↑↓Enter、線を離して追加、`?`のショートカット一覧、`Home`、格子への吸着）の確認状況：** コンパイルもテスト実行もしていません。CIが最初の確認になります。検索の並び替えなどの処理は `src/ui_polish.rs` に単体テストを書きましたが、実行はしていません。使い方は [使い方](docs/USER_GUIDE_JA.md) の「画面と操作の改善」を参照してください。
+`examples/` に **37種類のグラフ**があります。花器、ハニカム、Voronoi、ラティス、建築外装、らせん階段、曲線・曲面、NURBS、曲率比較などを含みます。各グラフのパラメータ変更、保存・再読み込み、再評価を確認する統合テストを追加しています。実際に成功したテストの範囲は [TEST_RESULTS.md](TEST_RESULTS.md) を参照してください。
 
-> **迷わないための機能（データの形の表示・値を見る・ノード辞典・無効化・グループ/メモ）の確認状況：** コンパイルもテスト実行もしていません。CIが最初の確認になります。使い方は [使い方](docs/USER_GUIDE_JA.md) の「迷わないための機能」を参照してください。
+数値を変えると影響先だけを再計算します。10,000ノードの検証では、中間ノードの編集で下流5,000ノードだけを再計算する契約を確認します。ヘッドレス計算の測定と、GUIの体感速度・メモリ使用量は別に評価しています。
 
-数値を変えたときは、影響を受けるノードを再計算します。幾何計算は画面操作とは別の処理で実行し、古い計算結果が最新の設定を上書きしないようにしています。
+## ソースからビルドする
 
-## 形状と互換性の範囲
-
-この版の形状は **点・折れ線・三角形メッシュ** です。円やロフトも分割した形状として扱います。
-
-**NURBS・B-rep、STEP、Rhinoの3DM、GrasshopperのGH/GHX、GHAプラグイン、ブーリアン演算、AIによるノード生成は未実装**です。「メッシュをまとめる」は複数のメッシュをまとめる処理で、交差部分を取り除く和演算ではありません。
-
-3Dプレビューの面は、既定でソフトウェアの奥行きバッファ（20万三角形まで）で描くため交差部分も前後が合います（未検証）。ワイヤー表示中や「正確な奥行き」をオフにしたときは従来の並べ方式で、交差部分の表示順が正確でない場合があります。書き出し前の検査も自己交差・最小肉厚・造形成功の完全な判定ではありません。詳細は [保存・出力の仕様](docs/IO_NOTES.md) を参照してください。
-
-MorphletはGrasshopperのようなノードによる形状制作を参考にした独立実装です。Rhino/Grasshopperの本体を切り出したものや、既存定義をそのまま動かす互換版ではありません。
-
-## 配布版の中身
-
-| ファイル・フォルダー | 役割 |
-|---|---|
-| `Morphlet.exe` | Windows用の実行ファイル |
-| `examples/` | `.morph`作品。配布版0.1.0は6つ。メッシュの作品にはSTLも付属（`07`〜`10`のSTLは未生成） |
-| `docs/` | 操作、設計、検証、ライセンスの説明 |
-| `licenses/` | 依存ライブラリ等のライセンス文面 |
-| `src/`・`tests/`・`Cargo.toml`・`Cargo.lock` | Rustソースコードとテスト。ビルド・変更したい人向け |
-
-作品を編集したら、配布サンプルと別の名前で保存すると元の作品例を残せます。
-
-## 開発者向け：ソースからビルドする
-
-### 前提
-
-- **Rust 1.100.0を推奨**します。この版で検証したツールチェーンです。
-- `Cargo.toml`の`rust-version = "1.88"`はパッケージが宣言する最低バージョンです。現在の`Cargo.lock`に固定された依存関係全体がRust 1.88でビルドできることは確認していません。
-- WindowsでMSVC版Rustを使う場合は、**Visual StudioのC++ Build Tools**と対応するWindows SDKが必要です。[Rust公式のWindows向け説明](https://rust-lang.github.io/rustup/installation/windows.html)
-- 初回の依存取得にはネット接続が必要な場合があります。ビルド後のアプリの基本機能はオフラインで利用できます。
-
-Windows用ZIPには実行ファイルと完全なソースを同梱しています。展開したフォルダーの`Cargo.toml`と同じ場所がソースのルートです。
-
-### Windows / PowerShell
-
-ソースのルートで実行します。
+- **Rust 1.100.0** をCIで使用します。`Cargo.toml` の宣言下限は1.88ですが、固定された依存関係全体の1.88でのビルドは未確認です。
+- Windows MSVCではVisual Studio C++ Build ToolsとWindows SDKが必要です。[Rust公式の手順](https://rust-lang.github.io/rustup/installation/windows.html)
+- Linuxのデスクトップ用開発パッケージは [CI workflow](.github/workflows/windows.yml) を参照してください。
+- 初回の依存取得にはネット接続が必要な場合があります。実行時の基本機能にクラウドサービスは必要ありません。
 
 ```powershell
-.\scripts\build-windows.ps1
-```
-
-このスクリプトはテストを実行してからリリース版をビルドし、各コマンドが失敗した場合は停止します。ツールチェーンの自動インストールや、PowerShellの実行ポリシー変更は行いません。
-
-スクリプトを実行できない環境では、同じフォルダーで以下を直接実行してください。テストが成功してからビルドへ進みます。
-
-```powershell
+cargo fmt --all -- --check
+cargo check --all-targets --locked
+cargo clippy --all-targets --locked -- -D warnings
 cargo test --all-targets --locked
-cargo build --release --locked --bin Morphlet
+cargo build --release --locked --bins
 ```
 
-Cargoの標準設定での生成先は`target\release\Morphlet.exe`です。`--locked`により同梱の`Cargo.lock`を維持します。[Cargoのビルド設定](https://doc.rust-lang.org/cargo/commands/cargo-build.html)
+Windowsの生成先は `target\release\Morphlet.exe` です。`--locked` は同梱の `Cargo.lock` を維持します。ビルドを簡略化する [scripts/build-windows.ps1](scripts/build-windows.ps1) もあります。実行したコマンドと環境は [検証結果](TEST_RESULTS.md) に記録しています。
 
-### ソースの構成
+## オフラインCLI
 
-| 場所 | 内容 |
-|---|---|
-| `src/model.rs`・`src/engine.rs` | 型付きグラフ、接続検証、評価、形状生成 |
-| `src/app.rs`・`src/canvas.rs`・`src/viewport.rs` | デスクトップ画面、ノード編集、3Dプレビュー |
-| `src/persistence.rs`・`src/file_picker.rs` | 保存・出力・履歴・ファイル選択 |
-| `src/gh_nodes.rs`・`src/expr.rs` | リスト・乱数・ノイズ・厚み・張り出しチェックのノード、式ノードの数式（長さと入れ子を制限） |
-| `src/import.rs` | STL・OBJの読み込み（サイズ上限・頂点の溶接・有限な座標の検査）。ファイル読み込みノードの計算 |
-| `src/script.rs`・`src/cluster.rs`・`src/script_ui.rs` | スクリプトの実行環境（制限つき）、まとめノードと`.morphpart`、その編集画面 |
-| `src/templates.rs` | サンプルグラフの生成 |
-| `src/annotations.rs`・`src/data_view.rs`・`src/help.rs` | グループ・メモ（保存と上限）、値を見る・データの形、ノード辞典 |
-| `src/ui_polish.rs`・`src/theme.rs` | 検索の並び替え・最近使ったノード・格子・画面の色の保存・ショートカット一覧（純粋な処理と単体テスト）、配色 |
-| `tests/` | 保存・出力などの統合テスト。各モジュールにも単体テストあり |
-| `assets/` | 日本語フォントなどのアプリ資産 |
-| `scripts/` | ビルド補助 |
+独立したコンソール版 nodes-cli は、JSONの入出力で catalog・validate・evaluate・build・apply・export-stl を実行します。Windowsでは nodes-cli.exe をPowerShellから使えます。GUIとは別の実行ファイルなので標準出力を取得できます。
 
-構造と次の拡張順序は [実装構成](docs/ARCHITECTURE.md)、実行した検証と残る確認事項は [検証記録](docs/VERIFICATION.md) を参照してください。
+スクリプト・外部ファイル読み込み・プラグインを実行しない制限付きGraph APIを使用します。変更したグラフは評価に成功してから保存し、作品名や表示設定を保持します。STLは明示的なOutputだけを選択し、空・無効・非メッシュの出力を黙って省略しません。使い方とJSONの契約は [CLI.md](docs/CLI.md) を参照してください。
 
 ## ドキュメントとライセンス
 
-- [はじめての使い方](docs/USER_GUIDE_JA.md)
-- [実装構成と今後の拡張](docs/ARCHITECTURE.md)
-- [検証記録](docs/VERIFICATION.md)
-- [保存・出力の仕様](docs/IO_NOTES.md)
-- [Grasshopperとの対応](docs/GH_COVERAGE.md)
+- [開発を再開する](docs/development/STATUS.md)
+- [実装構成](docs/ARCHITECTURE.md) / [ロードマップ](ROADMAP.md)
+- [対応・検証の数え方](NODE_COVERAGE.md) / [公式資料の調査記録](docs/compatibility/REFERENCE_NOTES.md)
+- [日本語操作ガイド](docs/USER_GUIDE_JA.md) / [保存・出力の仕様](docs/IO_NOTES.md)
+- [依存関係の監査範囲と未確認事項](docs/DEPENDENCIES.md)
 - [第三者ライセンス・出典](docs/THIRD_PARTY_NOTICES.md)
 
-本アプリのソースはMITまたはApache-2.0の選択式ライセンスです。フォントや依存ライブラリにはそれぞれのライセンスが適用されます。同梱のライセンス文面と第三者ライセンス一覧を確認してください。
+本アプリのソースはMITまたはApache-2.0の選択式ライセンスです。フォントと依存ライブラリにはそれぞれのライセンスが適用されます。新しい依存関係を追加する際は、ライセンスと再配布条件を確認してください。NODESは公開資料と数学を根拠にした独立実装であり、Rhino/Grasshopperの本体や非公開SDKを同梱しません。

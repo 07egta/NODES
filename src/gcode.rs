@@ -571,7 +571,9 @@ fn infill(loops: &[Vec<[f64; 2]>], spacing: f64) -> Vec<([f64; 2], [f64; 2])> {
         }
         crossings.sort_by(f64::total_cmp);
         let mut spans: Vec<(f64, f64)> = crossings
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| (c[0] + inset, c[1] - inset))
             .filter(|(a, b)| b > a)
             .collect();
@@ -755,9 +757,11 @@ mod tests {
 
     #[test]
     fn layer_height_above_line_width_is_rejected() {
-        let mut s = GcodeSettings::default();
-        s.layer_height_mm = 0.5;
-        s.line_width_mm = 0.4;
+        let s = GcodeSettings {
+            layer_height_mm: 0.5,
+            line_width_mm: 0.4,
+            ..GcodeSettings::default()
+        };
         assert!(s.validate().is_err());
     }
 

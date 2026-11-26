@@ -1,0 +1,18 @@
+{
+  "api_version": 1,
+  "edits": [
+    {"op": "add", "alias": "vase", "kind": "vase", "position": [20, 30]},
+    {"op": "add", "alias": "twist", "kind": "twist", "position": [290, 85]},
+    {"op": "add", "alias": "output", "kind": "output", "position": [290, 300]},
+    {"op": "set", "node": "vase", "input": "radius", "value": 32},
+    {"op": "set", "node": "vase", "input": "height", "value": 104},
+    {"op": "set", "node": "vase", "input": "thickness", "value": 2.4},
+    {"op": "set", "node": "vase", "input": "lobes", "value": 7},
+    {"op": "set", "node": "vase", "input": "amplitude", "value": 0.18},
+    {"op": "set", "node": "vase", "input": "segments", "value": 72},
+    {"op": "set", "node": "vase", "input": "layers", "value": 40},
+    {"op": "set", "node": "twist", "input": "angle", "value": 110},
+    {"op": "connect", "from": "vase", "to": "twist", "input": "geometry"},
+    {"op": "connect", "from": "twist", "to": "output", "input": "geometry"}
+  ]
+}

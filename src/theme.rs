@@ -205,7 +205,10 @@ pub fn category_color(category: &str) -> Color32 {
         "データ" => ((75, 96, 127), (166, 187, 216)),
         _ => ((45, 104, 94), (133, 201, 184)),
     };
-    pick(Color32::from_rgb(light.0, light.1, light.2), Color32::from_rgb(dark.0, dark.1, dark.2))
+    pick(
+        Color32::from_rgb(light.0, light.1, light.2),
+        Color32::from_rgb(dark.0, dark.1, dark.2),
+    )
 }
 
 /// Port colors describe the data type, not the component category. The tooltip also
@@ -222,7 +225,10 @@ pub fn port_color(kind: morphlet::model::DataType) -> Color32 {
         Geometry | DisplayGeometry => ((109, 70, 161), (194, 159, 250)),
         Any => ((82, 98, 113), (170, 187, 203)),
     };
-    pick(Color32::from_rgb(light.0, light.1, light.2), Color32::from_rgb(dark.0, dark.1, dark.2))
+    pick(
+        Color32::from_rgb(light.0, light.1, light.2),
+        Color32::from_rgb(dark.0, dark.1, dark.2),
+    )
 }
 
 pub fn pill(ui: &mut egui::Ui, text: &str, color: Color32) {

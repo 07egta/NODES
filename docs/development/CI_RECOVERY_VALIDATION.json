@@ -1,0 +1,398 @@
+{
+  "schema_version": 1,
+  "run_url": "https://github.com/07egta/NODES/actions/runs/45836582370",
+  "job_id": 139966940840,
+  "source_revision": "0e1032fc5409ff0212ed4d9b6b88c4f56df896ca",
+  "scope": "CI working tree after formatter and Clippy repair; candidate files require review and a fresh committed-source quality gate",
+  "bundle_sha256": "935dfef9807510165d15980c15a4e6383103038772983822abfdd936862a0ae6",
+  "checksum_verification": "All 369 fragments and all 52 per-file SHA256/UTF8 lengths matched; original blob IDs matched the source Git tree.",
+  "step_outcomes": {
+    "check": "success",
+    "checkout": "success",
+    "clippy_check": "failure",
+    "clippy_fix": "success",
+    "exporter_self_test": "success",
+    "fmt_after_fix": "success",
+    "fmt_check": "success",
+    "fmt_fix": "success",
+    "gh2": "success",
+    "perf": "success",
+    "registry": "success",
+    "system": "success",
+    "test": "success",
+    "toolchain": "success"
+  },
+  "rust_tests": {
+    "passed": 424,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 33
+  },
+  "remaining": "Strict Clippy failed. This is an independently preserved candidate, not an all-gates pass.",
+  "files": [
+    {
+      "path": "docs/compatibility/gh2_official_inventory.json",
+      "kind": "generated_json",
+      "source_blob_sha": null,
+      "sha256": "385aef4d26184e07b6e71a4a1bc937fd5b8bf062ef6bcf2868f85cbfe8b05f66",
+      "bytes": 937266
+    },
+    {
+      "path": "docs/compatibility/nodes_inventory.json",
+      "kind": "generated_json",
+      "source_blob_sha": null,
+      "sha256": "e0280b2f6ce0406f5e3445f8c21694801064d0d63a2d3a77423fae15ca890581",
+      "bytes": 597276
+    },
+    {
+      "path": "docs/development/performance.json",
+      "kind": "generated_json",
+      "source_blob_sha": null,
+      "sha256": "ee1f98bbdcccee903be9fc5581014919e1fbf47564635e2d7c1009e55d5a3a51",
+      "bytes": 1944
+    },
+    {
+      "path": "examples/coverage_perf.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "2b44f4404946ccfea2d882b14c56894751e9b2aa",
+      "sha256": "4b77017b1881fe6fec33aa0f8877072928027ec9ba8d0cfc58ff11c8982c1b38",
+      "bytes": 3217
+    },
+    {
+      "path": "src/app.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "5f1747ab3aa12b362927cadbad1aeee17bc95935",
+      "sha256": "891724bcdb09e96b338773b7144f5de60c753af8d2a9df5f16c5546131752771",
+      "bytes": 112501
+    },
+    {
+      "path": "src/canvas.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "21058e9cfa84504d96b5888b777fa6241dc24dff",
+      "sha256": "90132434af36c9e8ff33275dfa99d3e14d881bab61c4ce5b9600d4a67ed972ed",
+      "bytes": 54379
+    },
+    {
+      "path": "src/cluster.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "5a99d73545f0833bd8b033e68841e2facdea3b55",
+      "sha256": "a0e0a0ecf5b1ec6867856f859a9a3a3efe0995a0c4fed55cf287e7ecbe9fe78e",
+      "bytes": 33575
+    },
+    {
+      "path": "src/compatibility.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "4bf1827ff81c480339f665d6e7bbf1dffdcbf4c4",
+      "sha256": "65ab97368fe485436e82d1d87eda693199d0930ce38f4d96664a6f57b746c2b6",
+      "bytes": 3417
+    },
+    {
+      "path": "src/curve_geometry.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "8e491432832b71f1a2b260894d70cd85879f2f2e",
+      "sha256": "0211471a810bdcb98ecaee63bbb8af7048f31b23d5d323aca7c0df7b874fb324",
+      "bytes": 31875
+    },
+    {
+      "path": "src/curve_nodes.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "d6835336f31f93ecc10798c0064fd370561b9aac",
+      "sha256": "04d91679a8429bd1d55aadfd65e5d6b916440777dc58a931d648fb66d300d99e",
+      "bytes": 31146
+    },
+    {
+      "path": "src/data_tree.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "c1129a0d7b153a8128b1d42a4dc7fbe747e78bae",
+      "sha256": "fb85b74e6ab3f4a19698a215e2b725d713a4738280692869a9fcf87f178e7b3b",
+      "bytes": 19059
+    },
+    {
+      "path": "src/data_view.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "4229b45401845e93551a43188d44addb947abd26",
+      "sha256": "a8415d7caa91af123fee34697f1e4a1ed86c6b376aa203d42ba1841293945c55",
+      "bytes": 7832
+    },
+    {
+      "path": "src/engine.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "fc895b49c020b87ca6144a880153cba68f1eb6cc",
+      "sha256": "11418265c9eb3980ff559560686764e6d867d7c084973d1f59718c4d302ecccd",
+      "bytes": 80915
+    },
+    {
+      "path": "src/file_picker.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "9dc4f465cad088d6c1a8c98a4688bf97950a8e70",
+      "sha256": "d0986391591f65ae3fc1d93956fc03a577b6b2230f17b7d9339b8a8a5d7943da",
+      "bytes": 24266
+    },
+    {
+      "path": "src/gcode.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "a74abaa17e01d3c9b620c81884eb4f6db7e13258",
+      "sha256": "c44860bdbfe1105df5954688014662a2ea4a3d637b346e41cf79d6375af74c0f",
+      "bytes": 27507
+    },
+    {
+      "path": "src/generative.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "50ead89f8868489bb16bacf8923ca29989eeec46",
+      "sha256": "a5c0e4a1791207182d3be4cf0cfed3e230266205380624691a056b066af282b3",
+      "bytes": 53891
+    },
+    {
+      "path": "src/ghx.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "0f3e064b56156f439afa1961d59dc1b127de4cc9",
+      "sha256": "ace8471fbca518efbf1cb085365ad9b180cb51a4c830eedf83e0cd25d9dfc3c1",
+      "bytes": 31476
+    },
+    {
+      "path": "src/graph_api.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "4c445466c3848979ee6596f3f5bf46e67e694c46",
+      "sha256": "f66dd8b6d2abb1c59a4d9bc688bb3c6d773e9f0b7749c63459f469c6c73446b4",
+      "bytes": 14518
+    },
+    {
+      "path": "src/help.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "4f0929f867a5fc82040c2059b8a9c27cf172bd7a",
+      "sha256": "3a3a9212efbe790b26c3ca111b3a100756a7e7e73917f6e2aa0d5afe733461d7",
+      "bytes": 18769
+    },
+    {
+      "path": "src/import.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "b0482b87a2d8eadb97ec13c68e572c7036508193",
+      "sha256": "d19bd2ca15196599c3927623de141282cbfce85b563aefc38dcb3b31605512c0",
+      "bytes": 15453
+    },
+    {
+      "path": "src/latest_channel.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "2fed8ee7a96c1e5e932b0e12aec2435a41feaea1",
+      "sha256": "9326e4f1d2bbebb94bc70aae6fc79f37fdd1f86b7efc315ae62e86847c2693ce",
+      "bytes": 4691
+    },
+    {
+      "path": "src/lib.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "e04aff56167bf1fbe6314189a406cbc299f6fd03",
+      "sha256": "876a33079f2884421e1a452aab4459540fa205f1e63db7a4f6600d6ef7056f05",
+      "bytes": 635
+    },
+    {
+      "path": "src/main.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "a53c82734e4b4c60fc186081772779e6e6b0ad8a",
+      "sha256": "5e9e53b68a94f6010734ce9e66f43f4b579d3227fa4f96d2ec23e1c5477676ed",
+      "bytes": 6750
+    },
+    {
+      "path": "src/math_mapper_ui.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "30edc5ee457cead074da126084a15501e41f8e36",
+      "sha256": "a84d5ed7fac5bd94815fbb461abf060c42a122148877e2e9692d88ae89f55266",
+      "bytes": 4800
+    },
+    {
+      "path": "src/math_nodes.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "6e4d7ceb3a5b587ded6c648ed51dae4d13ecfab7",
+      "sha256": "e126f83f7ecd9ca7e5cab1bb0b6ea0a7cb72eb230b3f6ba8b79f7cc94a07b2b9",
+      "bytes": 85316
+    },
+    {
+      "path": "src/mesh_fabrication.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "b0d7fdf19fa796cb6f9eff6aa3727fa7a420c086",
+      "sha256": "6899ba51abef3ec44fbbcf3b4b0ccea52522883b5cfed342f6589f0e0d05d45a",
+      "bytes": 37035
+    },
+    {
+      "path": "src/mesh_geometry_checks.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "c305e62bc7bbc291b9b194896828a79964c56bf0",
+      "sha256": "bab4c92f45f49dd1db4c205f7bb39f00d4e268e79e42361640115844f3a52014",
+      "bytes": 9167
+    },
+    {
+      "path": "src/model.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "089736988445d2ff592c680413ba22698e9abba6",
+      "sha256": "10d9d37baff65bc74420e855ba7628c2e4dd217456d712e1079fc67b4725c6c9",
+      "bytes": 63510
+    },
+    {
+      "path": "src/polygon_triangulation.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "421559d60609ff90075623525c37fbbee85b36a0",
+      "sha256": "db28629d3b723a9da15bae628a12f3b717be58fe1bd9533c68889926ba119a66",
+      "bytes": 13154
+    },
+    {
+      "path": "src/script.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "c6f82e94a95f1daddd5bcd23441d67deb9950091",
+      "sha256": "cb250db7fd42cbc733ef41ff8e5ae7f00888ce184d0bbf41bf93e0d6b163e6d2",
+      "bytes": 25641
+    },
+    {
+      "path": "src/stl_export.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "d114f4a4fd38518ae1c9bdf928246eae73b3ca26",
+      "sha256": "c06a5ccec7d058708ea4a19bd20990262a12c8511a7a5ea9fbdc1527d5ea62d7",
+      "bytes": 42703
+    },
+    {
+      "path": "src/stl_export_ui.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "7398e4732fbf52622677696d3612859cbb64b449",
+      "sha256": "c05d41477cc64b37a656e9e08b88e2e4b052ad180fa5c1322295835c5702bd18",
+      "bytes": 21049
+    },
+    {
+      "path": "src/theme.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "22b5f599924359826e370e51a369e29b6423c228",
+      "sha256": "0a6c084bb338e1db72cb23fe977bed14c4d4d75618754a0910994ceda1bdab44",
+      "bytes": 8082
+    },
+    {
+      "path": "src/ui_polish.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "1c3500e1cc63f40da2be315416ccbb83441c7e57",
+      "sha256": "83ab028fec1bafc7afa2764d2647ba55d76220384243c433daf8a624bd200f4c",
+      "bytes": 16987
+    },
+    {
+      "path": "tests/access_evaluation_regressions.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "1eae594a39f61d29dd64b84e982fc5bcb1d88edf",
+      "sha256": "6db2e5266398bd8c258eab19b09726203714ea13fc637a57752f151767030efa",
+      "bytes": 5452
+    },
+    {
+      "path": "tests/core_integration.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "1f8c1eaf0bfbf4e42c707e1af2894b03f8ced6df",
+      "sha256": "963c6088014f665d4952dd1c2ad77f9be55fb1817ae5afe69be9abf513c9d7e0",
+      "bytes": 18644
+    },
+    {
+      "path": "tests/curve_geometry_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "770e429799a990c8b8023a19025b648168e68042",
+      "sha256": "4e3d859c6847e0d8a6bc940ddb08feee285cc81c57e061f337b21bc91b6678b8",
+      "bytes": 10702
+    },
+    {
+      "path": "tests/data_tree_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "dbcfb2cd776314cec1ee769409333a3bc7e354d9",
+      "sha256": "f527b56c87c754dc30f654a54dd241b1454a31bb099b7056fd5b05c53e423682",
+      "bytes": 11399
+    },
+    {
+      "path": "tests/example_edit_workflows.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "20603943c7601d40ea20a9b0d58880ee69e1ade2",
+      "sha256": "583e614c2988217b83536d023e71bb0b57cd0e229e17de57d4ded7e7063481ac",
+      "bytes": 15422
+    },
+    {
+      "path": "tests/fabrication_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "6dff60bf903738e06960d708e37b1ea719e18e73",
+      "sha256": "6d91d581102881ed79e7456fd4a11fa0c4e75b8780dc1169ffb2e5e938c7b9eb",
+      "bytes": 8483
+    },
+    {
+      "path": "tests/generative_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "e978d8246db574e9a7f210f23f2102012c0a1431",
+      "sha256": "f82340a5f1ddf83ea311a3b056a50e7b1097efeb814ecf273cf73835d2a47cf0",
+      "bytes": 4645
+    },
+    {
+      "path": "tests/graph_api_tree_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "3760c8f94d2052b6ee9d714db27b6ffda0d4281c",
+      "sha256": "85680861558f0daf29311f5d92914a82c06600ed3e8e2044f5364c79418b97f7",
+      "bytes": 4044
+    },
+    {
+      "path": "tests/integrated_workflows.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "f629c4de6bbc2307975bb583b431fbec3fd635bc",
+      "sha256": "ed55ac83eae93033d67baea9317480ce330fe60c6d74758eb5fa8a5f83eebfe5",
+      "bytes": 8135
+    },
+    {
+      "path": "tests/large_graph_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "933264dd0078e1ef142b3c68ef0ba303a3ed76be",
+      "sha256": "d21f28a2997cd146c8dd01d3484257309f4ee64c69917d1e3de430aabd3d5349",
+      "bytes": 3175
+    },
+    {
+      "path": "tests/math_nodes_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "c8eee0925cc048f0169e3d3de1094416759b207f",
+      "sha256": "59e74dd4fb5328a0d23d8b1d1ecd4c14deb96ef25f83a447cbca0e39df8d3fb6",
+      "bytes": 5571
+    },
+    {
+      "path": "tests/mesh_repair_regressions.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "107963bae18a6055331700981c28f194ffe99be2",
+      "sha256": "54931af46c32835e36a46f5f83be469e3be5b62ab043736b0177192d4d7cc865",
+      "bytes": 4925
+    },
+    {
+      "path": "tests/node_timing_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "0136d446f63ee666b9565463cc7a0d82ace3f0e4",
+      "sha256": "6f47c1233d0ebf4abec8e404e9ca775b59a0fab84bfc60b68b201e0d7bfd2686",
+      "bytes": 4817
+    },
+    {
+      "path": "tests/polygon_import_repair.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "035d6ba5e882bf78d071b03b2aa857dcb601e523",
+      "sha256": "3337c86eed634db366775aa8b2887e50c8cf932873b5e5a4c0b176a3dfda5796",
+      "bytes": 7264
+    },
+    {
+      "path": "tests/stl_export_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "e17866b0ad4d73253fc01b86df32829069be218e",
+      "sha256": "ee9d094f86584dd750881991a276868864c0d24bf73553975925432b26abb865",
+      "bytes": 9402
+    },
+    {
+      "path": "tests/surface_curvature_study.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "dd64116bcbf025de397f4b1a9b511796612341c4",
+      "sha256": "7e20e60ff867ba4f72dc2928043c31b5e42c67ca1bdc013994b5aaa4ab8adf76",
+      "bytes": 2610
+    },
+    {
+      "path": "tests/surface_kernel_tests.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "87341534f8157f2bba1a62ad0d63b000bab88422",
+      "sha256": "94aab1cbe5047f4cf92dae5381093e33ba7e2bf99f990278f8b1947b368c8f9e",
+      "bytes": 8620
+    },
+    {
+      "path": "tests/surface_knot_roundoff.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "5d229cc93e386f321ee68d427cfa1ad60a6a066a",
+      "sha256": "e5434108f709df540ace617bdab2b6a37c33017355193e1b5db6c166a7a89ef8",
+      "bytes": 2417
+    }
+  ]
+}
