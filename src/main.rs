@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
+mod math_mapper_ui;
 mod canvas;
 mod data_view;
 mod file_picker;
