@@ -234,7 +234,9 @@ pub(crate) fn evaluate_node(
         for (path, items) in &inputs.first().ok_or("入力がありません。")?.branches {
             cancelled(cancel)?;
             if items.is_empty() {
-                tree.branches.insert(path.clone(), Vec::new());
+                // A shallower non-empty branch may already have grafted an item onto
+                // this path. Preserve that item rather than overwrite it with emptiness.
+                tree.branches.entry(path.clone()).or_default();
             }
             for (index, v) in items.iter().enumerate() {
                 let mut p = path.clone();
