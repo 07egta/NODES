@@ -36,6 +36,7 @@ pub fn shape_of(tree: &Tree) -> DataShape {
 
 impl DataShape {
     /// Short text for the badge next to an output port: "1", "12", "{3}×12".
+    #[cfg(test)]
     pub fn badge(self) -> String {
         match self {
             Self::Empty => "0".into(),
@@ -92,6 +93,7 @@ pub fn value_text(value: &Value) -> String {
 }
 
 /// One row of the viewer: branch path, item index (None for an empty branch), text.
+#[cfg(test)]
 pub struct Row {
     pub path: String,
     pub index: Option<usize>,
@@ -99,6 +101,7 @@ pub struct Row {
 }
 
 /// The first `limit` rows and the number of rows left out.
+#[cfg(test)]
 pub fn rows(tree: &Tree, limit: usize) -> (Vec<Row>, usize) {
     let mut out = Vec::new();
     let mut hidden = 0usize;
@@ -224,5 +227,7 @@ mod tests {
         assert_eq!(hidden, 101);
         assert_eq!(rows[0].text, "0.0000");
         assert_eq!(rows[0].path, "{0}");
+        assert_eq!(rows[0].index, Some(0));
+        assert_eq!(rows[MAX_ROWS - 1].index, Some(MAX_ROWS - 1));
     }
 }

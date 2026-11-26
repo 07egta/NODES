@@ -44,7 +44,7 @@ try {
     }
 
     Write-Host '2/2 リリース版をビルドしています。'
-    & cargo build --release --locked --bin Morphlet
+    & cargo build --release --locked --bins
     $buildExitCode = $LASTEXITCODE
     if ($buildExitCode -ne 0) {
         throw "リリースビルドに失敗しました (exit $buildExitCode)。"

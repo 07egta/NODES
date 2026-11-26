@@ -1892,7 +1892,7 @@ impl MorphletApp {
             .show(ctx, |ui| {
                 ui.set_width(width);
                 let r = ui.add(egui::TextEdit::singleline(&mut self.palette_query)
-                    .hint_text("円を作る / twist / 点を並べる")
+                    .hint_text("円 / twist / 点を並べたい")
                     .desired_width(f32::INFINITY));
                 let first = self.palette_focus;
                 if first { r.request_focus(); self.palette_focus = false; }
@@ -2498,6 +2498,7 @@ fn same_calculation(a: &Graph, b: &Graph) -> bool {
                 && x.off == y.off
         })
 }
+#[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
     ui_polish::query_score(kind, query).is_some()
 }
