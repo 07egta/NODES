@@ -271,7 +271,7 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let list_kind = crate::gh_nodes::is_list_kind(node.kind) || crate::math_nodes::is_list_kind(node.kind);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -311,7 +311,7 @@ pub(crate) fn evaluate_node(
         // List nodes see their whole first list (an empty one is a valid input, e.g. for
         // リスト長 or 連結); their setting inputs still need at least one value.
         let skip = if list_kind {
-            node.kind != NodeKind::ConcatList && lists.iter().skip(1).any(|v| v.is_empty())
+            node.kind != NodeKind::ConcatList && !crate::math_nodes::accepts_empty_second(node.kind) && lists.iter().skip(1).any(|v| v.is_empty())
         } else {
             lists.iter().any(|v| v.is_empty())
         };
@@ -328,6 +328,8 @@ pub(crate) fn evaluate_node(
                 .number()?
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+        } else if crate::math_nodes::is_list_kind(node.kind) {
+            crate::math_nodes::run_list(node.kind, &lists, cancel)?
         } else if list_kind {
             crate::gh_nodes::run_list(node.kind, &lists, cancel)?
         } else {
@@ -437,6 +439,15 @@ fn preflight_run(
         NodeKind::Mirror => (shape(args)?.weight().saturating_mul(2), 1),
         NodeKind::Series | NodeKind::Range => {
             let count = num(args, 2)? as usize;
+            (count, count)
+        }
+        NodeKind::GhRange => {
+            let count = (num(args, 2)? as usize).saturating_add(1);
+            (count, count)
+        }
+        NodeKind::ConstructDomain => (2, 2),
+        NodeKind::RandomNormal => {
+            let count = num(args, 0)? as usize;
             (count, count)
         }
         NodeKind::Random | NodeKind::Populate => {
@@ -799,6 +810,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | Remap | Expression | GraphProfile | ImportMesh => {
             Err("このノードはリスト評価が必要です。".into())
         }
+        other => crate::math_nodes::run_item(other, a, cancel),
     }
 }
 
