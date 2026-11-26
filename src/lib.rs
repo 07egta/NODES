@@ -4,6 +4,8 @@ pub mod engine;
 pub mod expr;
 pub mod gcode;
 pub mod gh_nodes;
+pub mod ghx;
+pub mod graph_api;
 pub mod import;
 pub mod model;
 pub mod persistence;

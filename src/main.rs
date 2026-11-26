@@ -16,6 +16,35 @@ use std::path::{Path, PathBuf};
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "--node-catalog") {
+        match serde_json::to_string_pretty(&morphlet::graph_api::catalog()) {
+            Ok(json) => println!("{json}"),
+            Err(e) => { eprintln!("{e}"); std::process::exit(1); }
+        }
+        return Ok(());
+    }
+    if args.first().is_some_and(|a| a == "--build-graph") {
+        let result = match (args.get(1), args.get(2), args.len()) {
+            (Some(input), Some(output), 3) => morphlet::graph_api::build_file(Path::new(input), Path::new(output)),
+            _ => Err("Usage: --build-graph request.json output.morph".into()),
+        };
+        if let Err(e) = result { eprintln!("{e}"); std::process::exit(1); }
+        return Ok(());
+    }
+    if matches!(args.first().map(String::as_str), Some("--inspect-ghx" | "--convert-ghx")) {
+        let result = match (args.get(1), args.get(2), args.len()) {
+            (Some(input), Some(output), 3) if args[0] == "--inspect-ghx" =>
+                morphlet::ghx::inspect_file(Path::new(input), Path::new(output)),
+            (Some(input), Some(output), 3) =>
+                morphlet::ghx::convert_file(Path::new(input), Path::new(output)),
+            _ => Err("Usage: --inspect-ghx input.ghx report.json | --convert-ghx input.ghx output.morph".into()),
+        };
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     if args.first().is_some_and(|a| a == "--export-demos") {
         let path = args
             .get(1)

@@ -1223,6 +1223,7 @@ dependencies = [
  "rhai",
  "serde",
  "serde_json",
+ "xml-rs",
 ]
 
 [[package]]
