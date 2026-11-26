@@ -68,9 +68,12 @@ fn catalog_claims_are_conservative_and_mapped_nodes_exist() {
         .map(node_id).collect();
     let mut seen = BTreeSet::new();
     let mut guids = BTreeSet::new();
-    let rows = catalog["components"].as_array().unwrap();
-    assert!(!rows.is_empty());
-    for row in rows {
+    let gh1 = catalog["components"].as_array().unwrap();
+    let gh2 = catalog["gh2"]["components"].as_array().unwrap();
+    assert!(!gh1.is_empty() && !gh2.is_empty());
+    assert!(gh1.iter().all(|r| r["version_family"] == "GH1"));
+    assert!(gh2.iter().all(|r| r["version_family"] == "GH2"));
+    for row in gh1.iter().chain(gh2) {
         let name = row["name"].as_str().unwrap();
         let category = row["category"].as_str().unwrap();
         let family = row["version_family"].as_str().unwrap();
