@@ -85,7 +85,7 @@ pub struct ClusterDef {
 /// Extra cache-key text: script source, or a fingerprint of the definitions a cluster uses.
 pub fn key_extra(graph: &Graph, node: &Node) -> String {
     match node.kind {
-        NodeKind::Script => node.script.clone(),
+        NodeKind::Script | NodeKind::Expression => node.script.clone(),
         NodeKind::Cluster => node
             .cluster
             .map(|id| signature(&graph.clusters, id))

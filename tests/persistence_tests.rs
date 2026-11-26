@@ -412,8 +412,9 @@ fn new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged() {
         assert_eq!(back, *kind);
         assert!(NodeKind::all().contains(kind), "{name} missing from all()");
     }
-    // 42 geometry/data nodes plus the Script node (Cluster is created from a definition).
-    assert_eq!(NodeKind::all().len(), 43);
+    // 42 geometry/data nodes, the Script node and the 20 list/pattern/print nodes
+    // (Cluster is created from a definition).
+    assert_eq!(NodeKind::all().len(), 63);
     let mut seen = std::collections::BTreeSet::new();
     assert!(NodeKind::all().iter().all(|k| seen.insert(*k)));
 }
@@ -802,9 +803,9 @@ fn shipped_example_files_load_and_evaluate() {
             assert!(output.is_ok(), "{path:?} node {id}: {output:?}");
         }
     }
-    // The two newest example files are written to match their templates exactly.
+    // The newest example files are written to match their templates exactly.
     // If this fails after a template edit, regenerate with `Morphlet --export-demos examples`.
-    for index in [6, 7] {
+    for index in [6, 7, 8, 9] {
         let path = dir.join(format!("{:02}.morph", index + 1));
         assert_eq!(persistence::load(&path).unwrap(), templates::create(index));
     }
@@ -812,7 +813,7 @@ fn shipped_example_files_load_and_evaluate() {
 
 #[test]
 fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
-    assert_eq!(templates::TEMPLATES.len(), 8);
+    assert_eq!(templates::TEMPLATES.len(), 10);
     let old_names = [
         "ねじれの花器",
         "光のリング",
@@ -832,5 +833,627 @@ fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
             NEW_KINDS.iter().filter(|(k, _)| used.contains(k)).count() >= 4,
             "template {index} should exercise several new nodes"
         );
+    }
+}
+
+// ---- List, formula, pattern and print-checking nodes (gh_nodes.rs, expr.rs) ----
+
+const GH_KINDS: [(NodeKind, &str); 20] = [
+    (NodeKind::ListItem, "list_item"),
+    (NodeKind::ListLength, "list_length"),
+    (NodeKind::ReverseList, "reverse_list"),
+    (NodeKind::SortList, "sort_list"),
+    (NodeKind::CullPattern, "cull_pattern"),
+    (NodeKind::ShiftList, "shift_list"),
+    (NodeKind::ConcatList, "concat_list"),
+    (NodeKind::SubList, "sub_list"),
+    (NodeKind::Bounds, "bounds"),
+    (NodeKind::Remap, "remap"),
+    (NodeKind::Expression, "expression"),
+    (NodeKind::Random, "random"),
+    (NodeKind::Populate, "populate"),
+    (NodeKind::Noise, "noise"),
+    (NodeKind::NoiseDeform, "noise_deform"),
+    (NodeKind::GraphProfile, "graph_profile"),
+    (NodeKind::Shell, "shell"),
+    (NodeKind::OverhangCheck, "overhang_check"),
+    (NodeKind::Distance, "distance"),
+    (NodeKind::PointComponent, "point_component"),
+];
+
+fn set(graph: &mut Graph, id: NodeId, params: &[(&str, f64)]) {
+    for (key, value) in params {
+        graph
+            .node_mut(id)
+            .unwrap()
+            .params
+            .insert((*key).to_string(), *value);
+    }
+}
+fn numbers_of(tree: &Tree) -> Vec<f64> {
+    tree.branches
+        .values()
+        .flatten()
+        .map(|v| match v {
+            Value::Number(n) => *n,
+            other => panic!("number expected, got {other:?}"),
+        })
+        .collect()
+}
+fn mesh_in(tree: &Tree) -> Arc<Mesh> {
+    match tree.branches.values().flatten().next() {
+        Some(Value::Mesh(m)) => m.clone(),
+        other => panic!("mesh expected, got {other:?}"),
+    }
+}
+/// A list node fed by 数列 (start, step, count) on its first input.
+fn list_result(
+    kind: NodeKind,
+    series: (f64, f64, f64),
+    params: &[(&str, f64)],
+) -> Result<Vec<f64>, String> {
+    let mut graph = Graph::default();
+    let source = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    set(
+        &mut graph,
+        source,
+        &[("start", series.0), ("step", series.1), ("count", series.2)],
+    );
+    let id = graph.add(kind, [0., 0.]).unwrap();
+    let first = kind.spec().inputs[0].key;
+    graph.connect(source, id, first).unwrap();
+    set(&mut graph, id, params);
+    evaluate_one(&graph, id).map(|t| numbers_of(&t))
+}
+
+#[test]
+fn gh_node_kinds_keep_stable_serde_names_and_have_japanese_specs() {
+    for (kind, name) in GH_KINDS {
+        assert_eq!(serde_json::to_string(&kind).unwrap(), format!("\"{name}\""));
+        let back: NodeKind = serde_json::from_str(&format!("\"{name}\"")).unwrap();
+        assert_eq!(back, kind);
+        assert!(NodeKind::all().contains(&kind), "{name} missing from all()");
+        let spec = kind.spec();
+        assert_ne!(spec.label, "不明なノード", "{name} has no spec");
+        assert!(!spec.description.is_empty() && !spec.keywords.is_empty());
+    }
+}
+
+#[test]
+fn gh_nodes_evaluate_to_finite_non_empty_results_with_defaults() {
+    let mut graph = Graph::default();
+    let series = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    let cube = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+    let points = graph.add(NodeKind::Populate, [0., 0.]).unwrap();
+    let mut ids = Vec::new();
+    for (kind, _) in GH_KINDS {
+        let id = graph.add(kind, [0., 0.]).unwrap();
+        for spec in kind.spec().inputs.iter().filter(|s| s.default.is_none()) {
+            let from = match spec.kind {
+                morphlet::model::DataType::Point => points,
+                morphlet::model::DataType::Mesh | morphlet::model::DataType::Geometry => cube,
+                _ => series,
+            };
+            graph.connect(from, id, spec.key).unwrap();
+        }
+        ids.push((kind, id));
+    }
+    graph.validate().unwrap();
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    for (kind, id) in ids {
+        let tree = result.outputs[&id]
+            .as_ref()
+            .unwrap_or_else(|e| panic!("{kind:?}: {e}"));
+        let values: Vec<_> = tree.branches.values().flatten().collect();
+        assert!(!values.is_empty(), "{kind:?} produced nothing");
+        for value in values {
+            match value {
+                Value::Number(n) => assert!(n.is_finite(), "{kind:?}: {n}"),
+                Value::Point(p) => assert!(p.iter().all(|c| c.is_finite()), "{kind:?}"),
+                Value::Mesh(m) => {
+                    assert!(!m.triangles.is_empty(), "{kind:?}");
+                    assert!(m.vertices.iter().flatten().all(|c| c.is_finite()));
+                }
+                Value::Curve(c) => assert!(c.points.iter().flatten().all(|v| v.is_finite())),
+            }
+        }
+    }
+}
+
+#[test]
+fn list_nodes_compute_expected_values() {
+    let s = (0., 1., 5.); // 0 1 2 3 4
+    let item = |params: &[(&str, f64)]| list_result(NodeKind::ListItem, s, params);
+    assert_eq!(item(&[("index", 2.)]).unwrap(), [2.]);
+    assert_eq!(item(&[("index", -1.)]).unwrap(), [4.]);
+    assert_eq!(item(&[("index", 7.)]).unwrap(), [2.]);
+    assert!(item(&[("index", 7.), ("wrap", 0.)]).is_err());
+    assert!(item(&[("index", -1.), ("wrap", 0.)]).is_err());
+    assert_eq!(list_result(NodeKind::ListLength, s, &[]).unwrap(), [5.]);
+    assert_eq!(
+        list_result(NodeKind::ListLength, (0., 1., 0.), &[]).unwrap(),
+        [0.]
+    );
+    assert_eq!(
+        list_result(NodeKind::ReverseList, s, &[]).unwrap(),
+        [4., 3., 2., 1., 0.]
+    );
+    assert_eq!(
+        list_result(NodeKind::SortList, (4., -1.5, 4.), &[]).unwrap(),
+        [-0.5, 1., 2.5, 4.]
+    );
+    let shift = |params: &[(&str, f64)]| list_result(NodeKind::ShiftList, s, params).unwrap();
+    assert_eq!(shift(&[("offset", 1.)]), [1., 2., 3., 4., 0.]);
+    assert_eq!(shift(&[("offset", -1.)]), [4., 0., 1., 2., 3.]);
+    assert_eq!(shift(&[("offset", 1.), ("wrap", 0.)]), [1., 2., 3., 4.]);
+    assert_eq!(shift(&[("offset", -2.), ("wrap", 0.)]), [0., 1., 2.]);
+    assert!(shift(&[("offset", 9.), ("wrap", 0.)]).is_empty());
+    let sub = |params: &[(&str, f64)]| list_result(NodeKind::SubList, s, params).unwrap();
+    assert_eq!(sub(&[("start", 1.), ("count", 2.)]), [1., 2.]);
+    assert_eq!(sub(&[("start", 4.), ("count", 10.)]), [4.]);
+    assert!(sub(&[("start", 8.), ("count", 2.)]).is_empty());
+    assert_eq!(
+        list_result(NodeKind::Bounds, (3., -2., 4.), &[]).unwrap(),
+        [-3., 3.]
+    );
+    assert_eq!(
+        list_result(
+            NodeKind::Remap,
+            s,
+            &[("target_min", 0.), ("target_max", 100.)]
+        )
+        .unwrap(),
+        [0., 25., 50., 75., 100.]
+    );
+    assert_eq!(
+        list_result(
+            NodeKind::Remap,
+            s,
+            &[
+                ("target_min", 0.),
+                ("target_max", 1.),
+                ("use_source", 1.),
+                ("source_min", 0.),
+                ("source_max", 2.),
+                ("clamp", 1.),
+            ]
+        )
+        .unwrap(),
+        [0., 0.5, 1., 1., 1.]
+    );
+    // A list of equal values has no width: every value goes to the middle.
+    assert_eq!(
+        list_result(NodeKind::Remap, (7., 0., 3.), &[("target_max", 10.)]).unwrap(),
+        [5., 5., 5.]
+    );
+
+    // 間引きパターン with a 0/1 pattern made by 剰余, and 連結 of two lists.
+    let mut graph = Graph::default();
+    let series = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    set(
+        &mut graph,
+        series,
+        &[("start", 0.), ("step", 1.), ("count", 5.)],
+    );
+    let pattern = graph.add(NodeKind::Modulo, [0., 0.]).unwrap();
+    set(&mut graph, pattern, &[("b", 2.)]);
+    graph.connect(series, pattern, "a").unwrap();
+    let cull = graph.add(NodeKind::CullPattern, [0., 0.]).unwrap();
+    graph.connect(series, cull, "list").unwrap();
+    graph.connect(pattern, cull, "pattern").unwrap();
+    let concat = graph.add(NodeKind::ConcatList, [0., 0.]).unwrap();
+    graph.connect(series, concat, "a").unwrap();
+    graph.connect(cull, concat, "b").unwrap();
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(
+        numbers_of(result.outputs[&cull].as_ref().unwrap()),
+        [1., 3.]
+    );
+    assert_eq!(
+        numbers_of(result.outputs[&concat].as_ref().unwrap()),
+        [0., 1., 2., 3., 4., 1., 3.]
+    );
+}
+
+#[test]
+fn list_nodes_keep_branches_separate() {
+    let mut graph = Graph::default();
+    let series = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    set(&mut graph, series, &[("count", 3.)]);
+    let grafted = graph.add(NodeKind::Graft, [0., 0.]).unwrap();
+    graph.connect(series, grafted, "geometry").unwrap();
+    let length = graph.add(NodeKind::ListLength, [0., 0.]).unwrap();
+    graph.connect(grafted, length, "list").unwrap();
+    let tree = evaluate_one(&graph, length).unwrap();
+    assert_eq!(tree.branches.len(), 3);
+    assert_eq!(numbers_of(&tree), [1., 1., 1.]);
+}
+
+#[test]
+fn expression_parses_evaluates_and_rejects_garbage() {
+    use morphlet::expr::{MAX_EXPR_LEN, parse};
+    let eval = |src: &str, vars: [f64; 4]| parse(src).and_then(|e| e.eval(vars));
+    assert_eq!(eval("x * 2 + y", [3., 1., 0., 0.]).unwrap(), 7.);
+    assert_eq!(eval("x + y + z + w", [1., 2., 3., 4.]).unwrap(), 10.);
+    assert_eq!(eval("2 ^ 3 ^ 2", [0.; 4]).unwrap(), 512.);
+    assert_eq!(eval("-2 ^ 2", [0.; 4]).unwrap(), -4.);
+    assert_eq!(eval("(1 + 2) * 3 % 4", [0.; 4]).unwrap(), 1.);
+    assert_eq!(eval("max(x, 3) - min(2, 5)", [1., 0., 0., 0.]).unwrap(), 1.);
+    assert!((eval("sin(pi / 2)", [0.; 4]).unwrap() - 1.).abs() < 1e-12);
+    // Full-width characters typed through a Japanese IME are accepted.
+    assert_eq!(eval("ｘ＊２＋１", [4., 0., 0., 0.]).unwrap(), 9.);
+    assert!(parse(morphlet::expr::DEFAULT_EXPRESSION).is_ok());
+    // Bad text is a Japanese error, never a panic.
+    for bad in [
+        "",
+        "   ",
+        "x +",
+        "* x",
+        "(x",
+        "x)",
+        "foo(1)",
+        "min(1)",
+        "sin(1, 2)",
+        "1.2.3",
+        "1e400",
+        "x; drop",
+        "日本語",
+        "a + b",
+        "\u{0}",
+    ] {
+        let error = parse(bad).unwrap_err();
+        assert!(!error.is_empty(), "{bad:?}");
+    }
+    // Domain errors at evaluation time are errors, never NaN or infinity.
+    for bad in [
+        "x / 0",
+        "x % 0",
+        "sqrt(-1)",
+        "ln(0)",
+        "0 ^ -1",
+        "(-8) ^ 0.5",
+        "exp(1000)",
+    ] {
+        assert!(eval(bad, [1., 0., 0., 0.]).is_err(), "{bad}");
+    }
+    // Length, nesting and size are capped; deep input does not overflow the stack.
+    assert!(parse(&"1+".repeat(MAX_EXPR_LEN)).is_err());
+    assert!(parse(&format!("{}x{}", "(".repeat(100), ")".repeat(100))).is_err());
+    assert!(parse(&format!("{}x", "-".repeat(200))).is_err());
+    assert!(parse(&format!("{}x", "2^".repeat(100))).is_err());
+    assert!(parse(&"x".repeat(100_000)).is_err());
+    assert!(parse(&format!("{}x{}", "sin(".repeat(60), ")".repeat(60))).is_err());
+    assert!(parse(&format!("{}x{}", "(".repeat(10), ")".repeat(10))).is_ok());
+}
+
+#[test]
+fn expression_node_maps_lists_and_keeps_its_text_in_files() {
+    let temp = TempDir::new();
+    let mut graph = Graph::default();
+    let range = graph.add(NodeKind::Range, [0., 0.]).unwrap();
+    set(
+        &mut graph,
+        range,
+        &[("start", 0.), ("end", 4.), ("count", 5.)],
+    );
+    let formula = graph.add(NodeKind::Expression, [0., 0.]).unwrap();
+    assert_eq!(
+        graph.node(formula).unwrap().script,
+        morphlet::expr::DEFAULT_EXPRESSION
+    );
+    graph.node_mut(formula).unwrap().script = "x * x + y".into();
+    set(&mut graph, formula, &[("y", 1.)]);
+    graph.connect(range, formula, "x").unwrap();
+    assert_eq!(
+        numbers_of(&evaluate_one(&graph, formula).unwrap()),
+        [1., 2., 5., 10., 17.]
+    );
+    let path = temp.file("expr.morph");
+    let project = Project::new("式", graph.clone());
+    persistence::save(&path, &project).unwrap();
+    assert_eq!(persistence::load(&path).unwrap(), project);
+    // A broken formula marks only its own node, and editing the text recomputes it.
+    let cube = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+    graph.node_mut(formula).unwrap().script = "x +* 2".into();
+    let mut engine = Evaluator::default();
+    let result = engine.evaluate(&graph, &|| false);
+    assert!(result.outputs[&formula].is_err());
+    assert!(result.outputs[&cube].is_ok());
+    graph.node_mut(formula).unwrap().script = "x".into();
+    let result = engine.evaluate(&graph, &|| false);
+    assert_eq!(
+        numbers_of(result.outputs[&formula].as_ref().unwrap()),
+        [0., 1., 2., 3., 4.]
+    );
+}
+
+#[test]
+fn random_and_populate_are_deterministic_and_bounded() {
+    let random = |seed: f64| {
+        eval_numbers(
+            NodeKind::Random,
+            &[("count", 200.), ("min", -5.), ("max", 5.), ("seed", seed)],
+        )
+        .unwrap()
+    };
+    let a = random(1.);
+    assert_eq!(a.len(), 200);
+    assert_eq!(a, random(1.));
+    assert_ne!(a, random(2.));
+    assert!(a.iter().all(|v| (-5. ..5.).contains(v)));
+    assert!(eval_numbers(NodeKind::Random, &[("count", 513.)]).is_err());
+    assert!(eval_numbers(NodeKind::Random, &[("min", f64::NAN)]).is_err());
+
+    let mut graph = Graph::default();
+    let id = graph.add(NodeKind::Populate, [0., 0.]).unwrap();
+    set(
+        &mut graph,
+        id,
+        &[
+            ("count", 100.),
+            ("width", 40.),
+            ("depth", 20.),
+            ("height", 10.),
+        ],
+    );
+    let tree = evaluate_one(&graph, id).unwrap();
+    let points: Vec<_> = tree.branches.values().flatten().collect();
+    assert_eq!(points.len(), 100);
+    for p in points {
+        let Value::Point(p) = p else {
+            panic!("point expected")
+        };
+        assert!(p[0].abs() <= 20. && p[1].abs() <= 10. && (0. ..=10.).contains(&p[2]));
+    }
+    assert_eq!(evaluate_one(&graph, id).unwrap(), tree);
+    set(&mut graph, id, &[("width", -1.)]);
+    assert!(evaluate_one(&graph, id).is_err());
+}
+
+#[test]
+fn noise_is_smooth_deterministic_and_finite_at_extremes() {
+    let noise = |params: &[(&str, f64)]| eval_numbers(NodeKind::Noise, params).unwrap()[0];
+    let a = noise(&[("x", 3.3), ("y", -1.2), ("z", 7.), ("amp", 5.)]);
+    assert_eq!(a, noise(&[("x", 3.3), ("y", -1.2), ("z", 7.), ("amp", 5.)]));
+    assert!(a.abs() <= 5.);
+    let b = noise(&[("x", 3.31), ("y", -1.2), ("z", 7.), ("amp", 5.)]);
+    assert!((a - b).abs() < 0.1, "noise should change smoothly");
+    for x in [-1e5, -0.5, 0., 1e-9, 99_999.9, 1e5] {
+        let v = noise(&[("x", x), ("y", x), ("z", -x), ("size", 0.1), ("amp", 1e4)]);
+        assert!(v.is_finite() && v.abs() <= 1e4);
+    }
+    assert!(eval_numbers(NodeKind::Noise, &[("size", 0.)]).is_err());
+    assert!(eval_numbers(NodeKind::Noise, &[("x", f64::INFINITY)]).is_err());
+    for (x, y) in [(0., 0.), (1., 1.), (2., -3.)] {
+        // On the integer lattice gradient noise is exactly zero.
+        let v = noise(&[("x", x * 20.), ("y", y * 20.), ("z", 0.), ("amp", 1.)]);
+        assert!(v.abs() < 1e-12);
+    }
+}
+
+#[test]
+fn noise_deform_keeps_a_vase_closed() {
+    let mut graph = Graph::default();
+    let vase = graph.add(NodeKind::Vase, [0., 0.]).unwrap();
+    for mode in [0., 1., 2.] {
+        let id = graph.add(NodeKind::NoiseDeform, [0., 0.]).unwrap();
+        set(&mut graph, id, &[("mode", mode), ("amp", 1.)]);
+        graph.connect(vase, id, "geometry").unwrap();
+        let report = first_mesh_stats(&graph, id);
+        assert!(report.is_closed(), "mode {mode}: {report:?}");
+        assert!(report.signed_volume_mm3 > 0.);
+    }
+}
+
+#[test]
+fn graph_profile_shell_makes_a_closed_outward_printable_wall() {
+    let mut graph = Graph::default();
+    let radii = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    set(
+        &mut graph,
+        radii,
+        &[("start", 20.), ("step", 4.), ("count", 5.)],
+    );
+    let body = graph.add(NodeKind::GraphProfile, [0., 0.]).unwrap();
+    graph.connect(radii, body, "radii").unwrap();
+    let open = first_mesh_stats(&graph, body);
+    assert_eq!(open.open_edges, 64, "only the top rim is open: {open:?}");
+    assert_eq!(open.inconsistent_edges + open.non_manifold_edges, 0);
+    let shell = graph.add(NodeKind::Shell, [0., 0.]).unwrap();
+    graph.connect(body, shell, "geometry").unwrap();
+    let solid = first_mesh_stats(&graph, shell);
+    assert!(solid.is_closed(), "{solid:?}");
+    assert!(solid.signed_volume_mm3 > 0., "{solid:?}");
+    // The wall is thin compared with the filled cup.
+    set(&mut graph, body, &[("top", 1.)]);
+    let cup = first_mesh_stats(&graph, body);
+    assert!(cup.is_closed(), "{cup:?}");
+    set(&mut graph, body, &[("top", 0.)]);
+    assert!(solid.signed_volume_mm3 < cup.signed_volume_mm3 * 0.4);
+    // Twisting and noise first, as in the example, still gives a closed wall.
+    let noise = graph.add(NodeKind::NoiseDeform, [0., 0.]).unwrap();
+    graph.connect(body, noise, "geometry").unwrap();
+    let twist = graph.add(NodeKind::Twist, [0., 0.]).unwrap();
+    graph.connect(noise, twist, "geometry").unwrap();
+    let wall = graph.add(NodeKind::Shell, [0., 0.]).unwrap();
+    graph.connect(twist, wall, "geometry").unwrap();
+    let report = first_mesh_stats(&graph, wall);
+    assert!(
+        report.is_closed() && report.signed_volume_mm3 > 0.,
+        "{report:?}"
+    );
+    // Too thick for the shape is an error, not a folded mesh.
+    set(&mut graph, shell, &[("thickness", 50.)]);
+    assert!(evaluate_one(&graph, shell).is_err());
+    // A radius list that dips below 0.5 mm is refused.
+    set(
+        &mut graph,
+        radii,
+        &[("start", 40.), ("step", -10.), ("count", 5.)],
+    );
+    assert!(evaluate_one(&graph, body).is_err());
+}
+
+#[test]
+fn shell_of_a_box_has_the_exact_hollow_volume() {
+    let mut graph = Graph::default();
+    let cube = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+    let shell = graph.add(NodeKind::Shell, [0., 0.]).unwrap();
+    graph.connect(cube, shell, "geometry").unwrap();
+    let report = first_mesh_stats(&graph, shell);
+    assert!(report.is_closed(), "{report:?}");
+    let expected = 40f64.powi(3) - 36f64.powi(3);
+    assert!(
+        (report.signed_volume_mm3 - expected).abs() < 1e-6,
+        "{report:?}"
+    );
+    // An open plane becomes a closed slab.
+    let plane = graph.add(NodeKind::Plane, [0., 0.]).unwrap();
+    let slab = graph.add(NodeKind::Shell, [0., 0.]).unwrap();
+    graph.connect(plane, slab, "geometry").unwrap();
+    let report = first_mesh_stats(&graph, slab);
+    assert!(report.is_closed(), "{report:?}");
+    assert!((report.signed_volume_mm3 - 100. * 100. * 2.).abs() < 1e-6);
+}
+
+#[test]
+fn overhang_check_reports_flat_downward_faces() {
+    let check = |kind: NodeKind, angle: f64| {
+        let mut graph = Graph::default();
+        let shape = graph.add(kind, [0., 0.]).unwrap();
+        let id = graph.add(NodeKind::OverhangCheck, [0., 0.]).unwrap();
+        set(&mut graph, id, &[("angle", angle)]);
+        graph.connect(shape, id, "geometry").unwrap();
+        numbers_of(&evaluate_one(&graph, id).unwrap())
+    };
+    // A box only has vertical walls and a bottom on the plate.
+    assert_eq!(check(NodeKind::Box, 45.), [0., 0., 0.]);
+    // The lower half of a sphere overhangs.
+    let sphere = check(NodeKind::Sphere, 45.);
+    assert_eq!(sphere.len(), 3);
+    assert!(sphere[0] > 5. && sphere[0] < 50., "{sphere:?}");
+    assert!(sphere[1] > 0.);
+    assert!(sphere[2] > 45. && sphere[2] <= 90.);
+    let lenient = check(NodeKind::Sphere, 80.);
+    assert!(lenient[0] < sphere[0]);
+}
+
+#[test]
+fn distance_and_point_component() {
+    let mut graph = Graph::default();
+    let a = graph.add(NodeKind::Point, [0., 0.]).unwrap();
+    set(&mut graph, a, &[("x", 3.), ("y", 4.), ("z", 0.)]);
+    let b = graph.add(NodeKind::Point, [0., 0.]).unwrap();
+    let d = graph.add(NodeKind::Distance, [0., 0.]).unwrap();
+    graph.connect(a, d, "a").unwrap();
+    graph.connect(b, d, "b").unwrap();
+    let c = graph.add(NodeKind::PointComponent, [0., 0.]).unwrap();
+    set(&mut graph, c, &[("axis", 1.)]);
+    graph.connect(a, c, "point").unwrap();
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(numbers_of(result.outputs[&d].as_ref().unwrap()), [5.]);
+    assert_eq!(numbers_of(result.outputs[&c].as_ref().unwrap()), [4.]);
+    // A number cannot be wired into a point input.
+    let n = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+    assert!(graph.connect(n, d, "a").is_err());
+}
+
+#[test]
+fn new_example_works_are_closed_and_use_the_new_nodes() {
+    for (index, needed) in [
+        (
+            8,
+            &[
+                NodeKind::GraphProfile,
+                NodeKind::NoiseDeform,
+                NodeKind::Twist,
+                NodeKind::Shell,
+                NodeKind::Expression,
+            ][..],
+        ),
+        (
+            9,
+            &[
+                NodeKind::Populate,
+                NodeKind::Distance,
+                NodeKind::Remap,
+                NodeKind::Cylinder,
+            ][..],
+        ),
+    ] {
+        let project = templates::create(index);
+        assert_eq!(project.name, templates::TEMPLATES[index].name);
+        let used: Vec<_> = project.graph.nodes.iter().map(|n| n.kind).collect();
+        for kind in needed {
+            assert!(used.contains(kind), "template {index} lacks {kind:?}");
+        }
+        let output = project
+            .graph
+            .nodes
+            .iter()
+            .find(|n| n.kind == NodeKind::Output)
+            .unwrap()
+            .id;
+        let report = first_mesh_stats(&project.graph, output);
+        assert!(report.is_closed(), "template {index}: {report:?}");
+        assert!(report.signed_volume_mm3 > 0.);
+    }
+    // The attractor example makes one column per random point.
+    let project = templates::create(9);
+    let output = project
+        .graph
+        .nodes
+        .iter()
+        .find(|n| n.kind == NodeKind::Output)
+        .unwrap()
+        .id;
+    assert_eq!(
+        evaluate_one(&project.graph, output).unwrap().item_count(),
+        60
+    );
+}
+
+#[test]
+fn hostile_settings_on_new_nodes_are_errors_not_panics() {
+    let samples = [
+        f64::NAN,
+        f64::INFINITY,
+        -f64::INFINITY,
+        -1e300,
+        1e300,
+        -1.,
+        0.,
+        0.5,
+    ];
+    let mut graph = Graph::default();
+    let series = graph.add(NodeKind::Series, [0., 0.]).unwrap();
+    let cube = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+    let points = graph.add(NodeKind::Populate, [0., 0.]).unwrap();
+    for (kind, _) in GH_KINDS {
+        for spec in kind.spec().inputs.iter().filter(|s| s.default.is_some()) {
+            for value in samples {
+                let mut g = graph.clone();
+                let id = g.add(kind, [0., 0.]).unwrap();
+                for input in kind.spec().inputs.iter().filter(|s| s.default.is_none()) {
+                    let from = match input.kind {
+                        morphlet::model::DataType::Point => points,
+                        morphlet::model::DataType::Mesh | morphlet::model::DataType::Geometry => {
+                            cube
+                        }
+                        _ => series,
+                    };
+                    g.connect(from, id, input.key).unwrap();
+                }
+                set(&mut g, id, &[(spec.key, value)]);
+                let result = Evaluator::default().evaluate(&g, &|| false);
+                if let Some(Ok(tree)) = result.outputs.get(&id) {
+                    for v in tree.branches.values().flatten() {
+                        if let Value::Number(n) = v {
+                            assert!(n.is_finite(), "{kind:?} {} = {value}", spec.key);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
