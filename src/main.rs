@@ -6,6 +6,7 @@ mod file_picker;
 mod help;
 mod script_ui;
 mod theme;
+mod ui_polish;
 mod viewport;
 
 use morphlet::{engine::Evaluator, model::NodeKind, persistence, templates};
