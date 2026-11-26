@@ -6,7 +6,10 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Bound visible rows separately from the raw directory scan. Unrelated files
+// must not exhaust the display budget before the extension filter runs.
 const DIRECTORY_LIMIT: usize = 2_000;
+const DIRECTORY_SCAN_LIMIT: usize = 10_000;
 const ACCENT: Color32 = Color32::from_rgb(28, 133, 116);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -271,7 +274,7 @@ impl FilePicker {
                 } else if self.truncated {
                     ui.label(
                         RichText::new(
-                            "項目が多いため先頭 2,000 件まで表示。場所欄へ直接入力できます。",
+                            "一覧を一部だけ表示しています（最大 2,000 件）。場所欄へ直接入力できます。",
                         )
                         .small()
                         .weak(),
@@ -560,7 +563,7 @@ fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), St
     let mut entries = Vec::new();
     let mut truncated = false;
     for (index, entry) in directory.enumerate() {
-        if index >= DIRECTORY_LIMIT {
+        if index >= DIRECTORY_SCAN_LIMIT {
             truncated = true;
             break;
         }
@@ -584,11 +587,124 @@ fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), St
             path,
             is_dir,
         });
+        // Periodically keep only the best visible entries. Peak storage is
+        // bounded by twice the display limit, even for dense directories.
+        if entries.len() >= 2 * DIRECTORY_LIMIT {
+            keep_best_entries(&mut entries);
+            truncated = true;
+        }
     }
-    entries.sort_by(|a, b| {
-        b.is_dir
-            .cmp(&a.is_dir)
-            .then_with(|| a.sort_key.cmp(&b.sort_key))
-    });
+    if entries.len() > DIRECTORY_LIMIT {
+        keep_best_entries(&mut entries);
+        truncated = true;
+    }
+    entries.sort_unstable_by(compare_entries);
     Ok((entries, truncated))
+}
+
+fn compare_entries(a: &Entry, b: &Entry) -> std::cmp::Ordering {
+    b.is_dir
+        .cmp(&a.is_dir)
+        .then_with(|| a.sort_key.cmp(&b.sort_key))
+        .then_with(|| a.name.cmp(&b.name))
+        .then_with(|| a.path.cmp(&b.path))
+}
+
+fn keep_best_entries(entries: &mut Vec<Entry>) {
+    if entries.len() > DIRECTORY_LIMIT {
+        entries.select_nth_unstable_by(DIRECTORY_LIMIT, compare_entries);
+        entries.truncate(DIRECTORY_LIMIT);
+    }
+}
+
+#[cfg(test)]
+mod directory_listing_tests {
+    use super::*;
+
+    fn entry(name: String, is_dir: bool) -> Entry {
+        Entry {
+            path: PathBuf::from(&name),
+            sort_key: name.to_lowercase(),
+            name,
+            is_dir,
+        }
+    }
+
+    #[test]
+    fn bounded_selection_matches_full_sort_in_either_input_order() {
+        let make_entries = || {
+            (0..4_501)
+                .map(|i| entry(format!("item{i:05}.morph"), i % 7 == 0))
+                .collect::<Vec<_>>()
+        };
+        let mut expected = make_entries();
+        expected.sort_unstable_by(compare_entries);
+        expected.truncate(DIRECTORY_LIMIT);
+        let expected: Vec<_> = expected.into_iter().map(|e| e.path).collect();
+
+        for reverse in [false, true] {
+            let mut input = make_entries();
+            if reverse {
+                input.reverse();
+            }
+            let mut retained = Vec::new();
+            for item in input {
+                retained.push(item);
+                if retained.len() >= 2 * DIRECTORY_LIMIT {
+                    keep_best_entries(&mut retained);
+                }
+            }
+            keep_best_entries(&mut retained);
+            retained.sort_unstable_by(compare_entries);
+            let paths: Vec<_> = retained.into_iter().map(|e| e.path).collect();
+            assert_eq!(paths, expected);
+        }
+    }
+
+    #[test]
+    fn sort_is_directory_first_and_breaks_case_ties() {
+        let mut entries = [
+            entry("a.morph".into(), false),
+            entry("A.morph".into(), false),
+            entry("zzz".into(), true),
+        ];
+        entries.sort_unstable_by(compare_entries);
+        assert_eq!(
+            entries.map(|e| e.name),
+            ["zzz".to_string(), "A.morph".to_string(), "a.morph".to_string()]
+        );
+    }
+
+    struct TempDirectory(PathBuf);
+
+    impl Drop for TempDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn unrelated_files_do_not_consume_the_display_limit() {
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "nodes-picker-{}-{id}",
+            std::process::id()
+        ));
+        fs::create_dir(&path).unwrap();
+        let directory = TempDirectory(path);
+        for i in 0..=DIRECTORY_LIMIT {
+            fs::File::create(directory.0.join(format!("ignored{i:05}.txt"))).unwrap();
+        }
+        fs::File::create(directory.0.join("project.MORPH")).unwrap();
+        fs::create_dir(directory.0.join("subdirectory")).unwrap();
+
+        let (entries, truncated) = read_directory(&directory.0, "morph").unwrap();
+        assert!(!truncated);
+        assert_eq!(entries.len(), 2);
+        assert!(entries[0].is_dir);
+        assert_eq!(entries[1].name, "project.MORPH");
+    }
 }
