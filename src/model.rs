@@ -831,6 +831,9 @@ pub struct Node {
     /// Definition id (`Graph::clusters`) of a `Cluster` node.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster: Option<u64>,
+    /// Disabled (bypassed) node: outputs an empty tree. Not written when `false`.
+    #[serde(default, skip_serializing_if = "crate::annotations::is_false")]
+    pub off: bool,
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -840,6 +843,11 @@ pub struct Graph {
     /// Cluster definitions stored inside the work (empty in old files).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub clusters: Vec<ClusterDef>,
+    /// Coloured groups and free notes on the canvas (see `annotations.rs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<crate::annotations::Group>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<crate::annotations::Note>,
 }
 impl Graph {
     pub fn add(&mut self, kind: NodeKind, position: [f32; 2]) -> Result<NodeId, String> {
@@ -871,6 +879,7 @@ impl Graph {
             preview: true,
             script: String::new(),
             cluster: None,
+            off: false,
         });
         self.next_id = next;
         Ok(id)
@@ -936,6 +945,7 @@ impl Graph {
     }
     pub fn validate(&self) -> Result<(), String> {
         self.topological_order()?;
+        crate::annotations::validate(self)?;
         crate::cluster::validate_graph(self)
     }
     pub fn topological_order(&self) -> Result<Vec<NodeId>, String> {

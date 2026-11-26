@@ -726,6 +726,7 @@ pub fn parse_part(bytes: &[u8]) -> Result<PartFile, String> {
         nodes: Vec::new(),
         next_id: 0,
         clusters: file.clusters.clone(),
+        ..Graph::default()
     };
     validate_graph(&check)?;
     Ok(file)
