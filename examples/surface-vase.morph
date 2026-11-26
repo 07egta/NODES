@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "name": "精密曲面：NURBS 回転花器",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "nurbs_vase",
+        "name": "NURBS 回転花器",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "radius": 20,
+          "middle": 35,
+          "top": 25,
+          "height": 85
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "surface_area",
+        "name": "曲面積",
+        "position": [
+          270,
+          30
+        ],
+        "params": {
+          "steps": 32
+        },
+        "inputs": {
+          "surface": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          520,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.9
+}

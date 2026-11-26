@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "精密曲面：制御パネル",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "nurbs_panel",
+        "name": "NURBS パネル",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 70,
+          "depth": 45,
+          "rise": 25
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "surface_normal_line",
+        "name": "法線",
+        "position": [
+          270,
+          30
+        ],
+        "params": {
+          "u": 0.3,
+          "v": 0.4,
+          "length": 18
+        },
+        "inputs": {
+          "surface": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          520,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.9
+}

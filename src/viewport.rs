@@ -809,6 +809,14 @@ impl Viewport {
                             m.vertices.len().hash(&mut hasher);
                             m.triangles.len().hash(&mut hasher);
                         }
+                        Value::Surface(s) => {
+                            4u8.hash(&mut hasher);
+                            (Arc::as_ptr(s.preview()) as usize).hash(&mut hasher);
+                        }
+                        Value::Solid(s) => {
+                            5u8.hash(&mut hasher);
+                            (Arc::as_ptr(s.preview()) as usize).hash(&mut hasher);
+                        }
                     }
                 }
             }
@@ -873,6 +881,14 @@ impl Viewport {
                         Value::Mesh(mesh) => {
                             add_mesh(&mut scene, mesh, item.node_id, item.selected);
                             scene.mesh_sources.push(Arc::clone(mesh));
+                        }
+                        Value::Surface(s) => {
+                            add_mesh(&mut scene, s.preview(), item.node_id, item.selected);
+                            scene.mesh_sources.push(Arc::clone(s.preview()));
+                        }
+                        Value::Solid(s) => {
+                            add_mesh(&mut scene, s.preview(), item.node_id, item.selected);
+                            scene.mesh_sources.push(Arc::clone(s.preview()));
                         }
                     }
                 }

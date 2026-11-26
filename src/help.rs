@@ -194,7 +194,7 @@ pub fn tip(kind: NodeKind) -> &'static str {
         .unwrap_or(FALLBACK_TIP)
 }
 
-const CATEGORY_ORDER: [&str; 7] = ["立体", "曲線", "変形", "配列", "数値", "データ", "出力"];
+const CATEGORY_ORDER: [&str; 8] = ["立体", "精密曲面", "曲線", "変形", "配列", "数値", "データ", "出力"];
 
 fn type_hint(kind: DataType) -> &'static str {
     match kind {
@@ -204,6 +204,9 @@ fn type_hint(kind: DataType) -> &'static str {
         DataType::Mesh => "メッシュ",
         DataType::Geometry => "形状（点・曲線・メッシュ）",
         DataType::Any => "なんでも",
+        DataType::Surface => "数学曲面（メッシュとは別）",
+        DataType::Solid => "閉じたB-rep立体",
+        DataType::DisplayGeometry => "表示可能な形状（出力）",
     }
 }
 

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "name": "らせん階段",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "踏板",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 24,
+          "depth": 11,
+          "height": 2
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "move",
+        "name": "中心からの距離",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "x": 24
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "series",
+        "name": "回転角の数列",
+        "position": [
+          20,
+          420
+        ],
+        "params": {
+          "start": 0,
+          "step": 22.5,
+          "count": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "series",
+        "name": "高さの数列",
+        "position": [
+          20,
+          810
+        ],
+        "params": {
+          "start": 0,
+          "step": 4,
+          "count": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "rotate",
+        "name": "各段の角度",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "axis": 2
+        },
+        "inputs": {
+          "geometry": 1,
+          "angle": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "move",
+        "name": "各段の高さ",
+        "position": [
+          800,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 4,
+          "z": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 7
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

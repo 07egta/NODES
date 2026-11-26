@@ -1,6 +1,6 @@
 # NODES autonomous integration status
 
-- Updated: 2026-11-26T12:21:27.559242+00:00
+- Updated: 2026-11-26T12:28:01.763065+00:00
 - Branch: `develop/nodes-ultimate`
 - Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`
 - Main inspected at `79f32745923adfa9e3de05ef4683b6e3b5f4948f` and is not modified.
@@ -22,9 +22,9 @@
 
 ## Counts and verification
 
-- Registered baseline node kinds: 63 (registry audit still to be run here).
+- Registered baseline node kinds: 64. Integrated registry includes mathematics, data trees, generation, mesh and exact geometry; pending compiled inventory export.
 - Verified node count: not established. Registration count is not a compatibility count.
-- Latest local tests: not run yet; no pass claim.
+- Latest local tests: Data Tree isolated branch passed 182 tests; integrated branch compilation is pending. Extra hardening tests are queued. No integrated pass claim yet.
 - Windows CI baseline: prior run reported successful; new integration requires its own run.
 - GUI execution: not yet attempted.
 
@@ -57,4 +57,12 @@ cargo build --release --locked --bin Morphlet
 ## Related pull requests
 
 - #1 core integration, #2 mathematics, #3 interface, #4 Data Tree, #5 generative design.
-- Integration draft PR: pending first checkpoint commit.
+- Integration draft PR: https://github.com/07egta/NODES/pull/11
+
+## Integration checkpoint (WIP)
+
+Merged core 86aa816, Data Tree a44dead (+ public-adapter hardening), math 55ed4f5, generation b710702, mesh 2561ca8, UI ec814d9, GHX/API 63b8632, curve 6054b59 + surface 2626b8c (+ exact extrusion/iso integration), and audit 7884304 (+ metadata hardening). Original mission histories are preserved as merge parents at remote checkpoints.
+
+Resolved duplicated ClosestPoint enum registration. Pending: preserve both mission port-name conventions, then compile the combined runtime and fix any non-exhaustive geometry matches. Initial independent Data Tree suite passed 182 tests. Shared Cargo target now reduces redundant compilation memory.
+
+Git CLI push lacks write credentials. Checkpoint publication uses authenticated GitHub tree/commit/ref APIs with expected old SHA and force=false, then fetches the remote commit and aligns only this local integration branch. No external developer branch is rewritten.

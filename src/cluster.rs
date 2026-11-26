@@ -86,7 +86,7 @@ pub struct ClusterDef {
 /// Extra cache-key text: script source, or a fingerprint of the definitions a cluster uses.
 pub fn key_extra(graph: &Graph, node: &Node) -> String {
     match node.kind {
-        NodeKind::Script | NodeKind::Expression => node.script.clone(),
+        NodeKind::Script | NodeKind::Expression | NodeKind::PathMapper => node.script.clone(),
         // Path, modified time and size: editing the file on disk recomputes the node.
         NodeKind::ImportMesh => crate::import::source_key(&node.script),
         NodeKind::Cluster => node

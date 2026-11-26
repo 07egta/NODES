@@ -7,12 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 // Light-theme values. Files that do not read the mode (and the light branch of the
 // `pick` helpers below) use these directly.
 pub const INK: Color32 = Color32::from_rgb(35, 52, 57);
-pub const MUTED: Color32 = Color32::from_rgb(112, 129, 131);
-pub const TEAL: Color32 = Color32::from_rgb(28, 133, 116);
+pub const MUTED: Color32 = Color32::from_rgb(83, 99, 104);
+pub const TEAL: Color32 = Color32::from_rgb(21, 108, 94);
 pub const TEAL_PALE: Color32 = Color32::from_rgb(220, 239, 231);
 pub const LINE: Color32 = Color32::from_rgb(220, 226, 222);
-pub const CANVAS: Color32 = Color32::from_rgb(245, 246, 241);
-pub const ERROR: Color32 = Color32::from_rgb(184, 75, 66);
+pub const CANVAS: Color32 = Color32::from_rgb(240, 243, 245);
+pub const ERROR: Color32 = Color32::from_rgb(159, 52, 49);
 
 /// Dark is the default. Set from the saved setting at start-up and by the topbar toggle.
 static DARK: AtomicBool = AtomicBool::new(true);
@@ -97,6 +97,9 @@ pub fn wire_idle() -> Color32 {
         Color32::from_rgb(108, 136, 126),
     )
 }
+pub fn error() -> Color32 {
+    pick(ERROR, Color32::from_rgb(255, 153, 143))
+}
 pub fn error_fill() -> Color32 {
     pick(
         Color32::from_rgb(252, 231, 224),
@@ -167,9 +170,9 @@ pub fn apply_style(ctx: &egui::Context) {
     style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(6);
     style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
     style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(6);
-    style.spacing.item_spacing = egui::vec2(8.0, 8.0);
-    style.spacing.button_padding = egui::vec2(12.0, 7.0);
-    style.spacing.interact_size.y = 28.0;
+    style.spacing.item_spacing = egui::vec2(7.0, 6.0);
+    style.spacing.button_padding = egui::vec2(9.0, 5.0);
+    style.spacing.interact_size.y = 26.0;
     style.spacing.slider_width = 130.0;
     style
         .text_styles
@@ -192,15 +195,34 @@ pub fn small(text: impl Into<String>) -> RichText {
 
 /// Category colour, used for the card header tint, the pill and the library labels.
 pub fn category_color(category: &str) -> Color32 {
-    match category {
-        "数値" => Color32::from_rgb(176, 128, 52),
-        "曲線" => Color32::from_rgb(88, 142, 200),
-        "立体" => Color32::from_rgb(34, 150, 128),
-        "変形" => Color32::from_rgb(146, 116, 196),
-        "配列" => Color32::from_rgb(208, 128, 92),
-        "データ" => Color32::from_rgb(120, 138, 160),
-        _ => Color32::from_rgb(66, 140, 120),
-    }
+    let (light, dark) = match category {
+        "数値" => ((138, 91, 25), (226, 176, 91)),
+        "曲線" => ((40, 99, 166), (124, 185, 247)),
+        "精密曲面" => ((30, 106, 137), (113, 198, 230)),
+        "立体" => ((16, 113, 94), (92, 204, 173)),
+        "変形" => ((112, 73, 166), (195, 157, 244)),
+        "配列" => ((155, 83, 47), (246, 163, 116)),
+        "データ" => ((75, 96, 127), (166, 187, 216)),
+        _ => ((45, 104, 94), (133, 201, 184)),
+    };
+    pick(Color32::from_rgb(light.0, light.1, light.2), Color32::from_rgb(dark.0, dark.1, dark.2))
+}
+
+/// Port colors describe the data type, not the component category. The tooltip also
+/// spells the type out, so connections never rely on color alone.
+pub fn port_color(kind: morphlet::model::DataType) -> Color32 {
+    use morphlet::model::DataType::*;
+    let (light, dark) = match kind {
+        Number => ((149, 95, 26), (239, 186, 95)),
+        Point => ((158, 61, 112), (242, 154, 203)),
+        Curve => ((39, 99, 174), (135, 189, 255)),
+        Surface => ((30, 106, 137), (113, 198, 230)),
+        Solid => ((73, 99, 132), (155, 188, 227)),
+        Mesh => ((18, 112, 95), (93, 212, 177)),
+        Geometry | DisplayGeometry => ((109, 70, 161), (194, 159, 250)),
+        Any => ((82, 98, 113), (170, 187, 203)),
+    };
+    pick(Color32::from_rgb(light.0, light.1, light.2), Color32::from_rgb(dark.0, dark.1, dark.2))
 }
 
 pub fn pill(ui: &mut egui::Ui, text: &str, color: Color32) {

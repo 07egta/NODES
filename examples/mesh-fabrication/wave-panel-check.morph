@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "name": "波打つパネル・診断",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "箱",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "depth": 32,
+          "height": 14,
+          "width": 18
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "linear_array",
+        "name": "直線配列",
+        "position": [
+          290,
+          30
+        ],
+        "params": {
+          "count": 8,
+          "x": 26,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "wave",
+        "name": "波打つ",
+        "position": [
+          20,
+          340
+        ],
+        "params": {
+          "amplitude": 20,
+          "phase": 0,
+          "wavelength": 170
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          290,
+          385
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "mesh_audit",
+        "name": "健全性",
+        "position": [
+          550,
+          485
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 2
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1.1
+}

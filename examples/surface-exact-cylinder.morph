@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "name": "精密円から作る円筒と等弧長パターン",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "circle",
+        "name": "精密円",
+        "position": [
+          20,
+          60
+        ],
+        "params": {
+          "radius": 24,
+          "segments": 8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "surface_extrude",
+        "name": "精密円筒曲面",
+        "position": [
+          280,
+          60
+        ],
+        "params": {
+          "height": 65
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "surface_iso_curve",
+        "name": "精密断面",
+        "position": [
+          540,
+          60
+        ],
+        "params": {
+          "axis": 1,
+          "t": 0.6,
+          "steps": 8
+        },
+        "inputs": {
+          "surface": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "curve_divide",
+        "name": "等弧長の点",
+        "position": [
+          800,
+          60
+        ],
+        "params": {
+          "count": 16
+        },
+        "inputs": {
+          "curve": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "curve_length",
+        "name": "断面の周長",
+        "position": [
+          800,
+          300
+        ],
+        "params": {},
+        "inputs": {
+          "curve": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "surface_mesh",
+        "name": "明示的メッシュ変換",
+        "position": [
+          540,
+          360
+        ],
+        "params": {
+          "u_steps": 64,
+          "v_steps": 12
+        },
+        "inputs": {
+          "surface": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "output",
+        "name": "円筒曲面の表示",
+        "position": [
+          800,
+          520
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 7
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

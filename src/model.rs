@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 pub type NodeId = u64;
 pub const MAX_NODES: usize = 2_048;
-pub const MAX_ITEMS: usize = 8_192;
+pub const MAX_ITEMS: usize = 16_384;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;
 pub const MAX_TOTAL_WEIGHT: usize = 3_000_000;
@@ -19,6 +19,9 @@ pub enum DataType {
     Mesh,
     Geometry,
     Any,
+    Surface,
+    Solid,
+    DisplayGeometry,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
@@ -29,6 +32,9 @@ impl DataType {
             Self::Mesh => "メッシュ",
             Self::Geometry => "形状",
             Self::Any => "データ",
+            Self::Surface => "数学曲面",
+            Self::Solid => "B-rep 立体",
+            Self::DisplayGeometry => "表示形状",
         }
     }
     pub fn accepts(self, source: Self) -> bool {
@@ -37,6 +43,8 @@ impl DataType {
             || self == source
             || (self == Self::Geometry && matches!(source, Self::Point | Self::Curve | Self::Mesh))
             || (source == Self::Geometry && matches!(self, Self::Point | Self::Curve | Self::Mesh))
+            || (self == Self::DisplayGeometry && matches!(source, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
+            || (source == Self::DisplayGeometry && matches!(self, Self::Geometry | Self::Point | Self::Curve | Self::Mesh | Self::Surface | Self::Solid))
     }
 }
 
@@ -184,6 +192,242 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    SimplifyTree,
+    TrimTree,
+    PruneTree,
+    MergeTree,
+    EntwineTree,
+    FlipMatrix,
+    UnflattenTree,
+    PathMapper,
+    PartitionList,
+    TreeBranch,
+    TreeItem,
+    TreeStatistics,
+    CullNth,
+    CullIndex,
+    DuplicateData,
+    RepeatData,
+    MassAddition,
+    MassMultiplication,
+    ReplaceItems,
+    InsertItems,
+    MemberIndex,
+    RandomReduce,
+    Jitter,
+    // Mathematics mission: appended to preserve existing serialized node identities.
+    Negate,
+    Round,
+    Floor,
+    Ceiling,
+    Exponential,
+    Sinh,
+    Cosh,
+    Tanh,
+    Degrees,
+    Radians,
+    Asin,
+    Acos,
+    Atan,
+    SinRadians,
+    CosRadians,
+    TanRadians,
+    Atan2,
+    Root,
+    Logarithm,
+    Factorial,
+    Clamp,
+    Summation,
+    Product,
+    Average,
+    Median,
+    Variance,
+    StdDeviation,
+    GhRange,
+    ConstructDomain,
+    DomainEndpoint,
+    DomainLength,
+    EvaluateDomain,
+    DivideDomain,
+    DomainIntersection,
+    DomainUnion,
+    GraphMapper,
+    BoolAnd,
+    BoolOr,
+    BoolXor,
+    BoolNot,
+    Equals,
+    LargerThan,
+    SmallerThan,
+    SetContains,
+    SetUnion,
+    SetIntersection,
+    SetDifference,
+    CreateSet,
+    DuplicateDetection,
+    ConstructVector,
+    VectorComponent,
+    UnitX,
+    UnitY,
+    UnitZ,
+    VectorLength,
+    Unitize,
+    ReverseVector,
+    DotProduct,
+    CrossProduct,
+    VectorAngle,
+    VectorAddition,
+    VectorSubtraction,
+    VectorProjection,
+    VectorBetweenPoints,
+    RotateVector,
+    ClosestPoint,
+    PlaneProject,
+    PlaneCoordinates,
+    PlanePoint,
+    PointInPlane,
+    PlaneNormal3Pt,
+    RandomNormal,
+    VectorMultiply,
+    VectorDivide,
+    VectorAmplitude,
+    Lerp,
+    SmoothStep,
+    BezierValue,
+    NormalPdf,
+    MatrixTranspose,
+    MatrixMultiply,
+    MatrixInverse,
+    LinearSolve,
+    FourierMagnitude,
+    PlaneIntersectionPoint,
+    PlaneIntersectionDirection,
+    PlaneRotateAxis,
+    PlaneAlignAxis,
+    WorldPlaneAxis,
+    ChangeBasis,
+    // Procedural design (append-only serialized kinds).
+    RectGrid,
+    TriangularGrid,
+    HexGrid,
+    RadialGrid,
+    HexPanels,
+    TriPanels,
+    Voronoi2d,
+    ConvexHull2d,
+    MultiAttractor,
+    CurveAttractor,
+    GridArray,
+    PointArray,
+    Rotate3d,
+    Shear,
+    Taper,
+    FractalTree,
+    CylinderWrap,
+    Delaunay2d,
+    PopulateMesh,
+    CurveArray,
+    NoiseField,
+    LifeGrid,
+    // Mesh and fabrication nodes; append-only serialized identifiers.
+    MeshArea,
+    MeshVolume,
+    MeshCenter,
+    MeshDimensions,
+    MeshMass,
+    MeshAudit,
+    MeshVertices,
+    MeshFaces,
+    MeshNormals,
+    MeshEdges,
+    MeshBoundary,
+    MeshClosest,
+    MeshFlip,
+    MeshWeldExact,
+    MeshUnweld,
+    MeshUnify,
+    MeshSmooth,
+    MeshSubdivide,
+    MeshCatmullClark,
+    MeshOnBed,
+    MeshDeleteFace,
+    MeshConstruct,
+    MeshSelfContact,
+    MeshThicknessSample,
+    MeshCompact,
+    MeshNonManifold,
+    // Mathematical curve nodes: appended to preserve legacy serde names.
+    CurveLine,
+    CurveLineSdl,
+    CurvePolyline,
+    CurveCircleCnr,
+    CurveCircleThree,
+    CurveArc,
+    CurveArcThree,
+    CurveEllipse,
+    CurveSpiral,
+    CurveBezier,
+    CurveNurbs,
+    CurveWeightedNurbs,
+    CurveInterpolate,
+    CurveLength,
+    CurveEvaluate,
+    CurveEvaluateLength,
+    CurveClosestParameter,
+    CurveClosestPoint,
+    CurveStart,
+    CurveEnd,
+    CurveMiddle,
+    CurveTangent,
+    CurveCurvature,
+    CurveDomain,
+    CurveClosed,
+    CurveDivide,
+    CurveDivideLength,
+    CurveSubcurve,
+    CurveShatter,
+    CurveReverse,
+    CurveControls,
+    CurveWeights,
+    CurveKnots,
+    CurveDegree,
+    CurveInsertKnot,
+    CurveOffsetPreview,
+    CurveFrameX,
+    CurveFrameY,
+    CurveLineLine,
+    CurveLinePlane,
+    // Mathematical geometry, appended for stable old node ordering and names.
+    PlaneSurface,
+    NurbsPanel,
+    BilinearSurface,
+    CylinderSurface,
+    FrustumSurface,
+    SphereSurface,
+    TorusSurface,
+    EvaluateSurface,
+    SurfaceDirection,
+    SurfaceNormalLine,
+    SurfaceArea,
+    SurfaceClosestPoint,
+    SurfaceIsoCurve,
+    DivideSurface,
+    SurfaceMesh,
+    BrepBox,
+    BrepVolume,
+    BrepArea,
+    BrepIntersection,
+    BrepMove,
+    BrepFaces,
+    BrepEdges,
+    BrepVertices,
+    BrepMesh,
+    NurbsVase,
+    RuledSurface,
+    SurfaceExtrude,
+    BrepUnion,
+    BrepDifference,
+    BrepOffset,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +497,237 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::SimplifyTree,
+            Self::TrimTree,
+            Self::PruneTree,
+            Self::MergeTree,
+            Self::EntwineTree,
+            Self::FlipMatrix,
+            Self::UnflattenTree,
+            Self::PathMapper,
+            Self::PartitionList,
+            Self::TreeBranch,
+            Self::TreeItem,
+            Self::TreeStatistics,
+            Self::CullNth,
+            Self::CullIndex,
+            Self::DuplicateData,
+            Self::RepeatData,
+            Self::MassAddition,
+            Self::MassMultiplication,
+            Self::ReplaceItems,
+            Self::InsertItems,
+            Self::MemberIndex,
+            Self::RandomReduce,
+            Self::Jitter,
+            Self::Negate,
+            Self::Round,
+            Self::Floor,
+            Self::Ceiling,
+            Self::Exponential,
+            Self::Sinh,
+            Self::Cosh,
+            Self::Tanh,
+            Self::Degrees,
+            Self::Radians,
+            Self::Asin,
+            Self::Acos,
+            Self::Atan,
+            Self::SinRadians,
+            Self::CosRadians,
+            Self::TanRadians,
+            Self::Atan2,
+            Self::Root,
+            Self::Logarithm,
+            Self::Factorial,
+            Self::Clamp,
+            Self::Summation,
+            Self::Product,
+            Self::Average,
+            Self::Median,
+            Self::Variance,
+            Self::StdDeviation,
+            Self::GhRange,
+            Self::ConstructDomain,
+            Self::DomainEndpoint,
+            Self::DomainLength,
+            Self::EvaluateDomain,
+            Self::DivideDomain,
+            Self::DomainIntersection,
+            Self::DomainUnion,
+            Self::GraphMapper,
+            Self::BoolAnd,
+            Self::BoolOr,
+            Self::BoolXor,
+            Self::BoolNot,
+            Self::Equals,
+            Self::LargerThan,
+            Self::SmallerThan,
+            Self::SetContains,
+            Self::SetUnion,
+            Self::SetIntersection,
+            Self::SetDifference,
+            Self::CreateSet,
+            Self::DuplicateDetection,
+            Self::ConstructVector,
+            Self::VectorComponent,
+            Self::UnitX,
+            Self::UnitY,
+            Self::UnitZ,
+            Self::VectorLength,
+            Self::Unitize,
+            Self::ReverseVector,
+            Self::DotProduct,
+            Self::CrossProduct,
+            Self::VectorAngle,
+            Self::VectorAddition,
+            Self::VectorSubtraction,
+            Self::VectorProjection,
+            Self::VectorBetweenPoints,
+            Self::RotateVector,
+            Self::ClosestPoint,
+            Self::PlaneProject,
+            Self::PlaneCoordinates,
+            Self::PlanePoint,
+            Self::PointInPlane,
+            Self::PlaneNormal3Pt,
+            Self::RandomNormal,
+            Self::VectorMultiply,
+            Self::VectorDivide,
+            Self::VectorAmplitude,
+            Self::Lerp,
+            Self::SmoothStep,
+            Self::BezierValue,
+            Self::NormalPdf,
+            Self::MatrixTranspose,
+            Self::MatrixMultiply,
+            Self::MatrixInverse,
+            Self::LinearSolve,
+            Self::FourierMagnitude,
+            Self::PlaneIntersectionPoint,
+            Self::PlaneIntersectionDirection,
+            Self::PlaneRotateAxis,
+            Self::PlaneAlignAxis,
+            Self::WorldPlaneAxis,
+            Self::ChangeBasis,
+            Self::RectGrid,
+            Self::TriangularGrid,
+            Self::HexGrid,
+            Self::RadialGrid,
+            Self::HexPanels,
+            Self::TriPanels,
+            Self::Voronoi2d,
+            Self::ConvexHull2d,
+            Self::MultiAttractor,
+            Self::CurveAttractor,
+            Self::GridArray,
+            Self::PointArray,
+            Self::Rotate3d,
+            Self::Shear,
+            Self::Taper,
+            Self::FractalTree,
+            Self::CylinderWrap,
+            Self::Delaunay2d,
+            Self::PopulateMesh,
+            Self::CurveArray,
+            Self::NoiseField,
+            Self::LifeGrid,
+            Self::MeshArea,
+            Self::MeshVolume,
+            Self::MeshCenter,
+            Self::MeshDimensions,
+            Self::MeshMass,
+            Self::MeshAudit,
+            Self::MeshVertices,
+            Self::MeshFaces,
+            Self::MeshNormals,
+            Self::MeshEdges,
+            Self::MeshBoundary,
+            Self::MeshClosest,
+            Self::MeshFlip,
+            Self::MeshWeldExact,
+            Self::MeshUnweld,
+            Self::MeshUnify,
+            Self::MeshSmooth,
+            Self::MeshSubdivide,
+            Self::MeshCatmullClark,
+            Self::MeshOnBed,
+            Self::MeshDeleteFace,
+            Self::MeshConstruct,
+            Self::MeshSelfContact,
+            Self::MeshThicknessSample,
+            Self::MeshCompact,
+            Self::MeshNonManifold,
+            Self::CurveLine,
+            Self::CurveLineSdl,
+            Self::CurvePolyline,
+            Self::CurveCircleCnr,
+            Self::CurveCircleThree,
+            Self::CurveArc,
+            Self::CurveArcThree,
+            Self::CurveEllipse,
+            Self::CurveSpiral,
+            Self::CurveBezier,
+            Self::CurveNurbs,
+            Self::CurveWeightedNurbs,
+            Self::CurveInterpolate,
+            Self::CurveLength,
+            Self::CurveEvaluate,
+            Self::CurveEvaluateLength,
+            Self::CurveClosestParameter,
+            Self::CurveClosestPoint,
+            Self::CurveStart,
+            Self::CurveEnd,
+            Self::CurveMiddle,
+            Self::CurveTangent,
+            Self::CurveCurvature,
+            Self::CurveDomain,
+            Self::CurveClosed,
+            Self::CurveDivide,
+            Self::CurveDivideLength,
+            Self::CurveSubcurve,
+            Self::CurveShatter,
+            Self::CurveReverse,
+            Self::CurveControls,
+            Self::CurveWeights,
+            Self::CurveKnots,
+            Self::CurveDegree,
+            Self::CurveInsertKnot,
+            Self::CurveOffsetPreview,
+            Self::CurveFrameX,
+            Self::CurveFrameY,
+            Self::CurveLineLine,
+            Self::CurveLinePlane,
+            Self::PlaneSurface,
+            Self::NurbsPanel,
+            Self::BilinearSurface,
+            Self::CylinderSurface,
+            Self::FrustumSurface,
+            Self::SphereSurface,
+            Self::TorusSurface,
+            Self::EvaluateSurface,
+            Self::SurfaceDirection,
+            Self::SurfaceNormalLine,
+            Self::SurfaceArea,
+            Self::SurfaceClosestPoint,
+            Self::SurfaceIsoCurve,
+            Self::DivideSurface,
+            Self::SurfaceMesh,
+            Self::BrepBox,
+            Self::BrepVolume,
+            Self::BrepArea,
+            Self::BrepIntersection,
+            Self::BrepMove,
+            Self::BrepFaces,
+            Self::BrepEdges,
+            Self::BrepVertices,
+            Self::BrepMesh,
+            Self::NurbsVase,
+            Self::RuledSurface,
+            Self::SurfaceExtrude,
+            Self::BrepUnion,
+            Self::BrepDifference,
+            Self::BrepOffset,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -456,7 +931,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "円",
                     category: "曲線",
-                    description: "XY 平面に閉じた円の点列を作ります。分割数で滑らかさを調整。",
+                    description: "XY 平面に正確な有理円を作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "circle ring 丸 輪",
                     inputs: &[
                         n("radius", "半径", 30., 0.1, 1000., 0.5),
@@ -513,7 +988,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "らせん",
                     category: "曲線",
-                    description: "Z 軸を中心に上昇するらせん状の点列を作ります。",
+                    description: "Z 軸を中心に上昇する解析的ならせんを作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "helix spiral 螺旋 バネ スパイラル",
                     inputs: &[
                         n("radius", "半径", 25., 0.1, 1000., 0.5),
@@ -856,14 +1331,45 @@ impl NodeKind {
                     category: "出力",
                     description: "完成した形状を表示・書き出しの対象にします。",
                     keywords: "output preview export 出力 完成 表示 STL",
-                    inputs: &[g("geometry", "形状", DataType::Geometry)],
-                    output: DataType::Geometry,
+                    inputs: &[g("geometry", "形状", DataType::DisplayGeometry)],
+                    output: DataType::DisplayGeometry,
                 };
                 &SPEC
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
-            other => crate::gh_nodes::spec(other),
+            other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
+            other if crate::surface_nodes::KINDS.contains(&other) => crate::surface_nodes::spec(other),
+            Self::MeshArea
+            | Self::MeshVolume
+            | Self::MeshCenter
+            | Self::MeshDimensions
+            | Self::MeshMass
+            | Self::MeshAudit
+            | Self::MeshVertices
+            | Self::MeshFaces
+            | Self::MeshNormals
+            | Self::MeshEdges
+            | Self::MeshBoundary
+            | Self::MeshClosest
+            | Self::MeshFlip
+            | Self::MeshWeldExact
+            | Self::MeshUnweld
+            | Self::MeshUnify
+            | Self::MeshSmooth
+            | Self::MeshSubdivide
+            | Self::MeshCatmullClark
+            | Self::MeshOnBed
+            | Self::MeshDeleteFace
+            | Self::MeshConstruct
+            | Self::MeshSelfContact
+            | Self::MeshThicknessSample
+            | Self::MeshCompact
+            | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            other => crate::data_tree_nodes::spec(other)
+                .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::generative::is_kind(other).then(|| crate::generative::spec(other)))
+                .unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }
     }
 }
@@ -932,6 +1438,8 @@ impl Graph {
             preview: true,
             script: if kind == NodeKind::Expression {
                 crate::expr::DEFAULT_EXPRESSION.into()
+            } else if kind == NodeKind::PathMapper {
+                "{A;B}->{B;A}".into()
             } else {
                 String::new()
             },
@@ -1032,6 +1540,21 @@ impl Graph {
             }
             let specs = node.kind.spec().inputs;
             for (key, value) in &node.params {
+                if key == crate::data_tree::MATCH_PARAM {
+                    if !crate::data_tree_nodes::supports_matching(node.kind) {
+                        return Err("このノードはデータ照合を変更できません。".into());
+                    }
+                    crate::data_tree::MatchMode::from_number(*value)?;
+                    continue;
+                }
+                if let Some(port) = key.strip_prefix(crate::data_tree::PORT_PREFIX) {
+                    if !crate::data_tree_nodes::supports_transform(node.kind) ||
+                        !specs.iter().any(|s| s.key == port) {
+                        return Err("データツリー変換のポートが無効です。".into());
+                    }
+                    crate::data_tree::PortTransform::from_number(*value)?;
+                    continue;
+                }
                 if !value.is_finite() || !specs.iter().any(|s| s.key == key && s.default.is_some())
                 {
                     return Err(format!("「{}」のパラメータが無効です。", node.name));
@@ -1101,6 +1624,8 @@ pub struct Mesh {
 pub struct Curve {
     pub points: Vec<[f64; 3]>,
     pub closed: bool,
+    /// Exact runtime geometry; points are a separate display/legacy meshing cache.
+    pub geometry: Option<crate::curve_geometry::CurveGeometry>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -1108,6 +1633,8 @@ pub enum Value {
     Point([f64; 3]),
     Curve(Arc<Curve>),
     Mesh(Arc<Mesh>),
+    Surface(Arc<crate::surface_kernel::SurfaceValue>),
+    Solid(Arc<crate::surface_kernel::ClosedSolid>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
@@ -1116,16 +1643,20 @@ impl Value {
             Self::Point(_) => DataType::Point,
             Self::Curve(_) => DataType::Curve,
             Self::Mesh(_) => DataType::Mesh,
+            Self::Surface(_) => DataType::Surface,
+            Self::Solid(_) => DataType::Solid,
         }
     }
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
-            Self::Curve(c) => c.points.len().max(1),
+            Self::Curve(c) => c.points.len().max(1).saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
             Self::Mesh(m) => m
                 .vertices
                 .len()
                 .saturating_add(m.triangles.len().saturating_mul(3)),
+            Self::Surface(s) => s.weight(),
+            Self::Solid(s) => s.weight(),
         }
     }
     pub fn number(&self) -> Result<f64, String> {

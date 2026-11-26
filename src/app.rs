@@ -15,10 +15,11 @@ use morphlet::{
     engine::{Evaluation, Evaluator},
     gcode,
     latest_channel::{self, LatestReceiver, LatestSender},
-    model::{DataType, Graph, NodeId, NodeKind, Tree},
+    model::{DataType, Graph, Node, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
@@ -106,7 +107,14 @@ pub struct MorphletApp {
     after_save: Option<PendingAction>,
     dirty: bool,
     search: String,
+    palette_query: String,
+    palette_ime: bool,
     category: String,
+    library_filter: u8,
+    favorites: BTreeSet<NodeKind>,
+    show_library: bool,
+    show_workspace: bool,
+    clipboard: Vec<Node>,
     palette_open: bool,
     palette_focus: bool,
     palette_position: [f32; 2],
@@ -198,6 +206,13 @@ impl MorphletApp {
             after_save: None,
             dirty: false,
             search: String::new(),
+            palette_query: String::new(),
+            palette_ime: false,
+            library_filter: 0,
+            favorites: ui_polish::load_favorites(),
+            show_library: true,
+            show_workspace: true,
+            clipboard: Vec::new(),
             category: "すべて".into(),
             palette_open: false,
             palette_focus: false,
@@ -384,6 +399,9 @@ impl MorphletApp {
         };
         if let Some((project, path)) = new {
             self.project = project;
+            self.clipboard.clear();
+            self.wire_source = None;
+            self.palette_open = false;
             self.file_path = path;
             self.dirty = false;
             self.history = History::default();
@@ -567,7 +585,6 @@ impl MorphletApp {
         });
         match self.project.graph.add(kind, at) {
             Ok(id) => {
-                let mut connected = true;
                 if let Some(source) = wire {
                     let output = self
                         .project
@@ -576,9 +593,20 @@ impl MorphletApp {
                         .map(|n| n.kind.spec().output);
                     match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
                         Some(key) => {
-                            let _ = self.project.graph.connect(source, id, key);
+                            if let Err(e) = self.project.graph.connect(source, id, key) {
+                                // Keep a wire-drop operation transactional: never leave a half-added node.
+                                self.project.graph.remove(id);
+                                self.notify(e, true);
+                                self.palette_open = false;
+                                return;
+                            }
                         }
-                        None => connected = false,
+                        None => {
+                            self.project.graph.remove(id);
+                            self.notify("接続できる入力がありません。別のノードを選んでください。", true);
+                            self.palette_open = false;
+                            return;
+                        }
                     }
                 } else if let Some(source) = selected {
                     let output = self
@@ -597,15 +625,8 @@ impl MorphletApp {
                 self.recent.push(kind);
                 self.canvas.select_only(id);
                 self.palette_open = false;
-                self.search.clear();
-                if connected {
-                    self.notify(format!("「{}」を追加しました", kind.spec().label), false);
-                } else {
-                    self.notify(
-                        format!("「{}」を追加しましたが、線をつなげる入力がありません", kind.spec().label),
-                        true,
-                    );
-                }
+                self.palette_query.clear();
+                self.notify(format!("「{}」を追加しました", kind.spec().label), false);
             }
             Err(e) => self.notify(e, true),
         }
@@ -667,48 +688,51 @@ impl MorphletApp {
         self.canvas.selected.clear();
         self.canvas.connecting = None;
     }
+    fn selected_nodes(&self) -> Vec<Node> {
+        self.project.graph.nodes.iter().filter(|n| self.canvas.selected.contains(&n.id)).cloned().collect()
+    }
+    fn copy_selected(&mut self) {
+        let nodes = self.selected_nodes();
+        if !nodes.is_empty() {
+            self.clipboard = nodes;
+            self.notify(format!("{} ノードをコピーしました", self.clipboard.len()), false);
+        }
+    }
+    fn paste_selected(&mut self) {
+        if self.clipboard.is_empty() { return; }
+        let at = self.canvas.center_for_add(&self.project);
+        let min_x = self.clipboard.iter().map(|n| n.position[0]).fold(f32::INFINITY, f32::min);
+        let min_y = self.clipboard.iter().map(|n| n.position[1]).fold(f32::INFINITY, f32::min);
+        match insert_nodes(&mut self.project.graph, &self.clipboard, [at[0]-min_x, at[1]-min_y], false) {
+            Ok(ids) => {
+                self.canvas.selected = ids;
+                self.notify(format!("{} ノードを貼り付けました", self.canvas.selected.len()), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
     fn duplicate_selected(&mut self) {
-        let nodes: Vec<_> = self
-            .project
-            .graph
-            .nodes
-            .iter()
-            .filter(|n| self.canvas.selected.contains(&n.id))
-            .cloned()
-            .collect();
-        let mut map = std::collections::BTreeMap::new();
-        for old in &nodes {
-            match self
-                .project
-                .graph
-                .add(old.kind, [old.position[0] + 35., old.position[1] + 40.])
-            {
-                Ok(id) => {
-                    map.insert(old.id, id);
-                    if let Some(n) = self.project.graph.node_mut(id) {
-                        n.params = old.params.clone();
-                        n.name = format!("{} コピー", old.name);
-                        n.preview = old.preview;
-                        n.script = old.script.clone();
-                        n.cluster = old.cluster;
-                        n.off = old.off;
-                    }
-                }
-                Err(e) => {
-                    self.notify(e, true);
-                    return;
-                }
-            }
+        let nodes = self.selected_nodes();
+        if nodes.is_empty() { return; }
+        match insert_nodes(&mut self.project.graph, &nodes, [35., 40.], true) {
+            Ok(ids) => self.canvas.selected = ids,
+            Err(e) => self.notify(e, true),
         }
-        for old in &nodes {
-            if let Some(id) = map.get(&old.id) {
-                for (key, source) in &old.inputs {
-                    let from = *map.get(source).unwrap_or(source);
-                    let _ = self.project.graph.connect(from, *id, key);
-                }
-            }
+    }
+    fn open_palette(&mut self, at: [f32; 2], source: Option<NodeId>) {
+        self.wire_source = source;
+        self.palette_open = true;
+        self.palette_focus = true;
+        self.palette_position = at;
+        self.palette_query.clear();
+        self.palette_ime = false;
+        self.palette_cursor = 0;
+    }
+    fn toggle_favorite(&mut self, kind: NodeKind) {
+        if !self.favorites.remove(&kind) { self.favorites.insert(kind); }
+        if let Err(e) = ui_polish::save_favorites(&self.favorites) {
+            self.notify(e, true);
         }
-        self.canvas.selected = map.values().copied().collect();
     }
     /// Toggle 無効 on the selection: if any selected node is on, turn all off; else on.
     fn toggle_off_selected(&mut self) {
@@ -831,6 +855,12 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::D)) {
                 self.duplicate_selected();
             }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::C)) {
+                self.copy_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::V)) {
+                self.paste_selected();
+            }
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
                 self.toggle_off_selected();
             }
@@ -864,7 +894,9 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A)) {
                 self.canvas.selected = self.project.graph.nodes.iter().map(|n| n.id).collect();
             }
-            if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F)) {
+                self.canvas.fit_selection_requested = true;
+            } else if ctx.input(|i| i.key_pressed(egui::Key::F)) {
                 let items = self.previews();
                 self.viewport.fit(&items);
                 self.canvas.fit_requested = true;
@@ -872,10 +904,7 @@ impl MorphletApp {
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
                 || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::K))
             {
-                self.palette_open = true;
-                self.palette_focus = true;
-                self.palette_position = self.canvas.center_for_add(&self.project);
-                self.search.clear();
+                self.open_palette(self.canvas.center_for_add(&self.project), None);
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
@@ -888,236 +917,156 @@ impl MorphletApp {
     }
     fn topbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("topbar")
-            .exact_height(66.)
-            .frame(
-                egui::Frame::new()
-                    .fill(Color32::from_rgb(28, 48, 48))
-                    .inner_margin(egui::Margin::symmetric(18, 12)),
-            )
+            .frame(egui::Frame::new().fill(theme::toolbar_bg()).inner_margin(egui::Margin::symmetric(10, 6)))
             .show(ctx, |ui| {
-                ui.visuals_mut().override_text_color = Some(Color32::from_rgb(232, 241, 232));
-                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.fg_stroke = Stroke::new(1_f32, Color32::WHITE);
-                ui.horizontal_centered(|ui| {
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(30., 30.), Sense::hover());
-                    let p = ui.painter();
-                    p.line_segment(
-                        [
-                            r.left_bottom() - egui::vec2(0., 5.),
-                            r.center_top() + egui::vec2(-2., 4.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.line_segment(
-                        [
-                            r.center_top() + egui::vec2(-2., 4.),
-                            r.right_bottom() - egui::vec2(0., 5.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.circle_filled(
-                        r.center() + egui::vec2(0., 4.),
-                        3.5,
-                        Color32::from_rgb(232, 201, 120),
-                    );
-                    ui.label(
-                        RichText::new("morphlet")
-                            .size(24.)
-                            .strong()
-                            .color(Color32::from_rgb(242, 247, 233)),
-                    );
-                    ui.add_space(13.);
-                    ui.label(
-                        RichText::new("GEOMETRY STUDIO")
-                            .size(9.)
-                            .color(Color32::from_rgb(159, 187, 172)),
-                    );
-                    ui.add_space(18.);
-                    ui.separator();
-                    ui.add_space(8.);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.project.name)
-                            .font(egui::TextStyle::Body)
-                            .desired_width(185.)
-                            .frame(false)
-                            .text_color(Color32::from_rgb(228, 235, 226)),
-                    )
-                    .on_hover_text("作品名を編集");
-                    if self.dirty {
-                        ui.label(
-                            RichText::new("●")
-                                .size(9.)
-                                .color(Color32::from_rgb(228, 193, 115)),
-                        );
+                ui.horizontal_wrapped(|ui| {
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(22., 22.), Sense::hover());
+                    let a = r.left_bottom() + egui::vec2(3., -4.);
+                    let b = r.center_top() + egui::vec2(0., 4.);
+                    let c = r.right_bottom() - egui::vec2(3., 4.);
+                    for pair in [[a, b], [b, c], [a, c]] {
+                        ui.painter().line_segment(pair, Stroke::new(1.8, theme::teal()));
                     }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("書き出し ↗")
-                                        .color(Color32::from_rgb(20, 58, 45)),
-                                )
-                                .fill(Color32::from_rgb(177, 222, 184)),
-                            )
-                            .on_hover_text("完成形状を STL / OBJ へ")
-                            .clicked()
-                        {
-                            self.stl_export.open_dialog();
+                    for p in [a, b, c] { ui.painter().circle_filled(p, 2.6, theme::teal()); }
+                    ui.label(RichText::new("NODES").strong().size(18.).color(theme::ink()));
+                    ui.separator();
+                    ui.menu_button("ファイル", |ui| {
+                        if ui.button("新規作品").clicked() { self.request(PendingAction::New, ctx); ui.close(); }
+                        if ui.button("開く  Ctrl+O").clicked() { self.open_dialog(ctx); ui.close(); }
+                        if ui.button("保存  Ctrl+S").clicked() { self.save(false); ui.close(); }
+                        if ui.button("名前を付けて保存").clicked() { self.save(true); ui.close(); }
+                        ui.separator();
+                        if ui.button("STL / OBJ 書き出し").clicked() { self.stl_export.open_dialog(); ui.close(); }
+                        if ui.button("G-code（花瓶モード・未検証）").clicked() { self.gcode.open(); ui.close(); }
+                    });
+                    ui.menu_button("編集", |ui| {
+                        if ui.add_enabled(self.history.can_undo(), egui::Button::new("元に戻す  Ctrl+Z")).clicked() { self.undo(); ui.close(); }
+                        if ui.add_enabled(self.history.can_redo(), egui::Button::new("やり直す  Ctrl+Y")).clicked() { self.redo(); ui.close(); }
+                        ui.separator();
+                        let selected = !self.canvas.selected.is_empty();
+                        if ui.add_enabled(selected, egui::Button::new("コピー  Ctrl+C")).clicked() { self.copy_selected(); ui.close(); }
+                        if ui.add_enabled(!self.clipboard.is_empty(), egui::Button::new("貼り付け  Ctrl+V")).clicked() { self.paste_selected(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("複製  Ctrl+D")).clicked() { self.duplicate_selected(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("グループ  Ctrl+G")).clicked() { self.make_group(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("削除  Delete")).clicked() { self.delete_selected(); ui.close(); }
+                    });
+                    ui.menu_button("表示", |ui| {
+                        ui.checkbox(&mut self.show_library, "ノードライブラリ");
+                        ui.checkbox(&mut self.show_workspace, "3D と設定");
+                        if ui.button("選択にズーム  Shift+F").clicked() { self.canvas.fit_selection_requested = true; ui.close(); }
+                        if ui.button("全体表示  F").clicked() {
+                            self.canvas.fit_requested = true;
+                            let items = self.previews();
+                            self.viewport.fit(&items);
+                            ui.close();
                         }
-                        ui.menu_button("その他の書き出し", |ui| {
-                            if ui.button("G-code（花瓶モード・未検証）").clicked() {
-                                self.gcode.open();
-                                ui.close();
-                            }
-                        });
-                        if ui.button("保存").on_hover_text("Ctrl+S").clicked() {
-                            self.save(false);
-                        }
-                        if ui.button("開く").on_hover_text("Ctrl+O").clicked() {
-                            self.open_dialog(ctx);
-                        }
-                        if ui.button("作品例").clicked() {
-                            self.template_open = true;
-                        }
-                        if ui
-                            .button("ノード辞典")
-                            .on_hover_text("全ノードの説明・入力・使い方 · F1（選択中のノード）")
-                            .clicked()
-                        {
-                            self.help_window.open_index();
-                        }
-                        if ui.button("?").on_hover_text("使い方").clicked() {
-                            self.help_open = true;
-                        }
-                        if ui
-                            .button("キー")
-                            .on_hover_text("キーボードショートカット一覧 · ?")
-                            .clicked()
-                        {
-                            self.shortcuts_open = true;
-                        }
-                        let theme_label = if self.dark { "明るく" } else { "暗く" };
-                        if ui
-                            .button(theme_label)
-                            .on_hover_text("画面の色を切り替えます（選択は次回も保たれます）")
-                            .clicked()
-                        {
-                            self.toggle_theme(ctx);
+                        if ui.button(if self.dark { "ライトテーマ" } else { "ダークテーマ" }).clicked() {
+                            self.toggle_theme(ctx); ui.close();
                         }
                     });
+                    ui.menu_button("作例・ヘルプ", |ui| {
+                        if ui.button("作品例").clicked() { self.template_open = true; ui.close(); }
+                        if ui.button("ノード辞典  F1").clicked() { self.help_window.open_index(); ui.close(); }
+                        if ui.button("使い方").clicked() { self.help_open = true; ui.close(); }
+                        if ui.button("キー操作一覧").clicked() { self.shortcuts_open = true; ui.close(); }
+                    });
+                    ui.separator();
+                    if ui.small_button("＋ ノード").on_hover_text("Tab / Ctrl+K").clicked() {
+                        self.open_palette(self.canvas.center_for_add(&self.project), None);
+                    }
+                    if ui.small_button("保存").on_hover_text("Ctrl+S").clicked() { self.save(false); }
+                    if ui.button("書き出し").on_hover_text("STL / OBJ").clicked() { self.stl_export.open_dialog(); }
+                    let name_width = ui.available_width().min(170.);
+                    if name_width >= 100. {
+                        ui.add(egui::TextEdit::singleline(&mut self.project.name)
+                            .desired_width(name_width)
+                            .frame(false)).on_hover_text("作品名を編集");
+                    } else {
+                        ui.menu_button("作品名", |ui| { ui.text_edit_singleline(&mut self.project.name); });
+                    }
+                    if self.dirty { ui.label(theme::small("未保存")); }
                 });
             });
     }
     fn library(&mut self, ctx: &egui::Context) {
+        let width = ctx.available_rect().width();
+        let maximum = (width * 0.33).clamp(140., 290.);
         egui::SidePanel::left("library")
-            .exact_width(196.)
-            .resizable(false)
-            .frame(
-                egui::Frame::new()
-                    .fill(theme::panel_bg())
-                    .inner_margin(egui::Margin::symmetric(14, 14)),
-            )
+            .default_width(205_f32.min(maximum))
+            .min_width(140.)
+            .max_width(maximum)
+            .resizable(true)
+            .frame(egui::Frame::new().fill(theme::panel_bg()).inner_margin(egui::Margin::symmetric(9, 10)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("ライブラリ").strong().size(13.));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small(format!("{}", NodeKind::all().len())));
-                    });
+                    ui.label(theme::small(format!("{}", NodeKind::all().len())));
                 });
-                ui.add_space(7.);
-                let search = ui.add(
-                    egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("円・ねじる・並べる…")
-                        .desired_width(f32::INFINITY),
-                );
-                search.on_hover_text("日本語・英語で検索できます");
-                ui.add_space(10.);
+                ui.add(egui::TextEdit::singleline(&mut self.search)
+                    .hint_text("何を作る？")
+                    .desired_width(f32::INFINITY))
+                    .on_hover_text("日本語・英語で検索。例: 円を作る、Construct Point");
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut self.library_filter, 0, "全て");
+                    ui.selectable_value(&mut self.library_filter, 1, "★");
+                    ui.selectable_value(&mut self.library_filter, 2, "最近");
+                });
+                let mut categories: Vec<_> = NodeKind::all().iter().map(|k| k.spec().category).collect();
+                categories.sort_by_key(|c| (category_rank(c), *c));
+                categories.dedup();
                 egui::ComboBox::from_id_salt("category")
                     .selected_text(&self.category)
-                    .width(156.)
+                    .width((ui.available_width()-12.).max(70.))
                     .show_ui(ui, |ui| {
-                        for category in [
-                            "すべて",
-                            "数値",
-                            "曲線",
-                            "立体",
-                            "変形",
-                            "配列",
-                            "データ",
-                            "出力",
-                        ] {
-                            ui.selectable_value(&mut self.category, category.into(), category);
-                        }
+                        ui.selectable_value(&mut self.category, "すべて".into(), "すべて");
+                        for category in categories { ui.selectable_value(&mut self.category, category.into(), category); }
                     });
-                ui.add_space(12.);
+                let mut base = ordered_kinds();
+                if self.library_filter == 1 { base.retain(|k| self.favorites.contains(k)); }
+                if self.library_filter == 2 { base.retain(|k| self.recent.kinds().contains(k)); }
+                base.retain(|k| self.category == "すべて" || self.category == k.spec().category);
+                let ordered = if self.search.trim().is_empty() && self.library_filter != 2 {
+                    base
+                } else {
+                    ui_polish::rank(&base, &self.search, &self.recent, None)
+                };
                 let mut add = None;
+                let mut favorite = None;
+                ui.label(theme::small(format!("{} 件", ordered.len())));
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
-                    .max_height((ui.available_height() - 130.).max(140.))
                     .show(ui, |ui| {
                         let mut last = "";
-                        let mut ordered: Vec<_> = NodeKind::all().to_vec();
-                        ordered.sort_by_key(|kind| category_rank(kind.spec().category));
-                        for kind in &ordered {
+                        for kind in ordered {
                             let spec = kind.spec();
-                            if self.category != "すべて" && self.category != spec.category {
-                                continue;
-                            }
-                            if !matches_search(*kind, &self.search) {
-                                continue;
-                            }
-                            if last != spec.category {
-                                ui.add_space(9.);
+                            if self.search.trim().is_empty() && self.library_filter != 2 && last != spec.category {
+                                ui.add_space(5.);
                                 ui.label(theme::small(spec.category));
-                                ui.add_space(2.);
                                 last = spec.category;
                             }
-                            let color = theme::category_color(spec.category);
-                            let resp = ui.add_sized(
-                                [162., 30.],
-                                egui::Button::new(
-                                    RichText::new(format!("＋  {}", spec.label))
-                                        .size(12.)
-                                        .color(color),
-                                )
-                                .frame(false),
-                            );
-                            if resp
-                                .clone()
-                                .on_hover_text(format!(
-                                    "{}\n\n{}",
-                                    spec.description, "クリックで追加。選択中の形状に接続します。"
-                                ))
-                                .clicked()
-                            {
-                                add = Some(*kind);
-                            }
+                            ui.horizontal(|ui| {
+                                let starred = self.favorites.contains(&kind);
+                                if ui.small_button(if starred { "★" } else { "☆" })
+                                    .on_hover_text(if starred { "お気に入りから外す" } else { "お気に入りに追加" })
+                                    .clicked() { favorite = Some(kind); }
+                                let (r, _) = ui.allocate_exact_size(egui::vec2(6., 17.), Sense::hover());
+                                ui.painter().rect_filled(r, 2, theme::category_color(spec.category));
+                                if ui.add(egui::Button::new(ui_polish::one_line(spec.label, 10)).frame(false))
+                                    .on_hover_text(format!("{}\n{}", spec.label, spec.description)).clicked() {
+                                    add = Some(kind);
+                                }
+                            });
                         }
+                        if let Some(action) = crate::script_ui::library_parts(ui, &self.project.graph) {
+                            self.part_action(action);
+                        }
+                        ui.separator();
+                        if ui.button("作品例").clicked() { self.template_open = true; }
+                        if ui.small_button("新規作品").clicked() { self.request(PendingAction::New, ctx); }
                     });
+                if let Some(kind) = favorite { self.toggle_favorite(kind); }
                 if let Some(kind) = add {
-                    self.add_node(kind, None);
-                }
-                if let Some(action) = crate::script_ui::library_parts(ui, &self.project.graph) {
-                    self.part_action(action);
-                }
-                ui.add_space(12.);
-                ui.separator();
-                ui.add_space(8.);
-                ui.label(
-                    RichText::new("小さな操作から、\n思いがけない形へ。")
-                        .size(12.)
-                        .color(theme::muted()),
-                );
-                ui.add_space(8.);
-                if ui
-                    .add_sized([164., 31.], egui::Button::new("作品例からはじめる"))
-                    .clicked()
-                {
-                    self.template_open = true;
-                }
-                if ui.small_button("空のキャンバスを開く").clicked() {
-                    self.request(PendingAction::New, ctx);
+                    if !self.palette_open { self.add_node(kind, None); }
                 }
             });
     }
@@ -1137,28 +1086,32 @@ impl MorphletApp {
                     } else if let Some(e) = &self.evaluation {
                         let errors = e.outputs.values().filter(|r| r.is_err()).count();
                         if errors == 0 {
-                            ui.label(RichText::new("●").size(9.).color(theme::TEAL));
+                            ui.label(RichText::new("●").size(9.).color(theme::teal()));
                             ui.label(theme::small("更新済み"));
                         } else {
                             ui.label(
                                 RichText::new(format!("!  {} 個の入力を確認", errors))
                                     .size(11.)
-                                    .color(theme::ERROR),
+                                    .color(theme::error()),
                             );
                             if let Some(line) = self.error_line(e) {
-                                ui.label(RichText::new(line).size(11.).color(theme::ERROR));
+                                let short = ui_polish::one_line(&line, if ui.available_width() > 700. { 42 } else { 12 });
+                                ui.label(RichText::new(short).size(11.).color(theme::error())).on_hover_text(line);
                             }
                         }
-                        ui.label(theme::small(format!(
-                            "  {:.1} ms  ·  計算 {} / 再利用 {}",
-                            e.elapsed_ms, e.computed, e.cached
-                        )));
+                        if ui.available_width() > 460. {
+                            ui.label(theme::small(format!("{:.1} ms · 計算 {} / 再利用 {}", e.elapsed_ms, e.computed, e.cached)));
+                        } else {
+                            ui.label(theme::small(format!("{:.1} ms", e.elapsed_ms)));
+                        }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small("mm  /  °"));
-                        ui.separator();
-                        ui.label(theme::small("オフライン"));
-                        ui.separator();
+                        if ui.available_width() > 260. {
+                            ui.label(theme::small("mm / °"));
+                            ui.separator();
+                            ui.label(theme::small("オフライン"));
+                            ui.separator();
+                        }
                         ui.label(theme::small(format!(
                             "{} ノード",
                             self.project.graph.nodes.len()
@@ -1225,7 +1178,7 @@ impl MorphletApp {
         ui.label(theme::small(spec.description));
         if node.off {
             ui.colored_label(
-                theme::ERROR,
+                theme::error(),
                 "このノードは無効です（出力なし）。Ctrl+E または下の設定で戻せます。",
             );
         }
@@ -1235,7 +1188,7 @@ impl MorphletApp {
                 .corner_radius(6)
                 .inner_margin(8)
                 .show(ui, |ui| {
-                    ui.label(RichText::new(message).size(12.).color(theme::ERROR));
+                    ui.label(RichText::new(message).size(12.).color(theme::error()));
                 });
         }
         ui.add_space(9.);
@@ -1283,7 +1236,7 @@ impl MorphletApp {
                     ui.label(
                         RichText::new("形状を接続してください")
                             .size(11.)
-                            .color(theme::ERROR),
+                            .color(theme::error()),
                     );
                 }
             });
@@ -1291,11 +1244,66 @@ impl MorphletApp {
         if let Some(key) = disconnect {
             self.project.graph.disconnect(id, key);
         }
+        if morphlet::data_tree_nodes::supports_transform(node.kind) {
+            egui::CollapsingHeader::new("データツリー設定")
+                .id_salt(("tree_settings", id))
+                .show(ui, |ui| {
+                    use morphlet::data_tree::{MATCH_PARAM, PORT_PREFIX};
+                    if let Some(n) = self.project.graph.node_mut(id) {
+                        if morphlet::data_tree_nodes::supports_matching(node.kind) {
+                            let mut choice = n.params.get(MATCH_PARAM).copied().unwrap_or(-1.) as i32;
+                            let previous = choice;
+                            let names = ["旧互換（同じパス）", "Longest", "Shortest", "Cross"];
+                            egui::ComboBox::from_id_salt(("matching",id))
+                                .selected_text(names[(choice+1).clamp(0,3) as usize])
+                                .show_ui(ui, |ui| {
+                                    for (i,name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice,i as i32-1,*name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice < 0 { n.params.remove(MATCH_PARAM); }
+                                else { n.params.insert(MATCH_PARAM.into(),choice as f64); }
+                            }
+                        }
+                        for (index,input) in spec.inputs.iter().enumerate().take(shown) {
+                            let key = format!("{PORT_PREFIX}{}",input.key);
+                            let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
+                            let previous = choice;
+                            let names = ["そのまま","Flatten","Graft","Simplify"];
+                            ui.label(format!("{} · {} · {}", input.label,input.kind.label(),
+                                morphlet::data_tree_nodes::access_label(node.kind,index)));
+                            egui::ComboBox::from_id_salt(("tree_port",id,input.key))
+                                .selected_text(names[choice.min(3)])
+                                .show_ui(ui,|ui| {
+                                    for (i,name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice,i,*name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice == 0 { n.params.remove(&key); }
+                                else { n.params.insert(key,choice as f64); }
+                            }
+                        }
+                    }
+                });
+        }
+        if node.kind == NodeKind::PathMapper {
+            ui.label(theme::small("例: {A;B}->{B;A}（変数・非負整数のみ）"));
+            if let Some(n) = self.project.graph.node_mut(id) {
+                ui.add(egui::TextEdit::singleline(&mut n.script).char_limit(1024));
+            }
+        }
         if node.kind == NodeKind::Script {
             crate::script_ui::script_editor(ui, &mut self.project.graph, id);
         }
         if node.kind == NodeKind::Expression {
             crate::script_ui::expression_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::GraphMapper {
+            if let Some(n) = self.project.graph.node_mut(id) {
+                crate::math_mapper_ui::show(ui, n);
+            }
         }
         if node.kind == NodeKind::ImportMesh {
             self.import_panel(ui, id, &node.script);
@@ -1327,7 +1335,7 @@ impl MorphletApp {
                 match evaluation.and_then(|e| e.outputs.get(&id)) {
                     Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
                     Some(Err(e)) => {
-                        ui.colored_label(theme::ERROR, e);
+                        ui.colored_label(theme::error(), e);
                     }
                     None => {
                         ui.label(theme::small("未計算"));
@@ -1373,10 +1381,12 @@ impl MorphletApp {
             });
     }
     fn right_panel(&mut self, ctx: &egui::Context) {
+        let remaining = ctx.available_rect().width();
+        let maximum = (remaining - 220.).clamp(150., 850.);
         egui::SidePanel::right("workspace")
-            .default_width(485.)
-            .min_width(390.)
-            .max_width(850.)
+            .default_width((remaining * 0.42).clamp(150., maximum))
+            .min_width(150.)
+            .max_width(maximum)
             .resizable(true)
             .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
@@ -1390,7 +1400,7 @@ impl MorphletApp {
                                 ui.label(theme::small("LIVE"));
                             });
                         });
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.selectable_value(&mut self.preview_mode, 0, "完成形");
                             ui.selectable_value(&mut self.preview_mode, 1, "選択ノード");
                             ui.selectable_value(&mut self.preview_mode, 2, "表示中");
@@ -1403,7 +1413,7 @@ impl MorphletApp {
                             }
                         });
                     });
-                let h = (ui.available_height() * 0.51).max(220.);
+                let h = (ui.available_height() * 0.48).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
@@ -1421,18 +1431,14 @@ impl MorphletApp {
                     }
                 });
                 ui.add_space(2.);
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(14, 7))
-                    .show(ui, |ui| {
-                        self.viewport.controls(ui);
-                    });
-                ui.separator();
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        egui::Frame::new()
-                            .inner_margin(14)
-                            .show(ui, |ui| self.inspector(ui));
+                        egui::Frame::new().inner_margin(8).show(ui, |ui| {
+                            egui::CollapsingHeader::new("ビュー設定").default_open(true).show(ui, |ui| self.viewport.controls(ui));
+                            ui.separator();
+                            self.inspector(ui);
+                        });
                     });
             });
     }
@@ -1444,60 +1450,35 @@ impl MorphletApp {
                     .fill(theme::toolbar_bg())
                     .inner_margin(egui::Margin::symmetric(15, 10))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("ノードキャンバス").size(13.).strong());
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .button("＋ 追加")
-                                    .on_hover_text("Tab またはダブルクリック")
-                                    .clicked()
-                                {
-                                    self.palette_open = true;
-                                    self.palette_focus = true;
-                                    self.palette_position =
-                                        self.canvas.center_for_add(&self.project);
-                                    self.search.clear();
-                                }
-                                if ui
-                                    .small_button("メモ")
-                                    .on_hover_text(
-                                        "キャンバスにメモを置きます（右クリックでも追加）",
-                                    )
-                                    .clicked()
-                                {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(RichText::new("キャンバス").size(13.).strong());
+                            if ui.small_button("＋").on_hover_text("ノード追加 · Tab").clicked() {
+                                self.open_palette(self.canvas.center_for_add(&self.project), None);
+                            }
+                            if ui.add_enabled(self.history.can_undo(), egui::Button::new("↩")).on_hover_text("元に戻す · Ctrl+Z").clicked() { self.undo(); }
+                            if ui.add_enabled(self.history.can_redo(), egui::Button::new("↪")).on_hover_text("やり直す · Ctrl+Y").clicked() { self.redo(); }
+                            if ui.small_button("全体").clicked() { self.canvas.fit_requested = true; }
+                            if ui.small_button("選択").on_hover_text("選択にズーム · Shift+F").clicked() { self.canvas.fit_selection_requested = true; }
+                            ui.menu_button("操作", |ui| {
+                                if ui.button("全体を自動整列").clicked() { self.canvas.auto_arrange(&mut self.project); ui.close(); }
+                                ui.separator();
+                                let n = self.canvas.selected.len();
+                                if ui.add_enabled(n >= 2, egui::Button::new("選択：左端を揃える")).clicked() { self.canvas.align_selected(&mut self.project, 0); ui.close(); }
+                                if ui.add_enabled(n >= 2, egui::Button::new("選択：上端を揃える")).clicked() { self.canvas.align_selected(&mut self.project, 1); ui.close(); }
+                                if ui.add_enabled(n >= 3, egui::Button::new("選択：横方向の均等間隔")).clicked() { self.canvas.distribute_selected(&mut self.project, 0); ui.close(); }
+                                if ui.add_enabled(n >= 3, egui::Button::new("選択：縦方向の均等間隔")).clicked() { self.canvas.distribute_selected(&mut self.project, 1); ui.close(); }
+                                ui.separator();
+                                let mut minimap = !self.canvas.hide_minimap;
+                                if ui.checkbox(&mut minimap, "ミニマップ（10ノード以上）").changed() { self.canvas.hide_minimap = !minimap; }
+                                ui.checkbox(&mut self.canvas.snap, "格子に吸着");
+                                if ui.button("メモ").clicked() {
                                     let at = self.canvas.center_for_add(&self.project);
                                     self.add_note(at);
+                                    ui.close();
                                 }
-                                if ui
-                                    .small_button("値を見る")
-                                    .on_hover_text("選択中のノードの出力を一覧表示")
-                                    .clicked()
-                                {
-                                    self.values_open = !self.values_open;
-                                }
-                                if ui.small_button("整列").clicked() {
-                                    self.canvas.auto_arrange(&mut self.project);
-                                }
-                                ui.toggle_value(&mut self.canvas.snap, "格子")
-                                    .on_hover_text("格子に吸着: ノードを離すと格子点に揃います · Ctrl+Shift+G");
-                                if ui.small_button("全体").clicked() {
-                                    self.canvas.fit_requested = true;
-                                }
-                                if ui
-                                    .add_enabled(self.history.can_redo(), egui::Button::new("↪"))
-                                    .on_hover_text("やり直す · Ctrl+Y")
-                                    .clicked()
-                                {
-                                    self.redo();
-                                }
-                                if ui
-                                    .add_enabled(self.history.can_undo(), egui::Button::new("↩"))
-                                    .on_hover_text("元に戻す · Ctrl+Z")
-                                    .clicked()
-                                {
-                                    self.undo();
-                                }
+                                if ui.button("値を見る").clicked() { self.values_open = !self.values_open; ui.close(); }
                             });
+                            ui.label(theme::small(format!("{:.0}%", self.project.zoom * 100.)));
                         });
                     });
                 let stale = self.stale();
@@ -1532,20 +1513,11 @@ impl MorphletApp {
                     self.add_note(at);
                 }
                 if let Some(at) = outcome.add_at {
-                    self.palette_open = true;
-                    self.palette_focus = true;
-                    self.palette_position = at;
-                    self.search.clear();
-                    self.palette_cursor = 0;
+                    self.open_palette(at, None);
                 }
                 if let Some((from, at)) = outcome.drop_wire {
                     // Released on empty canvas: search, then connect the chosen node to `from`.
-                    self.wire_source = Some(from);
-                    self.palette_open = true;
-                    self.palette_focus = true;
-                    self.palette_position = at;
-                    self.search.clear();
-                    self.palette_cursor = 0;
+                    self.open_palette(at, Some(from));
                 }
             });
     }
@@ -1554,6 +1526,7 @@ impl MorphletApp {
     fn palette(&mut self, ctx: &egui::Context) {
         if !self.palette_open {
             self.wire_source = None;
+            self.palette_ime = false;
             return;
         }
         let mut open = true;
@@ -1562,116 +1535,73 @@ impl MorphletApp {
         let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
         let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
         let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
-        let matches = ui_polish::rank(&ordered, &self.search, &self.recent, wire_type);
-        let last = matches.len().saturating_sub(1);
-        // Keys are consumed here so the text box does not also act on them.
-        let down = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
-        let up = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
-        if down {
-            self.palette_cursor = (self.palette_cursor + 1).min(last);
-        }
-        if up {
-            self.palette_cursor = self.palette_cursor.saturating_sub(1);
-        }
-        self.palette_cursor = self.palette_cursor.min(last);
-        // IME Enter belongs to the input method while composing; only a plain Enter adds.
-        let composing = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Ime(_))));
-        let enter = !composing
-            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
-        if enter {
-            add = matches.get(self.palette_cursor).copied();
-        }
-        let cursor = self.palette_cursor;
+        let mut ime_event = false;
+        ctx.input(|i| {
+            for event in &i.events {
+                if let egui::Event::Ime(event) = event {
+                    ime_event = true;
+                    match event {
+                        egui::ImeEvent::Preedit(text) => self.palette_ime = !text.is_empty(),
+                        egui::ImeEvent::Commit(_) | egui::ImeEvent::Disabled => self.palette_ime = false,
+                        egui::ImeEvent::Enabled => {}
+                    }
+                }
+            }
+        });
+        let composing = ime_event || self.palette_ime;
+        let down = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
+        let up = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
+        let enter = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+        let escape = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        let width = (ctx.content_rect().width() - 40.).clamp(180., 480.);
+        let max_height = (ctx.content_rect().height() * 0.52).clamp(80., 390.);
         egui::Window::new("ノードを追加")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(460.)
-            .anchor(egui::Align2::CENTER_CENTER, [0., -60.])
+            .default_width(width)
+            .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
-                let r = ui.add(
-                    egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("何をしたい？  円 / twist / まる / 並べる")
-                        .desired_width(f32::INFINITY),
-                );
-                if self.palette_focus {
-                    r.request_focus();
-                    self.palette_focus = false;
-                }
-                if r.changed() {
-                    self.palette_cursor = 0;
-                }
+                ui.set_width(width);
+                let r = ui.add(egui::TextEdit::singleline(&mut self.palette_query)
+                    .hint_text("円を作る / twist / 点を並べる")
+                    .desired_width(f32::INFINITY));
+                let first = self.palette_focus;
+                if first { r.request_focus(); self.palette_focus = false; }
+                if r.changed() { self.palette_cursor = 0; }
                 if let Some(name) = &wire_name {
-                    ui.label(theme::small(format!(
-                        "「{name}」の出力をつなぎます。つなげられるノードを上に出しています"
-                    )));
+                    ui.label(theme::small(format!("{} · {} と接続できる候補のみ", name, wire_type.map(DataType::label).unwrap_or("データ"))));
                 }
-                ui.add_space(5.);
-                egui::ScrollArea::vertical()
-                    .max_height(380.)
-                    .show(ui, |ui| {
-                        for (index, kind) in matches.iter().enumerate() {
-                            let spec = kind.spec();
-                            let (rect, response) = ui.allocate_exact_size(
-                                egui::vec2(430., 40.),
-                                Sense::click(),
-                            );
-                            let active = index == cursor;
-                            if active || response.hovered() {
-                                ui.painter().rect_filled(
-                                    rect,
-                                    6,
-                                    if active {
-                                        theme::teal().gamma_multiply(0.22)
-                                    } else {
-                                        theme::line().gamma_multiply(0.35)
-                                    },
-                                );
-                            }
-                            if active {
-                                response.scroll_to_me(None);
-                            }
-                            let painter = ui.painter();
-                            painter.text(
-                                rect.left_top() + egui::vec2(12., 11.),
-                                egui::Align2::LEFT_CENTER,
-                                spec.label,
-                                FontId::proportional(13.),
-                                theme::ink(),
-                            );
-                            painter.text(
-                                rect.right_top() + egui::vec2(-12., 11.),
-                                egui::Align2::RIGHT_CENTER,
-                                spec.category,
-                                FontId::proportional(10.5),
-                                theme::category_color(spec.category),
-                            );
-                            painter.text(
-                                rect.left_top() + egui::vec2(12., 29.),
-                                egui::Align2::LEFT_CENTER,
-                                ui_polish::one_line(spec.description, 46),
-                                FontId::proportional(10.5),
-                                theme::muted(),
-                            );
-                            if response.clicked() {
-                                add = Some(*kind);
-                            }
-                        }
-                        if matches.is_empty() {
-                            ui.label(
-                                "見つかりません。「移動」「花器」「数列」などを試してください。",
-                            );
-                        }
-                    });
-                ui.add_space(4.);
-                ui.label(theme::small(
-                    "↑ ↓ で選ぶ  ·  Enter かクリックで追加  ·  Esc で閉じる",
-                ));
+                let matches = ui_polish::rank(&ordered, &self.palette_query, &self.recent, wire_type);
+                let last = matches.len().saturating_sub(1);
+                if down && !r.changed() { self.palette_cursor = (self.palette_cursor + 1).min(last); }
+                if up && !r.changed() { self.palette_cursor = self.palette_cursor.saturating_sub(1); }
+                self.palette_cursor = self.palette_cursor.min(last);
+                if enter && !r.changed() { add = matches.get(self.palette_cursor).copied(); }
+                ui.label(theme::small(format!("{} 件 · ↑↓ / Enter", matches.len())));
+                let cursor = self.palette_cursor;
+                egui::ScrollArea::vertical().max_height(max_height).show(ui, |ui| {
+                    for (index, kind) in matches.iter().enumerate() {
+                        let spec = kind.spec();
+                        let response = ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(6., 20.), Sense::hover());
+                            ui.painter().rect_filled(r, 2, theme::category_color(spec.category));
+                            ui.selectable_label(index == cursor, format!("{}  ·  {}", spec.label, spec.category))
+                                .on_hover_text(spec.description)
+                        }).inner;
+                        if index == cursor && (first || up || down || r.changed()) { response.scroll_to_me(None); }
+                        if response.clicked() { add = Some(*kind); }
+                    }
+                    if matches.is_empty() {
+                        ui.label(if wire_type.is_some() { "接続できる候補がありません。検索語を変えるか Esc で中止してください。" }
+                            else { "見つかりません。例: 円を作る、面を作る、花瓶を作る" });
+                    }
+                });
             });
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
-            self.palette_open = open && !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+            self.palette_open = open && !escape;
         }
     }
     /// ショートカット一覧 (?): every keyboard shortcut, in Japanese.
@@ -1890,6 +1820,7 @@ impl MorphletApp {
             ui.horizontal(|ui| {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
+                    self.clipboard.clear();
                     self.recovery = None;
                     self.dirty = true;
                     self.suppress_history = true;
@@ -1958,7 +1889,7 @@ impl MorphletApp {
                         data_view::show_tree(ui, tree, "window", h);
                     }
                     Some(Err(e)) => {
-                        ui.colored_label(theme::ERROR, e);
+                        ui.colored_label(theme::error(), e);
                     }
                     None => {
                         ui.label(theme::small("未計算"));
@@ -2012,8 +1943,10 @@ impl eframe::App for MorphletApp {
         }
         self.topbar(ctx);
         self.statusbar(ctx);
-        self.library(ctx);
-        self.right_panel(ctx);
+        if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
+            self.library(ctx);
+        }
+        if self.show_workspace { self.right_panel(ctx); }
         self.center_panel(ctx);
         self.palette(ctx);
         self.shortcuts_dialog(ctx);
@@ -2077,7 +2010,7 @@ impl eframe::App for MorphletApp {
                         .show(ui, |ui| {
                             ui.set_max_width(650.);
                             ui.label(RichText::new(text).size(12.).color(if *error {
-                                theme::ERROR
+                                theme::error()
                             } else {
                                 Color32::WHITE
                             }));
@@ -2120,6 +2053,40 @@ impl eframe::App for MorphletApp {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
+}
+
+/// Copies the chosen subgraph atomically. A duplicate retains upstream links;
+/// a paste only retains links inside the copied selection. Cluster definitions remain
+/// document-local, so a stale/missing definition causes validation to fail.
+fn insert_nodes(graph: &mut Graph, nodes: &[Node], offset: [f32; 2], retain_external: bool) -> Result<BTreeSet<NodeId>, String> {
+    if nodes.len() > morphlet::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
+        return Err("ノード数の上限を超えるため追加できません。".into());
+    }
+    let mut candidate = graph.clone();
+    let mut mapping = BTreeMap::new();
+    for old in nodes {
+        let id = candidate.add(old.kind, [
+            (old.position[0] + offset[0]).clamp(-1e6, 1e6),
+            (old.position[1] + offset[1]).clamp(-1e6, 1e6),
+        ])?;
+        mapping.insert(old.id, id);
+        let n = candidate.node_mut(id).ok_or("追加したノードが見つかりません。")?;
+        n.name = old.name.clone();
+        n.params = old.params.clone();
+        n.preview = old.preview;
+        n.script = old.script.clone();
+        n.cluster = old.cluster;
+        n.off = old.off;
+    }
+    for old in nodes {
+        let new = candidate.node_mut(mapping[&old.id]).ok_or("追加したノードが見つかりません。")?;
+        new.inputs = old.inputs.iter().filter_map(|(key, source)| {
+            mapping.get(source).copied().or_else(|| retain_external.then_some(*source)).map(|id| (key.clone(), id))
+        }).collect();
+    }
+    candidate.validate()?;
+    *graph = candidate;
+    Ok(mapping.values().copied().collect())
 }
 
 fn collect_export_trees(
@@ -2186,7 +2153,7 @@ fn ordered_kinds() -> Vec<NodeKind> {
     ordered
 }
 fn category_rank(category: &str) -> usize {
-    ["立体", "曲線", "変形", "配列", "数値", "データ", "出力"]
+    ["立体", "精密曲面", "曲線", "変形", "配列", "数値", "データ", "出力"]
         .iter()
         .position(|s| *s == category)
         .unwrap_or(99)
@@ -2243,6 +2210,36 @@ mod tests {
         assert!(matches_search(NodeKind::LinearArray, "並べる"));
         assert!(!matches_search(NodeKind::Circle, "box"));
     }
+    #[test]
+    fn copy_paste_remaps_internal_edges_and_drops_external_links() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let c = graph.add(NodeKind::Multiply, [600., 0.]).unwrap();
+        graph.connect(a, b, "a").unwrap();
+        graph.connect(b, c, "a").unwrap();
+        let nodes = vec![graph.node(b).unwrap().clone(), graph.node(c).unwrap().clone()];
+        let ids = insert_nodes(&mut graph, &nodes, [0., 300.], false).unwrap();
+        let pasted: Vec<_> = ids.iter().copied().collect();
+        assert!(graph.node(pasted[0]).unwrap().inputs.is_empty());
+        assert_eq!(graph.node(pasted[1]).unwrap().inputs["a"], pasted[0]);
+        let duplicates: Vec<_> = insert_nodes(&mut graph, &nodes, [0., 600.], true).unwrap().into_iter().collect();
+        assert_eq!(graph.node(duplicates[0]).unwrap().inputs["a"], a);
+        assert_eq!(graph.node(duplicates[1]).unwrap().inputs["a"], duplicates[0]);
+        graph.validate().unwrap();
+    }
+
+    #[test]
+    fn failed_paste_is_atomic() {
+        let mut graph = Graph::default();
+        let id = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let mut node = graph.node(id).unwrap().clone();
+        node.params.insert("value".into(), f64::NAN);
+        let before = graph.clone();
+        assert!(insert_nodes(&mut graph, &[node], [0., 0.], false).is_err());
+        assert_eq!(graph, before);
+    }
+
     #[test]
     fn layout_changes_do_not_trigger_geometry() {
         let a = templates::create(0);

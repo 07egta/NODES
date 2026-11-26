@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "name": "密度が変化する壁",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "rect_grid",
+        "name": "等間隔の候補点",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 15,
+          "ny": 12,
+          "dx": 7,
+          "dy": 7
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "point",
+        "name": "引力点",
+        "position": [
+          20,
+          420
+        ],
+        "params": {
+          "x": 40,
+          "y": 38,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "distance",
+        "name": "引力点への距離",
+        "position": [
+          280,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "remap",
+        "name": "遠いほど密度が低い",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "target_min": 0.95,
+          "target_max": 0.05
+        },
+        "inputs": {
+          "values": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "random",
+        "name": "同じシードの乱数",
+        "position": [
+          280,
+          420
+        ],
+        "params": {
+          "count": 180,
+          "min": 0,
+          "max": 1,
+          "seed": 17
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "expression",
+        "name": "密度マスク",
+        "position": [
+          800,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "x": 3,
+          "y": 4
+        },
+        "preview": false,
+        "script": "floor(1 + x - y)"
+      },
+      {
+        "id": 6,
+        "kind": "cull_pattern",
+        "name": "候補点を間引く",
+        "position": [
+          1060,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "list": 0,
+          "pattern": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "cylinder",
+        "name": "小さな円柱",
+        "position": [
+          800,
+          420
+        ],
+        "params": {
+          "radius": 2.5,
+          "height": 5,
+          "segments": 12
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "point_array",
+        "name": "点の位置に配置",
+        "position": [
+          1060,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "points": 6,
+          "geometry": 7
+        },
+        "preview": false
+      },
+      {
+        "id": 9,
+        "kind": "rotate",
+        "name": "壁として立てる",
+        "position": [
+          1320,
+          30
+        ],
+        "params": {
+          "axis": 0,
+          "angle": 90
+        },
+        "inputs": {
+          "geometry": 8
+        },
+        "preview": false
+      },
+      {
+        "id": 10,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 9
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 11
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}
