@@ -3,10 +3,10 @@
 Base: `df77c542473a5c637f3353dec48e367dd67db027` (evolve/all). MIT OR Apache-2.0. 既存の .morph / NodeKind 識別名を変更しない。実装は独自であり、GH/GHX 互換は主張しない。
 
 ## 公開資料
-- McNeel GH1: https://developer.rhino3d.com/guides/grasshopper/gh-algorithms-and-data-structures/data-structures/ — Range は N+1、Series は要素数 N。
+- McNeel GH1: https://s3.amazonaws.com/mcneel/grasshopper/1.0/docs/en/AlgorithmicModelling.pdf — Range divides into N parts, producing N+1 values; https://grasshopperdocs.com/components/grasshoppersets/range.html lists the Domain and Steps ports.
 - McNeel GH1: https://developer.rhino3d.com/guides/grasshopper/the-why-and-how-of-data-trees/ — item/list mapping。
 - Grasshopper Docs (第三者のコンポーネント索引): https://grasshopperdocs.com/addons/grasshopper-maths.html , https://grasshopperdocs.com/addons/grasshopper-vector.html , https://grasshopperdocs.com/completeIndex.html
-- GH2 はベータで全 GH1 コンポーネントを備えるわけではない: https://discourse.mcneel.com/t/rhino-beta-feature-grasshopper-2-beta/221336 。GH2 の個々のコンポーネントの実測照合なし。
+- McNeel GH2 official docs (Rhino 9.3.26329.6001, export 2026-11-25): https://www.rhino3d.com/docs/grasshopper2/ and https://www.rhino3d.com/docs/grasshopper2/specs/index.html (1,419 components). GH2 has distinct Maths/Function/Complex and other components; not a GH1 superset that this PR claims to reproduce. GH2 Range From Steps: https://www.rhino3d.com/docs/grasshopper2/specs/0000000006b142528a12f9d56f03b469.html (start, increment, step count).
 
 ## 追加登録 (72)
 
@@ -92,7 +92,7 @@ Base: `df77c542473a5c637f3353dec48e367dd67db027` (evolve/all). MIT OR Apache-2.0
 - 角度は新規ノードでは rad を基本とし、Degrees/Radians を別途提供。旧ノードの角度仕様は維持。
 - 区間の合併は包絡区間、交差なしは空。DivideDomain は隣接小区間を平らな端点列で返す。GH1 の完全同等の多出力・型ではない。
 - ベクトル出力は既存 Point の座標上限 1e9 に従う。平面は右手系に直交化、平行軸は拒否。最近点探索は候補×検索点 100万以下、同距離は初出。
-- Graph Mapper は数値出力 (線形/Bezier/Sin/Cos/Gaussian/指数)、既存 GraphProfile と別ノード。独自の曲線定義。数式パーサは既存 expr.rs。行列、逆行列、線形方程式、フーリエ、最適化、完全な Plane ノード群、型付き集合は後続。
+- Graph Mapper は数値出力 (線形/Bezier/Sin/Cos/Gaussian/指数)、既存 GraphProfile と別ノード。独自の曲線定義。インスペクターで種類を選択し、ベジェ制御点をドラッグ可能。ノードの既存 params に保存し、評価器とプレビューは同一 mapper 関数を使う。上流から制御点を接続した場合はドラッグを無効にし、グラフはローカル設定の参考表示になる。3D 表示は下流の形状ノードがマッパー出力を利用した場合に更新される設計（実機未検証）。数式パーサは既存 expr.rs。行列、逆行列、線形方程式、フーリエ、最適化、完全な Plane ノード群、型付き集合は後続。
 - 総和/平均はスケーリング + 補償和、標準偏差は母集団。総積は途中オーバーフローをエラーとしアンダーフローは f64 の通常挙動。乱数は既存 SplitMix64 を利用。GH の乱数系列の同一性は主張しない。
 
 ## 検証
