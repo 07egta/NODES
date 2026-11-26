@@ -3,7 +3,7 @@
 use crate::engine::{cancelled, num};
 use crate::model::{DataType, MAX_ITEMS, NodeKind, NodeSpec, Value, g, i, n};
 use std::collections::BTreeSet;
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::{E, PI, TAU};
 
 pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
     use NodeKind::*;
@@ -220,7 +220,7 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
                 keywords: "log ln logarithm",
                 inputs: &[
                     n("x", "真数", 1.0, -1e12, 1e12, 0.01),
-                    n("base", "底", 2.718281828459045, 0.000000001, 1e12, 0.01),
+                    n("base", "底", E, 0.000000001, 1e12, 0.01),
                 ],
                 output: DataType::Number,
             };

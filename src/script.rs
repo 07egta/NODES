@@ -35,6 +35,9 @@ const SCRIPT_STACK_BYTES: usize = 16 * 1024 * 1024;
 const MAX_MERGE_PARTS: usize = 4_096;
 const CANCELLED: &str = "計算を停止しました。";
 
+type UnaryMathFunction = fn(f64) -> f64;
+type BinaryMathFunction = fn(f64, f64) -> f64;
+
 const fn number_input(key: &'static str, label: &'static str, default: f64) -> InputSpec {
     InputSpec {
         key,
@@ -370,7 +373,7 @@ fn register_api(engine: &mut Engine) {
     engine.register_get("z", |p: &mut SPoint| p.0[2]);
 
     // Math. Arguments may be integers or floats (Rhai itself is strict about that).
-    let unary: [(&str, fn(f64) -> f64); 15] = [
+    let unary: [(&str, UnaryMathFunction); 15] = [
         ("sin", f64::sin),
         ("cos", f64::cos),
         ("tan", f64::tan),
@@ -392,7 +395,7 @@ fn register_api(engine: &mut Engine) {
             finite(f(num(&x)?))
         });
     }
-    let binary: [(&str, fn(f64, f64) -> f64); 4] = [
+    let binary: [(&str, BinaryMathFunction); 4] = [
         ("atan2", f64::atan2),
         ("pow", f64::powf),
         ("min", f64::min),

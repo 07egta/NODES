@@ -39,7 +39,8 @@ fn scalar_chain(count: usize) -> Graph {
 fn ten_thousand_scalar_nodes_evaluate_cache_and_recompute_only_the_edited_suffix() {
     const COUNT: usize = 10_000;
     const MIDDLE: usize = COUNT / 2;
-    assert!(MAX_NODES >= COUNT);
+    // Keep the capacity requirement at compile time as well as graph validation below.
+    const _: () = assert!(MAX_NODES >= COUNT);
     let mut graph = scalar_chain(COUNT);
     let last = (COUNT - 1) as NodeId;
     let mut evaluator = Evaluator::default();

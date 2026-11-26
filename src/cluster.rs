@@ -120,12 +120,16 @@ fn definition_signature(def: &ClusterDef) -> String {
     out
 }
 
+/// Definition id and observed revision; missing definitions retain a None revision.
+type ClusterDependencyRevision = (u64, Option<u128>);
+type SharedClusterDependencies = Arc<[ClusterDependencyRevision]>;
+
 /// Exact cache identities without copying complete definition JSON into every instance.
 /// The token is assigned only after comparing the full definition signature (not a hash).
 #[derive(Clone, PartialEq)]
 pub(crate) enum CacheExtra {
     Text(String),
-    Cluster(Option<Arc<[(u64, Option<u128>)]>>),
+    Cluster(Option<SharedClusterDependencies>),
 }
 
 struct DefinitionRevision {
@@ -139,7 +143,7 @@ struct DefinitionRevision {
 pub(crate) struct CacheKeys {
     definitions: BTreeMap<u64, DefinitionRevision>,
     checked: BTreeSet<u64>,
-    roots: BTreeMap<u64, Arc<[(u64, Option<u128>)]>>,
+    roots: BTreeMap<u64, SharedClusterDependencies>,
     revision: u128,
 }
 
@@ -186,7 +190,7 @@ impl CacheKeys {
             }
             dependencies.push((id, self.definitions.get(&id).map(|d| d.revision)));
         }
-        let key: Arc<[(u64, Option<u128>)]> = dependencies.into();
+        let key: SharedClusterDependencies = dependencies.into();
         self.roots.insert(root, Arc::clone(&key));
         CacheExtra::Cluster(Some(key))
     }

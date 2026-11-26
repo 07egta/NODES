@@ -773,7 +773,7 @@ impl CurveGeometry {
         for w in breaks.windows(2) {
             stopped(cancel)?;
             let whole = self.gauss(w[0], w[1], &mut work)?;
-            self.refine(w[0], w[1], whole, 0, &mut work, &mut table, cancel)?;
+            self.refine([w[0], w[1]], whole, 0, &mut work, &mut table, cancel)?;
         }
         Ok(table)
     }
@@ -804,8 +804,7 @@ impl CurveGeometry {
     }
     fn refine(
         &self,
-        a: f64,
-        b: f64,
+        interval: [f64; 2],
         whole: f64,
         depth: usize,
         work: &mut usize,
@@ -813,6 +812,7 @@ impl CurveGeometry {
         cancel: &dyn Fn() -> bool,
     ) -> R<()> {
         stopped(cancel)?;
+        let [a, b] = interval;
         let m = (a + b) / 2.;
         let left = self.gauss(a, m, work)?;
         let right = self.gauss(m, b, work)?;
@@ -834,8 +834,8 @@ impl CurveGeometry {
         } else if depth == 12 {
             Err("弧長計算が収束しません。曲線を分割してください。".into())
         } else {
-            self.refine(a, m, left, depth + 1, work, table, cancel)?;
-            self.refine(m, b, right, depth + 1, work, table, cancel)
+            self.refine([a, m], left, depth + 1, work, table, cancel)?;
+            self.refine([m, b], right, depth + 1, work, table, cancel)
         }
     }
     /// Approximate nearest parameter: sample all spans, refine local minima in each sampled
