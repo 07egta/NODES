@@ -203,8 +203,14 @@ def collect(
 def serialize(report: dict, limit: int = MAX_JSON_BYTES) -> str:
     # ASCII escaping keeps every fragment on exactly one log line, including
     # source strings containing newlines or workflow-command-looking text.
+    # The runner's legacy ##[command] parser also searches inside a line;
+    # neutralize both command syntaxes while preserving decoded JSON content.
     while True:
-        payload = json.dumps(report, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+        payload = (
+            json.dumps(report, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+            .replace("##[", r"\u0023\u0023[")
+            .replace("::", r"\u003a\u003a")
+        )
         if len(payload) <= limit:
             return payload
         if not report["files"]:
@@ -215,7 +221,10 @@ def serialize(report: dict, limit: int = MAX_JSON_BYTES) -> str:
 
 
 def checkpoint_lines(payload: str, revision: str, chunk_size: int = CHUNK_CHARS) -> list[str]:
-    if not 1 <= chunk_size <= CHUNK_CHARS or not payload.isascii():
+    if (
+        not 1 <= chunk_size <= CHUNK_CHARS or not payload.isascii()
+        or "##[" in payload or "::" in payload
+    ):
         raise ExportError("invalid_chunk_encoding")
     parts = [payload[index:index + chunk_size] for index in range(0, len(payload), chunk_size)]
     digest = hashlib.sha256(payload.encode("ascii")).hexdigest()
@@ -324,10 +333,13 @@ class CheckpointTests(unittest.TestCase):
             collect(root, "main", {})
 
     def test_numbered_fragments_roundtrip_without_log_command_injection(self) -> None:
-        payload = json.dumps(
-            {"text": "日本語\n::error::fake\n" + "A" * 20000},
-            ensure_ascii=True, separators=(",", ":"),
-        )
+        original = "日本語\n::error::fake\n##[error]fake\n" + "A" * 20000
+        payload = serialize({"files": [], "omitted": [], "complete": True, "text": original})
+        self.assertEqual(json.loads(payload)["text"], original)
+        self.assertNotIn("##[", payload)
+        self.assertNotIn("::", payload)
+        with self.assertRaises(ExportError):
+            checkpoint_lines('{"unsafe":"##[error]fake"}', "1" * 40)
         lines = checkpoint_lines(payload, "1" * 40)
         parts = []
         expected_count = len(lines) - 2
