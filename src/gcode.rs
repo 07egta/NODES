@@ -755,9 +755,11 @@ mod tests {
 
     #[test]
     fn layer_height_above_line_width_is_rejected() {
-        let mut s = GcodeSettings::default();
-        s.layer_height_mm = 0.5;
-        s.line_width_mm = 0.4;
+        let s = GcodeSettings {
+            layer_height_mm: 0.5,
+            line_width_mm: 0.4,
+            ..GcodeSettings::default()
+        };
         assert!(s.validate().is_err());
     }
 

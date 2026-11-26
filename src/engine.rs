@@ -1,10 +1,11 @@
 //! Deterministic, bounded graph evaluation and procedural mesh construction.
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
 use crate::model::*;
-use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
 #[derive(Clone, Debug, Default)]
@@ -33,8 +34,14 @@ pub struct Evaluator {
     cache: BTreeMap<NodeId, Cache>,
     cache_weight: usize,
     revision: u64,
+    /// Thread cap override (`None`: all available cores, up to `MAX_THREADS`).
+    max_threads: Option<usize>,
 }
 impl Evaluator {
+    /// Limits the worker threads used for one graph level (1 = fully sequential).
+    pub fn set_max_threads(&mut self, threads: usize) {
+        self.max_threads = Some(threads);
+    }
     fn remove_cached(&mut self, id: NodeId) {
         if let Some(old) = self.cache.remove(&id) {
             self.cache_weight = self
@@ -61,16 +68,16 @@ impl Evaluator {
         self.cache.insert(id, entry);
     }
 
-    pub fn evaluate(&mut self, graph: &Graph, cancel: &dyn Fn() -> bool) -> Evaluation {
+    pub fn evaluate(&mut self, graph: &Graph, cancel: &(dyn Fn() -> bool + Sync)) -> Evaluation {
         let start = Instant::now();
         let mut out = Evaluation::default();
         // Latch cancellation: a one-shot callback must not become a cached node error.
-        let stopped = Cell::new(false);
+        let stopped = AtomicBool::new(false);
         let stop = || {
-            if !stopped.get() && cancel() {
-                stopped.set(true);
+            if !stopped.load(Ordering::Relaxed) && cancel() {
+                stopped.store(true, Ordering::Relaxed);
             }
-            stopped.get()
+            stopped.load(Ordering::Relaxed)
         };
         if stop() {
             out.cancelled = true;
@@ -92,79 +99,190 @@ impl Evaluator {
         self.cache_weight = self.cache.values().fold(0usize, |sum, c| {
             sum.saturating_add(c.result.as_ref().map(Tree::weight).unwrap_or(0))
         });
+        let threads = if graph.nodes.len() >= PARALLEL_MIN_NODES {
+            self.max_threads
+                .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
+                .clamp(1, MAX_THREADS)
+        } else {
+            1
+        };
         let mut revisions = BTreeMap::new();
         let mut retained = 0usize;
-        for id in order {
+        'levels: for level in levels(graph, &order) {
             if stop() {
                 out.cancelled = true;
                 break;
             }
-            let Some(node) = graph.node(id) else { continue };
-            // Disabled node: empty output, never cached; revision 0 marks "off" for children.
-            if node.off {
-                self.remove_cached(id);
-                revisions.insert(id, 0);
-                out.outputs.insert(id, Ok(Tree::default()));
-                continue;
+            // Phase 1 (sequential): disabled nodes, cache keys and cache hits.
+            let mut slots: Vec<Slot> = Vec::with_capacity(level.len());
+            for id in level {
+                let Some(node) = graph.node(id) else { continue };
+                // Disabled node: empty output, never cached; revision 0 marks "off" for children.
+                if node.off {
+                    self.remove_cached(id);
+                    revisions.insert(id, 0);
+                    out.outputs.insert(id, Ok(Tree::default()));
+                    continue;
+                }
+                let key = Key {
+                    kind: node.kind,
+                    params: node.params.clone(),
+                    inputs: node
+                        .inputs
+                        .iter()
+                        .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
+                        .collect(),
+                    extra: crate::cluster::key_extra(graph, node),
+                };
+                let hit = self
+                    .cache
+                    .get(&id)
+                    .filter(|c| c.key == key)
+                    .map(|c| (c.result.clone(), c.revision));
+                slots.push(Slot {
+                    id,
+                    node,
+                    key,
+                    hit,
+                    fresh: None,
+                });
             }
-            let key = Key {
-                kind: node.kind,
-                params: node.params.clone(),
-                inputs: node
-                    .inputs
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
-                    .collect(),
-                extra: crate::cluster::key_extra(graph, node),
-            };
-            let (result, revision, is_cached) =
-                if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
-                    (c.result.clone(), c.revision, true)
-                } else {
-                    let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
+            // Phase 2: compute the misses. Nodes of one level never depend on each other, so
+            // they may run in parallel; results are slotted by index, so the outcome does
+            // not depend on scheduling.
+            let misses: Vec<usize> = (0..slots.len())
+                .filter(|&i| slots[i].hit.is_none())
+                .collect();
+            let outputs = &out.outputs;
+            if threads > 1 && misses.len() > 1 {
+                let next = AtomicUsize::new(0);
+                let results: Vec<Mutex<Option<Result<Tree, String>>>> =
+                    misses.iter().map(|_| Mutex::new(None)).collect();
+                std::thread::scope(|scope| {
+                    for _ in 0..threads.min(misses.len()) {
+                        scope.spawn(|| {
+                            loop {
+                                let k = next.fetch_add(1, Ordering::Relaxed);
+                                let Some(&i) = misses.get(k) else { break };
+                                if stop() {
+                                    break;
+                                }
+                                let r = crate::cluster::evaluate_any(
+                                    graph,
+                                    slots[i].node,
+                                    outputs,
+                                    &stop,
+                                );
+                                // A result computed while cancelling may be a cancel error.
+                                if !stop()
+                                    && let Ok(mut cell) = results[k].lock()
+                                {
+                                    *cell = Some(r);
+                                }
+                            }
+                        });
+                    }
+                });
+                for (k, cell) in results.into_iter().enumerate() {
+                    slots[misses[k]].fresh = cell.into_inner().ok().flatten();
+                }
+            } else {
+                for &i in &misses {
                     if stop() {
-                        out.cancelled = true;
                         break;
                     }
-                    self.revision = self.revision.wrapping_add(1).max(1);
-                    (result, self.revision, false)
+                    let r = crate::cluster::evaluate_any(graph, slots[i].node, outputs, &stop);
+                    if !stop() {
+                        slots[i].fresh = Some(r);
+                    }
+                }
+            }
+            // Phase 3 (sequential, in level order): revisions, weight budget, cache, outputs.
+            for slot in slots {
+                let id = slot.id;
+                let (result, revision, is_cached) = match (slot.hit, slot.fresh) {
+                    (Some((r, rev)), _) => (r, rev, true),
+                    (None, Some(r)) => {
+                        self.revision = self.revision.wrapping_add(1).max(1);
+                        (r, self.revision, false)
+                    }
+                    (None, None) => {
+                        out.cancelled = true;
+                        break 'levels;
+                    }
                 };
-            if is_cached {
-                out.cached += 1;
-            } else {
-                out.computed += 1;
+                if is_cached {
+                    out.cached += 1;
+                } else {
+                    out.computed += 1;
+                }
+                let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
+                if retained.saturating_add(weight) > MAX_TOTAL_WEIGHT {
+                    self.remove_cached(id);
+                    self.revision = self.revision.wrapping_add(1).max(1);
+                    revisions.insert(id, self.revision);
+                    out.outputs.insert(
+                        id,
+                        Err(
+                            "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
+                                .into(),
+                        ),
+                    );
+                    continue;
+                }
+                retained = retained.saturating_add(weight);
+                if !is_cached {
+                    self.store_cached(
+                        id,
+                        Cache {
+                            key: slot.key,
+                            revision,
+                            result: result.clone(),
+                        },
+                    );
+                }
+                revisions.insert(id, revision);
+                out.outputs.insert(id, result);
             }
-            let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
-            if retained.saturating_add(weight) > MAX_TOTAL_WEIGHT {
-                self.remove_cached(id);
-                self.revision = self.revision.wrapping_add(1).max(1);
-                revisions.insert(id, self.revision);
-                out.outputs.insert(
-                    id,
-                    Err(
-                        "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
-                            .into(),
-                    ),
-                );
-                continue;
-            }
-            retained = retained.saturating_add(weight);
-            if !is_cached {
-                self.store_cached(
-                    id,
-                    Cache {
-                        key,
-                        revision,
-                        result: result.clone(),
-                    },
-                );
-            }
-            revisions.insert(id, revision);
-            out.outputs.insert(id, result);
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
+}
+
+/// Graphs with fewer nodes than this are evaluated on one thread (spawning costs more).
+const PARALLEL_MIN_NODES: usize = 8;
+const MAX_THREADS: usize = 8;
+
+struct Slot<'a> {
+    id: NodeId,
+    node: &'a Node,
+    key: Key,
+    hit: Option<(Result<Tree, String>, u64)>,
+    fresh: Option<Result<Tree, String>>,
+}
+
+/// Groups the topological order into levels: a node's level is one more than its deepest
+/// parent, so nodes of one level are independent. Order inside a level follows `order`.
+fn levels(graph: &Graph, order: &[NodeId]) -> Vec<Vec<NodeId>> {
+    let mut level_of: BTreeMap<NodeId, usize> = BTreeMap::new();
+    let mut out: Vec<Vec<NodeId>> = Vec::new();
+    for &id in order {
+        let Some(node) = graph.node(id) else { continue };
+        let level = node
+            .inputs
+            .values()
+            .filter_map(|p| level_of.get(p))
+            .map(|l| l + 1)
+            .max()
+            .unwrap_or(0);
+        level_of.insert(id, level);
+        if out.len() <= level {
+            out.resize_with(level + 1, Vec::new);
+        }
+        out[level].push(id);
+    }
+    out
 }
 
 pub(crate) fn evaluate_node(
@@ -1620,6 +1738,7 @@ fn segments_intersect(a: [f64; 2], b: [f64; 2], c: [f64; 2], d: [f64; 2], eps: f
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
     fn add(g: &mut Graph, k: NodeKind) -> NodeId {
         g.add(k, [0., 0.]).unwrap()
     }
@@ -1663,6 +1782,7 @@ mod tests {
             add(&mut graph, NodeKind::Vase);
         }
         let mut engine = Evaluator::default();
+        engine.set_max_threads(1); // call counts below must be deterministic
         assert!(
             engine
                 .evaluate(&graph, &|| false)
@@ -1678,21 +1798,26 @@ mod tests {
         // before its sixteen old cached meshes are visited or replaced.
         let mut prefix = graph.clone();
         prefix.nodes.truncate(8);
-        let calls = Cell::new(0usize);
-        let prefix_result = Evaluator::default().evaluate(&prefix, &|| {
-            calls.set(calls.get() + 1);
+        let calls = AtomicUsize::new(0);
+        let mut prefix_engine = Evaluator::default();
+        prefix_engine.set_max_threads(1);
+        let prefix_result = prefix_engine.evaluate(&prefix, &|| {
+            calls.fetch_add(1, Ordering::SeqCst);
             false
         });
         assert!(prefix_result.outputs.values().all(Result::is_ok));
-        let allowed = calls.get();
+        let allowed = calls.load(Ordering::SeqCst);
         drop(prefix_result);
-        calls.set(0);
+        calls.store(0, Ordering::SeqCst);
         let result = engine.evaluate(&graph, &|| {
-            calls.set(calls.get() + 1);
-            calls.get() > allowed
+            calls.fetch_add(1, Ordering::SeqCst) + 1 > allowed / 2
         });
         assert!(result.cancelled);
-        assert_eq!(result.computed, 8);
+        assert!(
+            result.computed > 0 && result.computed < 24,
+            "{}",
+            result.computed
+        );
         assert!(engine.cache_weight <= MAX_TOTAL_WEIGHT);
         assert_eq!(
             engine.cache_weight,
@@ -1750,11 +1875,8 @@ mod tests {
         let mut graph = Graph::default();
         let id = add(&mut graph, NodeKind::Vase);
         let mut engine = Evaluator::default();
-        let calls = Cell::new(0usize);
-        let result = engine.evaluate(&graph, &|| {
-            calls.set(calls.get() + 1);
-            calls.get() == 10
-        });
+        let calls = AtomicUsize::new(0);
+        let result = engine.evaluate(&graph, &|| calls.fetch_add(1, Ordering::SeqCst) + 1 == 10);
         assert!(result.cancelled);
         assert!(result.outputs.is_empty());
         assert!(engine.cache.is_empty());

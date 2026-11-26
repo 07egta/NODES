@@ -650,11 +650,13 @@ fn normalized(v: [f64; 3]) -> Option<[f64; 3]> {
     let l = length(v);
     (l > 1e-12 && l.is_finite()).then(|| [v[0] / l, v[1] / l, v[2] / l])
 }
+/// Per-vertex normals (`None` where unusable) and per-face normals.
+type VertexNormals = (Vec<Option<[f64; 3]>>, Vec<[f64; 3]>);
 /// Angle-weighted vertex normals; `None` where a vertex has no usable face.
 fn vertex_normals(
     m: &Mesh,
     cancel: &dyn Fn() -> bool,
-) -> Result<(Vec<Option<[f64; 3]>>, Vec<[f64; 3]>), String> {
+) -> Result<VertexNormals, String> {
     let mut sums = vec![[0.; 3]; m.vertices.len()];
     let mut faces = Vec::with_capacity(m.triangles.len());
     for (k, t) in m.triangles.iter().enumerate() {

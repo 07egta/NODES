@@ -881,12 +881,6 @@ fn numbers_of(tree: &Tree) -> Vec<f64> {
         })
         .collect()
 }
-fn mesh_in(tree: &Tree) -> Arc<Mesh> {
-    match tree.branches.values().flatten().next() {
-        Some(Value::Mesh(m)) => m.clone(),
-        other => panic!("mesh expected, got {other:?}"),
-    }
-}
 /// A list node fed by 数列 (start, step, count) on its first input.
 fn list_result(
     kind: NodeKind,
