@@ -271,7 +271,8 @@ pub(crate) fn evaluate_node(
     } else {
         None
     };
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind);
+    let list_kind =
+        crate::gh_nodes::is_list_kind(node.kind) || crate::nodes_shape::is_list_kind(node.kind);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -329,7 +330,7 @@ pub(crate) fn evaluate_node(
                 != 0.;
             vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
         } else if list_kind {
-            crate::gh_nodes::run_list(node.kind, &lists, cancel)?
+            crate::nodes_shape::run_list(node.kind, &lists, cancel)?
         } else {
             let count = lists.iter().map(|v| v.len()).max().unwrap_or(0);
             let mut values = Vec::new();
@@ -446,7 +447,7 @@ fn preflight_run(
         NodeKind::NoiseDeform => (shape(args)?.weight(), 1),
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
-        _ => (0, 1),
+        _ => crate::nodes_shape::estimate(kind, args)?,
     };
     if weight > remaining_weight || items > remaining_items {
         return Err("配列や数列の結果が大きすぎます。生成前に停止しました。個数や分割数を減らしてください。".into());
@@ -794,6 +795,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
+        ArcCurve | Polyline | SmoothCurve | OffsetCurve | PointOnCurve | DivideCurve | Pipe
+        | Sweep | SmoothMesh | Subdivide | WeldMesh | UnifyNormals | MeshInfo | Taper | Bend
+        | GridArray | Gyroid | RevolvePoints => crate::nodes_shape::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
         | Remap | Expression | GraphProfile | ImportMesh => {

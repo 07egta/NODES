@@ -6,6 +6,7 @@ pub mod gcode;
 pub mod gh_nodes;
 pub mod import;
 pub mod model;
+pub mod nodes_shape;
 pub mod persistence;
 pub mod print_info;
 pub mod raster;

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "name": "ジャイロイドの小物入れ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "gyroid",
+        "name": "ジャイロイド",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "cell": 15.0,
+          "depth": 60.0,
+          "height": 40.0,
+          "resolution": 40.0,
+          "thickness": 0.35,
+          "width": 60.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "smooth_mesh",
+        "name": "なめらかにする",
+        "position": [
+          262.0,
+          30.0
+        ],
+        "params": {
+          "iterations": 2.0,
+          "method": 1.0,
+          "strength": 0.5
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "mesh_info",
+        "name": "メッシュ情報",
+        "position": [
+          262.0,
+          310.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          504.0,
+          30.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 0.86
+}

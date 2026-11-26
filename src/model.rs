@@ -184,6 +184,26 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    // Curve, tube, mesh-repair, transform and gyroid nodes (see `nodes_shape.rs`). Appended
+    // after the kinds above; the serde names are the snake_case names of these variants.
+    ArcCurve,
+    Polyline,
+    SmoothCurve,
+    OffsetCurve,
+    PointOnCurve,
+    DivideCurve,
+    Pipe,
+    Sweep,
+    SmoothMesh,
+    Subdivide,
+    WeldMesh,
+    UnifyNormals,
+    MeshInfo,
+    Taper,
+    Bend,
+    GridArray,
+    Gyroid,
+    RevolvePoints,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +273,24 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::ArcCurve,
+            Self::Polyline,
+            Self::SmoothCurve,
+            Self::OffsetCurve,
+            Self::PointOnCurve,
+            Self::DivideCurve,
+            Self::Pipe,
+            Self::Sweep,
+            Self::SmoothMesh,
+            Self::Subdivide,
+            Self::WeldMesh,
+            Self::UnifyNormals,
+            Self::MeshInfo,
+            Self::Taper,
+            Self::Bend,
+            Self::GridArray,
+            Self::Gyroid,
+            Self::RevolvePoints,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -863,7 +901,7 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
-            other => crate::gh_nodes::spec(other),
+            other => crate::nodes_shape::spec(other),
         }
     }
 }
