@@ -71,6 +71,8 @@ nodes-cli diagnose examples/01.morph
 
 大量のエラーでも出力を抑えるため、各ノードの原因 ID は最大 64 個、各原因候補の影響先 ID は最大 256 個です。総数は `upstream_root_count` / `affected_count`、省略の有無は `upstream_roots_truncated` / `affected_nodes_truncated` で確認できます。形状の頂点配列やデータツリー全体は診断に含めません。
 
+長い評価メッセージは UTF-8 の文字境界を保って最大 8,192 バイトに抑え、`message_truncated` で省略の有無を示します。通常のエラー文はそのまま保持します。
+
 各診断コマンドは新しい評価器を使うので、通常 `cached_count` は `0` です。`hotspots[].elapsed_ms` は入力準備・キャッシュ処理・形状計算などを含むノード処理の経過時間、`share_percent` は対象ノードの計測時間合計に対する比率です。CPU 使用率、GUI のフレーム時間、最適化後の予測時間としては扱わないでください。
 
 ## 編集例

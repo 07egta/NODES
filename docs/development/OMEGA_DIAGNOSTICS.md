@@ -120,3 +120,37 @@ documents cancellable solving and null gaps on unassigned item outputs, which
 differ from compact whole-twig routing. These inform review questions; the new
 NODES report is dependency inference and does not implement or certify GH error
 semantics, native null values, multi-output gap rules, or cluster-internal causes.
+
+## Functional checkpoint 2: bounded worst-case work
+
+The initial feature is remotely preserved at `78eac24ac730ff3a9d882df55a991923e25ad7c2`.
+Independent review of a growing-prefix fan-in graph found that saturated affected
+previews were repeatedly copied for different upstream root sets. The follow-up
+keeps exact counts but orders shared groups by their smallest affected ID, appends
+ordered previews directly and skips updates unable to change an already full
+preview. This targets diagnostic-report construction only.
+
+Error text is now capped at 8,192 UTF-8 bytes with `message_truncated`; real error
+messages normally remain unchanged. Timing normalization also remains finite for
+synthetic extreme values. Core regressions after these edits: **11 passed**.
+The independent reviewer rechecked the grouping/counting, preview ordering,
+message boundaries and index invariants without finding a correctness issue.
+
+The reproducible `examples/diagnostics_perf.rs` benchmark and
+[protocol](DIAGNOSTICS_PERF_PROTOCOL.md) measure real evaluated graphs, including
+10,000-node success chains, maximum-length failure chains, balanced multi-root
+joins and a 16,383-node growing-prefix adversary. The executable uses independent
+closed-form fixture expectations, separates evaluation/diagnosis/serialization,
+and records source/profile metadata. Full matched before/after results are pending.
+
+The first all-target local run exhausted the shared filesystem while emitting
+large debug binaries/logs. It is **not** counted as a passing suite. Only this
+workstream's reproducible `target` cache was removed (6.3 GiB), then rebuilding
+resumed with `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
+`CARGO_INCREMENTAL=0`, `CARGO_BUILD_JOBS=2`. Source files and remote checkpoints
+were preserved. These local flags do not change repository Cargo profiles or CI.
+
+The native desktop is available through Xfce, although the ordinary command shell
+has no display variables. GUI launch and interaction will use that desktop after
+the rebuilt binary is ready. Additional diagnostic-list navigation and an
+independent BFS oracle are being developed in the same workstream.

@@ -1,5 +1,7 @@
 use morphlet::cluster::ClusterDef;
-use morphlet::diagnostics::{MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, NodeFailure, diagnose};
+use morphlet::diagnostics::{
+    MAX_DIAGNOSTIC_MESSAGE_BYTES, MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, NodeFailure, diagnose,
+};
 use morphlet::engine::{Evaluation, Evaluator, NodeTiming};
 use morphlet::model::{Graph, NodeId, NodeKind, Tree};
 use std::cell::Cell;
@@ -57,6 +59,7 @@ fn two_root_failures_merge_without_duplicate_causes_or_affected_nodes() {
     assert_eq!(report.blocked_nodes[1].upstream_roots, vec![a, b]);
     assert_eq!(report.blocked_nodes[2].upstream_root_count, 2);
     for failure in report.root_failures.iter().chain(&report.blocked_nodes) {
+        assert!(!failure.message_truncated);
         assert_eq!(
             &failure.message,
             evaluation.outputs[&failure.node.id].as_ref().unwrap_err()
@@ -286,6 +289,64 @@ fn timing_ranking_includes_cache_hits_and_partial_work_without_claiming_cpu_perc
     assert!(json["summary"]["measured_node_ms"].is_number());
     assert!(json["hotspots"][0]["elapsed_ms"].is_number());
     assert!(json["hotspots"][0]["share_percent"].is_number());
+
+    evaluation.node_timings.get_mut(&a).unwrap().elapsed_ms = f64::MAX;
+    evaluation.node_timings.get_mut(&b).unwrap().elapsed_ms = f64::MAX;
+    let overflow = diagnose(&graph, &evaluation);
+    assert_eq!(overflow.summary.measured_node_ms, f64::MAX);
+    let shares: f64 = overflow
+        .hotspots
+        .iter()
+        .map(|hotspot| hotspot.share_percent)
+        .sum();
+    assert!((shares - 100.).abs() < 1e-10);
+    assert!(serde_json::to_value(overflow).unwrap()["summary"]["measured_node_ms"].is_number());
+}
+
+#[test]
+fn roots_are_id_sorted_even_when_discovered_in_reverse_topological_order() {
+    let mut graph = Graph::default();
+    let low = failing_divide(&mut graph);
+    let high = failing_divide(&mut graph);
+    let source = add(&mut graph, NodeKind::Number);
+    graph.connect(source, low, "a").unwrap();
+    assert_eq!(graph.topological_order().unwrap(), vec![high, source, low]);
+    let evaluation = Evaluator::default().evaluate(&graph, &|| false);
+    let report = diagnose(&graph, &evaluation);
+    assert_eq!(ids(&report.root_failures), vec![low, high]);
+}
+
+#[test]
+fn oversized_error_text_is_utf8_safe_and_unknown_evaluation_ids_are_ignored() {
+    let mut graph = Graph::default();
+    let node = add(&mut graph, NodeKind::Number);
+    let long_message = "不正な入力🟣".repeat(MAX_DIAGNOSTIC_MESSAGE_BYTES);
+    let mut evaluation = Evaluation::default();
+    evaluation.outputs.insert(node, Err(long_message.clone()));
+    evaluation
+        .outputs
+        .insert(node + 1, Err("別のグラフのエラー".into()));
+    evaluation.node_timings.insert(
+        node + 1,
+        NodeTiming {
+            elapsed_ms: 10.,
+            cached: true,
+        },
+    );
+    let report = diagnose(&graph, &evaluation);
+    assert_eq!(report.summary.node_count, 1);
+    assert_eq!(report.summary.completed_count, 1);
+    assert_eq!(report.summary.failed_count, 1);
+    assert!(report.hotspots.is_empty());
+    let failure = &report.root_failures[0];
+    assert!(failure.message_truncated);
+    assert!(failure.message.len() <= MAX_DIAGNOSTIC_MESSAGE_BYTES);
+    assert!(failure.message.ends_with('…'));
+    assert!(long_message.starts_with(failure.message.trim_end_matches('…')));
+    assert_eq!(
+        evaluation.outputs[&node].as_ref().unwrap_err(),
+        &long_message
+    );
 }
 
 #[test]

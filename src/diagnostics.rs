@@ -18,6 +18,9 @@ pub const DIAGNOSTIC_SCHEMA_VERSION: u32 = 1;
 /// Exact counts are retained when the display/API relationship lists are shortened.
 pub const MAX_REPORTED_ROOTS: usize = 64;
 pub const MAX_REPORTED_AFFECTED: usize = 256;
+/// Error messages can contain user script text. Bound each report entry without
+/// changing the evaluator's original result or splitting a UTF-8 character.
+pub const MAX_DIAGNOSTIC_MESSAGE_BYTES: usize = 8_192;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct DiagnosticReport {
@@ -82,8 +85,9 @@ impl From<&Node> for NodeRef {
 #[derive(Clone, Debug, Serialize)]
 pub struct NodeFailure {
     pub node: NodeRef,
-    /// Original evaluator message, preserved verbatim.
+    /// Original evaluator message, preserved verbatim unless message_truncated.
     pub message: String,
+    pub message_truncated: bool,
     /// Failed upstream roots, sorted by ID, capped at MAX_REPORTED_ROOTS.
     /// Empty for a root failure itself.
     pub upstream_roots: Vec<NodeId>,
@@ -254,10 +258,25 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     report.summary.disabled_count = report.disabled_nodes.len();
     report.summary.unevaluated_count = report.unevaluated_nodes.len();
     // Real evaluator times cannot overflow this sum; keep the public report JSON
-    // finite even for synthetic/stale callers constructing Evaluation manually.
-    report.summary.measured_node_ms =
-        valid_time(report.summary.measured_node_ms).unwrap_or(f64::MAX);
-    if report.summary.measured_node_ms > 0. {
+    // finite even for synthetic callers constructing Evaluation manually. For an
+    // overflowing synthetic sum, saturate the reported total but normalize shares
+    // in scaled units so they still do not exceed 100% in aggregate.
+    if !report.summary.measured_node_ms.is_finite() {
+        let largest = report
+            .hotspots
+            .iter()
+            .map(|hotspot| hotspot.elapsed_ms)
+            .fold(0., f64::max);
+        let scaled_total: f64 = report
+            .hotspots
+            .iter()
+            .map(|hotspot| hotspot.elapsed_ms / largest)
+            .sum();
+        for hotspot in &mut report.hotspots {
+            hotspot.share_percent = (hotspot.elapsed_ms / largest) / scaled_total * 100.;
+        }
+        report.summary.measured_node_ms = f64::MAX;
+    } else if report.summary.measured_node_ms > 0. {
         for hotspot in &mut report.hotspots {
             hotspot.share_percent = hotspot.elapsed_ms / report.summary.measured_node_ms * 100.;
         }
@@ -313,16 +332,20 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             },
         );
     }
-    let mut root_positions = BTreeMap::new();
+    // Only indices set by actual root failures are ever read from this vector.
+    // Direct indexing avoids a map lookup for each root/group membership.
+    let mut root_positions = vec![0; nodes.len()];
     let mut groups: BTreeMap<(bool, usize), AffectedGroup> = BTreeMap::new();
     for (id, failure) in failures {
         let node = nodes[indices[&id]];
         let Some(Err(message)) = evaluation.outputs.get(&id) else {
             continue;
         };
+        let (message, message_truncated) = bounded_message(message);
         let mut entry = NodeFailure {
             node: NodeRef::from(node),
-            message: message.clone(),
+            message,
+            message_truncated,
             upstream_roots: Vec::new(),
             upstream_root_count: 0,
             upstream_roots_truncated: false,
@@ -331,7 +354,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             affected_nodes_truncated: false,
         };
         if failure.is_root {
-            root_positions.insert(indices[&id], report.root_failures.len());
+            root_positions[indices[&id]] = report.root_failures.len();
             report.root_failures.push(entry);
         } else {
             let group = groups.entry(failure.roots.key()).or_insert_with(|| {
@@ -363,9 +386,14 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     }
     // Transpose root membership once per shared root set. A many-root merge followed
     // by a long chain therefore does not visit every root for every descendant.
-    for group in groups.values() {
+    // Process groups by their smallest affected ID. Prefix-merge graphs can have
+    // many distinct root sets; filling the smallest previews first lets later
+    // groups update exact counts without repeatedly copying already-full lists.
+    let mut groups: Vec<_> = groups.values().collect();
+    groups.sort_unstable_by_key(|group| group.preview.first().copied());
+    for group in groups {
         group.roots.for_each(|index| {
-            let root = &mut report.root_failures[root_positions[&index]];
+            let root = &mut report.root_failures[root_positions[index]];
             root.affected_count += group.count;
             merge_preview(&mut root.affected_nodes, &group.preview);
         });
@@ -382,10 +410,38 @@ fn valid_time(time: f64) -> Option<f64> {
     (time.is_finite() && time >= 0.).then_some(time)
 }
 
+fn bounded_message(message: &str) -> (String, bool) {
+    if message.len() <= MAX_DIAGNOSTIC_MESSAGE_BYTES {
+        return (message.to_owned(), false);
+    }
+    let mut end = MAX_DIAGNOSTIC_MESSAGE_BYTES - '…'.len_utf8();
+    while !message.is_char_boundary(end) {
+        end -= 1;
+    }
+    (format!("{}…", &message[..end]), true)
+}
+
 /// Keep the smallest IDs across groups, independently of their allocation order.
 fn merge_preview(current: &mut Vec<NodeId>, incoming: &[NodeId]) {
+    if incoming.is_empty()
+        || (current.len() == MAX_REPORTED_AFFECTED
+            && incoming
+                .first()
+                .zip(current.last())
+                .is_some_and(|(first, last)| first >= last))
+    {
+        return;
+    }
     if current.is_empty() {
         current.extend(incoming.iter().take(MAX_REPORTED_AFFECTED));
+        return;
+    }
+    if current
+        .last()
+        .zip(incoming.first())
+        .is_some_and(|(last, first)| last < first)
+    {
+        current.extend(incoming.iter().take(MAX_REPORTED_AFFECTED - current.len()));
         return;
     }
     let mut merged = Vec::with_capacity(MAX_REPORTED_AFFECTED.min(current.len() + incoming.len()));
