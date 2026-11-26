@@ -911,236 +911,156 @@ impl MorphletApp {
     }
     fn topbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("topbar")
-            .exact_height(66.)
-            .frame(
-                egui::Frame::new()
-                    .fill(Color32::from_rgb(28, 48, 48))
-                    .inner_margin(egui::Margin::symmetric(18, 12)),
-            )
+            .frame(egui::Frame::new().fill(theme::toolbar_bg()).inner_margin(egui::Margin::symmetric(10, 6)))
             .show(ctx, |ui| {
-                ui.visuals_mut().override_text_color = Some(Color32::from_rgb(232, 241, 232));
-                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.fg_stroke = Stroke::new(1_f32, Color32::WHITE);
-                ui.horizontal_centered(|ui| {
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(30., 30.), Sense::hover());
-                    let p = ui.painter();
-                    p.line_segment(
-                        [
-                            r.left_bottom() - egui::vec2(0., 5.),
-                            r.center_top() + egui::vec2(-2., 4.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.line_segment(
-                        [
-                            r.center_top() + egui::vec2(-2., 4.),
-                            r.right_bottom() - egui::vec2(0., 5.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.circle_filled(
-                        r.center() + egui::vec2(0., 4.),
-                        3.5,
-                        Color32::from_rgb(232, 201, 120),
-                    );
-                    ui.label(
-                        RichText::new("morphlet")
-                            .size(24.)
-                            .strong()
-                            .color(Color32::from_rgb(242, 247, 233)),
-                    );
-                    ui.add_space(13.);
-                    ui.label(
-                        RichText::new("GEOMETRY STUDIO")
-                            .size(9.)
-                            .color(Color32::from_rgb(159, 187, 172)),
-                    );
-                    ui.add_space(18.);
-                    ui.separator();
-                    ui.add_space(8.);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.project.name)
-                            .font(egui::TextStyle::Body)
-                            .desired_width(185.)
-                            .frame(false)
-                            .text_color(Color32::from_rgb(228, 235, 226)),
-                    )
-                    .on_hover_text("作品名を編集");
-                    if self.dirty {
-                        ui.label(
-                            RichText::new("●")
-                                .size(9.)
-                                .color(Color32::from_rgb(228, 193, 115)),
-                        );
+                ui.horizontal_wrapped(|ui| {
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(22., 22.), Sense::hover());
+                    let a = r.left_bottom() + egui::vec2(3., -4.);
+                    let b = r.center_top() + egui::vec2(0., 4.);
+                    let c = r.right_bottom() - egui::vec2(3., 4.);
+                    for pair in [[a, b], [b, c], [a, c]] {
+                        ui.painter().line_segment(pair, Stroke::new(1.8, theme::teal()));
                     }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("書き出し ↗")
-                                        .color(Color32::from_rgb(20, 58, 45)),
-                                )
-                                .fill(Color32::from_rgb(177, 222, 184)),
-                            )
-                            .on_hover_text("完成形状を STL / OBJ へ")
-                            .clicked()
-                        {
-                            self.stl_export.open_dialog();
+                    for p in [a, b, c] { ui.painter().circle_filled(p, 2.6, theme::teal()); }
+                    ui.label(RichText::new("NODES").strong().size(18.).color(theme::ink()));
+                    ui.separator();
+                    ui.menu_button("ファイル", |ui| {
+                        if ui.button("新規作品").clicked() { self.request(PendingAction::New, ctx); ui.close(); }
+                        if ui.button("開く  Ctrl+O").clicked() { self.open_dialog(ctx); ui.close(); }
+                        if ui.button("保存  Ctrl+S").clicked() { self.save(false); ui.close(); }
+                        if ui.button("名前を付けて保存").clicked() { self.save(true); ui.close(); }
+                        ui.separator();
+                        if ui.button("STL / OBJ 書き出し").clicked() { self.stl_export.open_dialog(); ui.close(); }
+                        if ui.button("G-code（花瓶モード・未検証）").clicked() { self.gcode.open(); ui.close(); }
+                    });
+                    ui.menu_button("編集", |ui| {
+                        if ui.add_enabled(self.history.can_undo(), egui::Button::new("元に戻す  Ctrl+Z")).clicked() { self.undo(); ui.close(); }
+                        if ui.add_enabled(self.history.can_redo(), egui::Button::new("やり直す  Ctrl+Y")).clicked() { self.redo(); ui.close(); }
+                        ui.separator();
+                        let selected = !self.canvas.selected.is_empty();
+                        if ui.add_enabled(selected, egui::Button::new("コピー  Ctrl+C")).clicked() { self.copy_selected(); ui.close(); }
+                        if ui.add_enabled(!self.clipboard.is_empty(), egui::Button::new("貼り付け  Ctrl+V")).clicked() { self.paste_selected(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("複製  Ctrl+D")).clicked() { self.duplicate_selected(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("グループ  Ctrl+G")).clicked() { self.make_group(); ui.close(); }
+                        if ui.add_enabled(selected, egui::Button::new("削除  Delete")).clicked() { self.delete_selected(); ui.close(); }
+                    });
+                    ui.menu_button("表示", |ui| {
+                        ui.checkbox(&mut self.show_library, "ノードライブラリ");
+                        ui.checkbox(&mut self.show_workspace, "3D と設定");
+                        if ui.button("選択にズーム  Shift+F").clicked() { self.canvas.fit_selection_requested = true; ui.close(); }
+                        if ui.button("全体表示  F").clicked() {
+                            self.canvas.fit_requested = true;
+                            let items = self.previews();
+                            self.viewport.fit(&items);
+                            ui.close();
                         }
-                        ui.menu_button("その他の書き出し", |ui| {
-                            if ui.button("G-code（花瓶モード・未検証）").clicked() {
-                                self.gcode.open();
-                                ui.close();
-                            }
-                        });
-                        if ui.button("保存").on_hover_text("Ctrl+S").clicked() {
-                            self.save(false);
-                        }
-                        if ui.button("開く").on_hover_text("Ctrl+O").clicked() {
-                            self.open_dialog(ctx);
-                        }
-                        if ui.button("作品例").clicked() {
-                            self.template_open = true;
-                        }
-                        if ui
-                            .button("ノード辞典")
-                            .on_hover_text("全ノードの説明・入力・使い方 · F1（選択中のノード）")
-                            .clicked()
-                        {
-                            self.help_window.open_index();
-                        }
-                        if ui.button("?").on_hover_text("使い方").clicked() {
-                            self.help_open = true;
-                        }
-                        if ui
-                            .button("キー")
-                            .on_hover_text("キーボードショートカット一覧 · ?")
-                            .clicked()
-                        {
-                            self.shortcuts_open = true;
-                        }
-                        let theme_label = if self.dark { "明るく" } else { "暗く" };
-                        if ui
-                            .button(theme_label)
-                            .on_hover_text("画面の色を切り替えます（選択は次回も保たれます）")
-                            .clicked()
-                        {
-                            self.toggle_theme(ctx);
+                        if ui.button(if self.dark { "ライトテーマ" } else { "ダークテーマ" }).clicked() {
+                            self.toggle_theme(ctx); ui.close();
                         }
                     });
+                    ui.menu_button("作例・ヘルプ", |ui| {
+                        if ui.button("作品例").clicked() { self.template_open = true; ui.close(); }
+                        if ui.button("ノード辞典  F1").clicked() { self.help_window.open_index(); ui.close(); }
+                        if ui.button("使い方").clicked() { self.help_open = true; ui.close(); }
+                        if ui.button("キー操作一覧").clicked() { self.shortcuts_open = true; ui.close(); }
+                    });
+                    ui.separator();
+                    if ui.small_button("＋ ノード").on_hover_text("Tab / Ctrl+K").clicked() {
+                        self.open_palette(self.canvas.center_for_add(&self.project), None);
+                    }
+                    if ui.small_button("保存").on_hover_text("Ctrl+S").clicked() { self.save(false); }
+                    if ui.button("書き出し").on_hover_text("STL / OBJ").clicked() { self.stl_export.open_dialog(); }
+                    let name_width = ui.available_width().min(170.);
+                    if name_width >= 100. {
+                        ui.add(egui::TextEdit::singleline(&mut self.project.name)
+                            .desired_width(name_width)
+                            .frame(false)).on_hover_text("作品名を編集");
+                    } else {
+                        ui.menu_button("作品名", |ui| { ui.text_edit_singleline(&mut self.project.name); });
+                    }
+                    if self.dirty { ui.label(theme::small("未保存")); }
                 });
             });
     }
     fn library(&mut self, ctx: &egui::Context) {
+        let width = ctx.available_rect().width();
+        let maximum = (width * 0.33).clamp(140., 290.);
         egui::SidePanel::left("library")
-            .exact_width(196.)
-            .resizable(false)
-            .frame(
-                egui::Frame::new()
-                    .fill(theme::panel_bg())
-                    .inner_margin(egui::Margin::symmetric(14, 14)),
-            )
+            .default_width(205_f32.min(maximum))
+            .min_width(140.)
+            .max_width(maximum)
+            .resizable(true)
+            .frame(egui::Frame::new().fill(theme::panel_bg()).inner_margin(egui::Margin::symmetric(9, 10)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("ライブラリ").strong().size(13.));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small(format!("{}", NodeKind::all().len())));
-                    });
+                    ui.label(theme::small(format!("{}", NodeKind::all().len())));
                 });
-                ui.add_space(7.);
-                let search = ui.add(
-                    egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("円・ねじる・並べる…")
-                        .desired_width(f32::INFINITY),
-                );
-                search.on_hover_text("日本語・英語で検索できます");
-                ui.add_space(10.);
+                ui.add(egui::TextEdit::singleline(&mut self.search)
+                    .hint_text("何を作る？")
+                    .desired_width(f32::INFINITY))
+                    .on_hover_text("日本語・英語で検索。例: 円を作る、Construct Point");
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut self.library_filter, 0, "全て");
+                    ui.selectable_value(&mut self.library_filter, 1, "★");
+                    ui.selectable_value(&mut self.library_filter, 2, "最近");
+                });
+                let mut categories: Vec<_> = NodeKind::all().iter().map(|k| k.spec().category).collect();
+                categories.sort_by_key(|c| (category_rank(c), *c));
+                categories.dedup();
                 egui::ComboBox::from_id_salt("category")
                     .selected_text(&self.category)
-                    .width(156.)
+                    .width((ui.available_width()-12.).max(70.))
                     .show_ui(ui, |ui| {
-                        for category in [
-                            "すべて",
-                            "数値",
-                            "曲線",
-                            "立体",
-                            "変形",
-                            "配列",
-                            "データ",
-                            "出力",
-                        ] {
-                            ui.selectable_value(&mut self.category, category.into(), category);
-                        }
+                        ui.selectable_value(&mut self.category, "すべて".into(), "すべて");
+                        for category in categories { ui.selectable_value(&mut self.category, category.into(), category); }
                     });
-                ui.add_space(12.);
+                let mut base = ordered_kinds();
+                if self.library_filter == 1 { base.retain(|k| self.favorites.contains(k)); }
+                if self.library_filter == 2 { base.retain(|k| self.recent.kinds().contains(k)); }
+                base.retain(|k| self.category == "すべて" || self.category == k.spec().category);
+                let ordered = if self.search.trim().is_empty() && self.library_filter != 2 {
+                    base
+                } else {
+                    ui_polish::rank(&base, &self.search, &self.recent, None)
+                };
                 let mut add = None;
+                let mut favorite = None;
+                ui.label(theme::small(format!("{} 件", ordered.len())));
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
-                    .max_height((ui.available_height() - 130.).max(140.))
                     .show(ui, |ui| {
                         let mut last = "";
-                        let mut ordered: Vec<_> = NodeKind::all().to_vec();
-                        ordered.sort_by_key(|kind| category_rank(kind.spec().category));
-                        for kind in &ordered {
+                        for kind in ordered {
                             let spec = kind.spec();
-                            if self.category != "すべて" && self.category != spec.category {
-                                continue;
-                            }
-                            if !matches_search(*kind, &self.search) {
-                                continue;
-                            }
-                            if last != spec.category {
-                                ui.add_space(9.);
+                            if self.search.trim().is_empty() && self.library_filter != 2 && last != spec.category {
+                                ui.add_space(5.);
                                 ui.label(theme::small(spec.category));
-                                ui.add_space(2.);
                                 last = spec.category;
                             }
-                            let color = theme::category_color(spec.category);
-                            let resp = ui.add_sized(
-                                [162., 30.],
-                                egui::Button::new(
-                                    RichText::new(format!("＋  {}", spec.label))
-                                        .size(12.)
-                                        .color(color),
-                                )
-                                .frame(false),
-                            );
-                            if resp
-                                .clone()
-                                .on_hover_text(format!(
-                                    "{}\n\n{}",
-                                    spec.description, "クリックで追加。選択中の形状に接続します。"
-                                ))
-                                .clicked()
-                            {
-                                add = Some(*kind);
-                            }
+                            ui.horizontal(|ui| {
+                                let starred = self.favorites.contains(&kind);
+                                if ui.small_button(if starred { "★" } else { "☆" })
+                                    .on_hover_text(if starred { "お気に入りから外す" } else { "お気に入りに追加" })
+                                    .clicked() { favorite = Some(kind); }
+                                let (r, _) = ui.allocate_exact_size(egui::vec2(6., 17.), Sense::hover());
+                                ui.painter().rect_filled(r, 2, theme::category_color(spec.category));
+                                if ui.add(egui::Button::new(ui_polish::one_line(spec.label, 10)).frame(false))
+                                    .on_hover_text(format!("{}\n{}", spec.label, spec.description)).clicked() {
+                                    add = Some(kind);
+                                }
+                            });
                         }
+                        if let Some(action) = crate::script_ui::library_parts(ui, &self.project.graph) {
+                            self.part_action(action);
+                        }
+                        ui.separator();
+                        if ui.button("作品例").clicked() { self.template_open = true; }
+                        if ui.small_button("新規作品").clicked() { self.request(PendingAction::New, ctx); }
                     });
+                if let Some(kind) = favorite { self.toggle_favorite(kind); }
                 if let Some(kind) = add {
-                    self.add_node(kind, None);
-                }
-                if let Some(action) = crate::script_ui::library_parts(ui, &self.project.graph) {
-                    self.part_action(action);
-                }
-                ui.add_space(12.);
-                ui.separator();
-                ui.add_space(8.);
-                ui.label(
-                    RichText::new("小さな操作から、\n思いがけない形へ。")
-                        .size(12.)
-                        .color(theme::muted()),
-                );
-                ui.add_space(8.);
-                if ui
-                    .add_sized([164., 31.], egui::Button::new("作品例からはじめる"))
-                    .clicked()
-                {
-                    self.template_open = true;
-                }
-                if ui.small_button("空のキャンバスを開く").clicked() {
-                    self.request(PendingAction::New, ctx);
+                    if !self.palette_open { self.add_node(kind, None); }
                 }
             });
     }
@@ -1564,6 +1484,7 @@ impl MorphletApp {
     fn palette(&mut self, ctx: &egui::Context) {
         if !self.palette_open {
             self.wire_source = None;
+            self.palette_ime = false;
             return;
         }
         let mut open = true;
@@ -1572,116 +1493,73 @@ impl MorphletApp {
         let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
         let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
         let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
-        let matches = ui_polish::rank(&ordered, &self.search, &self.recent, wire_type);
-        let last = matches.len().saturating_sub(1);
-        // Keys are consumed here so the text box does not also act on them.
-        let down = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
-        let up = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
-        if down {
-            self.palette_cursor = (self.palette_cursor + 1).min(last);
-        }
-        if up {
-            self.palette_cursor = self.palette_cursor.saturating_sub(1);
-        }
-        self.palette_cursor = self.palette_cursor.min(last);
-        // IME Enter belongs to the input method while composing; only a plain Enter adds.
-        let composing = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Ime(_))));
-        let enter = !composing
-            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
-        if enter {
-            add = matches.get(self.palette_cursor).copied();
-        }
-        let cursor = self.palette_cursor;
+        let mut ime_event = false;
+        ctx.input(|i| {
+            for event in &i.events {
+                if let egui::Event::Ime(event) = event {
+                    ime_event = true;
+                    match event {
+                        egui::ImeEvent::Preedit(text) => self.palette_ime = !text.is_empty(),
+                        egui::ImeEvent::Commit(_) | egui::ImeEvent::Disabled => self.palette_ime = false,
+                        egui::ImeEvent::Enabled => {}
+                    }
+                }
+            }
+        });
+        let composing = ime_event || self.palette_ime;
+        let down = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
+        let up = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
+        let enter = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+        let escape = !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        let width = (ctx.content_rect().width() - 40.).clamp(180., 480.);
+        let max_height = (ctx.content_rect().height() * 0.52).clamp(80., 390.);
         egui::Window::new("ノードを追加")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(460.)
-            .anchor(egui::Align2::CENTER_CENTER, [0., -60.])
+            .default_width(width)
+            .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
-                let r = ui.add(
-                    egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("何をしたい？  円 / twist / まる / 並べる")
-                        .desired_width(f32::INFINITY),
-                );
-                if self.palette_focus {
-                    r.request_focus();
-                    self.palette_focus = false;
-                }
-                if r.changed() {
-                    self.palette_cursor = 0;
-                }
+                ui.set_width(width);
+                let r = ui.add(egui::TextEdit::singleline(&mut self.palette_query)
+                    .hint_text("円を作る / twist / 点を並べる")
+                    .desired_width(f32::INFINITY));
+                let first = self.palette_focus;
+                if first { r.request_focus(); self.palette_focus = false; }
+                if r.changed() { self.palette_cursor = 0; }
                 if let Some(name) = &wire_name {
-                    ui.label(theme::small(format!(
-                        "「{name}」の出力をつなぎます。つなげられるノードを上に出しています"
-                    )));
+                    ui.label(theme::small(format!("{} · {} と接続できる候補のみ", name, wire_type.map(DataType::label).unwrap_or("データ"))));
                 }
-                ui.add_space(5.);
-                egui::ScrollArea::vertical()
-                    .max_height(380.)
-                    .show(ui, |ui| {
-                        for (index, kind) in matches.iter().enumerate() {
-                            let spec = kind.spec();
-                            let (rect, response) = ui.allocate_exact_size(
-                                egui::vec2(430., 40.),
-                                Sense::click(),
-                            );
-                            let active = index == cursor;
-                            if active || response.hovered() {
-                                ui.painter().rect_filled(
-                                    rect,
-                                    6,
-                                    if active {
-                                        theme::teal().gamma_multiply(0.22)
-                                    } else {
-                                        theme::line().gamma_multiply(0.35)
-                                    },
-                                );
-                            }
-                            if active {
-                                response.scroll_to_me(None);
-                            }
-                            let painter = ui.painter();
-                            painter.text(
-                                rect.left_top() + egui::vec2(12., 11.),
-                                egui::Align2::LEFT_CENTER,
-                                spec.label,
-                                FontId::proportional(13.),
-                                theme::ink(),
-                            );
-                            painter.text(
-                                rect.right_top() + egui::vec2(-12., 11.),
-                                egui::Align2::RIGHT_CENTER,
-                                spec.category,
-                                FontId::proportional(10.5),
-                                theme::category_color(spec.category),
-                            );
-                            painter.text(
-                                rect.left_top() + egui::vec2(12., 29.),
-                                egui::Align2::LEFT_CENTER,
-                                ui_polish::one_line(spec.description, 46),
-                                FontId::proportional(10.5),
-                                theme::muted(),
-                            );
-                            if response.clicked() {
-                                add = Some(*kind);
-                            }
-                        }
-                        if matches.is_empty() {
-                            ui.label(
-                                "見つかりません。「移動」「花器」「数列」などを試してください。",
-                            );
-                        }
-                    });
-                ui.add_space(4.);
-                ui.label(theme::small(
-                    "↑ ↓ で選ぶ  ·  Enter かクリックで追加  ·  Esc で閉じる",
-                ));
+                let matches = ui_polish::rank(&ordered, &self.palette_query, &self.recent, wire_type);
+                let last = matches.len().saturating_sub(1);
+                if down && !r.changed() { self.palette_cursor = (self.palette_cursor + 1).min(last); }
+                if up && !r.changed() { self.palette_cursor = self.palette_cursor.saturating_sub(1); }
+                self.palette_cursor = self.palette_cursor.min(last);
+                if enter && !r.changed() { add = matches.get(self.palette_cursor).copied(); }
+                ui.label(theme::small(format!("{} 件 · ↑↓ / Enter", matches.len())));
+                let cursor = self.palette_cursor;
+                egui::ScrollArea::vertical().max_height(max_height).show(ui, |ui| {
+                    for (index, kind) in matches.iter().enumerate() {
+                        let spec = kind.spec();
+                        let response = ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(6., 20.), Sense::hover());
+                            ui.painter().rect_filled(r, 2, theme::category_color(spec.category));
+                            ui.selectable_label(index == cursor, format!("{}  ·  {}", spec.label, spec.category))
+                                .on_hover_text(spec.description)
+                        }).inner;
+                        if index == cursor && (first || up || down || r.changed()) { response.scroll_to_me(None); }
+                        if response.clicked() { add = Some(*kind); }
+                    }
+                    if matches.is_empty() {
+                        ui.label(if wire_type.is_some() { "接続できる候補がありません。検索語を変えるか Esc で中止してください。" }
+                            else { "見つかりません。例: 円を作る、面を作る、花瓶を作る" });
+                    }
+                });
             });
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
-            self.palette_open = open && !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+            self.palette_open = open && !escape;
         }
     }
     /// ショートカット一覧 (?): every keyboard shortcut, in Japanese.
