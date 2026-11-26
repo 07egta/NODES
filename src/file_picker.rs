@@ -372,6 +372,7 @@ impl FilePicker {
             }
             Err(error) => {
                 self.entries.clear();
+                self.truncated = false;
                 self.error = Some(error);
             }
         }
@@ -689,10 +690,7 @@ mod directory_listing_tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "nodes-picker-{}-{id}",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("nodes-picker-{}-{id}", std::process::id()));
         fs::create_dir(&path).unwrap();
         let directory = TempDirectory(path);
         for i in 0..=DIRECTORY_LIMIT {
