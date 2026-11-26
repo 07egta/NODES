@@ -3,7 +3,7 @@
   "branch": "feat/nodes-omega-geometry",
   "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
   "pr": 16,
-  "updated_at_utc": "2026-11-26T23:41:12.359817+00:00",
+  "updated_at_utc": "2026-11-26T23:51:19.477862+00:00",
   "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
   "baseline": {
     "run_id": 45907598179,
@@ -236,6 +236,28 @@
       "review": "Root reviewed shared indexed fan/face analysis, global quantized welding, preserved export limits and actual-process CLI regression. Final diagnostic wording shortened after tests; combined GUI compilation remains pending.",
       "contract": "Closed means nonempty, consistently oriented manifold topology without degenerate or duplicate nondegenerate faces. Shared vertices across separate meshes are tested after 1e-6 mm quantized welding.",
       "limits": "Self-intersections, shell nesting, wall thickness and physical printability remain unverified. This does not forbid exporting open meshes. Full 2m-face performance is not measured."
+    },
+    {
+      "name": "Bounded regular reusable-part input",
+      "files": [
+        "src/cluster.rs",
+        "tests/part_io_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 2
+      },
+      "after": {
+        "passed": 3,
+        "failed": 0
+      },
+      "related_suites": {
+        "script_tests": 32
+      },
+      "command": "cargo test --locked --offline --test part_io_regressions --test script_tests",
+      "review": "Independent integration_audit review: metadata before open prevents an ordinary FIFO from blocking; descriptor check, byte limit and transactional import remain.",
+      "reproduction": "Actual child test process blocked on FIFO and was killed/reaped at 2 seconds before the fix. After the fix it returned an error immediately and preserved graph state.",
+      "limits": "Unix FIFO test is platform-specific. This matches existing project/GHX regular-file checks, not protection against hostile path replacement races."
     }
   ],
   "environment_events": [

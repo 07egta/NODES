@@ -907,7 +907,20 @@ pub fn save_part(path: &Path, graph: &Graph, def_id: u64) -> Result<(), String> 
 }
 
 pub fn load_part(path: &Path, graph: &mut Graph) -> Result<u64, String> {
+    // Check before opening: a FIFO can block in File::open before our bounded
+    // reader gets a chance to run. Match the project/GHX input contract.
+    let metadata = std::fs::metadata(path).map_err(|e| format!("部品を開けませんでした: {e}"))?;
+    if !metadata.is_file() {
+        return Err("部品には通常のファイルを指定してください。".into());
+    }
     let file = File::open(path).map_err(|e| format!("部品を開けませんでした: {e}"))?;
+    if !file
+        .metadata()
+        .map_err(|e| format!("部品を開けませんでした: {e}"))?
+        .is_file()
+    {
+        return Err("部品には通常のファイルを指定してください。".into());
+    }
     let mut bytes = Vec::new();
     file.take((MAX_PART_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
