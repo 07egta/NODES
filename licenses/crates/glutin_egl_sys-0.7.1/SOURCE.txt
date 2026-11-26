@@ -1,0 +1,8 @@
+Package: glutin_egl_sys 0.7.1
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/rust-windowing/glutin
+Crates.io package: https://crates.io/crates/glutin_egl_sys/0.7.1
+Authors from manifest: Kirill Chibisov <contact@kchibisov.com>
+Registry checksum: 4c4680ba6195f424febdc3ba46e7a42a0e58743f2edb115297b86d7f8ecc02d2
+Crate VCS info: {"git": {"sha1": "d9b4fd7036386c5f23b0a1015a31a986805d4db3"}, "path_in_vcs": "glutin_egl_sys"}

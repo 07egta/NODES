@@ -1,0 +1,8 @@
+Package: simd-adler32 0.3.10
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/mcountryman/simd-adler32
+Crates.io package: https://crates.io/crates/simd-adler32/0.3.10
+Authors from manifest: Marvin Countryman <me@maar.vin>
+Registry checksum: 3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea
+Crate VCS info: {"git": {"sha1": "d93164f98d7fe2daf883f2e1bec82778dd26199a"}, "path_in_vcs": ""}

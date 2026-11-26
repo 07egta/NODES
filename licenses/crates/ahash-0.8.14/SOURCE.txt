@@ -1,0 +1,8 @@
+Package: ahash 0.8.14
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/tkaitchuck/ahash
+Crates.io package: https://crates.io/crates/ahash/0.8.14
+Authors from manifest: Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
+Registry checksum: 54dae3d1d7b8956f3506c4e999a74e77f932a59153ccf38ab8cf96db74bb9dc0
+Crate VCS info: {"git": {"sha1": "c583f2314a975a9261816f050ab5f02ee0bac22a"}, "path_in_vcs": ""}

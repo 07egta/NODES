@@ -1,0 +1,8 @@
+Package: itoa 1.0.19
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/dtolnay/itoa
+Crates.io package: https://crates.io/crates/itoa/1.0.19
+Authors from manifest: David Tolnay <dtolnay@gmail.com>
+Registry checksum: 3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4
+Crate VCS info: {"git": {"sha1": "9339ca99a43c550b5ee36e2afe524d1c90413461"}, "path_in_vcs": ""}

@@ -1,0 +1,8 @@
+Package: fdeflate 0.3.7
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/image-rs/fdeflate
+Crates.io package: https://crates.io/crates/fdeflate/0.3.7
+Authors from manifest: The image-rs Developers
+Registry checksum: 1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c
+Crate VCS info: {"git": {"sha1": "c365c7e6ffa81feb2e1fb762eed7299f05c9b0ca"}, "path_in_vcs": ""}

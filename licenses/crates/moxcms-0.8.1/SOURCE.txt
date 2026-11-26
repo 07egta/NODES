@@ -1,0 +1,8 @@
+Package: moxcms 0.8.1
+Declared license: BSD-3-Clause OR Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/awxkee/moxcms.git
+Crates.io package: https://crates.io/crates/moxcms/0.8.1
+Authors from manifest: Radzivon Bartoshyk
+Registry checksum: bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b
+Crate VCS info: {"git": {"sha1": "c4affa196727d17f21a7f6f148a558867decb470"}, "path_in_vcs": ""}

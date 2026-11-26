@@ -1,0 +1,8 @@
+Package: autocfg 1.5.1
+Declared license: Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/cuviper/autocfg
+Crates.io package: https://crates.io/crates/autocfg/1.5.1
+Authors from manifest: Josh Stone <cuviper@gmail.com>
+Registry checksum: f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53
+Crate VCS info: {"git": {"sha1": "2799b09c24e6632f8e653c5cd8fc303e85a906ba"}, "path_in_vcs": ""}

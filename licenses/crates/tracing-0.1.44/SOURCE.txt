@@ -1,0 +1,8 @@
+Package: tracing 0.1.44
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/tokio-rs/tracing
+Crates.io package: https://crates.io/crates/tracing/0.1.44
+Authors from manifest: Eliza Weisman <eliza@buoyant.io>, Tokio Contributors <team@tokio.rs>
+Registry checksum: 63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100
+Crate VCS info: {"git": {"sha1": "2d55f6faf9be83e7e4634129fb96813241aac2b8"}, "path_in_vcs": "tracing"}

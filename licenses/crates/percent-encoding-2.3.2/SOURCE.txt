@@ -1,0 +1,8 @@
+Package: percent-encoding 2.3.2
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/servo/rust-url/
+Crates.io package: https://crates.io/crates/percent-encoding/2.3.2
+Authors from manifest: The rust-url developers
+Registry checksum: 9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220
+Crate VCS info: {"git": {"sha1": "91377f48bf35011d042aa5abef9e7f2a0a625aaa", "dirty": true}, "path_in_vcs": "percent_encoding"}

@@ -1,0 +1,8 @@
+Package: windows-targets 0.52.6
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/microsoft/windows-rs
+Crates.io package: https://crates.io/crates/windows-targets/0.52.6
+Authors from manifest: Microsoft
+Registry checksum: 9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973
+Crate VCS info: {"git": {"sha1": "db06b51c2ebb743efb544d40e3064efa49f28d38"}, "path_in_vcs": "crates/libs/targets"}

@@ -1,0 +1,8 @@
+Package: bytemuck 1.25.2
+Declared license: Zlib OR Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/Lokathor/bytemuck
+Crates.io package: https://crates.io/crates/bytemuck/1.25.2
+Authors from manifest: Lokathor <zefria@gmail.com>
+Registry checksum: 95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797
+Crate VCS info: {"git": {"sha1": "f363643e951a7ac9e4b9921de982f2b0918902e3"}, "path_in_vcs": ""}

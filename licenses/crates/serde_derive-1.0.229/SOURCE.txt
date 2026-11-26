@@ -1,0 +1,8 @@
+Package: serde_derive 1.0.229
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/serde-rs/serde
+Crates.io package: https://crates.io/crates/serde_derive/1.0.229
+Authors from manifest: Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>
+Registry checksum: e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348
+Crate VCS info: {"git": {"sha1": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"}, "path_in_vcs": "serde_derive"}

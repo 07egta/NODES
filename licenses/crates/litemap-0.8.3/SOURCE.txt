@@ -1,0 +1,8 @@
+Package: litemap 0.8.3
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/litemap/0.8.3
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: 47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae
+Crate VCS info: {"git": {"sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"}, "path_in_vcs": "utils/litemap"}

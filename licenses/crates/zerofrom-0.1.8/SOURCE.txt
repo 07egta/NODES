@@ -1,0 +1,8 @@
+Package: zerofrom 0.1.8
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/zerofrom/0.1.8
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: 0ec05a11813ea801ff6d75110ad09cd0824ddba17dfe17128ea0d5f68e6c5272
+Crate VCS info: {"git": {"sha1": "e9575f7e4b5aeddfeeb87ada5d3e715950e8233e"}, "path_in_vcs": "utils/zerofrom"}

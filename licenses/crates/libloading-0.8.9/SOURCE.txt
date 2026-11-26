@@ -1,0 +1,8 @@
+Package: libloading 0.8.9
+Declared license: ISC
+Selected license: ISC
+Repository: https://github.com/nagisa/rust_libloading/
+Crates.io package: https://crates.io/crates/libloading/0.8.9
+Authors from manifest: Simonas Kazlauskas <libloading@kazlauskas.me>
+Registry checksum: d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55
+Crate VCS info: {"git": {"sha1": "f4ec9e702de2d0778bccff8525dc44e4cacac2d1"}, "path_in_vcs": ""}

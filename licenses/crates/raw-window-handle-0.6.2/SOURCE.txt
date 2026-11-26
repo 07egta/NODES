@@ -1,0 +1,8 @@
+Package: raw-window-handle 0.6.2
+Declared license: MIT OR Apache-2.0 OR Zlib
+Selected license: MIT
+Repository: https://github.com/rust-windowing/raw-window-handle
+Crates.io package: https://crates.io/crates/raw-window-handle/0.6.2
+Authors from manifest: Osspial <osspial@gmail.com>
+Registry checksum: 20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539
+Crate VCS info: {"git": {"sha1": "5fda8e8420b069368e9450e70c2869e32dcdffc1"}, "path_in_vcs": ""}

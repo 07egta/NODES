@@ -1,0 +1,8 @@
+Package: litrs 1.1.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/LukasKalbertodt/litrs
+Crates.io package: https://crates.io/crates/litrs/1.1.0
+Authors from manifest: Lukas Kalbertodt <lukas.kalbertodt@gmail.com>
+Registry checksum: 02b614978e47ce529faee66579f2b2fe19c94aa96d910a6a9a8043b2b02d8175
+Crate VCS info: {"git": {"sha1": "264dc9a1c75a37edefeabd530ab86eb78d76a1f8"}, "path_in_vcs": ""}

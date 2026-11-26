@@ -1,0 +1,8 @@
+Package: num-traits 0.2.19
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/rust-num/num-traits
+Crates.io package: https://crates.io/crates/num-traits/0.2.19
+Authors from manifest: The Rust Project Developers
+Registry checksum: 071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841
+Crate VCS info: {"git": {"sha1": "7ec3d41d39b28190ec1d42db38021107b3951f3a"}, "path_in_vcs": ""}

@@ -1,0 +1,10 @@
+Package: ecolor 0.33.3
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/emilk/egui
+Crates.io package: https://crates.io/crates/ecolor/0.33.3
+Authors from manifest: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>, Andreas Reich <reichandreas@gmx.de>
+Registry checksum: 71ddb8ac7643d1dba1bb02110e804406dd459a838efcb14011ced10556711a8e
+Crate VCS info: {"git": {"sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"}, "path_in_vcs": "crates/ecolor"}
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE

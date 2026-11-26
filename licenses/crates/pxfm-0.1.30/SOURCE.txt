@@ -1,0 +1,8 @@
+Package: pxfm 0.1.30
+Declared license: BSD-3-Clause OR Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/awxkee/pxfm
+Crates.io package: https://crates.io/crates/pxfm/0.1.30
+Authors from manifest: Radzivon Bartoshyk
+Registry checksum: d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea
+Crate VCS info: {"git": {"sha1": "acf7acd00cfc845307eda7b7b2de19e42303de82"}, "path_in_vcs": ""}

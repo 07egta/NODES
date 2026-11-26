@@ -1,0 +1,8 @@
+Package: ab_glyph_rasterizer 0.1.10
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/alexheretic/ab-glyph
+Crates.io package: https://crates.io/crates/ab_glyph_rasterizer/0.1.10
+Authors from manifest: Alex Butler <alexheretic@gmail.com>
+Registry checksum: 366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618
+Crate VCS info: {"git": {"sha1": "971e5a9b337fbae3edb1ac3ac44d84351d24e8b8"}, "path_in_vcs": "rasterizer"}

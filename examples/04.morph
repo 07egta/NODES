@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "螺旋のスケッチ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "helix",
+        "name": "らせん",
+        "position": [
+          60.0,
+          40.0
+        ],
+        "params": {
+          "height": 110.0,
+          "radius": 30.0,
+          "segments": 256.0,
+          "turns": 3.5
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330.0,
+          90.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 1.1
+}

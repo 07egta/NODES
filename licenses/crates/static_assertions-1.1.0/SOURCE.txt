@@ -1,0 +1,8 @@
+Package: static_assertions 1.1.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/nvzqz/static-assertions-rs
+Crates.io package: https://crates.io/crates/static_assertions/1.1.0
+Authors from manifest: Nikolai Vazquez
+Registry checksum: a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f
+Crate VCS info: {"git": {"sha1": "18bc65a094d890fe1faa5d3ccb70f12b89eabf56"}}

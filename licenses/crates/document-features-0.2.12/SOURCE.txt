@@ -1,0 +1,8 @@
+Package: document-features 0.2.12
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/slint-ui/document-features
+Crates.io package: https://crates.io/crates/document-features/0.2.12
+Authors from manifest: Slint Developers <info@slint.dev>
+Registry checksum: d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61
+Crate VCS info: {"git": {"sha1": "721e708012254b81760bd2befdae0970e7a2615e"}, "path_in_vcs": ""}

@@ -1,0 +1,8 @@
+Package: icu_collections 2.4.0
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/icu_collections/2.4.0
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: fe090a42a0d3140fed8c63263ed1fecc02422cb2f4bfe55cd8de2de1b8e105dd
+Crate VCS info: {"git": {"sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"}, "path_in_vcs": "components/collections"}

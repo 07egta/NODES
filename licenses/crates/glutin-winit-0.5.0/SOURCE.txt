@@ -1,0 +1,8 @@
+Package: glutin-winit 0.5.0
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/rust-windowing/glutin
+Crates.io package: https://crates.io/crates/glutin-winit/0.5.0
+Authors from manifest: Kirill Chibisov <contact@kchibisov.com>
+Registry checksum: 85edca7075f8fc728f28cb8fbb111a96c3b89e930574369e3e9c27eb75d3788f
+Crate VCS info: {"git": {"sha1": "0811b6c753334f1681c7db8a48e407596cfa9366"}, "path_in_vcs": "glutin-winit"}

@@ -1,0 +1,8 @@
+Package: synstructure 0.14.0
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/mystor/synstructure
+Crates.io package: https://crates.io/crates/synstructure/0.14.0
+Authors from manifest: Nika Layzell <nika@thelayzells.com>
+Registry checksum: 901704edd0dfe137f1987838ee4f259e4e063c31371bdb423f7ae38ec6f77f02
+Crate VCS info: {"git": {"sha1": "30cfafe36e42405e717a8e55da042a2835a698d7"}, "path_in_vcs": ""}

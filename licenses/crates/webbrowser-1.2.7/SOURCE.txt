@@ -1,0 +1,8 @@
+Package: webbrowser 1.2.7
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/amodm/webbrowser-rs
+Crates.io package: https://crates.io/crates/webbrowser/1.2.7
+Authors from manifest: Amod Malviya @amodm
+Registry checksum: 73e91ccd4698f2647d6137e8eb17a3f1dcfd63810be9029fb2398f507279b95b
+Crate VCS info: {"git": {"sha1": "243b00f25761838258a0dd7404d60c9cfc204d60"}, "path_in_vcs": ""}

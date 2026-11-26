@@ -1,0 +1,9 @@
+Package: khronos_api 3.1.0
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/brendanzab/gl-rs/
+Crates.io package: https://crates.io/crates/khronos_api/3.1.0
+Authors from manifest: Brendan Zabarauskas <bjzaba@yahoo.com.au>, Corey Richardson, Arseny Kapoulkine, Pierre Krieger <pierre.krieger1708@gmail.com>
+Registry checksum: e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc
+Crate VCS info: {"git": {"sha1": "f150967b1c44ae888e6676f93f639ebc82771bdc"}}
+Supplemental original license: https://github.com/rust-windowing/gl-rs/blob/f150967b1c44ae888e6676f93f639ebc82771bdc/LICENSE

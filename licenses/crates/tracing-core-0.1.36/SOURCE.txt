@@ -1,0 +1,8 @@
+Package: tracing-core 0.1.36
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/tokio-rs/tracing
+Crates.io package: https://crates.io/crates/tracing-core/0.1.36
+Authors from manifest: Tokio Contributors <team@tokio.rs>
+Registry checksum: db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a
+Crate VCS info: {"git": {"sha1": "10a9e838a35e6ded79d66af246be2ee05417136d"}, "path_in_vcs": "tracing-core"}

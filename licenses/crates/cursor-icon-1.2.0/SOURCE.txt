@@ -1,0 +1,8 @@
+Package: cursor-icon 1.2.0
+Declared license: MIT OR Apache-2.0 OR Zlib
+Selected license: MIT
+Repository: https://github.com/rust-windowing/cursor-icon
+Crates.io package: https://crates.io/crates/cursor-icon/1.2.0
+Authors from manifest: Kirill Chibisov <contact@kchibisov.com>
+Registry checksum: f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f
+Crate VCS info: {"git": {"sha1": "766287581de8b4895d018c2d15ada77627a954f0"}, "path_in_vcs": ""}

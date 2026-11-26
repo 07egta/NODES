@@ -1,0 +1,8 @@
+Package: error-code 3.4.0
+Declared license: BSL-1.0
+Selected license: BSL-1.0
+Repository: https://github.com/DoumanAsh/error-code
+Crates.io package: https://crates.io/crates/error-code/3.4.0
+Authors from manifest: Douman <douman@gmx.se>
+Registry checksum: 0b5343afd4a8365a643ac588dab4cf234a190c7f6c88c9f6dd6ffe00837661b7
+Crate VCS info: {"git": {"sha1": "e4615e514db3ff64f5f1b328b4865b20a3dcdbc3"}, "path_in_vcs": ""}

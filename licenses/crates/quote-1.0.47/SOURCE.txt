@@ -1,0 +1,8 @@
+Package: quote 1.0.47
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/dtolnay/quote
+Crates.io package: https://crates.io/crates/quote/1.0.47
+Authors from manifest: David Tolnay <dtolnay@gmail.com>
+Registry checksum: 1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001
+Crate VCS info: {"git": {"sha1": "723dcb47d3f0ddc896e17287c8a8d3f2ea2317d5"}, "path_in_vcs": ""}

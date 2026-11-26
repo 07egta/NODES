@@ -1,0 +1,8 @@
+Package: tinystr 0.8.5
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/tinystr/0.8.5
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: abc840c238154d58f9e86b2792261edfde565a17696e1cda1a449de27979801a
+Crate VCS info: {"git": {"sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"}, "path_in_vcs": "utils/tinystr"}

@@ -1,0 +1,8 @@
+Package: winit 0.30.13
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/rust-windowing/winit
+Crates.io package: https://crates.io/crates/winit/0.30.13
+Authors from manifest: The winit contributors, Pierre Krieger <pierre.krieger1708@gmail.com>
+Registry checksum: a6755fa58a9f8350bd1e472d4c3fcc25f824ec358933bba33306d0b63df5978d
+Crate VCS info: {"git": {"sha1": "e9809ef54b18499bb4f2cac945719ecc2a61061b"}, "path_in_vcs": ""}

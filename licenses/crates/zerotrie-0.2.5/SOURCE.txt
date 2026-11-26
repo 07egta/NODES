@@ -1,0 +1,8 @@
+Package: zerotrie 0.2.5
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/zerotrie/0.2.5
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: 4ea269c3bd32f0a32c321907a2ae912ba6f4649bb0fc764a15627e99a7095a3f
+Crate VCS info: {"git": {"sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"}, "path_in_vcs": "utils/zerotrie"}

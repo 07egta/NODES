@@ -1,0 +1,8 @@
+Package: idna_adapter 1.2.2
+Declared license: Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/hsivonen/idna_adapter
+Crates.io package: https://crates.io/crates/idna_adapter/1.2.2
+Authors from manifest: The rust-url developers
+Registry checksum: cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714
+Crate VCS info: {"git": {"sha1": "1d9782f32c9e29218542b4a9411a82b35ec5c8cb"}, "path_in_vcs": ""}

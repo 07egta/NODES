@@ -1,0 +1,9 @@
+Package: clipboard-win 5.4.3
+Declared license: BSL-1.0
+Selected license: BSL-1.0
+Repository: https://github.com/DoumanAsh/clipboard-win
+Crates.io package: https://crates.io/crates/clipboard-win/5.4.3
+Authors from manifest: Douman <douman@gmx.se>
+Registry checksum: 052af7878466feccda12ba7a6a67d019d712f296809559b47c12c8cc196d3a9a
+Crate VCS info: {"git": {"sha1": "ed27008ae5d1f10cfbb266de039f0fb35fd05a56"}, "path_in_vcs": ""}
+Supplemental original license: https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/LICENSE

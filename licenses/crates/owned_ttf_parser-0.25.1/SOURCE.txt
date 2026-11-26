@@ -1,0 +1,8 @@
+Package: owned_ttf_parser 0.25.1
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/alexheretic/owned-ttf-parser
+Crates.io package: https://crates.io/crates/owned_ttf_parser/0.25.1
+Authors from manifest: Alex Butler <alexheretic@gmail.com>
+Registry checksum: 36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b
+Crate VCS info: {"git": {"sha1": "3abee95150b4c32f16ffbaf1bb922a68b465d48b"}, "path_in_vcs": ""}

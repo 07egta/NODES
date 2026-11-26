@@ -1,0 +1,8 @@
+Package: flate2 1.1.11
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/rust-lang/flate2-rs
+Crates.io package: https://crates.io/crates/flate2/1.1.11
+Authors from manifest: Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>
+Registry checksum: 626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4
+Crate VCS info: {"git": {"sha1": "cd06529164c5447958f309e649ffe6c9d6329865"}, "path_in_vcs": ""}

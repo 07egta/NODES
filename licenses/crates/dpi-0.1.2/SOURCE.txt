@@ -1,0 +1,8 @@
+Package: dpi 0.1.2
+Declared license: Apache-2.0 AND MIT
+Selected license: Apache-2.0 AND MIT
+Repository: https://github.com/rust-windowing/winit
+Crates.io package: https://crates.io/crates/dpi/0.1.2
+Authors from manifest: 
+Registry checksum: d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76
+Crate VCS info: {"git": {"sha1": "587ade844dfb0eada3696ba1cb263c66eea80581"}, "path_in_vcs": "dpi"}

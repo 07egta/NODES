@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "name": "星のトーテム",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "star",
+        "name": "星形",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "inner_radius": 19.0,
+          "points": 7.0,
+          "radius": 32.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "押し出し",
+        "position": [
+          290.0,
+          30.0
+        ],
+        "params": {
+          "height": 108.0,
+          "layers": 40.0
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          20.0,
+          280.0
+        ],
+        "params": {
+          "angle": 145.0
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          290.0,
+          305.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 1.1
+}

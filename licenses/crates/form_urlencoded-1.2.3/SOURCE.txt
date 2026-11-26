@@ -1,0 +1,8 @@
+Package: form_urlencoded 1.2.3
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/servo/rust-url
+Crates.io package: https://crates.io/crates/form_urlencoded/1.2.3
+Authors from manifest: The rust-url developers
+Registry checksum: afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e
+Crate VCS info: {"git": {"sha1": "ad1c66cbff6e318393d872641e30589ff9687b9c"}, "path_in_vcs": "form_urlencoded"}

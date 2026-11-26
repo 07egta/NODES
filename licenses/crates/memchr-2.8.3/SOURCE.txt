@@ -1,0 +1,8 @@
+Package: memchr 2.8.3
+Declared license: Unlicense OR MIT
+Selected license: MIT
+Repository: https://github.com/BurntSushi/memchr
+Crates.io package: https://crates.io/crates/memchr/2.8.3
+Authors from manifest: Andrew Gallant <jamslam@gmail.com>, bluss
+Registry checksum: cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98
+Crate VCS info: {"git": {"sha1": "5fdb40c054e1fff359a2f7bdf7f87a13b34b465d"}, "path_in_vcs": ""}

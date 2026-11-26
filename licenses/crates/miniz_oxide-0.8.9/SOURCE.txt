@@ -1,0 +1,8 @@
+Package: miniz_oxide 0.8.9
+Declared license: MIT OR Zlib OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
+Crates.io package: https://crates.io/crates/miniz_oxide/0.8.9
+Authors from manifest: Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com
+Registry checksum: 1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316
+Crate VCS info: {"git": {"sha1": "44e43c7786e379b2b1a7fde4aa0e63be719e583d"}, "path_in_vcs": "miniz_oxide"}

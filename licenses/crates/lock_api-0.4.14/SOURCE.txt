@@ -1,0 +1,8 @@
+Package: lock_api 0.4.14
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/Amanieu/parking_lot
+Crates.io package: https://crates.io/crates/lock_api/0.4.14
+Authors from manifest: Amanieu d'Antras <amanieu@gmail.com>
+Registry checksum: 224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965
+Crate VCS info: {"git": {"sha1": "d7828fff7b5d6327ae608e82db45f888b344449a"}, "path_in_vcs": "lock_api"}

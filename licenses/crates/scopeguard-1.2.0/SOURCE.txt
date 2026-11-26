@@ -1,0 +1,8 @@
+Package: scopeguard 1.2.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/bluss/scopeguard
+Crates.io package: https://crates.io/crates/scopeguard/1.2.0
+Authors from manifest: bluss
+Registry checksum: 94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49
+Crate VCS info: {"git": {"sha1": "bb988222848d39b0b9037b29da3a3a1eb05ebf4b"}, "path_in_vcs": ""}

@@ -1,0 +1,8 @@
+Package: zerofrom-derive 0.1.8
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/zerofrom-derive/0.1.8
+Authors from manifest: Manish Goregaokar <manishsmail@gmail.com>
+Registry checksum: f75b4683f6c7f45248d4d64056a24298c6281e0993356d7d1b4a1a962ef10d4a
+Crate VCS info: {"git": {"sha1": "ce235d80cf7cbd028e8bd59920420e1203b205b3"}, "path_in_vcs": "utils/zerofrom/derive"}

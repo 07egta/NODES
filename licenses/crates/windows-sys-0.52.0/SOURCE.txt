@@ -1,0 +1,8 @@
+Package: windows-sys 0.52.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/microsoft/windows-rs
+Crates.io package: https://crates.io/crates/windows-sys/0.52.0
+Authors from manifest: Microsoft
+Registry checksum: 282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d
+Crate VCS info: {"git": {"sha1": "3a605cba064b26f2a198ac58085f8c8836f47c38"}, "path_in_vcs": "crates/libs/sys"}

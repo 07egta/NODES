@@ -1,0 +1,8 @@
+Package: unicode-ident 1.0.27
+Declared license: (MIT OR Apache-2.0) AND Unicode-3.0
+Selected license: MIT AND Unicode-3.0
+Repository: https://github.com/dtolnay/unicode-ident
+Crates.io package: https://crates.io/crates/unicode-ident/1.0.27
+Authors from manifest: David Tolnay <dtolnay@gmail.com>
+Registry checksum: a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563
+Crate VCS info: {"git": {"sha1": "c1ac3afb721f3cea6527bc2255340a04d0de3ca0"}, "path_in_vcs": ""}

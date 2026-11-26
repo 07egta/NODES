@@ -1,0 +1,10 @@
+Package: emath 0.33.3
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/emilk/egui/tree/main/crates/emath
+Crates.io package: https://crates.io/crates/emath/0.33.3
+Authors from manifest: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
+Registry checksum: 491bdf728bf25ddd9ad60d4cf1c48588fa82c013a2440b91aa7fc43e34a07c32
+Crate VCS info: {"git": {"sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"}, "path_in_vcs": "crates/emath"}
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE

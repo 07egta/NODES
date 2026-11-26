@@ -1,0 +1,8 @@
+Package: zerovec 0.11.9
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/zerovec/0.11.9
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: f58a2799cfe9a1670c7ea8edbd52ef8edb93cb37a7f83bf31ba9e35d9dae6a40
+Crate VCS info: {"git": {"sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"}, "path_in_vcs": "utils/zerovec"}

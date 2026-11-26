@@ -1,0 +1,8 @@
+Package: arboard 3.7.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/1Password/arboard
+Crates.io package: https://crates.io/crates/arboard/3.7.0
+Authors from manifest: 
+Registry checksum: aeb9553e62312c8756a5979254fc6d7da8bbeb5986a1e17037fab932f7037917
+Crate VCS info: {"git": {"sha1": "5f5c8637911ba219edee619105a19b4f74e66a9f"}, "path_in_vcs": ""}

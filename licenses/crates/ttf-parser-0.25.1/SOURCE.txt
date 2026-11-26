@@ -1,0 +1,8 @@
+Package: ttf-parser 0.25.1
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/harfbuzz/ttf-parser
+Crates.io package: https://crates.io/crates/ttf-parser/0.25.1
+Authors from manifest: Caleb Maclennan <caleb@alerque.com>, Laurenz Stampfl <laurenz.stampfl@gmail.com>, Yevhenii Reizner <razrfalcon@gmail.com>, خالد حسني (Khaled Hosny) <khaled@aliftype.com>
+Registry checksum: d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31
+Crate VCS info: {"git": {"sha1": "56c33b910b03ca152f78363ec471c5dfd97c3069"}, "path_in_vcs": ""}

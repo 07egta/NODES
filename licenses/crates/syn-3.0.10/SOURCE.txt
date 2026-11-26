@@ -1,0 +1,8 @@
+Package: syn 3.0.10
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/dtolnay/syn
+Crates.io package: https://crates.io/crates/syn/3.0.10
+Authors from manifest: David Tolnay <dtolnay@gmail.com>
+Registry checksum: 4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79
+Crate VCS info: {"git": {"sha1": "97ec37dda8a893a460066da694fd1eb7cb30538a"}, "path_in_vcs": ""}

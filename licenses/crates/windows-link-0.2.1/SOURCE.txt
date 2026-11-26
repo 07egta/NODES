@@ -1,0 +1,8 @@
+Package: windows-link 0.2.1
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/microsoft/windows-rs
+Crates.io package: https://crates.io/crates/windows-link/0.2.1
+Authors from manifest: 
+Registry checksum: f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5
+Crate VCS info: {"git": {"sha1": "d468916ac27a36fb8a12bafc1bf5c0ec2fe92238"}, "path_in_vcs": "crates/libs/link"}

@@ -1,0 +1,8 @@
+Package: cfg_aliases 0.2.2
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/katharostech/cfg_aliases
+Crates.io package: https://crates.io/crates/cfg_aliases/0.2.2
+Authors from manifest: Zicklag <zicklag@katharostech.com>
+Registry checksum: f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527
+Crate VCS info: {"git": {"sha1": "e069ce61e00fee423ac1dbe6a897f228f1774716"}, "path_in_vcs": ""}

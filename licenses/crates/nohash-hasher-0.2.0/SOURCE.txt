@@ -1,0 +1,8 @@
+Package: nohash-hasher 0.2.0
+Declared license: Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/paritytech/nohash-hasher
+Crates.io package: https://crates.io/crates/nohash-hasher/0.2.0
+Authors from manifest: Parity Technologies <admin@parity.io>
+Registry checksum: 2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451
+Crate VCS info: {"git": {"sha1": "99b021664e9d7fd3e1f7ffb8633a137e21e12149"}}

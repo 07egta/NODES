@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "name": "光のリング",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "sphere",
+        "name": "球",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "radius": 9.0,
+          "rings": 20.0,
+          "segments": 32.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "move",
+        "name": "移動",
+        "position": [
+          290.0,
+          30.0
+        ],
+        "params": {
+          "x": 65.0,
+          "y": 0.0,
+          "z": 18.0
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "radial_array",
+        "name": "円形配列",
+        "position": [
+          20.0,
+          320.0
+        ],
+        "params": {
+          "angle": 360.0,
+          "count": 10.0
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          290.0,
+          350.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 1.1
+}

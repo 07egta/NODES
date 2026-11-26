@@ -1,0 +1,8 @@
+Package: bitflags 2.13.2
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/bitflags/bitflags
+Crates.io package: https://crates.io/crates/bitflags/2.13.2
+Authors from manifest: The Rust Project Developers
+Registry checksum: 3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06
+Crate VCS info: {"git": {"sha1": "80ce9b545acb0bd42150695fc351889cac1d8eb4"}, "path_in_vcs": ""}

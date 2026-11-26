@@ -1,0 +1,8 @@
+Package: smol_str 0.2.2
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/rust-analyzer/smol_str
+Crates.io package: https://crates.io/crates/smol_str/0.2.2
+Authors from manifest: Aleksey Kladov <aleksey.kladov@gmail.com>
+Registry checksum: dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead
+Crate VCS info: {"git": {"sha1": "aea39b4974f55e9380556272b1335e2f6fd13cc7"}, "path_in_vcs": ""}

@@ -1,0 +1,8 @@
+Package: web-time 1.1.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/daxpedda/web-time
+Crates.io package: https://crates.io/crates/web-time/1.1.0
+Authors from manifest: 
+Registry checksum: 5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb
+Crate VCS info: {"git": {"sha1": "2d200ded30bbcab66f6a4bfa277ac546685728db"}, "path_in_vcs": ""}

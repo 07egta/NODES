@@ -1,0 +1,8 @@
+Package: adler2 2.0.1
+Declared license: 0BSD OR MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/oyvindln/adler2
+Crates.io package: https://crates.io/crates/adler2/2.0.1
+Authors from manifest: Jonas Schievink <jonasschievink@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>
+Registry checksum: 320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa
+Crate VCS info: {"git": {"sha1": "89a031a0f42eeff31c70dc598b398cbf31f1680f"}, "path_in_vcs": ""}

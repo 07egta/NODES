@@ -1,0 +1,8 @@
+Package: ab_glyph 0.2.32
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/alexheretic/ab-glyph
+Crates.io package: https://crates.io/crates/ab_glyph/0.2.32
+Authors from manifest: Alex Butler <alexheretic@gmail.com>
+Registry checksum: 01c0457472c38ea5bd1c3b5ada5e368271cb550be7a4ca4a0b4634e9913f6cc2
+Crate VCS info: {"git": {"sha1": "ffde4c677fa1095ac355174c1aa2919d7d53eff3"}, "path_in_vcs": "glyph"}

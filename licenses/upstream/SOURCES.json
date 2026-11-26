@@ -1,0 +1,34 @@
+{
+  "egui-mit": {
+    "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+    "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+  },
+  "egui-apache": {
+    "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+    "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+  },
+  "clipboard": {
+    "url": "https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/LICENSE",
+    "git_blob_sha": "36b7cd93cdfbac762f5be4c6ce276df2ea6305c2"
+  },
+  "profiling-mit": {
+    "url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+    "git_blob_sha": "6a84e059ad8b43e03c2b06bc2af4dc1d8442808d"
+  },
+  "profiling-apache": {
+    "url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE",
+    "git_blob_sha": "139dce95d473c201a8561ef17536314d8b8cda65"
+  },
+  "glgen": {
+    "url": "https://github.com/rust-windowing/gl-rs/blob/ea503e8d5fb6d73c6030e6191ce738cd3bf3433e/LICENSE",
+    "git_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+  },
+  "khronos": {
+    "url": "https://github.com/rust-windowing/gl-rs/blob/f150967b1c44ae888e6676f93f639ebc82771bdc/LICENSE",
+    "git_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+  },
+  "noto": {
+    "url": "https://github.com/google/fonts/blob/main/ofl/notosansjp/OFL.txt",
+    "git_blob_sha": "1c9f43281b8f216c5461fe9ac729afbade7724e4"
+  }
+}

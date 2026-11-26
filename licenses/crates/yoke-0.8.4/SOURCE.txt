@@ -1,0 +1,8 @@
+Package: yoke 0.8.4
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/yoke/0.8.4
+Authors from manifest: Manish Goregaokar <manishsmail@gmail.com>
+Registry checksum: 417ef3fcf6c300b7dbd25c85531a746931c02ad536f3cf4786ed1e88223340b3
+Crate VCS info: {"git": {"sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"}, "path_in_vcs": "utils/yoke"}

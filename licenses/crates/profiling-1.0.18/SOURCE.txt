@@ -1,0 +1,10 @@
+Package: profiling 1.0.18
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/aclysma/profiling
+Crates.io package: https://crates.io/crates/profiling/1.0.18
+Authors from manifest: Philip Degarmo <aclysma@gmail.com>
+Registry checksum: 3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5
+Crate VCS info: {"git": {"sha1": "8271551172eb6fa4cba47369aedd93790c623df9"}, "path_in_vcs": "profiling"}
+Supplemental original license: https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT
+Supplemental original license: https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE

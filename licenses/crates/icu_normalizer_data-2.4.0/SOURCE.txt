@@ -1,0 +1,8 @@
+Package: icu_normalizer_data 2.4.0
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/icu_normalizer_data/2.4.0
+Authors from manifest: The ICU4X Project Developers
+Registry checksum: 20f0088bfb7441f7a37fa0c9e20cb1e9cba1cac6b9ce8cd2a6dc44294f8e8cbc
+Crate VCS info: {"git": {"sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"}, "path_in_vcs": "provider/data/normalizer"}

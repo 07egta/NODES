@@ -1,0 +1,8 @@
+Package: image 0.25.10
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/image-rs/image
+Crates.io package: https://crates.io/crates/image/0.25.10
+Authors from manifest: The image-rs Developers
+Registry checksum: 85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104
+Crate VCS info: {"git": {"sha1": "76e57184f22772dad1138e96954e57945406b15e"}, "path_in_vcs": ""}

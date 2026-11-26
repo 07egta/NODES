@@ -1,0 +1,9 @@
+Package: gl_generator 0.14.0
+Declared license: Apache-2.0
+Selected license: Apache-2.0
+Repository: https://github.com/brendanzab/gl-rs/
+Crates.io package: https://crates.io/crates/gl_generator/0.14.0
+Authors from manifest: Brendan Zabarauskas <bjzaba@yahoo.com.au>, Corey Richardson, Arseny Kapoulkine
+Registry checksum: 1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d
+Crate VCS info: {"git": {"sha1": "ea503e8d5fb6d73c6030e6191ce738cd3bf3433e"}}
+Supplemental original license: https://github.com/rust-windowing/gl-rs/blob/ea503e8d5fb6d73c6030e6191ce738cd3bf3433e/LICENSE

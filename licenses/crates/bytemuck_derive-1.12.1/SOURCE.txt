@@ -1,0 +1,8 @@
+Package: bytemuck_derive 1.12.1
+Declared license: Zlib OR Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/Lokathor/bytemuck
+Crates.io package: https://crates.io/crates/bytemuck_derive/1.12.1
+Authors from manifest: Lokathor <zefria@gmail.com>
+Registry checksum: 6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c
+Crate VCS info: {"git": {"sha1": "839ee557dd9b1ac5a0b0155cabba71f96b4ccd06"}, "path_in_vcs": "derive"}

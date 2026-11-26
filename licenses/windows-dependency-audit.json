@@ -1,0 +1,3861 @@
+{
+  "audit_date": "2026-11-26",
+  "target": "x86_64-pc-windows-gnullvm",
+  "scope": "Active normal and build dependencies from cargo tree --locked --offline --target x86_64-pc-windows-gnullvm --edges normal,build, cross-referenced to cargo metadata for version, source and license information. Dev-only and optional inactive edges excluded. Includes build-time dependencies; not a claim that every crate contributes machine code to the EXE.",
+  "cargo_lock_sha256": "96331253910df5b9537f9b79393a0378a58ea68373df42653f1c6138ae4bd5d5",
+  "package_count": 114,
+  "forbidden_license_metadata_hits": [],
+  "missing_license_texts": [],
+  "packages": [
+    {
+      "name": "ab_glyph",
+      "version": "0.2.32",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/alexheretic/ab-glyph",
+      "authors": [
+        "Alex Butler <alexheretic@gmail.com>"
+      ],
+      "registry_checksum": "01c0457472c38ea5bd1c3b5ada5e368271cb550be7a4ca4a0b4634e9913f6cc2",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ffde4c677fa1095ac355174c1aa2919d7d53eff3"
+        },
+        "path_in_vcs": "glyph"
+      },
+      "features": [
+        "default",
+        "gvar-alloc",
+        "std",
+        "variable-fonts"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/ab_glyph-0.2.32/LICENSE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "ab_glyph_rasterizer",
+      "version": "0.1.10",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/alexheretic/ab-glyph",
+      "authors": [
+        "Alex Butler <alexheretic@gmail.com>"
+      ],
+      "registry_checksum": "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "971e5a9b337fbae3edb1ac3ac44d84351d24e8b8"
+        },
+        "path_in_vcs": "rasterizer"
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/ab_glyph_rasterizer-0.1.10/LICENSE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "adler2",
+      "version": "2.0.1",
+      "declared_license": "0BSD OR MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/oyvindln/adler2",
+      "authors": [
+        "Jonas Schievink <jonasschievink@gmail.com>",
+        "oyvindln <oyvindln@users.noreply.github.com>"
+      ],
+      "registry_checksum": "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "89a031a0f42eeff31c70dc598b398cbf31f1680f"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/adler2-2.0.1/LICENSE-0BSD",
+          "sha256": "861399f8c21c042b110517e76dc6b63a2b334276c8cf17412fc3c8908ca8dc17"
+        },
+        {
+          "path": "licenses/crates/adler2-2.0.1/LICENSE-APACHE",
+          "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb"
+        },
+        {
+          "path": "licenses/crates/adler2-2.0.1/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "ahash",
+      "version": "0.8.14",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/tkaitchuck/ahash",
+      "authors": [
+        "Tom Kaitchuck <Tom.Kaitchuck@gmail.com>"
+      ],
+      "registry_checksum": "54dae3d1d7b8956f3506c4e999a74e77f932a59153ccf38ab8cf96db74bb9dc0",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "c583f2314a975a9261816f050ab5f02ee0bac22a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "no-rng",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/ahash-0.8.14/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/ahash-0.8.14/LICENSE-MIT",
+          "sha256": "0444c6991eead6822f7b9102e654448d51624431119546492e8b231db42c48bb"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "arboard",
+      "version": "3.7.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/1Password/arboard",
+      "authors": [],
+      "registry_checksum": "aeb9553e62312c8756a5979254fc6d7da8bbeb5986a1e17037fab932f7037917",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "5f5c8637911ba219edee619105a19b4f74e66a9f"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "core-graphics",
+        "image",
+        "image-data",
+        "windows-sys"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/arboard-3.7.0/LICENSE-APACHE.txt",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/arboard-3.7.0/LICENSE-MIT.txt",
+          "sha256": "f35468024534e0f4f16bb94cd0e88c87fbd1314f919c2645a07d350fb77b40c0"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "autocfg",
+      "version": "1.5.1",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/cuviper/autocfg",
+      "authors": [
+        "Josh Stone <cuviper@gmail.com>"
+      ],
+      "registry_checksum": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "2799b09c24e6632f8e653c5cd8fc303e85a906ba"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/autocfg-1.5.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/autocfg-1.5.1/LICENSE-MIT",
+          "sha256": "27995d58ad5c1145c1a8cd86244ce844886958a35eb2b78c6b772748669999ac"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "bitflags",
+      "version": "2.13.2",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/bitflags/bitflags",
+      "authors": [
+        "The Rust Project Developers"
+      ],
+      "registry_checksum": "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "80ce9b545acb0bd42150695fc351889cac1d8eb4"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/bitflags-2.13.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/bitflags-2.13.2/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "bytemuck",
+      "version": "1.25.2",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Lokathor/bytemuck",
+      "authors": [
+        "Lokathor <zefria@gmail.com>"
+      ],
+      "registry_checksum": "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "f363643e951a7ac9e4b9921de982f2b0918902e3"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "bytemuck_derive",
+        "derive",
+        "extern_crate_alloc",
+        "min_const_generics"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/bytemuck-1.25.2/LICENSE-APACHE",
+          "sha256": "e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb"
+        },
+        {
+          "path": "licenses/crates/bytemuck-1.25.2/LICENSE-MIT",
+          "sha256": "9df9ba60a11af705f2e451b53762686e615d86f76b169cf075c3237730dbd7e2"
+        },
+        {
+          "path": "licenses/crates/bytemuck-1.25.2/LICENSE-ZLIB",
+          "sha256": "84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "bytemuck_derive",
+      "version": "1.12.1",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Lokathor/bytemuck",
+      "authors": [
+        "Lokathor <zefria@gmail.com>"
+      ],
+      "registry_checksum": "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "839ee557dd9b1ac5a0b0155cabba71f96b4ccd06"
+        },
+        "path_in_vcs": "derive"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/bytemuck_derive-1.12.1/LICENSE-APACHE",
+          "sha256": "e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb"
+        },
+        {
+          "path": "licenses/crates/bytemuck_derive-1.12.1/LICENSE-MIT",
+          "sha256": "9df9ba60a11af705f2e451b53762686e615d86f76b169cf075c3237730dbd7e2"
+        },
+        {
+          "path": "licenses/crates/bytemuck_derive-1.12.1/LICENSE-ZLIB",
+          "sha256": "84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "byteorder-lite",
+      "version": "0.1.0",
+      "declared_license": "Unlicense OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/image-rs/byteorder-lite",
+      "authors": [],
+      "registry_checksum": "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7d44da06a48fe10d7e23efd9a932d18a7a2def63"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/byteorder-lite-0.1.0/LICENSE-MIT",
+          "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f"
+        },
+        {
+          "path": "licenses/crates/byteorder-lite-0.1.0/UNLICENSE",
+          "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.5",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-lang/cfg-if",
+      "authors": [
+        "Alex Crichton <alex@alexcrichton.com>"
+      ],
+      "registry_checksum": "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "8b0a2b0fc1fa3b3741b9e72895f390cf499fe36f"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/cfg-if-1.0.5/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/cfg-if-1.0.5/LICENSE-MIT",
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "cfg_aliases",
+      "version": "0.2.2",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/katharostech/cfg_aliases",
+      "authors": [
+        "Zicklag <zicklag@katharostech.com>"
+      ],
+      "registry_checksum": "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "e069ce61e00fee423ac1dbe6a897f228f1774716"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/cfg_aliases-0.2.2/LICENSE",
+          "sha256": "31b94860253d8ec7b4529f51901044d3b459d6292d996504a36b1bae3a36a812"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "clipboard-win",
+      "version": "5.4.3",
+      "declared_license": "BSL-1.0",
+      "selected_license": "BSL-1.0",
+      "repository": "https://github.com/DoumanAsh/clipboard-win",
+      "authors": [
+        "Douman <douman@gmx.se>"
+      ],
+      "registry_checksum": "052af7878466feccda12ba7a6a67d019d712f296809559b47c12c8cc196d3a9a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ed27008ae5d1f10cfbb266de039f0fb35fd05a56"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/clipboard-win-5.4.3/LICENSE",
+          "sha256": "ea056d2c64294936b226f7360c265e77c52adc4ba171ee61029357f101f439cf"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/LICENSE",
+          "git_blob_sha": "36b7cd93cdfbac762f5be4c6ce276df2ea6305c2"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "crc32fast",
+      "version": "1.5.6",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/srijs/rust-crc32fast",
+      "authors": [
+        "Sam Rijs <srijs@airpost.net>",
+        "Alex Crichton <alex@alexcrichton.com>"
+      ],
+      "registry_checksum": "fd9ae8fcb3ea71b0b26338b4ffb13006bb175de8fd07921089a906ce7e5e6945",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "1cc840080a9f59b95018683890a0bf870fb64526"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/crc32fast-1.5.6/LICENSE-APACHE",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+        },
+        {
+          "path": "licenses/crates/crc32fast-1.5.6/LICENSE-MIT",
+          "sha256": "61d383b05b87d78f94d2937e2580cce47226d17823c0430fbcad09596537efcf"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "cursor-icon",
+      "version": "1.2.0",
+      "declared_license": "MIT OR Apache-2.0 OR Zlib",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-windowing/cursor-icon",
+      "authors": [
+        "Kirill Chibisov <contact@kchibisov.com>"
+      ],
+      "registry_checksum": "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "766287581de8b4895d018c2d15ada77627a954f0"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/cursor-icon-1.2.0/LICENSE-APACHE",
+          "sha256": "b59affd015e517ed998dd735757f9a3693643cd389609947ed54074234a10784"
+        },
+        {
+          "path": "licenses/crates/cursor-icon-1.2.0/LICENSE-MIT",
+          "sha256": "c138726a726ac37bae09d0f8a48e74e8e3aa8a8952fcd10fae0fb224cc1c05f1"
+        },
+        {
+          "path": "licenses/crates/cursor-icon-1.2.0/LICENSE-ZLIB",
+          "sha256": "01e533bd94e8f1c32b2c2531e2c398de7d35d7804add3d574b4e1fe581d53537"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "displaydoc",
+      "version": "0.2.7",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/yaahc/displaydoc",
+      "authors": [
+        "Jane Lusby <jlusby@yaah.dev>"
+      ],
+      "registry_checksum": "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "20016487354a96b22a7b97974483ae4f51a1bddc"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/displaydoc-0.2.7/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/displaydoc-0.2.7/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "document-features",
+      "version": "0.2.12",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/slint-ui/document-features",
+      "authors": [
+        "Slint Developers <info@slint.dev>"
+      ],
+      "registry_checksum": "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "721e708012254b81760bd2befdae0970e7a2615e"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/document-features-0.2.12/LICENSE-APACHE",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "licenses/crates/document-features-0.2.12/LICENSE-MIT",
+          "sha256": "aa893340d14b9844625be6a50ac644169a01b52f0211cbf81b09e1874c8cd81d"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "dpi",
+      "version": "0.1.2",
+      "declared_license": "Apache-2.0 AND MIT",
+      "selected_license": "Apache-2.0 AND MIT",
+      "repository": "https://github.com/rust-windowing/winit",
+      "authors": [],
+      "registry_checksum": "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "587ade844dfb0eada3696ba1cb263c66eea80581"
+        },
+        "path_in_vcs": "dpi"
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/dpi-0.1.2/LICENSE",
+          "sha256": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a"
+        },
+        {
+          "path": "licenses/crates/dpi-0.1.2/LICENSE-LIBM-MIT",
+          "sha256": "9eff396a99bafd208e7126602420d6864f6066c08b84485a5b032320a9c01997"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "ecolor",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>",
+        "Andreas Reich <reichandreas@gmx.de>"
+      ],
+      "registry_checksum": "71ddb8ac7643d1dba1bb02110e804406dd459a838efcb14011ced10556711a8e",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/ecolor"
+      },
+      "features": [
+        "bytemuck"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/ecolor-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/ecolor-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "eframe",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/eframe",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "457481173e6db5ca9fa2be93a58df8f4c7be639587aeb4853b526c6cf87db4e6",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/eframe"
+      },
+      "features": [
+        "default_fonts",
+        "glow",
+        "x11"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/eframe-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/eframe-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "egui",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "6a9b567d356674e9a5121ed3fedfb0a7c31e059fe71f6972b691bcd0bfc284e3",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/egui"
+      },
+      "features": [
+        "bytemuck",
+        "default_fonts"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/egui-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/egui-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "egui-winit",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/egui-winit",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "ec6687e5bb551702f4ad10ac428bab12acf9d53047ebb1082d4a0ed8c6251a29",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/egui-winit"
+      },
+      "features": [
+        "arboard",
+        "bytemuck",
+        "clipboard",
+        "links",
+        "smithay-clipboard",
+        "webbrowser",
+        "x11"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/egui-winit-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/egui-winit-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "egui_glow",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/egui_glow",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "6420863ea1d90e750f75075231a260030ad8a9f30a7cef82cdc966492dc4c4eb",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/egui_glow"
+      },
+      "features": [
+        "x11"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/egui_glow-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/egui_glow-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "emath",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/emath",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "491bdf728bf25ddd9ad60d4cf1c48588fa82c013a2440b91aa7fc43e34a07c32",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/emath"
+      },
+      "features": [
+        "bytemuck"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/emath-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/emath-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "epaint",
+      "version": "0.33.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/epaint",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "009d0dd3c2163823a0abdb899451ecbc78798dec545ee91b43aff1fa790bab62",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/epaint"
+      },
+      "features": [
+        "bytemuck",
+        "default_fonts",
+        "epaint_default_fonts"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/epaint-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/epaint-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "epaint_default_fonts",
+      "version": "0.33.3",
+      "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+      "selected_license": "MIT AND OFL-1.1 AND Ubuntu-font-1.0",
+      "repository": "https://github.com/emilk/egui/tree/main/crates/epaint_default_fonts",
+      "authors": [
+        "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"
+      ],
+      "registry_checksum": "5c4fbe202b6578d3d56428fa185cdf114a05e49da05f477b3c7f0fbb221f1862",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"
+        },
+        "path_in_vcs": "crates/epaint_default_fonts"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/LICENSE-APACHE",
+          "sha256": "97345ce38907b2d685c97211a85e50b994725530af4540198f1ff4e45cfaedf7"
+        },
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/LICENSE-MIT",
+          "sha256": "aa55803cbe37fb5a418597bddc6505c134338320773418b005faad1a9ab043b8"
+        },
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/fonts/Hack-Regular.txt",
+          "sha256": "47c0cccbeec7e8614548cc485588b28149e7874188df5f41b36efebcee285c87"
+        },
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/fonts/OFL.txt",
+          "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+        },
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/fonts/UFL.txt",
+          "sha256": "2f0015108d68627bd788d313f529c21ff4da2c2c42a5e1f3883acc83480f9002"
+        },
+        {
+          "path": "licenses/crates/epaint_default_fonts-0.33.3/fonts/emoji-icon-font-mit-license.txt",
+          "sha256": "b9d2c1d909aa149996fd4c91dcb92b2362a04431640c1d200959da94caf8cde1"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT",
+          "git_blob_sha": "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
+        },
+        {
+          "url": "https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE",
+          "git_blob_sha": "11069edd79019f7dafbe3138841cf289209270dd"
+        }
+      ],
+      "notes": [
+        "The bundled Hack font additionally preserves the MIT and Bitstream Vera notices, and the DejaVu public-domain statement, in fonts/Hack-Regular.txt. Emoji icon font MIT, Noto Emoji OFL, and Ubuntu font UFL notices are also included verbatim."
+      ]
+    },
+    {
+      "name": "error-code",
+      "version": "3.4.0",
+      "declared_license": "BSL-1.0",
+      "selected_license": "BSL-1.0",
+      "repository": "https://github.com/DoumanAsh/error-code",
+      "authors": [
+        "Douman <douman@gmx.se>"
+      ],
+      "registry_checksum": "0b5343afd4a8365a643ac588dab4cf234a190c7f6c88c9f6dd6ffe00837661b7",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "e4615e514db3ff64f5f1b328b4865b20a3dcdbc3"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/error-code-3.4.0/LICENSE",
+          "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "fdeflate",
+      "version": "0.3.7",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/image-rs/fdeflate",
+      "authors": [
+        "The image-rs Developers"
+      ],
+      "registry_checksum": "1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "c365c7e6ffa81feb2e1fb762eed7299f05c9b0ca"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/fdeflate-0.3.7/LICENSE-APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/fdeflate-0.3.7/LICENSE-MIT",
+          "sha256": "c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "flate2",
+      "version": "1.1.11",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-lang/flate2-rs",
+      "authors": [
+        "Alex Crichton <alex@alexcrichton.com>",
+        "Josh Triplett <josh@joshtriplett.org>"
+      ],
+      "registry_checksum": "626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "cd06529164c5447958f309e649ffe6c9d6329865"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "any_impl",
+        "default",
+        "miniz_oxide",
+        "runtime_detection",
+        "rust_backend"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/flate2-1.1.11/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/flate2-1.1.11/LICENSE-MIT",
+          "sha256": "025436edff4cfcdde17a5811fdea78892d8482efd1abdec5a17872d07a4f2112"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "form_urlencoded",
+      "version": "1.2.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/servo/rust-url",
+      "authors": [
+        "The rust-url developers"
+      ],
+      "registry_checksum": "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ad1c66cbff6e318393d872641e30589ff9687b9c"
+        },
+        "path_in_vcs": "form_urlencoded"
+      },
+      "features": [
+        "alloc",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/form_urlencoded-1.2.3/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/form_urlencoded-1.2.3/LICENSE-MIT",
+          "sha256": "20c7855c364d57ea4c97889a5e8d98470a9952dade37bd9248b9a54431670e5e"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "gl_generator",
+      "version": "0.14.0",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/gl-rs/",
+      "authors": [
+        "Brendan Zabarauskas <bjzaba@yahoo.com.au>",
+        "Corey Richardson",
+        "Arseny Kapoulkine"
+      ],
+      "registry_checksum": "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ea503e8d5fb6d73c6030e6191ce738cd3bf3433e"
+        }
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/gl_generator-0.14.0/LICENSE",
+          "sha256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/rust-windowing/gl-rs/blob/ea503e8d5fb6d73c6030e6191ce738cd3bf3433e/LICENSE",
+          "git_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "glow",
+      "version": "0.16.0",
+      "declared_license": "MIT OR Apache-2.0 OR Zlib",
+      "selected_license": "MIT",
+      "repository": "https://github.com/grovesNL/glow",
+      "authors": [
+        "Joshua Groves <josh@joshgroves.com>",
+        "Dzmitry Malyshau <kvarkus@gmail.com>"
+      ],
+      "registry_checksum": "c5e5ea60d70410161c8bf5da3fdfeaa1c72ed2c15f8bbb9d19fe3a4fad085f08",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "83c7b9b59ec4b26942801b3d0164db6d396a8c74"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/glow-0.16.0/LICENSE-APACHE",
+          "sha256": "b8601fc79bdf8d8088f0938bea861ffc63ed0eebbedf25f44ab2cf2e85bd7edc"
+        },
+        {
+          "path": "licenses/crates/glow-0.16.0/LICENSE-MIT",
+          "sha256": "cdbd06e25b8c9c5d6019949d2de8123f56d29cee4166396423d2ba8c81700845"
+        },
+        {
+          "path": "licenses/crates/glow-0.16.0/LICENSE-ZLIB",
+          "sha256": "636f644f1e149eb62961657c0e34953681eff64435653912e7bd19992666faa5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "glutin",
+      "version": "0.32.3",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/rust-windowing/glutin",
+      "authors": [
+        "Kirill Chibisov <contact@kchibisov.com>"
+      ],
+      "registry_checksum": "12124de845cacfebedff80e877bb37b5b75c34c5a4c89e47e1cdd67fb6041325",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "20d1c103172aa4025f02cc94ca16a3169bea789c"
+        },
+        "path_in_vcs": "glutin"
+      },
+      "features": [
+        "egl",
+        "glutin_egl_sys",
+        "glutin_glx_sys",
+        "glutin_wgl_sys",
+        "glx",
+        "libloading",
+        "wgl",
+        "windows-sys",
+        "x11",
+        "x11-dl"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/glutin-0.32.3/LICENSE",
+          "sha256": "a4445427440043e8ce6fadf7a43fb906cb0d7f6c573a560a9f142cf9f9bf8ff4"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "glutin-winit",
+      "version": "0.5.0",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-windowing/glutin",
+      "authors": [
+        "Kirill Chibisov <contact@kchibisov.com>"
+      ],
+      "registry_checksum": "85edca7075f8fc728f28cb8fbb111a96c3b89e930574369e3e9c27eb75d3788f",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "0811b6c753334f1681c7db8a48e407596cfa9366"
+        },
+        "path_in_vcs": "glutin-winit"
+      },
+      "features": [
+        "egl",
+        "glx",
+        "wgl",
+        "x11"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/glutin-winit-0.5.0/LICENSE",
+          "sha256": "d35629aec828ca86834f76e4c813bd6a6f0dda9005da898b0f49021f8042c5bd"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "glutin_egl_sys",
+      "version": "0.7.1",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/rust-windowing/glutin",
+      "authors": [
+        "Kirill Chibisov <contact@kchibisov.com>"
+      ],
+      "registry_checksum": "4c4680ba6195f424febdc3ba46e7a42a0e58743f2edb115297b86d7f8ecc02d2",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d9b4fd7036386c5f23b0a1015a31a986805d4db3"
+        },
+        "path_in_vcs": "glutin_egl_sys"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/glutin_egl_sys-0.7.1/LICENSE",
+          "sha256": "a4445427440043e8ce6fadf7a43fb906cb0d7f6c573a560a9f142cf9f9bf8ff4"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "glutin_wgl_sys",
+      "version": "0.6.1",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/rust-windowing/glutin",
+      "authors": [
+        "Kirill Chibisov <contact@kchibisov.com>"
+      ],
+      "registry_checksum": "2c4ee00b289aba7a9e5306d57c2d05499b2e5dc427f84ac708bd2c090212cf3e",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d9b4fd7036386c5f23b0a1015a31a986805d4db3"
+        },
+        "path_in_vcs": "glutin_wgl_sys"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/glutin_wgl_sys-0.6.1/LICENSE",
+          "sha256": "a4445427440043e8ce6fadf7a43fb906cb0d7f6c573a560a9f142cf9f9bf8ff4"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_collections",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "fe090a42a0d3140fed8c63263ed1fecc02422cb2f4bfe55cd8de2de1b8e105dd",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "components/collections"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_collections-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_locale_core",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "25d29b57c17c6528d0dc4c2141cfa2d08200465acb537a3909c8b9b8a4a984c0",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "components/locale_core"
+      },
+      "features": [
+        "zerovec"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_locale_core-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_normalizer",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "404a3b8c486f205c87fe7f23ab6894d84a4ad76d6e4671ae1981ba7def87c599",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "components/normalizer"
+      },
+      "features": [
+        "compiled_data"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_normalizer-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_normalizer_data",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "20f0088bfb7441f7a37fa0c9e20cb1e9cba1cac6b9ce8cd2a6dc44294f8e8cbc",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "provider/data/normalizer"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_normalizer_data-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_properties",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "2ea83d991c56158f7cf898bf86436c1dfe7c07ee82fe88951f2695c9f37a379f",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "components/properties"
+      },
+      "features": [
+        "compiled_data"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_properties-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_properties_data",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "b98f29af82d02b163fe50161388350e743bb3107cc8e8c2f7314cb505faddfcf",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "provider/data/properties"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_properties_data-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "icu_provider",
+      "version": "2.4.0",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "provider/core"
+      },
+      "features": [
+        "baked"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/icu_provider-2.4.0/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "idna",
+      "version": "1.1.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/servo/rust-url/",
+      "authors": [
+        "The rust-url developers"
+      ],
+      "registry_checksum": "3b0875f23caa03898994f6ddc501886a45c7d3d62d04d2d90788d47be1b1e4de",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "91377f48bf35011d042aa5abef9e7f2a0a625aaa",
+          "dirty": true
+        },
+        "path_in_vcs": "idna"
+      },
+      "features": [
+        "alloc",
+        "compiled_data",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/idna-1.1.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/idna-1.1.0/LICENSE-MIT",
+          "sha256": "b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "idna_adapter",
+      "version": "1.2.2",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/hsivonen/idna_adapter",
+      "authors": [
+        "The rust-url developers"
+      ],
+      "registry_checksum": "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "1d9782f32c9e29218542b4a9411a82b35ec5c8cb"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "compiled_data"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/idna_adapter-1.2.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/idna_adapter-1.2.2/LICENSE-MIT",
+          "sha256": "8b43ce8accd61e9d370b5ca9e9c4f953279b5c239926c62315b40e24df51b726"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "image",
+      "version": "0.25.10",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/image-rs/image",
+      "authors": [
+        "The image-rs Developers"
+      ],
+      "registry_checksum": "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "76e57184f22772dad1138e96954e57945406b15e"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "bmp",
+        "png",
+        "tiff"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/image-0.25.10/LICENSE-APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/image-0.25.10/LICENSE-MIT",
+          "sha256": "c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "itoa",
+      "version": "1.0.19",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/dtolnay/itoa",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "9339ca99a43c550b5ee36e2afe524d1c90413461"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/itoa-1.0.19/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/itoa-1.0.19/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "khronos_api",
+      "version": "3.1.0",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/gl-rs/",
+      "authors": [
+        "Brendan Zabarauskas <bjzaba@yahoo.com.au>",
+        "Corey Richardson",
+        "Arseny Kapoulkine",
+        "Pierre Krieger <pierre.krieger1708@gmail.com>"
+      ],
+      "registry_checksum": "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "f150967b1c44ae888e6676f93f639ebc82771bdc"
+        }
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/khronos_api-3.1.0/LICENSE",
+          "sha256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac"
+        },
+        {
+          "path": "licenses/crates/khronos_api-3.1.0/REGISTRY-NOTICES.txt",
+          "sha256": "422e87256173c70b7297e1e3e743fac0b56061923b587e8a1dd2a5f7a9cc3c82"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/rust-windowing/gl-rs/blob/f150967b1c44ae888e6676f93f639ebc82771bdc/LICENSE",
+          "git_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "libloading",
+      "version": "0.8.9",
+      "declared_license": "ISC",
+      "selected_license": "ISC",
+      "repository": "https://github.com/nagisa/rust_libloading/",
+      "authors": [
+        "Simonas Kazlauskas <libloading@kazlauskas.me>"
+      ],
+      "registry_checksum": "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "f4ec9e702de2d0778bccff8525dc44e4cacac2d1"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/libloading-0.8.9/LICENSE",
+          "sha256": "b29f8b01452350c20dd1af16ef83b598fea3053578ccc1c7a0ef40e57be2620f"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "litemap",
+      "version": "0.8.3",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"
+        },
+        "path_in_vcs": "utils/litemap"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/litemap-0.8.3/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "litrs",
+      "version": "1.1.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/LukasKalbertodt/litrs",
+      "authors": [
+        "Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"
+      ],
+      "registry_checksum": "02b614978e47ce529faee66579f2b2fe19c94aa96d910a6a9a8043b2b02d8175",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "264dc9a1c75a37edefeabd530ab86eb78d76a1f8"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/litrs-1.1.0/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/litrs-1.1.0/LICENSE-MIT",
+          "sha256": "7dc1552e88f49132cb358b1b962fc5e79fa42d70bcbb88c526d33e45b8e98036"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "lock_api",
+      "version": "0.4.14",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Amanieu/parking_lot",
+      "authors": [
+        "Amanieu d'Antras <amanieu@gmail.com>"
+      ],
+      "registry_checksum": "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d7828fff7b5d6327ae608e82db45f888b344449a"
+        },
+        "path_in_vcs": "lock_api"
+      },
+      "features": [
+        "atomic_usize",
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/lock_api-0.4.14/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/lock_api-0.4.14/LICENSE-MIT",
+          "sha256": "c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "log",
+      "version": "0.4.35",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-lang/log",
+      "authors": [
+        "The Rust Project Developers"
+      ],
+      "registry_checksum": "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a46450ba763280c29d35b53aa8ad0ff1fc1d78d0"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "alloc",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/log-0.4.35/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/log-0.4.35/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.3",
+      "declared_license": "Unlicense OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/BurntSushi/memchr",
+      "authors": [
+        "Andrew Gallant <jamslam@gmail.com>",
+        "bluss"
+      ],
+      "registry_checksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "5fdb40c054e1fff359a2f7bdf7f87a13b34b465d"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/memchr-2.8.3/COPYING",
+          "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f"
+        },
+        {
+          "path": "licenses/crates/memchr-2.8.3/LICENSE-MIT",
+          "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f"
+        },
+        {
+          "path": "licenses/crates/memchr-2.8.3/UNLICENSE",
+          "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "memoffset",
+      "version": "0.9.1",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Gilnaa/memoffset",
+      "authors": [
+        "Gilad Naaman <gilad.naaman@gmail.com>"
+      ],
+      "registry_checksum": "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "153fc3d50f03755be53148bc3eb97390f9011e45"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/memoffset-0.9.1/LICENSE",
+          "sha256": "3234ac55816264ee7b6c7ee27efd61cf0a1fe775806870e3d9b4c41ea73c5cb1"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.8.9",
+      "declared_license": "MIT OR Zlib OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide",
+      "authors": [
+        "Frommi <daniil.liferenko@gmail.com>",
+        "oyvindln <oyvindln@users.noreply.github.com>",
+        "Rich Geldreich richgel99@gmail.com"
+      ],
+      "registry_checksum": "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "44e43c7786e379b2b1a7fde4aa0e63be719e583d"
+        },
+        "path_in_vcs": "miniz_oxide"
+      },
+      "features": [
+        "default",
+        "simd",
+        "simd-adler32",
+        "with-alloc"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/miniz_oxide-0.8.9/LICENSE",
+          "sha256": "4108245a1f2df9d4e94df8abed5b4ba0759bb2f9b40a6b939f1be141077ae50b"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.8.9/LICENSE-APACHE.md",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.8.9/LICENSE-MIT.md",
+          "sha256": "799e9ca9d179295ef372f25d3769cdda7d25bb2668add6a6a1e22d1e4c678b8d"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.8.9/LICENSE-ZLIB.md",
+          "sha256": "0a54e647fe54104658b5e563c04c6f9edf251710e47bce692e0bd990a4ddaa39"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.9.1",
+      "declared_license": "MIT OR Zlib OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide",
+      "authors": [
+        "Frommi <daniil.liferenko@gmail.com>",
+        "oyvindln <oyvindln@users.noreply.github.com>",
+        "Rich Geldreich richgel99@gmail.com"
+      ],
+      "registry_checksum": "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "4e582392df3a739d2b0dfd2c537dc33e8942be38"
+        },
+        "path_in_vcs": "miniz_oxide"
+      },
+      "features": [
+        "default",
+        "simd",
+        "simd-adler32",
+        "with-alloc"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/miniz_oxide-0.9.1/LICENSE",
+          "sha256": "4108245a1f2df9d4e94df8abed5b4ba0759bb2f9b40a6b939f1be141077ae50b"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.9.1/LICENSE-APACHE.md",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.9.1/LICENSE-MIT.md",
+          "sha256": "799e9ca9d179295ef372f25d3769cdda7d25bb2668add6a6a1e22d1e4c678b8d"
+        },
+        {
+          "path": "licenses/crates/miniz_oxide-0.9.1/LICENSE-ZLIB.md",
+          "sha256": "0a54e647fe54104658b5e563c04c6f9edf251710e47bce692e0bd990a4ddaa39"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "moxcms",
+      "version": "0.8.1",
+      "declared_license": "BSD-3-Clause OR Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/awxkee/moxcms.git",
+      "authors": [
+        "Radzivon Bartoshyk"
+      ],
+      "registry_checksum": "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "c4affa196727d17f21a7f6f148a558867decb470"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "avx",
+        "avx_luts",
+        "avx_shaper_fixed_point_paths",
+        "avx_shaper_paths",
+        "default",
+        "lut",
+        "neon",
+        "neon_luts",
+        "neon_shaper_fixed_point_paths",
+        "neon_shaper_paths",
+        "sse",
+        "sse_luts",
+        "sse_shaper_fixed_point_paths",
+        "sse_shaper_paths"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/moxcms-0.8.1/LICENSE-APACHE.md",
+          "sha256": "90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5"
+        },
+        {
+          "path": "licenses/crates/moxcms-0.8.1/LICENSE.md",
+          "sha256": "2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "nohash-hasher",
+      "version": "0.2.0",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/paritytech/nohash-hasher",
+      "authors": [
+        "Parity Technologies <admin@parity.io>"
+      ],
+      "registry_checksum": "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "99b021664e9d7fd3e1f7ffb8633a137e21e12149"
+        }
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/nohash-hasher-0.2.0/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/crates/nohash-hasher-0.2.0/LICENSE-MIT",
+          "sha256": "ec353d4fecf7963b4c054384557e5dbc3c7a717997eb4a3815b315721a6aa75a"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "num-traits",
+      "version": "0.2.19",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-num/num-traits",
+      "authors": [
+        "The Rust Project Developers"
+      ],
+      "registry_checksum": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7ec3d41d39b28190ec1d42db38021107b3951f3a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "libm",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/num-traits-0.2.19/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/num-traits-0.2.19/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/matklad/once_cell",
+      "authors": [
+        "Aleksey Kladov <aleksey.kladov@gmail.com>"
+      ],
+      "registry_checksum": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "80fe900b21f6d76c1a2ed74d3343e8a3a88c46d0"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "alloc",
+        "default",
+        "race",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/once_cell-1.21.4/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/once_cell-1.21.4/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "owned_ttf_parser",
+      "version": "0.25.1",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/alexheretic/owned-ttf-parser",
+      "authors": [
+        "Alex Butler <alexheretic@gmail.com>"
+      ],
+      "registry_checksum": "36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "3abee95150b4c32f16ffbaf1bb922a68b465d48b"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "apple-layout",
+        "default",
+        "glyph-names",
+        "gvar-alloc",
+        "opentype-layout",
+        "std",
+        "variable-fonts"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/owned_ttf_parser-0.25.1/LICENSE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "parking_lot",
+      "version": "0.12.5",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Amanieu/parking_lot",
+      "authors": [
+        "Amanieu d'Antras <amanieu@gmail.com>"
+      ],
+      "registry_checksum": "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d7828fff7b5d6327ae608e82db45f888b344449a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/parking_lot-0.12.5/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/parking_lot-0.12.5/LICENSE-MIT",
+          "sha256": "c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "parking_lot_core",
+      "version": "0.9.12",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/Amanieu/parking_lot",
+      "authors": [
+        "Amanieu d'Antras <amanieu@gmail.com>"
+      ],
+      "registry_checksum": "2621685985a2ebf1c516881c026032ac7deafcda1a2c9b7850dc81e3dfcb64c1",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d7828fff7b5d6327ae608e82db45f888b344449a"
+        },
+        "path_in_vcs": "core"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/parking_lot_core-0.9.12/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/parking_lot_core-0.9.12/LICENSE-MIT",
+          "sha256": "c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "percent-encoding",
+      "version": "2.3.2",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/servo/rust-url/",
+      "authors": [
+        "The rust-url developers"
+      ],
+      "registry_checksum": "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "91377f48bf35011d042aa5abef9e7f2a0a625aaa",
+          "dirty": true
+        },
+        "path_in_vcs": "percent_encoding"
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/percent-encoding-2.3.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/percent-encoding-2.3.2/LICENSE-MIT",
+          "sha256": "b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "pin-project-lite",
+      "version": "0.2.18",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/taiki-e/pin-project-lite",
+      "authors": [],
+      "registry_checksum": "c938015719552d665fd0553b90d96cd7ff58e83e4c061ca99e6bb78865a72752",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "281af7d8b23d1a87c30f32af73b1596703f29d5f"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/pin-project-lite-0.2.18/LICENSE-APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/pin-project-lite-0.2.18/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "png",
+      "version": "0.18.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/image-rs/image-png",
+      "authors": [
+        "The image-rs Developers"
+      ],
+      "registry_checksum": "60769b8b31b2a9f263dae2776c37b1b28ae246943cf719eb6946a1db05128a61",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "2a3f980245e3ae38b82ade96533e7b450e8477bb"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/png-0.18.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/png-0.18.1/LICENSE-MIT",
+          "sha256": "eaf40297c75da471f7cda1f3458e8d91b4b2ec866e609527a13acfa93b638652"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "potential_utf",
+      "version": "0.1.6",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "d83eb9bc6d8e5cf568e7a1101d60ee05e81ed50ea106026f3d18deeb046d7661",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"
+        },
+        "path_in_vcs": "utils/potential_utf"
+      },
+      "features": [
+        "zerovec"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/potential_utf-0.1.6/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/dtolnay/proc-macro2",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>",
+        "Alex Crichton <alex@alexcrichton.com>"
+      ],
+      "registry_checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ed8a5497669cd63db33bf24646f261b012bbbc4a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/proc-macro2-1.0.107/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/proc-macro2-1.0.107/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "profiling",
+      "version": "1.0.18",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/aclysma/profiling",
+      "authors": [
+        "Philip Degarmo <aclysma@gmail.com>"
+      ],
+      "registry_checksum": "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "8271551172eb6fa4cba47369aedd93790c623df9"
+        },
+        "path_in_vcs": "profiling"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/profiling-1.0.18/LICENSE-APACHE",
+          "sha256": "6ee32466aaa724095c99d108c8e549fb9e2bd2c5d81708afb1cd373b3177f7d2"
+        },
+        {
+          "path": "licenses/crates/profiling-1.0.18/LICENSE-MIT",
+          "sha256": "e64891b51361725890d69bafa508ad013bc92aeef99054caecb6f5ce5f7dfd51"
+        }
+      ],
+      "supplemental_license_sources": [
+        {
+          "url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+          "git_blob_sha": "6a84e059ad8b43e03c2b06bc2af4dc1d8442808d"
+        },
+        {
+          "url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE",
+          "git_blob_sha": "139dce95d473c201a8561ef17536314d8b8cda65"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "pxfm",
+      "version": "0.1.30",
+      "declared_license": "BSD-3-Clause OR Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/awxkee/pxfm",
+      "authors": [
+        "Radzivon Bartoshyk"
+      ],
+      "registry_checksum": "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "acf7acd00cfc845307eda7b7b2de19e42303de82"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/pxfm-0.1.30/LICENSE-APACHE.md",
+          "sha256": "90bf2d659c43045111b65c733ab2a6d4cbcb422a098368c8c58a9ba3db4ed0c5"
+        },
+        {
+          "path": "licenses/crates/pxfm-0.1.30/LICENSE.md",
+          "sha256": "2aa92cada6431e75615e3fe6cb1a9082c98f777d48ae1c087c0da0e37f7b8bff"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/dtolnay/quote",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "723dcb47d3f0ddc896e17287c8a8d3f2ea2317d5"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/quote-1.0.47/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/quote-1.0.47/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "raw-window-handle",
+      "version": "0.6.2",
+      "declared_license": "MIT OR Apache-2.0 OR Zlib",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-windowing/raw-window-handle",
+      "authors": [
+        "Osspial <osspial@gmail.com>"
+      ],
+      "registry_checksum": "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "5fda8e8420b069368e9450e70c2869e32dcdffc1"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "alloc",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/raw-window-handle-0.6.2/LICENSE-APACHE.md",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "licenses/crates/raw-window-handle-0.6.2/LICENSE-MIT.md",
+          "sha256": "9c5a80639a57c1c945570e7ebbca0706305849ce3c098021325cca9db2f7acc4"
+        },
+        {
+          "path": "licenses/crates/raw-window-handle-0.6.2/LICENSE-ZLIB.md",
+          "sha256": "ae895c8576e682f310fb70d93d9f99b1dd82872094c54a8f6cdfe2ca5c2d6ecb"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "scopeguard",
+      "version": "1.2.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/bluss/scopeguard",
+      "authors": [
+        "bluss"
+      ],
+      "registry_checksum": "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "bb988222848d39b0b9037b29da3a3a1eb05ebf4b"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/scopeguard-1.2.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/scopeguard-1.2.0/LICENSE-MIT",
+          "sha256": "fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "serde",
+      "version": "1.0.229",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/serde-rs/serde",
+      "authors": [
+        "Erick Tryzelaar <erick.tryzelaar@gmail.com>",
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"
+        },
+        "path_in_vcs": "serde"
+      },
+      "features": [
+        "default",
+        "derive",
+        "rc",
+        "serde_derive",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/serde-1.0.229/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/serde-1.0.229/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "serde_core",
+      "version": "1.0.229",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/serde-rs/serde",
+      "authors": [
+        "Erick Tryzelaar <erick.tryzelaar@gmail.com>",
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"
+        },
+        "path_in_vcs": "serde_core"
+      },
+      "features": [
+        "alloc",
+        "rc",
+        "result",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/serde_core-1.0.229/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/serde_core-1.0.229/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/serde-rs/serde",
+      "authors": [
+        "Erick Tryzelaar <erick.tryzelaar@gmail.com>",
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"
+        },
+        "path_in_vcs": "serde_derive"
+      },
+      "features": [
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/serde_derive-1.0.229/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/serde_derive-1.0.229/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.154",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/serde-rs/json",
+      "authors": [],
+      "registry_checksum": "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "20572a6d066958542d79cdd6cf1a7cd9f0c8e1f8"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/serde_json-1.0.154/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/serde_json-1.0.154/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "simd-adler32",
+      "version": "0.3.10",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/mcountryman/simd-adler32",
+      "authors": [
+        "Marvin Countryman <me@maar.vin>"
+      ],
+      "registry_checksum": "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d93164f98d7fe2daf883f2e1bec82778dd26199a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "const-generics",
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/simd-adler32-0.3.10/LICENSE.md",
+          "sha256": "42a35170233e83e18856792e748de4c1ce4a63b2afce9a370c89ef3fe23f9f2d"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "smallvec",
+      "version": "1.16.6",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/smallvec/smallvec",
+      "authors": [
+        "The Servo Project Developers"
+      ],
+      "registry_checksum": "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "347b5c346168f9648bf4298d6ed49deda7e18aeb"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "const_generics",
+        "const_new",
+        "union"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/smallvec-1.16.6/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/smallvec-1.16.6/LICENSE-MIT",
+          "sha256": "0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "smol_str",
+      "version": "0.2.2",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/rust-analyzer/smol_str",
+      "authors": [
+        "Aleksey Kladov <aleksey.kladov@gmail.com>"
+      ],
+      "registry_checksum": "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "aea39b4974f55e9380556272b1335e2f6fd13cc7"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/smol_str-0.2.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/smol_str-0.2.2/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "stable_deref_trait",
+      "version": "1.2.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/storyyeller/stable_deref_trait",
+      "authors": [
+        "Robert Grosse <n210241048576@gmail.com>"
+      ],
+      "registry_checksum": "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "30002b4228f7cdee309217b6bf6eee099dda0b00"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/stable_deref_trait-1.2.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/stable_deref_trait-1.2.1/LICENSE-MIT",
+          "sha256": "5e05b024f653a5ce199e77cbbbd42fb5553562ec714b819421ed0c3e552a75d7"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "static_assertions",
+      "version": "1.1.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/nvzqz/static-assertions-rs",
+      "authors": [
+        "Nikolai Vazquez"
+      ],
+      "registry_checksum": "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "18bc65a094d890fe1faa5d3ccb70f12b89eabf56"
+        }
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/static_assertions-1.1.0/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/crates/static_assertions-1.1.0/LICENSE-MIT",
+          "sha256": "ea084a2373ebc1f0902c09266e7bf25a05ab3814c1805bb017ffa7308f90c061"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "syn",
+      "version": "3.0.10",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/dtolnay/syn",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "97ec37dda8a893a460066da694fd1eb7cb30538a"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "clone-impls",
+        "default",
+        "derive",
+        "extra-traits",
+        "fold",
+        "full",
+        "parsing",
+        "printing",
+        "proc-macro",
+        "visit",
+        "visit-mut"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/syn-3.0.10/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/syn-3.0.10/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "synstructure",
+      "version": "0.14.0",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/mystor/synstructure",
+      "authors": [
+        "Nika Layzell <nika@thelayzells.com>"
+      ],
+      "registry_checksum": "901704edd0dfe137f1987838ee4f259e4e063c31371bdb423f7ae38ec6f77f02",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "30cfafe36e42405e717a8e55da042a2835a698d7"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/synstructure-0.14.0/LICENSE",
+          "sha256": "219920e865eee70b7dcfc948a86b099e7f4fe2de01bcca2ca9a20c0a033f2b59"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "tinystr",
+      "version": "0.8.5",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "abc840c238154d58f9e86b2792261edfde565a17696e1cda1a449de27979801a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "utils/tinystr"
+      },
+      "features": [
+        "zerovec"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/tinystr-0.8.5/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "tracing",
+      "version": "0.1.44",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/tokio-rs/tracing",
+      "authors": [
+        "Eliza Weisman <eliza@buoyant.io>",
+        "Tokio Contributors <team@tokio.rs>"
+      ],
+      "registry_checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "2d55f6faf9be83e7e4634129fb96813241aac2b8"
+        },
+        "path_in_vcs": "tracing"
+      },
+      "features": [
+        "log"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/tracing-0.1.44/LICENSE",
+          "sha256": "898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "tracing-core",
+      "version": "0.1.36",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/tokio-rs/tracing",
+      "authors": [
+        "Tokio Contributors <team@tokio.rs>"
+      ],
+      "registry_checksum": "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "10a9e838a35e6ded79d66af246be2ee05417136d"
+        },
+        "path_in_vcs": "tracing-core"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/tracing-core-0.1.36/LICENSE",
+          "sha256": "898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1"
+        },
+        {
+          "path": "licenses/crates/tracing-core-0.1.36/src/spin/LICENSE",
+          "sha256": "58545fed1565e42d687aecec6897d35c6d37ccb71479a137c0deb2203e125c79"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "ttf-parser",
+      "version": "0.25.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/harfbuzz/ttf-parser",
+      "authors": [
+        "Caleb Maclennan <caleb@alerque.com>",
+        "Laurenz Stampfl <laurenz.stampfl@gmail.com>",
+        "Yevhenii Reizner <razrfalcon@gmail.com>",
+        "خالد حسني (Khaled Hosny) <khaled@aliftype.com>"
+      ],
+      "registry_checksum": "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "56c33b910b03ca152f78363ec471c5dfd97c3069"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "apple-layout",
+        "glyph-names",
+        "gvar-alloc",
+        "opentype-layout",
+        "std",
+        "variable-fonts"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/ttf-parser-0.25.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/ttf-parser-0.25.1/LICENSE-MIT",
+          "sha256": "f3c9fe731c701ed77fd5fbaac573872af04dc5869385eb9bd5e3c73c42713814"
+        },
+        {
+          "path": "licenses/crates/ttf-parser-0.25.1/tests/fonts/colr_1_LICENSE",
+          "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "declared_license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "selected_license": "MIT AND Unicode-3.0",
+      "repository": "https://github.com/dtolnay/unicode-ident",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "c1ac3afb721f3cea6527bc2255340a04d0de3ca0"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/unicode-ident-1.0.27/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/crates/unicode-ident-1.0.27/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "licenses/crates/unicode-ident-1.0.27/LICENSE-UNICODE",
+          "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "1.13.3",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/unicode-rs/unicode-segmentation",
+      "authors": [
+        "kwantam <kwantam@gmail.com>",
+        "Manish Goregaokar <manishsmail@gmail.com>"
+      ],
+      "registry_checksum": "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "66a032fd8d667bc47ac5b640b151dff3f5356d07"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/unicode-segmentation-1.13.3/COPYRIGHT",
+          "sha256": "23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d"
+        },
+        {
+          "path": "licenses/crates/unicode-segmentation-1.13.3/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/unicode-segmentation-1.13.3/LICENSE-MIT",
+          "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "url",
+      "version": "2.5.9",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/servo/rust-url",
+      "authors": [
+        "The rust-url developers"
+      ],
+      "registry_checksum": "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ad1c66cbff6e318393d872641e30589ff9687b9c"
+        },
+        "path_in_vcs": "url"
+      },
+      "features": [
+        "std"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/url-2.5.9/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/url-2.5.9/LICENSE-MIT",
+          "sha256": "b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "utf8_iter",
+      "version": "1.1.0",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/hsivonen/utf8_iter",
+      "authors": [
+        "Henri Sivonen <hsivonen@hsivonen.fi>"
+      ],
+      "registry_checksum": "af3bd9d3e571c26fcce9d033b87ea5ab061b8d2ffe9b7a5675d810d68f03edf0",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "17ac91ec5c6e18cf31a38dc1c0a704aebd35bb1f"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/utf8_iter-1.1.0/COPYRIGHT",
+          "sha256": "c30152c94a6d75e021adbc52b3a52470366a46edb917e17deae3259251af244c"
+        },
+        {
+          "path": "licenses/crates/utf8_iter-1.1.0/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/crates/utf8_iter-1.1.0/LICENSE-MIT",
+          "sha256": "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "utf_types",
+      "version": "1.0.0",
+      "declared_license": "Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/hsivonen/utf_types",
+      "authors": [
+        "Henri Sivonen <hsivonen@hsivonen.fi>"
+      ],
+      "registry_checksum": "3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "3e8dc643be477f9f0be8cfa21e519b742649fa80"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/utf_types-1.0.0/COPYRIGHT",
+          "sha256": "3210be7332b5bdf48eb24a945258b9f38616a2cceb0dfc06e3c3c7e9740475a0"
+        },
+        {
+          "path": "licenses/crates/utf_types-1.0.0/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/crates/utf_types-1.0.0/LICENSE-MIT",
+          "sha256": "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "declared_license": "MIT/Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/SergioBenitez/version_check",
+      "authors": [
+        "Sergio Benitez <sb@sergio.bz>"
+      ],
+      "registry_checksum": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d77ef9f27cc336719b2d839d09ee6635dd22f758"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/version_check-0.9.5/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/crates/version_check-0.9.5/LICENSE-MIT",
+          "sha256": "b7e650f3fce5c53249d1cdc608b54df156a97edd636cf9d23498d0cfe7aec63e"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "web-time",
+      "version": "1.1.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/daxpedda/web-time",
+      "authors": [],
+      "registry_checksum": "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "2d200ded30bbcab66f6a4bfa277ac546685728db"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/web-time-1.1.0/LICENSE-APACHE",
+          "sha256": "54a744942eb3fa63a74d8d359989ed6962c04f3f10ff20cfa08ff8aa7efbe4e6"
+        },
+        {
+          "path": "licenses/crates/web-time-1.1.0/LICENSE-MIT",
+          "sha256": "f428305bbf2e70fbd807af0f3c7ac1b7acfb95311640f451e9d2e48db6d7e96b"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "webbrowser",
+      "version": "1.2.7",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/amodm/webbrowser-rs",
+      "authors": [
+        "Amod Malviya @amodm"
+      ],
+      "registry_checksum": "73e91ccd4698f2647d6137e8eb17a3f1dcfd63810be9029fb2398f507279b95b",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "243b00f25761838258a0dd7404d60c9cfc204d60"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/webbrowser-1.2.7/LICENSE-APACHE",
+          "sha256": "b0f7d40eaa9577d99132579866bf1eaf448577dc737582b8a34f1b3e7fab8994"
+        },
+        {
+          "path": "licenses/crates/webbrowser-1.2.7/LICENSE-MIT",
+          "sha256": "7f0f4f8802c102d35110806d1755b7681127575b644f64750810cc47fa78df5b"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/microsoft/windows-rs",
+      "authors": [],
+      "registry_checksum": "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d468916ac27a36fb8a12bafc1bf5c0ec2fe92238"
+        },
+        "path_in_vcs": "crates/libs/link"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/windows-link-0.2.1/license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "path": "licenses/crates/windows-link-0.2.1/license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.52.0",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/microsoft/windows-rs",
+      "authors": [
+        "Microsoft"
+      ],
+      "registry_checksum": "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "3a605cba064b26f2a198ac58085f8c8836f47c38"
+        },
+        "path_in_vcs": "crates/libs/sys"
+      },
+      "features": [
+        "Win32",
+        "Win32_Devices",
+        "Win32_Devices_HumanInterfaceDevice",
+        "Win32_Foundation",
+        "Win32_Globalization",
+        "Win32_Graphics",
+        "Win32_Graphics_Dwm",
+        "Win32_Graphics_Gdi",
+        "Win32_Graphics_OpenGL",
+        "Win32_Media",
+        "Win32_Security",
+        "Win32_System",
+        "Win32_System_Com",
+        "Win32_System_Com_StructuredStorage",
+        "Win32_System_LibraryLoader",
+        "Win32_System_Ole",
+        "Win32_System_SystemInformation",
+        "Win32_System_SystemServices",
+        "Win32_System_Threading",
+        "Win32_System_WindowsProgramming",
+        "Win32_UI",
+        "Win32_UI_Accessibility",
+        "Win32_UI_Controls",
+        "Win32_UI_HiDpi",
+        "Win32_UI_Input",
+        "Win32_UI_Input_Ime",
+        "Win32_UI_Input_KeyboardAndMouse",
+        "Win32_UI_Input_Pointer",
+        "Win32_UI_Input_Touch",
+        "Win32_UI_Shell",
+        "Win32_UI_TextServices",
+        "Win32_UI_WindowsAndMessaging",
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/windows-sys-0.52.0/license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "path": "licenses/crates/windows-sys-0.52.0/license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.61.2",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/microsoft/windows-rs",
+      "authors": [],
+      "registry_checksum": "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "32c3144490c016fe496a0aed769bce60987a2e9d"
+        },
+        "path_in_vcs": "crates/libs/sys"
+      },
+      "features": [
+        "Wdk",
+        "Wdk_Foundation",
+        "Wdk_Storage",
+        "Wdk_Storage_FileSystem",
+        "Win32",
+        "Win32_Foundation",
+        "Win32_Graphics",
+        "Win32_Graphics_Gdi",
+        "Win32_Networking",
+        "Win32_Networking_WinSock",
+        "Win32_Security",
+        "Win32_Storage",
+        "Win32_Storage_FileSystem",
+        "Win32_System",
+        "Win32_System_Com",
+        "Win32_System_Console",
+        "Win32_System_DataExchange",
+        "Win32_System_Diagnostics",
+        "Win32_System_Diagnostics_Debug",
+        "Win32_System_IO",
+        "Win32_System_LibraryLoader",
+        "Win32_System_Memory",
+        "Win32_System_Ole",
+        "Win32_System_SystemInformation",
+        "Win32_System_Threading",
+        "Win32_System_WindowsProgramming",
+        "Win32_UI",
+        "Win32_UI_Input",
+        "Win32_UI_Input_KeyboardAndMouse",
+        "Win32_UI_Shell",
+        "Win32_UI_WindowsAndMessaging",
+        "default"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/windows-sys-0.61.2/license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "path": "licenses/crates/windows-sys-0.61.2/license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "windows-targets",
+      "version": "0.52.6",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/microsoft/windows-rs",
+      "authors": [
+        "Microsoft"
+      ],
+      "registry_checksum": "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "db06b51c2ebb743efb544d40e3064efa49f28d38"
+        },
+        "path_in_vcs": "crates/libs/targets"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/windows-targets-0.52.6/license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "path": "licenses/crates/windows-targets-0.52.6/license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.52.6",
+      "declared_license": "MIT OR Apache-2.0",
+      "selected_license": "MIT",
+      "repository": "https://github.com/microsoft/windows-rs",
+      "authors": [
+        "Microsoft"
+      ],
+      "registry_checksum": "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "db06b51c2ebb743efb544d40e3064efa49f28d38"
+        },
+        "path_in_vcs": "crates/targets/x86_64_gnullvm"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/windows_x86_64_gnullvm-0.52.6/license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "path": "licenses/crates/windows_x86_64_gnullvm-0.52.6/license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "winit",
+      "version": "0.30.13",
+      "declared_license": "Apache-2.0",
+      "selected_license": "Apache-2.0",
+      "repository": "https://github.com/rust-windowing/winit",
+      "authors": [
+        "The winit contributors",
+        "Pierre Krieger <pierre.krieger1708@gmail.com>"
+      ],
+      "registry_checksum": "a6755fa58a9f8350bd1e472d4c3fcc25f824ec358933bba33306d0b63df5978d",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "e9809ef54b18499bb4f2cac945719ecc2a61061b"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [
+        "bytemuck",
+        "percent-encoding",
+        "rwh_06",
+        "x11",
+        "x11-dl",
+        "x11rb"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/winit-0.30.13/LICENSE",
+          "sha256": "6dc0e068dcf3a5bc8e054205b85b7720e1d49265bbc64bf515d2cf79197df69a"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "writeable",
+      "version": "0.6.4",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"
+        },
+        "path_in_vcs": "utils/writeable"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/writeable-0.6.4/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "xml-rs",
+      "version": "0.8.29",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/kornelski/xml-rs",
+      "authors": [
+        "Vladimir Matveev <vmatveev@citrine.cc>"
+      ],
+      "registry_checksum": "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "33cdf417b112c0ebd1f0858b2a67464b3712a4c6"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/xml-rs-0.8.29/LICENSE",
+          "sha256": "0dc18d924dc0a5f41172a393012843a5eaaef338e795b3645da9cc3b6068220b"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "yoke",
+      "version": "0.8.4",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "Manish Goregaokar <manishsmail@gmail.com>"
+      ],
+      "registry_checksum": "417ef3fcf6c300b7dbd25c85531a746931c02ad536f3cf4786ed1e88223340b3",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "utils/yoke"
+      },
+      "features": [
+        "derive",
+        "zerofrom"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/yoke-0.8.4/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "yoke-derive",
+      "version": "0.8.4",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "Manish Goregaokar <manishsmail@gmail.com>"
+      ],
+      "registry_checksum": "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a59ab860d4bda548e94dfbf992d87fe1f761bc55"
+        },
+        "path_in_vcs": "utils/yoke/derive"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/yoke-derive-0.8.4/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerocopy",
+      "version": "0.8.66",
+      "declared_license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/google/zerocopy",
+      "authors": [],
+      "registry_checksum": "cba8a86aee14fc8cc6c208af60854b3d4ab7185a9a369a12c648faa2716ff42a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "6ad9091bae1e9e2d7007c3c77ee85a3386e688e2"
+        },
+        "path_in_vcs": "zerocopy"
+      },
+      "features": [
+        "derive",
+        "simd",
+        "zerocopy-derive"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerocopy-0.8.66/LICENSE-APACHE",
+          "sha256": "9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3"
+        },
+        {
+          "path": "licenses/crates/zerocopy-0.8.66/LICENSE-BSD",
+          "sha256": "83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32"
+        },
+        {
+          "path": "licenses/crates/zerocopy-0.8.66/LICENSE-MIT",
+          "sha256": "1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerofrom",
+      "version": "0.1.8",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "0ec05a11813ea801ff6d75110ad09cd0824ddba17dfe17128ea0d5f68e6c5272",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "e9575f7e4b5aeddfeeb87ada5d3e715950e8233e"
+        },
+        "path_in_vcs": "utils/zerofrom"
+      },
+      "features": [
+        "derive"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerofrom-0.1.8/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerofrom-derive",
+      "version": "0.1.8",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "Manish Goregaokar <manishsmail@gmail.com>"
+      ],
+      "registry_checksum": "f75b4683f6c7f45248d4d64056a24298c6281e0993356d7d1b4a1a962ef10d4a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "ce235d80cf7cbd028e8bd59920420e1203b205b3"
+        },
+        "path_in_vcs": "utils/zerofrom/derive"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerofrom-derive-0.1.8/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerotrie",
+      "version": "0.2.5",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "4ea269c3bd32f0a32c321907a2ae912ba6f4649bb0fc764a15627e99a7095a3f",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "a14f2dad852be26bad277ae704abf27a15cbfed1"
+        },
+        "path_in_vcs": "utils/zerotrie"
+      },
+      "features": [
+        "yoke",
+        "zerofrom"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerotrie-0.2.5/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerovec",
+      "version": "0.11.9",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "The ICU4X Project Developers"
+      ],
+      "registry_checksum": "f58a2799cfe9a1670c7ea8edbd52ef8edb93cb37a7f83bf31ba9e35d9dae6a40",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "utils/zerovec"
+      },
+      "features": [
+        "derive",
+        "yoke"
+      ],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerovec-0.11.9/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zerovec-derive",
+      "version": "0.11.7",
+      "declared_license": "Unicode-3.0",
+      "selected_license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu4x",
+      "authors": [
+        "Manish Goregaokar <manishsmail@gmail.com>"
+      ],
+      "registry_checksum": "c3743ddbf47738d929cd1ae2e199d40d0162979dfe31aef8ae646d2bf00bf97a",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "031d9e89f6a3fd26a14491e090729d46094328fd"
+        },
+        "path_in_vcs": "utils/zerovec/derive"
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/zerovec-derive-0.11.7/LICENSE",
+          "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    },
+    {
+      "name": "zmij",
+      "version": "1.0.23",
+      "declared_license": "MIT",
+      "selected_license": "MIT",
+      "repository": "https://github.com/dtolnay/zmij",
+      "authors": [
+        "David Tolnay <dtolnay@gmail.com>"
+      ],
+      "registry_checksum": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b7cc48b58028e8af7be87e94c0c1c8936f1a57c"
+        },
+        "path_in_vcs": ""
+      },
+      "features": [],
+      "license_files": [
+        {
+          "path": "licenses/crates/zmij-1.0.23/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "supplemental_license_sources": [],
+      "notes": []
+    }
+  ],
+  "runtime_notices": [
+    {
+      "path": "licenses/runtime/COPYING.MinGW-w64-runtime.txt",
+      "sha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f"
+    },
+    {
+      "path": "licenses/runtime/COPYING.winpthreads.txt",
+      "sha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177"
+    },
+    {
+      "path": "licenses/runtime/COPYING.winstorecompat.txt",
+      "sha256": "fa7368d1f93d890c173177475d8ec7aff265a7d08f1f364d66f74d138978ce36"
+    },
+    {
+      "path": "licenses/runtime/LLVM-LICENSE.TXT",
+      "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee"
+    },
+    {
+      "path": "licenses/runtime/Rust-1.100.0-COPYRIGHT-library.html",
+      "sha256": "626556344c12679d7cab2c1aa2ce80de01937b62c2c88c62f0650a469be18799"
+    },
+    {
+      "path": "licenses/runtime/Rust-Apache-2.0.txt",
+      "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+    },
+    {
+      "path": "licenses/runtime/Rust-BSD-2-Clause.txt",
+      "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df"
+    },
+    {
+      "path": "licenses/runtime/Rust-ISC.txt",
+      "sha256": "0ff61769b238634e042ab759dddfd104a8e69d091e3600ae3410e401a6164381"
+    },
+    {
+      "path": "licenses/runtime/Rust-LLVM-exception.txt",
+      "sha256": "e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e"
+    },
+    {
+      "path": "licenses/runtime/Rust-MIT.txt",
+      "sha256": "b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0"
+    },
+    {
+      "path": "licenses/runtime/Rust-NCSA.txt",
+      "sha256": "39cb0234065c92b9e6cee3830cbb52b1aa289aa8fe9ba2e66730fec5cf05c630"
+    },
+    {
+      "path": "licenses/runtime/Rust-Unicode-3.0.txt",
+      "sha256": "f5062c9a188d81dfe66b56db4182dcf9e4b17c0d9b0d311a8e20b3a1b075c443"
+    }
+  ],
+  "fonts": [
+    {
+      "file": "assets/MorphletJP.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/google/fonts/blob/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+      "original_sha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+      "distributed_sha256": "f22a262ff47f85a483d460de5dbd5d03133964f805f19fac23c1efd8149b2c9b",
+      "modifications": "Variable font instantiated at weight 400. Internal name IDs 1/2/3/4/6/16/17 changed to Morphlet JP / Regular variants. Glyph repertoire retained.",
+      "license_file": "assets/FONT-LICENSE.txt",
+      "license_file_sha256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
+      "copyright": "(c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'."
+    }
+  ]
+}

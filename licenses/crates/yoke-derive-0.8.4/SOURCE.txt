@@ -1,0 +1,8 @@
+Package: yoke-derive 0.8.4
+Declared license: Unicode-3.0
+Selected license: Unicode-3.0
+Repository: https://github.com/unicode-org/icu4x
+Crates.io package: https://crates.io/crates/yoke-derive/0.8.4
+Authors from manifest: Manish Goregaokar <manishsmail@gmail.com>
+Registry checksum: ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71
+Crate VCS info: {"git": {"sha1": "a59ab860d4bda548e94dfbf992d87fe1f761bc55"}, "path_in_vcs": "utils/yoke/derive"}

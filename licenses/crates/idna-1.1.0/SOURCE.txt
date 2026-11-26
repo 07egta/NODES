@@ -1,0 +1,8 @@
+Package: idna 1.1.0
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/servo/rust-url/
+Crates.io package: https://crates.io/crates/idna/1.1.0
+Authors from manifest: The rust-url developers
+Registry checksum: 3b0875f23caa03898994f6ddc501886a45c7d3d62d04d2d90788d47be1b1e4de
+Crate VCS info: {"git": {"sha1": "91377f48bf35011d042aa5abef9e7f2a0a625aaa", "dirty": true}, "path_in_vcs": "idna"}

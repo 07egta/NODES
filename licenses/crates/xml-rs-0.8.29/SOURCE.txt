@@ -1,0 +1,8 @@
+Package: xml-rs 0.8.29
+Declared license: MIT
+Selected license: MIT
+Repository: https://github.com/kornelski/xml-rs
+Crates.io package: https://crates.io/crates/xml-rs/0.8.29
+Authors from manifest: Vladimir Matveev <vmatveev@citrine.cc>
+Registry checksum: e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7
+Crate VCS info: {"git": {"sha1": "33cdf417b112c0ebd1f0858b2a67464b3712a4c6"}, "path_in_vcs": ""}

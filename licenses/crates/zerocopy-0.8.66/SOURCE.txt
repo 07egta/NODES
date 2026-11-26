@@ -1,0 +1,8 @@
+Package: zerocopy 0.8.66
+Declared license: BSD-2-Clause OR Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/google/zerocopy
+Crates.io package: https://crates.io/crates/zerocopy/0.8.66
+Authors from manifest: 
+Registry checksum: cba8a86aee14fc8cc6c208af60854b3d4ab7185a9a369a12c648faa2716ff42a
+Crate VCS info: {"git": {"sha1": "6ad9091bae1e9e2d7007c3c77ee85a3386e688e2"}, "path_in_vcs": "zerocopy"}

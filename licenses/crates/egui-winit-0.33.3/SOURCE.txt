@@ -1,0 +1,10 @@
+Package: egui-winit 0.33.3
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/emilk/egui/tree/main/crates/egui-winit
+Crates.io package: https://crates.io/crates/egui-winit/0.33.3
+Authors from manifest: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
+Registry checksum: ec6687e5bb551702f4ad10ac428bab12acf9d53047ebb1082d4a0ed8c6251a29
+Crate VCS info: {"git": {"sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"}, "path_in_vcs": "crates/egui-winit"}
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE

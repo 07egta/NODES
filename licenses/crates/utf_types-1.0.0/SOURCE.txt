@@ -1,0 +1,8 @@
+Package: utf_types 1.0.0
+Declared license: Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/hsivonen/utf_types
+Crates.io package: https://crates.io/crates/utf_types/1.0.0
+Authors from manifest: Henri Sivonen <hsivonen@hsivonen.fi>
+Registry checksum: 3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6
+Crate VCS info: {"git": {"sha1": "3e8dc643be477f9f0be8cfa21e519b742649fa80"}, "path_in_vcs": ""}

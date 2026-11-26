@@ -1,0 +1,8 @@
+Package: utf8_iter 1.1.0
+Declared license: Apache-2.0 OR MIT
+Selected license: MIT
+Repository: https://github.com/hsivonen/utf8_iter
+Crates.io package: https://crates.io/crates/utf8_iter/1.1.0
+Authors from manifest: Henri Sivonen <hsivonen@hsivonen.fi>
+Registry checksum: af3bd9d3e571c26fcce9d033b87ea5ab061b8d2ffe9b7a5675d810d68f03edf0
+Crate VCS info: {"git": {"sha1": "17ac91ec5c6e18cf31a38dc1c0a704aebd35bb1f"}, "path_in_vcs": ""}

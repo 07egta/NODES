@@ -1,0 +1,12 @@
+Package: epaint_default_fonts 0.33.3
+Declared license: (MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0
+Selected license: MIT AND OFL-1.1 AND Ubuntu-font-1.0
+Repository: https://github.com/emilk/egui/tree/main/crates/epaint_default_fonts
+Crates.io package: https://crates.io/crates/epaint_default_fonts/0.33.3
+Authors from manifest: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
+Registry checksum: 5c4fbe202b6578d3d56428fa185cdf114a05e49da05f477b3c7f0fbb221f1862
+Crate VCS info: {"git": {"sha1": "44cdd653e2317d300fb8a6c9c36b03f23991e803"}, "path_in_vcs": "crates/epaint_default_fonts"}
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-MIT
+Supplemental original license: https://github.com/emilk/egui/blob/44cdd653e2317d300fb8a6c9c36b03f23991e803/LICENSE-APACHE
+
+The bundled Hack font additionally preserves the MIT and Bitstream Vera notices, and the DejaVu public-domain statement, in fonts/Hack-Regular.txt. Emoji icon font MIT, Noto Emoji OFL, and Ubuntu font UFL notices are also included verbatim.

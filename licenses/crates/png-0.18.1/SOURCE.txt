@@ -1,0 +1,8 @@
+Package: png 0.18.1
+Declared license: MIT OR Apache-2.0
+Selected license: MIT
+Repository: https://github.com/image-rs/image-png
+Crates.io package: https://crates.io/crates/png/0.18.1
+Authors from manifest: The image-rs Developers
+Registry checksum: 60769b8b31b2a9f263dae2776c37b1b28ae246943cf719eb6946a1db05128a61
+Crate VCS info: {"git": {"sha1": "2a3f980245e3ae38b82ade96533e7b450e8477bb"}, "path_in_vcs": ""}
