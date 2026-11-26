@@ -1,37 +1,46 @@
 # NODES autonomous integration status
 
-- Updated: 2026-11-26T12:28:01.763065+00:00
+- Updated: 2026-11-26 21:41 JST / 12:41 UTC
 - Branch: `develop/nodes-ultimate`
 - Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`
-- Main inspected at `79f32745923adfa9e3de05ef4683b6e3b5f4948f` and is not modified.
-- Stage: WIP integration and verification; not a complete Grasshopper implementation.
+- Main inspected at `79f32745923adfa9e3de05ef4683b6e3b5f4948f`; never pushed directly.
+- Integration draft PR: https://github.com/07egta/NODES/pull/11
+- Stage: integrated development preview. Not a complete Grasshopper implementation.
 
 ## Completed
 
-- Inspected all remote branches and existing pull requests #1–#5.
-- Selected evolve/all because it already integrates scripts, clusters, mesh import/export, fabrication preview and original node extensions.
-- Created a dedicated integration branch. Preserve every original mission branch and use immutable commit IDs when integrating concurrent work.
-- Found working Rust 1.100/Cargo 1.100 at `/home/agent/.cargo/bin`; direct Git transport is available in this execution environment.
+- Inspected all remote branches and existing PRs; retained all original mission histories.
+- Integrated core, Data Tree, mathematics, generation, mesh, UI, GHX/API, exact curves, exact surfaces, and coverage research.
+- Added legacy `ClosestPoint` input migration, including nested clusters and conflict rejection.
+- Unified input access metadata and ordinal branch matching for new nodes while preserving original graph behavior.
+- Preserved exact curves through affine transforms, arrays, ruled/extruded surfaces and iso curves.
+- Fixed B-spline span tessellation, variance cancellation and product underflow/overflow intermediates.
+- Added analytical surface Gaussian, mean and principal curvatures.
+- Detected and repaired Delaunay hull gaps with independent area/convex-hull regression checks.
+- Exposed safe new kernel families through the offline Graph API and excluded scripts/file input.
+- Evaluated all 36 existing sample graphs, serialized/reloaded them, and checked warm-cache reuse.
+- Published checkpoints `219d92d`, `86a2276`, `2e6534f`; subsequent validated changes are being saved now.
 
 ## Current work
 
-1. Run baseline tests and integrate core correctness work.
-2. Integrate Data Tree, mathematics, UI, geometry, mesh and generation mission branches in reviewed units.
-3. Fix build/test failures with independent regression tests.
-4. Publish checkpoints after each meaningful change.
+1. Publish the integrated 350-test checkpoint.
+2. Incorporate reviewed curvature edge-case fix, full GH2 official index inventory, node timing and capacity work.
+3. Measure graph performance and add inspector timing, then run formatting, lint and release-build gates.
+4. Finish CI, compiled node inventory, architecture, roadmap and test evidence documents.
 
-## Counts and verification
+## Counts and latest verification
 
-- Registered baseline node kinds: 64. Integrated registry includes mathematics, data trees, generation, mesh and exact geometry; pending compiled inventory export.
-- Verified node count: not established. Registration count is not a compatibility count.
-- Latest local tests: Data Tree isolated branch passed 182 tests; integrated branch compilation is pending. Extra hardening tests are queued. No integrated pass claim yet.
-- Windows CI baseline: prior run reported successful; new integration requires its own run.
-- GUI execution: not yet attempted.
+- Registered node count: compiled inventory regeneration pending (298 picker kinds expected, plus Cluster); do not infer Grasshopper compatibility from this count.
+- Grasshopper VERIFIED node count: 0 backed by external Grasshopper oracle fixtures; no parity claim.
+- Local command: `cargo test --all-targets --locked` using Rust/Cargo 1.100.
+- Latest combined result: **350 passed, 0 failed, 2 ignored**, 24 test suites, exit 0. Ignored tests are opt-in benchmarks/stress checks.
+- Tests include the common access contracts, numeric precision, exact geometry, generation, saved examples and API catalog. Later changes require their own validation.
+- Windows CI and Intel Arc runtime: not verified for this checkpoint.
+- GUI attempt: native desktop is available, but its terminal window did not accept focused text input. The build environment has no DISPLAY. No application GUI test is claimed.
 
-## Commands
+## Build and test
 
 ```sh
-export PATH="/home/agent/.cargo/bin:$PATH" # only needed when cargo is not on PATH
 cargo test --all-targets --locked
 cargo check --all-targets --locked
 cargo fmt --all -- --check
@@ -39,30 +48,25 @@ cargo clippy --all-targets --locked
 cargo build --release --locked --bin Morphlet
 ```
 
-## Known limitations / unverified
+In the current sandbox Cargo is at `/home/agent/.cargo/bin`. Only the integration checkout may use `CARGO_TARGET_DIR=/workspace/scratch/a294e49d5e0f/nodes-trees/target`; concurrent worktrees with the same package/version previously reused incompatible artifacts. Other worktrees must use isolated targets.
 
-- One output per node; value types and exact geometry differ across concurrent mission branches.
-- Current MAX_NODES is 2048. No 10000-node support claim.
-- GH1/GH2 parity, robust B-rep booleans, CAD exchange and Windows GUI/Intel Arc behavior are not established.
-- Most concurrent mission PRs explicitly had not been compiled in their authoring environment.
+## Known limitations and unverified work
 
-## Next resume steps
+- One output per node; no general mixed Item/List/Tree scheduler and no native runtime Null value.
+- MAX_NODES is currently 2048. A separately reviewed 16384-capacity change still needs integration and measurement.
+- General B-rep booleans, trimmed surfaces, STEP/IGES/3DM, binary GH, complete GHX, plugin ABI and complete GH1/GH2 parity are unfinished.
+- Scalar settings in list adapters intentionally use their declared FirstItem/SingleItem access. Port metadata records this limitation.
+- GUI, DPI, Japanese font rendering, Windows deployment, idle CPU/RAM, GPU performance and real printing remain unverified.
+- Existing Rust 1.100 warnings and formatting differences remain to be addressed; passing tests are not a clean-clippy claim.
 
-1. `git fetch origin` and inspect this branch, PR and latest commits before changing anything.
-2. Inspect `git status --short`; do not overwrite existing work.
-3. Next files: `src/engine.rs`, `src/model.rs`, mission module files, `tests/`.
-4. Next command: `cargo test --all-targets --locked` after core integration.
-5. Next feature: common Data Tree matching and integration of existing node kernels.
+## Exact next resume steps
 
-## Related pull requests
+1. `git fetch origin` and inspect `develop/nodes-ultimate`, PR #11, this file and `git status --short`; preserve other work.
+2. Reviewed local follow-ups: curvature `997183b`, GH2 inventory `6f77c9f`, timings `299f510`, capacity `95a070e`. Check history before cherry-picking to avoid duplicates.
+3. Next files: `src/app.rs`, `src/engine.rs`, `tests/large_graph_tests.rs`, `examples/coverage_perf.rs`, `.github/workflows/`, coverage and development documents.
+4. Next commands: `cargo test --test node_timing_tests --test large_graph_tests -- --nocapture`, followed by `cargo run --release --example coverage_perf` after saving source.
+5. Next features: per-node elapsed/cached UI, measured 10000-node evaluation, full official index tracking and robust validation gates.
 
-- #1 core integration, #2 mathematics, #3 interface, #4 Data Tree, #5 generative design.
-- Integration draft PR: https://github.com/07egta/NODES/pull/11
+## Publication mechanism
 
-## Integration checkpoint (WIP)
-
-Merged core 86aa816, Data Tree a44dead (+ public-adapter hardening), math 55ed4f5, generation b710702, mesh 2561ca8, UI ec814d9, GHX/API 63b8632, curve 6054b59 + surface 2626b8c (+ exact extrusion/iso integration), and audit 7884304 (+ metadata hardening). Original mission histories are preserved as merge parents at remote checkpoints.
-
-Resolved duplicated ClosestPoint enum registration. Pending: preserve both mission port-name conventions, then compile the combined runtime and fix any non-exhaustive geometry matches. Initial independent Data Tree suite passed 182 tests. Shared Cargo target now reduces redundant compilation memory.
-
-Git CLI push lacks write credentials. Checkpoint publication uses authenticated GitHub tree/commit/ref APIs with expected old SHA and force=false, then fetches the remote commit and aligns only this local integration branch. No external developer branch is rewritten.
+Git CLI push lacks write credentials. Authenticated GitHub tree/commit/ref tools publish to this branch with expected-old-SHA and `force=false`. Fetch the resulting remote commit and verify its SHA after every checkpoint. No external developer branch is rewritten. Source mission commits are retained as merge parents. Local integration commits may be consolidated into an equivalent remote snapshot by this API path.

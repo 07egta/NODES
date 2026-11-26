@@ -36,6 +36,9 @@ pub const KINDS: &[K] = &[
     K::BrepUnion,
     K::BrepDifference,
     K::BrepOffset,
+    K::SurfaceGaussianCurvature,
+    K::SurfaceMeanCurvature,
+    K::SurfacePrincipalCurvatures,
 ];
 const S: crate::model::InputSpec = g("surface", "曲面", D::Surface);
 const B: crate::model::InputSpec = g("solid", "閉じた立体", D::Solid);
@@ -131,6 +134,27 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "surface normal line 法線",
             Curve,
             [S, U, V, n("length", "表示長", 10., 0.001, 1e6, 0.5)]
+        ),
+        K::SurfaceGaussianCurvature => spec!(
+            "ガウス曲率",
+            "正確な二階微分からガウス曲率Kを求めます。特異点・非C2内部ノットはエラー。",
+            "surface gaussian curvature K 曲率",
+            Number,
+            [S, U, V]
+        ),
+        K::SurfaceMeanCurvature => spec!(
+            "平均曲率",
+            "法線Su×Svと第二基本形式から平均曲率Hを求めます。外向き球はH=-1/r。",
+            "surface mean curvature H 曲率",
+            Number,
+            [S, U, V]
+        ),
+        K::SurfacePrincipalCurvatures => spec!(
+            "主曲率",
+            "符号付き主曲率2値を昇順で返します。法線Su×Sv。外向き球の両曲率は-1/r。",
+            "surface principal curvature k1 k2 曲率",
+            Number,
+            [S, U, V]
         ),
         K::SurfaceArea => spec!(
             "曲面積",
@@ -380,6 +404,15 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
                 closed: false,
                 geometry: None,
             }))])
+        }
+        K::SurfaceGaussianCurvature | K::SurfaceMeanCurvature | K::SurfacePrincipalCurvatures => {
+            let result = surface(a)?.curvature(num(a, 1)?, num(a, 2)?, stop)?;
+            let values = match kind {
+                K::SurfaceGaussianCurvature => vec![result.gaussian],
+                K::SurfaceMeanCurvature => vec![result.mean],
+                _ => result.principal.to_vec(),
+            };
+            Ok(values.into_iter().map(Value::Number).collect())
         }
         K::SurfaceArea => Ok(vec![Value::Number(
             surface(a)?.area(num(a, 1)? as usize, stop)?,

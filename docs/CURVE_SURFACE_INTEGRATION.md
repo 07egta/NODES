@@ -1,15 +1,16 @@
 # Exact curve/surface integration
 
-Status: implementation checkpoint; local compile/test results are recorded by the integration owner in `TEST_RESULTS.md` and `docs/development/STATUS.md`. This document does not declare GH compatibility.
+Status: local Rust 1.100 compilation and the 23 curve/surface integration tests passed on 2026-11-26. Command: `cargo test --locked --test curve_geometry_tests --test curve_surface_integration --test surface_kernel_tests`. The integration owner records final whole-product results in `TEST_RESULTS.md` and `docs/development/STATUS.md`. This document does not declare GH compatibility.
 
 ## Preserved mathematical data
 
-`Curve.geometry` and `SurfaceValue.geometry` retain mathematical geometry; display samples are separate. Surface nodes now consume exact NURBS profiles when present. A curve display resolution of 4, 8, 96 or 512 points must not change the resulting extrusion.
+`Curve.geometry` and `SurfaceValue.geometry` retain mathematical geometry; display samples are separate. Surface nodes now consume exact NURBS profiles when present. A curve display resolution of 8, 16, 96 or 256 points must not change the resulting extrusion.
 
 - **SurfaceExtrude:** exact extrusion of a full, clamped, nonperiodic NURBS curve in Z. Maximum 32 U controls and degree 8 in the surface representation; old polyline inputs remain piecewise linear. The original profile's mathematical geometry is translated with its display points.
 - **RuledSurface:** exact Euclidean interpolation between compatible NURBS profiles with equal normalized knots, degree, rational weights and closure. Unequal weights, trimmed intervals and periodic splines are rejected explicitly. A reversed complete profile can be realigned by the reverse option.
 - **SurfaceIsoCurve:** exact tensor contraction in homogeneous coordinates for NURBS surfaces. Planes produce lines; frusta, spheres and tori produce exact rational conics or lines. Surface poles that collapse an iso curve to a single point are rejected.
 - Analytic conic isocurves preserve the locus and endpoints; rational curve parameterization is not equal to the source analytic surface's angular parameter.
+- Surface tessellation includes active NURBS knots, so nonuniform degree-one corners are not bridged by a display chord.
 - `iso_polyline` remains an explicit approximation API, with no mathematical geometry attached.
 
 ## Independent regressions

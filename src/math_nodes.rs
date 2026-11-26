@@ -858,6 +858,101 @@ fn stable_sum(a: &[f64]) -> f64 {
     s+c
 }
 
+
+/// A positive finite nonzero float as mantissa in [1, 2) times 2^exponent.
+/// Normalizing subnormals with an exact power of two avoids reciprocal overflow.
+fn binary_parts(value: f64) -> (f64, i64) {
+    let (value, correction) = if value < f64::MIN_POSITIVE {
+        (value * 4_503_599_627_370_496.0, -52)
+    } else {
+        (value, 0)
+    };
+    let bits = value.to_bits();
+    let exponent = ((bits >> 52) & 0x7ff) as i64 - 1023 + correction;
+    let mantissa = f64::from_bits((bits & ((1_u64 << 52) - 1)) | (1023_u64 << 52));
+    (mantissa, exponent)
+}
+
+/// Multiplication keeps its exponent separately, so a finite final answer is not
+/// lost to intermediate overflow/underflow. Ordinary mantissa rounding remains.
+/// Subnormal final values are supported; rounding a nonzero product to zero is an error.
+fn stable_product(data: &[f64], stop: &dyn Fn() -> bool) -> Result<f64, String> {
+    let mut negative = false;
+    let mut has_zero = false;
+    for &value in data {
+        cancelled(stop)?;
+        negative ^= value.is_sign_negative();
+        has_zero |= value == 0.0;
+    }
+    if has_zero {
+        return Ok(if negative { -0.0 } else { 0.0 });
+    }
+    let mut mantissa = 1.0;
+    let mut exponent = 0_i64;
+    for &value in data {
+        cancelled(stop)?;
+        let (m, e) = binary_parts(value.abs());
+        mantissa *= m;
+        exponent = exponent.checked_add(e).ok_or("総積の指数が上限を超えました。")?;
+        if mantissa >= 2.0 {
+            mantissa *= 0.5;
+            exponent = exponent.checked_add(1).ok_or("総積の指数が上限を超えました。")?;
+        }
+    }
+    if exponent > 1023 {
+        return Err("総積が桁あふれしました。".into());
+    }
+    if exponent < -1075 {
+        return Err("総積が小さすぎて、非ゼロの数値として表せません。".into());
+    }
+    let magnitude = if exponent >= -1022 {
+        mantissa * f64::from_bits(((exponent + 1023) as u64) << 52)
+    } else {
+        // The first multiplication is exact and normal. Only the final scaling
+        // rounds to a subnormal, including ties at half the smallest subnormal.
+        (mantissa * f64::MIN_POSITIVE)
+            * f64::from_bits(((exponent + 2045) as u64) << 52)
+    };
+    if !magnitude.is_finite() {
+        return Err("総積が桁あふれしました。".into());
+    }
+    if magnitude == 0.0 {
+        return Err("総積が小さすぎて、非ゼロの数値として表せません。".into());
+    }
+    Ok(if negative { -magnitude } else { magnitude })
+}
+
+/// Center before scaling: scaling a large shared offset first can erase a small
+/// but representable spread. The midpoint avoids overflow for opposite extrema.
+fn population_stddev(data: &mut [f64], stop: &dyn Fn() -> bool) -> Result<f64, String> {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for &value in data.iter() {
+        cancelled(stop)?;
+        lo = lo.min(value);
+        hi = hi.max(value);
+    }
+    if lo == hi { return Ok(0.0); }
+    let center = lo * 0.5 + hi * 0.5;
+    let mut spread = 0.0_f64;
+    for value in data.iter_mut() {
+        cancelled(stop)?;
+        *value -= center;
+        spread = spread.max(value.abs());
+    }
+    if spread == 0.0 { return Ok(0.0); }
+    for value in data.iter_mut() {
+        cancelled(stop)?;
+        *value /= spread;
+    }
+    let mean = stable_sum(data) / data.len() as f64;
+    for value in data.iter_mut() {
+        cancelled(stop)?;
+        *value = (*value - mean).powi(2);
+    }
+    Ok((stable_sum(data) / data.len() as f64).sqrt() * spread)
+}
+
 // A matrix is transported as a row-major numeric list; dimensions are explicit.
 fn dim(lists: &[&[Value]], index: usize, limit: usize) -> Result<usize,String> {
     let n=lists.get(index).and_then(|l|l.first()).ok_or("行列の次元がありません。")?.number()?;
@@ -1031,17 +1126,16 @@ pub fn run_list(kind: NodeKind, lists: &[&[Value]], stop: &dyn Fn()->bool) -> Re
         Summation|Product|Average|Median|Variance|StdDeviation=>{
             let mut data=Vec::with_capacity(a.len());
             for v in a {cancelled(stop)?;data.push(v.number()?);}
-            if kind==Product {
-                let mut result=1.0;
-                if data.contains(&0.0) {return scalar(0.0);}
-                for x in data {cancelled(stop)?;result*=x;if !result.is_finite(){return Err("総積が桁あふれしました。".into());}}
-                return scalar(result);
-            }
+            if kind==Product { return scalar(stable_product(&data, stop)?); }
             if data.is_empty() {return if kind==Summation {scalar(0.0)} else {Ok(vec![])};}
             if kind==Median {
                 data.sort_by(f64::total_cmp);
                 let m=data.len()/2;
                 return scalar(if data.len()%2==1 {data[m]} else {lerp(data[m-1],data[m],0.5)});
+            }
+            if matches!(kind, Variance | StdDeviation) {
+                let sd = population_stddev(&mut data, stop)?;
+                return scalar(if kind == Variance { sd * sd } else { sd });
             }
             let len=data.len() as f64;
             let m=data.iter().fold(0.0_f64,|x,y|x.max(y.abs()));
@@ -1049,11 +1143,7 @@ pub fn run_list(kind: NodeKind, lists: &[&[Value]], stop: &dyn Fn()->bool) -> Re
             for x in &mut data {*x/=m;}
             let sum=stable_sum(&data);
             if kind==Summation {return scalar(sum*m);}
-            let mean=sum/len;
-            if kind==Average {return scalar(mean*m);}
-            for x in &mut data {*x=(*x-mean).powi(2);}
-            let sd=(stable_sum(&data)/len).sqrt()*m;
-            scalar(if kind==Variance {sd*sd} else {sd})
+            scalar((sum/len)*m)
         }
         _=>Err("未対応の数学リストノード。".into())
     }

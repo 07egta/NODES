@@ -290,46 +290,12 @@ pub fn supports_transform(kind: NodeKind) -> bool {
     !matches!(kind, NodeKind::Script | NodeKind::Cluster)
 }
 pub fn supports_matching(kind: NodeKind) -> bool {
-    supports_transform(kind)
-        && !is_tree_kind(kind)
-        && !is_list_kind(kind)
-        && !crate::gh_nodes::is_list_kind(kind)
-        && !matches!(
-            kind,
-            NodeKind::Flatten
-                | NodeKind::Graft
-                | NodeKind::Output
-                | NodeKind::Merge
-                | NodeKind::Loft
-                | NodeKind::ImportMesh
-                | NodeKind::Number
-        )
-        && kind.spec().inputs.len() > 1
+    crate::node_access::supports_item_matching(kind)
 }
 
-/// Access labels are explicit. Existing special nodes retain their original access policy.
+/// Shared inspector metadata; never infer list access from a data type.
 pub fn access_label(kind: NodeKind, index: usize) -> &'static str {
-    use NodeKind::*;
-    match kind {
-        Flatten | Graft | SimplifyTree | TrimTree | PruneTree | FlipMatrix | PathMapper
-        | TreeStatistics | PartitionList
-            if index == 0 =>
-        {
-            "Tree"
-        }
-        MergeTree | EntwineTree | UnflattenTree => "Tree",
-        TreeItem | TreeBranch if index == 0 => "Tree",
-        TreeItem | TreeBranch if index == 1 => "List",
-        Merge | Loft if index == 0 => "List",
-        ListItem | CullPattern | CullIndex | ReplaceItems | InsertItems if index == 1 => "List",
-        ReplaceItems | InsertItems if index == 2 => "List",
-        ConcatList => "List",
-        MemberIndex if index == 1 => "List",
-        k if index == 0 && (is_list_kind(k) || crate::gh_nodes::is_list_kind(k)) => "List",
-        Script | Cluster => "Custom",
-        Output => "Tree",
-        _ => "Item",
-    }
+    crate::node_access::for_input(kind, index).map_or("Unknown", |a| a.label())
 }
 
 // These adapters are public API entry points as well as evaluator helpers.

@@ -105,7 +105,8 @@ pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
     // Read only the envelope first so future schemas get an explicit version error.
     let header: Header = serde_json::from_slice(bytes).map_err(parse_error)?;
     check_schema_version(header.schema_version)?;
-    let project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
+    let mut project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
+    crate::compatibility::normalize_legacy_inputs(&mut project.graph)?;
     project.validate()?;
     Ok(project)
 }

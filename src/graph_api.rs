@@ -24,7 +24,17 @@ pub fn permitted(kind: NodeKind) -> bool {
         Mirror | Twist | Wave | LinearArray | RadialArray | Merge | Flatten | Graft |
         Output | ListItem | ListLength | ReverseList | SortList | CullPattern |
         ShiftList | ConcatList | SubList | Bounds | Remap | Random | Populate |
-        Noise | NoiseDeform | GraphProfile | Shell | OverhangCheck | Distance | PointComponent)
+        Noise | NoiseDeform | GraphProfile | Shell | OverhangCheck | Distance | PointComponent |
+        MeshArea | MeshVolume | MeshCenter | MeshDimensions | MeshMass | MeshAudit |
+        MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest |
+        MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide |
+        MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshConstruct | MeshSelfContact |
+        MeshThicknessSample | MeshCompact | MeshNonManifold)
+        || crate::math_nodes::spec(kind).is_some()
+        || crate::curve_nodes::is_curve_kind(kind)
+        || crate::surface_nodes::KINDS.contains(&kind)
+        || crate::generative::is_kind(kind)
+        || (crate::data_tree_nodes::spec(kind).is_some() && kind != PathMapper)
 }
 
 #[derive(Debug, Serialize)]
@@ -36,6 +46,8 @@ pub struct PortInfo {
     pub min: f64,
     pub max: f64,
     pub integer: bool,
+    pub access: &'static str,
+    pub access_description: &'static str,
 }
 #[derive(Debug, Serialize)]
 pub struct NodeInfo {
@@ -45,6 +57,8 @@ pub struct NodeInfo {
     pub description: &'static str,
     pub inputs: Vec<PortInfo>,
     pub output: DataType,
+    pub item_matching_configurable: bool,
+    pub default_branch_matching: &'static str,
 }
 #[derive(Debug, Serialize)]
 pub struct Catalog {
@@ -58,9 +72,13 @@ pub fn catalog() -> Catalog {
         nodes: NodeKind::all().iter().copied().filter(|k| permitted(*k)).map(|kind| {
             let spec = kind.spec();
             NodeInfo { kind, label: spec.label, category: spec.category, description: spec.description,
-                output: spec.output, inputs: spec.inputs.iter().map(|p| PortInfo {
+                item_matching_configurable: crate::node_access::supports_item_matching(kind),
+                default_branch_matching: if crate::node_access::uses_ordinal_matching(kind) { "ordinal" } else { "legacy_paths_unless_explicit" },
+                output: spec.output, inputs: spec.inputs.iter().enumerate().map(|(index,p)| PortInfo {
                     key: p.key, label: p.label, kind: p.kind, default: p.default,
                     min: p.min, max: p.max, integer: p.integer,
+                    access: crate::node_access::for_input(kind,index).map_or("Unknown", |a| a.label()),
+                    access_description: crate::node_access::for_input(kind,index).map_or("", |a| a.description()),
                 }).collect() }
         }).collect(),
     }

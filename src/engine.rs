@@ -222,7 +222,7 @@ pub(crate) fn evaluate_node(
                         spec.label, site(), spec.min, spec.max
                     ));
                 }
-                if spec.integer && (n - n.round()).abs() > 1e-8 {
+                if spec.integer && n.fract() != 0.0 {
                     return Err(format!("「{}」{} は整数にしてください。", spec.label, site()));
                 }
             }
@@ -266,7 +266,7 @@ pub(crate) fn evaluate_node(
         None
     };
     let curve_list = crate::curve_nodes::is_list_kind(node.kind);
-    let list_kind = crate::gh_nodes::is_list_kind(node.kind) || crate::data_tree_nodes::is_list_kind(node.kind) || crate::math_nodes::is_list_kind(node.kind) || crate::generative::is_list(node.kind) || node.kind == NodeKind::MeshConstruct || curve_list;
+    let list_kind = crate::node_access::uses_list_access(node.kind);
     let matching = node.params.get(dt::MATCH_PARAM).copied()
         .map(dt::MatchMode::from_number).transpose()?;
     let item_mode = matching.unwrap_or(dt::MatchMode::Longest);
@@ -286,7 +286,7 @@ pub(crate) fn evaluate_node(
     }
     // Old .morph files omit MATCH_PARAM and keep the original exact-path behaviour.
     // When a matching mode is selected, use ordinal branch matching instead.
-    let matched = if matching.is_some() || crate::data_tree_nodes::is_list_kind(node.kind) {
+    let matched = if matching.is_some() || crate::node_access::uses_ordinal_matching(node.kind) {
         dt::match_branches(&inputs)?
     } else {
       paths.into_iter().map(|path| {
@@ -322,7 +322,9 @@ pub(crate) fn evaluate_node(
         let values = (|| -> Result<Vec<Value>, String> {
         // List nodes see their whole first list (an empty one is a valid input, e.g. for
         // リスト長 or 連結); their setting inputs still need at least one value.
-        let skip = if list_kind {
+        let skip = if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
+            lists.iter().any(|v| v.is_empty())
+        } else if list_kind {
             node.kind != NodeKind::ConcatList && !crate::math_nodes::accepts_empty_second(node.kind) && lists.iter().skip(1).any(|v| v.is_empty())
         } else {
             lists.iter().any(|v| v.is_empty())
@@ -838,7 +840,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d | PopulateMesh | CurveArray | NoiseField | LifeGrid => crate::generative::run_item(kind, a, cancel),
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
-        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh | NurbsVase | RuledSurface | SurfaceExtrude | BrepUnion | BrepDifference | BrepOffset => crate::surface_nodes::run(kind, a, cancel),
+        PlaneSurface | NurbsPanel | BilinearSurface | CylinderSurface | FrustumSurface | SphereSurface | TorusSurface | EvaluateSurface | SurfaceDirection | SurfaceNormalLine | SurfaceArea | SurfaceClosestPoint | SurfaceIsoCurve | DivideSurface | SurfaceMesh | BrepBox | BrepVolume | BrepArea | BrepIntersection | BrepMove | BrepFaces | BrepEdges | BrepVertices | BrepMesh | NurbsVase | RuledSurface | SurfaceExtrude | BrepUnion | BrepDifference | BrepOffset | SurfaceGaussianCurvature | SurfaceMeanCurvature | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
         MeshArea
         | MeshVolume
         | MeshCenter
@@ -961,7 +963,7 @@ pub(crate) fn map_shape(
         Value::Surface(_) | Value::Solid(_) => Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into()),
     }
 }
-fn map_affine_shape(v: &Value, f: impl Fn([f64;3]) -> [f64;3], cancel: &dyn Fn() -> bool) -> Result<Value,String> {
+pub(crate) fn map_affine_shape(v: &Value, f: impl Fn([f64;3]) -> [f64;3], cancel: &dyn Fn() -> bool) -> Result<Value,String> {
     let mut mapped = map_shape(v, &f, cancel)?;
     if let (Value::Curve(before), Value::Curve(after)) = (v, &mut mapped) {
         if let Some(g) = &before.geometry {

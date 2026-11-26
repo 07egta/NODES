@@ -300,7 +300,7 @@ pub(crate) fn estimate(kind:NodeKind,a:&[&Value])->Result<(usize,usize),String> 
 }
 fn translated(v:&Value,p:[f64;3],cancel:&dyn Fn()->bool)->Result<Value,String>{
     if p==[0.;3] { return Ok(v.clone()); }
-    map_shape(v,|q|add(q,p),cancel)
+    crate::engine::map_affine_shape(v,|q|add(q,p),cancel)
 }
 fn array_budget(v:&Value,n:usize)->Result<(),String>{
     if n>MAX_ITEMS || v.weight().saturating_mul(n)>MAX_TOTAL_WEIGHT/2 {
@@ -395,14 +395,14 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
             if len<1e-12 {return Err("回転軸の長さがゼロです。".into());}
             let u=mul(axis,1./len);
             let (s,k)=num(a,5)?.to_radians().sin_cos();
-            Ok(vec![map_shape(v,|p|{
+            Ok(vec![crate::engine::map_affine_shape(v,|p|{
                 let d=sub(p,c);
                 add(c,add(add(mul(d,k),mul(cross(u,d),s)),mul(u,dot(u,d)*(1.-k))))
             },cancel)?])
         }
         Shear=>{
             let (x,y)=(num(a,1)?,num(a,2)?);
-            Ok(vec![map_shape(shape(a)?,|p|[p[0]+x*p[2],p[1]+y*p[2],p[2]],cancel)?])
+            Ok(vec![crate::engine::map_affine_shape(shape(a)?,|p|[p[0]+x*p[2],p[1]+y*p[2],p[2]],cancel)?])
         }
         Taper=>{
             let v=shape(a)?;
@@ -444,7 +444,7 @@ pub(crate) fn run_item(kind:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->Result
             let angle=num(a,1)?.to_radians();
             let ratio=num(a,2)?;
             let depth=count(a,3,10)?;
-            let mut stack=vec![([0.;3],0.,len,depth)];
+            let mut stack=vec![([0.;3],0.0_f64,len,depth)];
             let mut out=Vec::with_capacity((1usize<<depth)-1);
             while let Some((p,t,l,d))=stack.pop() {
                 cancelled(cancel)?;
@@ -725,6 +725,19 @@ fn incircle(a:P2,b:P2,c:P2,p:P2)->f64{
 /// Incremental Bowyer-Watson on normalized planar coordinates. Reject ambiguous
 /// degeneracies rather than return a mesh with missing sites or invalid triangles.
 fn delaunay(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
+    // A finite supertriangle can suppress a true hull triangle near collinearity.
+    // Retry a bounded number of larger enclosures only when the hull audit fails.
+    let mut last = String::new();
+    for extent in [32., 128., 512., 2048.] {
+        match delaunay_enclosed(input, extent, cancel) {
+            Ok(mesh) => return Ok(mesh),
+            Err(error) if error.starts_with("凸包境界") => last = error,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last)
+}
+fn delaunay_enclosed(input:&[[f64;3]],extent:f64,cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
     if input.len()>MAX_SITES{return Err("ドロネー分割は 256 点までです。".into());}
     if input.len()<3{return Err("異なる 3 点以上が必要です。".into());}
     let mut lo=[f64::INFINITY;2];let mut hi=[f64::NEG_INFINITY;2];
@@ -742,7 +755,7 @@ fn delaunay(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
     }
     let n=p.len();
     if n<3{return Err("異なる 3 点以上が必要です。".into());}
-    p.extend([[-32.,-16.],[32.,-16.],[0.,32.]]);
+    p.extend([[-extent,-extent*0.5],[extent,-extent*0.5],[0.,extent]]);
     let mut tris=vec![[n,n+1,n+2]];
     for i in 0..n{
         cancelled(cancel)?;
@@ -789,6 +802,19 @@ fn delaunay(input:&[[f64;3]],cancel:&dyn Fn()->bool)->Result<Vec<Value>,String>{
     }
     if used.iter().any(|v|!*v)||edges.values().any(|&v|v>2)||n+tris.len()!=edges.len()+1{
         return Err("退化した分割です。点の間隔を広げてください。".into());
+    }
+    // Euler and empty circumcircles do not prove that the convex hull is covered.
+    // Every exterior directed edge of a CCW triangulation must support the hull:
+    // all sites lie on its left. This rejects concave notches left by the enclosure.
+    for t in &tris {
+        cancelled(cancel)?;
+        for (a,b) in [(t[0],t[1]),(t[1],t[2]),(t[2],t[0])] {
+            if edges[&(a.min(b),a.max(b))] == 1
+                && p[..n].iter().any(|&q| side(p[a],p[b],q) < -1e-12)
+            {
+                return Err("凸包境界を完全に分割できません。点の間隔を広げてください。".into());
+            }
+        }
     }
     crate::engine::as_mesh(Mesh{vertices,triangles:tris.into_iter().map(|t|t.map(|i|i as u32)).collect()},cancel)
 }
@@ -902,7 +928,7 @@ mod extra_tests{
     }
     #[test]
     fn curve_array_spacing_uses_arc_length_and_not_vertex_indices(){
-        let c=Curve{points:vec![[0.;3],[1.,0.,0.],[5.,0.,0.]],closed:false};
+        let c=Curve{points:vec![[0.;3],[1.,0.,0.],[5.,0.,0.]],closed:false,geometry:None};
         let a=curve_array(&Value::Point([0.;3]),&c,3,&||false).unwrap();
         assert_eq!(a,vec![Value::Point([0.;3]),Value::Point([2.5,0.,0.]),Value::Point([5.,0.,0.])]);
     }
@@ -913,5 +939,22 @@ mod extra_tests{
         assert!(one[7]&&one[12]&&one[17]);
         assert_eq!(one.iter().filter(|v|**v).count(),3);
         assert_eq!(life_step(&one,5,5),cells);
+    }
+}
+
+#[cfg(test)]
+mod hull_coverage_regressions {
+    use super::*;
+    #[test]
+    fn near_collinear_interior_site_cannot_leave_a_hole_in_the_convex_hull() {
+        let points = [[-0.1,-0.003,0.],[0.5,0.,0.],[-0.4,-0.005,0.],[0.,0.5,0.]];
+        let values = delaunay(&points, &|| false).unwrap();
+        let Value::Mesh(mesh) = &values[0] else {panic!("mesh required")};
+        assert_eq!(mesh.triangles.len(),3);
+        let area: f64 = mesh.triangles.iter().map(|t| {
+            let [a,b,c] = t.map(|i| mesh.vertices[i as usize]);
+            length(cross(sub(b,a),sub(c,a))) * 0.5
+        }).sum();
+        assert!((area - 0.22625).abs() < 1e-14, "{area}");
     }
 }

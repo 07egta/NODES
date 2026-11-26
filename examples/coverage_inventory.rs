@@ -31,15 +31,23 @@ fn inventory(source_revision: Option<&str>) -> Value {
                         "label": p.label,
                         "type": p.kind,
                         "default": p.default,
-                        "required_connection": p.default.is_none(),
+                        "required_connection": if matches!(kind, NodeKind::Cluster | NodeKind::Script) {
+                            None
+                        } else {
+                            Some(p.default.is_none())
+                        },
+                        "requirement_status": if matches!(kind, NodeKind::Cluster | NodeKind::Script) {
+                            "CUSTOM_EVALUATOR; inspect definition or script input policy"
+                        } else {
+                            "STANDARD_EVALUATOR"
+                        },
                         "min": p.default.map(|_| p.min),
                         "max": p.default.map(|_| p.max),
                         "step": p.default.map(|_| p.step),
                         "integer": p.integer,
-                        // NodeSpec on the baseline has no access declaration.
-                        // A type or a default does not establish Item/List/Tree.
-                        "access": null,
-                        "access_status": "NOT_DECLARED_IN_NODE_SPEC"
+                        "access": morphlet::node_access::for_input(kind, index).map(|a| a.label()),
+                        "access_description": morphlet::node_access::for_input(kind, index).map(|a| a.description()),
+                        "access_status": "NODES_RUNTIME_CONTRACT"
                     })
                 })
                 .collect();
@@ -58,6 +66,8 @@ fn inventory(source_revision: Option<&str>) -> Value {
                     "connection_encoding": "source_node_id"
                 }],
                 "registration": if kind == NodeKind::Cluster { "definition_only" } else { "picker" },
+                "branch_matching": if morphlet::node_access::uses_ordinal_matching(kind) { "ordinal" } else { "legacy_paths_unless_explicit" },
+                "item_matching_configurable": morphlet::node_access::supports_item_matching(kind),
                 "evaluation_status": "NOT_INFERRED",
                 "compatibility": "NOT_INFERRED"
             });
@@ -146,7 +156,7 @@ mod tests {
         for (port, spec) in add["inputs"].as_array().unwrap().iter().zip(specs) {
             assert_eq!(port["key"], spec.key);
             assert_eq!(port["default"], json!(spec.default));
-            assert!(port["access"].is_null());
+            assert_eq!(port["access"], "Item");
         }
         assert_ne!(fingerprint(b"default=1"), fingerprint(b"default=2"));
     }
@@ -160,5 +170,23 @@ mod tests {
         assert_eq!(inventory(Some(sha))["source_revision"], sha);
         assert!(revision_from_args(&["--source-revision".into(), "main".into()]).is_err());
         assert!(revision_from_args(&["--unknown".into()]).is_err());
+    }
+
+    #[test]
+    fn custom_input_requirements_are_not_guessed_from_missing_defaults() {
+        let report = inventory(None);
+        for row in report["nodes"].as_array().unwrap() {
+            if row["nodes_id"] == "script" || row["nodes_id"] == "cluster" {
+                for input in row["inputs"].as_array().unwrap() {
+                    assert!(input["required_connection"].is_null());
+                    assert!(
+                        input["requirement_status"]
+                            .as_str()
+                            .unwrap()
+                            .starts_with("CUSTOM_EVALUATOR")
+                    );
+                }
+            }
+        }
     }
 }

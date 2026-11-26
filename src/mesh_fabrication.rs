@@ -505,7 +505,7 @@ pub fn run_item(kind:NodeKind,a:&[&Value],stop:&dyn Fn()->bool)->Result<Vec<Valu
             let select=|uses:&Vec<(usize,bool)>|kind==MeshEdges||(kind==MeshBoundary&&uses.len()==1)||(kind==MeshNonManifold&&uses.len()>2);
             let total=es.values().filter(|us|select(us)).count();count(total)?;
             let mut values=Vec::new();for(i,(&(a,b),us))in es.iter().enumerate(){tick(i,stop)?;
-                if select(us){values.push(Value::Curve(Arc::new(Curve{points:vec![m.vertices[a as usize],m.vertices[b as usize]],closed:false})));}
+                if select(us){values.push(Value::Curve(Arc::new(Curve{points:vec![m.vertices[a as usize],m.vertices[b as usize]],closed:false,geometry:None})));}
             }Ok(values)}
         MeshSelfContact=>Ok(numbers([crate::mesh_geometry_checks::nonadjacent_contacts(m,stop)? as f64])),
         MeshThicknessSample=>{let (w,n)=crate::mesh_geometry_checks::sampled_thickness(m,num(a,1)? as usize,stop)?;Ok(numbers([w,n as f64]))}

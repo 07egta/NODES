@@ -11,6 +11,9 @@ The JSON is generated from the compiled `NodeKind::all()` and `NodeSpec`, not
 from a manually maintained count. `Cluster` is listed separately as a
 definition-only registration. The report includes serialized IDs, port order,
 types, numeric defaults and bounds, descriptions and search keywords.
+Connection requirements for Script and Cluster are left unknown because
+their custom evaluators distinguish optional geometry and definition-driven
+ports; absence of a numeric default alone does not make those inputs required.
 
 Use `--source-revision <full-git-sha>` to attach the commit being examined. The
 revision is supplied by the caller and does not assert that their worktree was

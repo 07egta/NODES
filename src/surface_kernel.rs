@@ -2,6 +2,7 @@
 //! No external kernel. A tessellation is a derived Mesh, not a solid.
 use crate::curve_geometry::{CurveGeometry, NurbsCurve};
 use crate::model::{Curve, Mesh};
+use crate::surface_curvature::{Curvature, SurfaceJet2};
 use std::collections::BTreeMap;
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
@@ -177,6 +178,58 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
         .collect();
     (b, d)
 }
+/// Values and exact first/second derivatives of the B-spline basis.
+/// Recurrence: N'_(i,p)=p*N_(i,p-1)/(k[i+p]-k[i]) -
+/// p*N_(i+1,p-1)/(k[i+p+1]-k[i+1]); differentiate once more for N''.
+fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
+    let mut b = vec![0.; k.len() - 1];
+    let span = if t == k[n] {
+        n - 1
+    } else {
+        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
+    };
+    b[span] = 1.;
+    let mut d = vec![0.; b.len()];
+    let mut dd = d.clone();
+    for degree in 1..=p {
+        let mut next = vec![0.; b.len() - 1];
+        let mut nd = next.clone();
+        let mut ndd = next.clone();
+        for i in 0..next.len() {
+            let l = k[i + degree] - k[i];
+            let r = k[i + degree + 1] - k[i + 1];
+            if l > 0. {
+                next[i] += (t - k[i]) * b[i] / l;
+                nd[i] += degree as f64 * b[i] / l;
+                ndd[i] += degree as f64 * d[i] / l;
+            }
+            if r > 0. {
+                next[i] += (k[i + degree + 1] - t) * b[i + 1] / r;
+                nd[i] -= degree as f64 * b[i + 1] / r;
+                ndd[i] -= degree as f64 * d[i + 1] / r;
+            }
+        }
+        b = next;
+        d = nd;
+        dd = ndd;
+    }
+    [b, d, dd]
+}
+/// Do not invent a unique curvature at a knot where the parameterization is not C2.
+fn require_second_order_continuity(k: &[f64], n: usize, p: usize, t: f64) -> R<()> {
+    if t == k[p] || t == k[n] {
+        return Ok(());
+    }
+    let multiplicity = k.iter().filter(|u| **u == t).count();
+    if multiplicity > 0 && p.saturating_sub(multiplicity) < 2 {
+        fail(
+            "二階微分が連続でない内部ノットでは曲率を一意に評価できません。U/Vをノットからずらしてください。",
+        )
+    } else {
+        Ok(())
+    }
+}
+
 impl NurbsSurface {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -446,6 +499,66 @@ impl NurbsSurface {
             knots.clone(),
         )?))
     }
+    /// Rational derivatives from homogeneous tensor-product derivatives, not a
+    /// finite difference or the display mesh. Internal non-C2 knots are rejected.
+    pub fn derivatives2(&self, u: f64, v: f64, stop: &dyn Fn() -> bool) -> R<SurfaceJet2> {
+        check_cancel(stop)?;
+        let (u, v) = (uv(u)?, uv(v)?);
+        let [[a, b], [c, d]] = self.native_domain();
+        let tu = if u == 1. { b } else { a + (b - a) * u };
+        let tv = if v == 1. { d } else { c + (d - c) * v };
+        require_second_order_continuity(&self.ku, self.nu, self.pu, tu)?;
+        require_second_order_continuity(&self.kv, self.nv, self.pv, tv)?;
+        let [bu, du, duu] = basis_second(&self.ku, self.nu, self.pu, tu);
+        let [bv, dv, dvv] = basis_second(&self.kv, self.nv, self.pv, tv);
+        let su = b - a;
+        let sv = d - c;
+        let max_weight = self.weights.iter().copied().fold(0., f64::max);
+        let mut h = [[0.; 4]; 6];
+        for i in 0..self.nu {
+            check_cancel(stop)?;
+            for j in 0..self.nv {
+                let k = i * self.nv + j;
+                let w = self.weights[k] / max_weight;
+                let p = self.points[k];
+                let q = [p[0] * w, p[1] * w, p[2] * w, w];
+                let coeff = [
+                    bu[i] * bv[j],
+                    du[i] * bv[j] * su,
+                    bu[i] * dv[j] * sv,
+                    duu[i] * bv[j] * su * su,
+                    du[i] * dv[j] * su * sv,
+                    bu[i] * dvv[j] * sv * sv,
+                ];
+                for order in 0..6 {
+                    for axis in 0..4 {
+                        h[order][axis] += coeff[order] * q[axis];
+                    }
+                }
+            }
+        }
+        let w = h[0][3];
+        if w <= 0. || !w.is_finite() {
+            return fail("曲面の有理分母が無効です。");
+        }
+        let point: Point3 = std::array::from_fn(|i| h[0][i] / w);
+        let du: Point3 = std::array::from_fn(|i| (h[1][i] - point[i] * h[1][3]) / w);
+        let dv: Point3 = std::array::from_fn(|i| (h[2][i] - point[i] * h[2][3]) / w);
+        let duu =
+            std::array::from_fn(|i| (h[3][i] - point[i] * h[3][3] - 2. * du[i] * h[1][3]) / w);
+        let duv = std::array::from_fn(|i| {
+            (h[4][i] - point[i] * h[4][3] - du[i] * h[2][3] - dv[i] * h[1][3]) / w
+        });
+        let dvv =
+            std::array::from_fn(|i| (h[5][i] - point[i] * h[5][3] - 2. * dv[i] * h[2][3]) / w);
+        SurfaceJet2 {
+            first: Sample { point, du, dv }.checked()?,
+            duu,
+            duv,
+            dvv,
+        }
+        .checked()
+    }
     pub fn native_domain(&self) -> [[f64; 2]; 2] {
         [
             [self.ku[self.pu], self.ku[self.nu]],
@@ -666,6 +779,70 @@ impl Surface {
         }
         s.normal()
     }
+    /// Exact first and second derivatives with respect to normalized UV.
+    pub fn derivatives2(&self, u: f64, v: f64, stop: &dyn Fn() -> bool) -> R<SurfaceJet2> {
+        check_cancel(stop)?;
+        let (u, v) = (uv(u)?, uv(v)?);
+        if let Geometry::Nurbs(n) = &self.0 {
+            return n.derivatives2(u, v, stop);
+        }
+        if matches!(&self.0, Geometry::Sphere { .. }) && (v == 0. || v == 1.) {
+            return fail("球の極はUV特異点です。曲率は極から離れた点で評価してください。");
+        }
+        let first = self.evaluate(u, v)?;
+        let (s, c) = (if u == 1. { 0. } else { TAU * u }).sin_cos();
+        let (duu, duv, dvv) = match &self.0 {
+            Geometry::Plane(_) => ([0.; 3], [0.; 3], [0.; 3]),
+            Geometry::Frustum { r0, r1, .. } => {
+                let r = r0 + (r1 - r0) * v;
+                let dr = r1 - r0;
+                (
+                    [-TAU * TAU * r * c, -TAU * TAU * r * s, 0.],
+                    [-TAU * dr * s, TAU * dr * c, 0.],
+                    [0.; 3],
+                )
+            }
+            Geometry::Sphere { r } => {
+                let (sl, cl) = (PI * (v - 0.5)).sin_cos();
+                (
+                    [-TAU * TAU * r * cl * c, -TAU * TAU * r * cl * s, 0.],
+                    [TAU * PI * r * sl * s, -TAU * PI * r * sl * c, 0.],
+                    [
+                        -PI * PI * r * cl * c,
+                        -PI * PI * r * cl * s,
+                        -PI * PI * r * sl,
+                    ],
+                )
+            }
+            Geometry::Torus { major, minor } => {
+                let (sv, cv) = (if v == 1. { 0. } else { TAU * v }).sin_cos();
+                let r = major + minor * cv;
+                (
+                    [-TAU * TAU * r * c, -TAU * TAU * r * s, 0.],
+                    [TAU * TAU * minor * sv * s, -TAU * TAU * minor * sv * c, 0.],
+                    [
+                        -TAU * TAU * minor * cv * c,
+                        -TAU * TAU * minor * cv * s,
+                        -TAU * TAU * minor * sv,
+                    ],
+                )
+            }
+            Geometry::Nurbs(_) => unreachable!("NURBS derivatives delegated above"),
+        };
+        SurfaceJet2 {
+            first,
+            duu,
+            duv,
+            dvv,
+        }
+        .checked()
+    }
+    /// Signed curvatures use n=Su×Sv/|Su×Sv|. Gaussian is orientation independent.
+    pub fn curvature(&self, u: f64, v: f64, stop: &dyn Fn() -> bool) -> R<Curvature> {
+        let jet = self.derivatives2(u, v, stop)?;
+        check_cancel(stop)?;
+        jet.curvature()
+    }
     pub fn closest_plane_point(&self, p: Point3) -> R<Point3> {
         match &self.0 {
             Geometry::Plane(plane) => plane.closest(p),
@@ -744,27 +921,58 @@ impl Surface {
             crate::engine::validate_mesh(&m, stop)?;
             return Ok(m);
         }
-        let (nu, nv) = if matches!(&self.0, Geometry::Plane(_)) {
-            (1, 1)
-        } else if let Geometry::Nurbs(n) = &self.0 {
-            if n.pu == 1 && n.pv == 1 && n.nu > 2 {
-                let spans = n.nu - 1;
-                (spans * (nu / spans).max(1), nv)
-            } else {
-                (nu, nv)
-            }
-        } else {
-            (nu, nv)
-        };
-        let (uc, vc) = (nu + usize::from(!pu), nv + usize::from(!pv));
-        let mut m = Mesh::default();
-        for j in 0..vc {
-            check_cancel(stop)?;
-            for i in 0..uc {
-                m.vertices.push(
-                    self.evaluate(i as f64 / nu as f64, j as f64 / nv as f64)?
-                        .point,
+        // Mandatory knot lines preserve corners and derivative discontinuities.
+        // Retain distinct knots, but omit a uniform sample extremely close to a knot
+        // so roundoff cannot introduce an accidental near-zero display cell.
+        let samples = |steps: usize, knots: &[f64], degree: usize, count: usize| {
+            let mut values = vec![0., 1.];
+            if !knots.is_empty() {
+                let lo = knots[degree];
+                let hi = knots[count];
+                values.extend(
+                    knots
+                        .iter()
+                        .filter(|k| **k > lo && **k < hi)
+                        .map(|k| (k - lo) / (hi - lo)),
                 );
+                values.sort_by(f64::total_cmp);
+                values.dedup();
+            }
+            let mandatory = values.clone();
+            for i in 1..steps {
+                let t = i as f64 / steps as f64;
+                if !mandatory
+                    .iter()
+                    .any(|k| (t - k).abs() <= 32. * f64::EPSILON)
+                {
+                    values.push(t);
+                }
+            }
+            values.sort_by(f64::total_cmp);
+            values.dedup();
+            values
+        };
+        let (mut us, mut vs) = match &self.0 {
+            Geometry::Plane(_) => (vec![0., 1.], vec![0., 1.]),
+            Geometry::Nurbs(n) => (
+                samples(nu, &n.ku, n.pu, n.nu),
+                samples(nv, &n.kv, n.pv, n.nv),
+            ),
+            _ => (samples(nu, &[], 0, 0), samples(nv, &[], 0, 0)),
+        };
+        let (nu, nv) = (us.len() - 1, vs.len() - 1);
+        if pu {
+            us.pop();
+        }
+        if pv {
+            vs.pop();
+        }
+        let (uc, vc) = (us.len(), vs.len());
+        let mut m = Mesh::default();
+        for &v in &vs {
+            check_cancel(stop)?;
+            for &u in &us {
+                m.vertices.push(self.evaluate(u, v)?.point);
             }
         }
         let idx = |i: usize, j: usize| ((j % vc) * uc + i % uc) as u32;
@@ -793,7 +1001,7 @@ impl Surface {
             )?))
         };
         let radial = |u: f64| {
-            let (s, c) = (TAU * u).sin_cos();
+            let (s, c) = (if u == 1. { 0. } else { TAU * u }).sin_cos();
             [c, s, 0.]
         };
         match &self.0 {
@@ -834,7 +1042,7 @@ impl Surface {
                     let q = radial(t);
                     CurveGeometry::arc(mul(q, *major), mul(q, *minor), [0., 0., *minor], 0., TAU)
                 } else {
-                    let (s, c) = (TAU * t).sin_cos();
+                    let (s, c) = (if t == 1. { 0. } else { TAU * t }).sin_cos();
                     let r = major + minor * c;
                     CurveGeometry::arc([0., 0., minor * s], [r, 0., 0.], [0., r, 0.], 0., TAU)
                 }

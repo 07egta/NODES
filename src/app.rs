@@ -1253,7 +1253,8 @@ impl MorphletApp {
                         if morphlet::data_tree_nodes::supports_matching(node.kind) {
                             let mut choice = n.params.get(MATCH_PARAM).copied().unwrap_or(-1.) as i32;
                             let previous = choice;
-                            let names = ["旧互換（同じパス）", "Longest", "Shortest", "Cross"];
+                            let default_name = if morphlet::node_access::uses_ordinal_matching(node.kind) { "既定（枝順・Longest）" } else { "旧互換（同じパス）" };
+                            let names = [default_name, "Longest", "Shortest", "Cross"];
                             egui::ComboBox::from_id_salt(("matching",id))
                                 .selected_text(names[(choice+1).clamp(0,3) as usize])
                                 .show_ui(ui, |ui| {

@@ -56,7 +56,12 @@ fn every_registered_kind_has_unique_id_and_complete_metadata() {
             );
             assert!(!input.label.trim().is_empty(), "{id}: missing port label");
             if let Some(default) = input.default {
-                assert_eq!(input.kind, DataType::Number, "{id}: non-number default");
+                // A polymorphic port (e.g. a cluster input) can accept a numeric
+                // default without having the narrow Number type itself.
+                assert!(
+                    input.kind.accepts(DataType::Number),
+                    "{id}: incompatible numeric default"
+                );
                 assert!(default.is_finite() && input.min.is_finite() && input.max.is_finite());
                 assert!((input.min..=input.max).contains(&default));
                 assert!(input.step.is_finite() && input.step > 0.);

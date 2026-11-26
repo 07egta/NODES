@@ -44,7 +44,7 @@
           40
         ],
         "params": {
-          "amplitude": 20,
+          "amp": 20,
           "frequency": 1,
           "phase": 0
         },

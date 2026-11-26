@@ -131,7 +131,7 @@ manual/automated comparison against a licensed GH1 installation.
 | Deconstruct Path | path -> integers | not implemented |
 | Replace Paths | tree, source paths, target paths -> tree | remap_paths API / restricted Path Mapper; no distinct node |
 | Path Mapper | tree, mapping expression -> tree | new safe subset {A;B}->{B;A}, literals/A-Z, collisions append, unmatched paths preserved |
-| Flip Matrix | matrix-like tree -> tree | new rectangular sibling branches only; ragged rejected |
+| Flip Matrix | matrix-like tree -> tree | new rectangular sibling branches only; ragged rejected; output siblings start at 0, so original sparse sibling labels are not restored by double transpose |
 | Trim Tree | tree, depth -> tree | new; depth 1; retain at least one index |
 | Split Tree | tree, path masks -> two trees | not implemented |
 | Clean Tree | tree, clean invalid, clean empty -> tree | not implemented; prune_empty API only |
@@ -173,3 +173,9 @@ search work limits. Its singleton Simplify case documents a NODES API choice,
 not a GH1 UI equivalence claim. See David Rutten's distinction between the
 GH1 UI/GH_Structure simplifier and DataTree<T>.SimplifyPaths in
 [McNeel forum](https://discourse.mcneel.com/t/problem-with-simplify-in-gh-data-structures/75055).
+
+The public item-matching iterator has the same 64-port limit as branch
+matching and Cross Reference. `dispatch` checks the input logical payload
+weight before cloning Arc-backed values. Flip Matrix retains the parent path
+but numbers output columns from zero; its double-transpose law preserves data
+order, not arbitrary sparse original sibling labels.

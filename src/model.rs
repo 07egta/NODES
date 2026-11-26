@@ -428,8 +428,22 @@ pub enum NodeKind {
     BrepUnion,
     BrepDifference,
     BrepOffset,
+    SurfaceGaussianCurvature,
+    SurfaceMeanCurvature,
+    SurfacePrincipalCurvatures,
 }
 impl NodeKind {
+    /// Preserve the input keys used by the independent generative-design mission.
+    /// ClosestPoint is one operation in the unified registry; canonical keys are
+    /// candidates/queries. Unknown keys remain unknown and are still rejected.
+    pub fn canonical_input_key(self, key: &str) -> &str {
+        match (self, key) {
+            (Self::ClosestPoint, "points") => "candidates",
+            (Self::ClosestPoint, "targets") => "queries",
+            _ => key,
+        }
+    }
+
     pub fn all() -> &'static [Self] {
         &[
             Self::Number,
@@ -728,6 +742,9 @@ impl NodeKind {
             Self::BrepUnion,
             Self::BrepDifference,
             Self::BrepOffset,
+            Self::SurfaceGaussianCurvature,
+            Self::SurfaceMeanCurvature,
+            Self::SurfacePrincipalCurvatures,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1469,6 +1486,7 @@ impl Graph {
             .spec()
             .output;
         let node = self.node(to).ok_or("接続先が見つかりません。")?;
+        let input = node.kind.canonical_input_key(input);
         let target = node
             .kind
             .spec()
@@ -1505,6 +1523,7 @@ impl Graph {
     }
     pub fn disconnect(&mut self, to: NodeId, input: &str) {
         if let Some(n) = self.node_mut(to) {
+            let input = n.kind.canonical_input_key(input);
             n.inputs.remove(input);
         }
     }
