@@ -26,11 +26,11 @@ macro_rules! spec {
 }
 pub fn is_curve_kind(k:NodeKind)->bool {
     use NodeKind::*;
-    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane)
+    matches!(k, CurveLine | CurveLineSdl | CurvePolyline | CurveCircleCnr | CurveCircleThree | CurveArc | CurveArcThree | CurveEllipse | CurveSpiral | CurveBezier | CurveNurbs | CurveWeightedNurbs | CurveInterpolate | CurveLength | CurveEvaluate | CurveEvaluateLength | CurveClosestParameter | CurveClosestPoint | CurveStart | CurveEnd | CurveMiddle | CurveTangent | CurveCurvature | CurveDomain | CurveClosed | CurveDivide | CurveDivideLength | CurveSubcurve | CurveShatter | CurveReverse | CurveControls | CurveWeights | CurveKnots | CurveDegree | CurveInsertKnot | CurveOffsetPreview | CurveFrameX | CurveFrameY | CurveLineLine | CurveLinePlane | CurveJoin | CurveExplode | CurveExtend | CurveBlend | CurveRebuildApprox | CurveDeviationApprox | CurveOrientationXy | CurvePlanarityApprox | CurvePlaneNormalApprox)
 }
 pub fn is_list_kind(k:NodeKind)->bool {
     use NodeKind::*;
-    matches!(k,CurvePolyline|CurveBezier|CurveNurbs|CurveWeightedNurbs|CurveInterpolate|CurveShatter)
+    matches!(k,CurvePolyline|CurveBezier|CurveNurbs|CurveWeightedNurbs|CurveInterpolate|CurveShatter|CurveJoin)
 }
 pub fn spec(k:NodeKind)->&'static NodeSpec {
     use NodeKind::*;
@@ -75,6 +75,15 @@ pub fn spec(k:NodeKind)->&'static NodeSpec {
         CurveFrameY=>spec!("垂直断面 Y 軸","perpendicular frame y","接線とX軸に直交する単位Y軸（XYZ）。",Point,[C,T]),
         CurveLineLine=>spec!("線分・線分交点","line line intersection","2本の有限直線の交点。平行・重複は明示エラー。",Point,[g("a","線分 A",DataType::Curve),g("b","線分 B",DataType::Curve),TOL]),
         CurveLinePlane=>spec!("線分・平面交点","line plane intersection","有限直線と原点・法線で定義した平面。重複は明示エラー。",Point,[C,g("origin","平面上の点",DataType::Point),g("normal","平面法線 XYZ",DataType::Point),TOL]),
+        CurveJoin=>spec!("曲線を順に連結","join curves polycurve","枝内の曲線を順番どおりに連結。許容差内の隙間は短い直線で接続（近似由来）。",Curve,[g("curves","曲線リスト",DataType::Curve),TOL,SEG]),
+        CurveExplode=>spec!("曲線を構成要素に分解","explode curve","複合曲線の構成曲線または次数1の線分に分解。滑らかなNURBSはそのまま。",Curve,[C,SEG]),
+        CurveExtend=>spec!("曲線を接線で延長","extend curve tangent","曲線の始点・終点を直線接線で延長。閉曲線は対象外。",Curve,[C,n("start","始点側の長さ",0.,0.,10000.,0.5),n("end","終点側の長さ",10.,0.,10000.,0.5),SEG]),
+        CurveBlend=>spec!("2曲線の接線ブレンド","blend curve g1","Aの終点からBの始点まで、両端接線方向を合わせる三次Bezier。G1接続。",Curve,[g("a","曲線 A",DataType::Curve),g("b","曲線 B",DataType::Curve),n("strength","接線長 / 端点距離",0.33,0.001,10.,0.01),SEG]),
+        CurveRebuildApprox=>spec!("曲線を近似再構築","rebuild curve fit interpolation approx","元の曲線を等パラメータでサンプルして弦長補間する。元形状との完全一致を保証しない。閉じた曲線も非周期の補間。",Curve,[C,i("count","補間点数",12.,3.,128.),DEG,SEG]),
+        CurveDeviationApprox=>spec!("曲線間のサンプル偏差","curve deviation approximate hausdorff","両曲線をサンプルし、相手曲線への近似最近接距離の最大値を返す。保証付き最大偏差ではない。",Number,[g("a","元の曲線",DataType::Curve),g("b","比較曲線",DataType::Curve),i("samples","片側のサンプル数",24.,4.,64.)]),
+        CurveOrientationXy=>spec!("閉曲線の向き XY（近似）","curve orientation clockwise counterclockwise","XYに平行な閉曲線のサンプル符号付き面積。+1は反時計回り、-1は時計回り、0は面積ほぼゼロ。自己交差は未検査。",Number,[C,TOL,SEG]),
+        CurvePlanarityApprox=>spec!("平面性判定（近似）","curve planar planarity","サンプル点の平面からの最大偏差を調べる。許容距離以下なら1。直線も1。保証付き判定ではない。",Number,[C,TOL,SEG]),
+        CurvePlaneNormalApprox=>spec!("曲線の平面法線（近似）","curve plane normal","サンプル点で平面法線を求める。非平面または直線の場合はエラー。",Point,[C,TOL,SEG]),
         _=>unreachable!("curve node dispatch"),
     }
 }
@@ -84,7 +93,7 @@ fn cv(v:&Value)->R<&Curve>{match v{Value::Curve(c)=>Ok(c.as_ref()),_=>Err("曲�
 /// Legacy, mesh-derived, or nonlinearly transformed curves evaluate as piecewise linear curves,
 /// never as a recovered smooth NURBS. Use this API for future surface nodes.
 pub fn geometry(c:&Curve)->R<CurveGeometry>{
-    match &c.geometry {Some(g)=>Ok(g.clone()),None=>Ok(CurveGeometry::nurbs(NurbsCurve::polyline(c.points.clone(),c.closed)?))}
+    match &c.geometry {Some(g)=>Ok(g.clone()),None=>Ok(CurveGeometry::nurbs(NurbsCurve::polyline(c.points.clone(),c.closed)?).marked_approximate())}
 }
 fn curve<'a>(a:&[&'a Value],k:usize)->R<&'a Curve>{
     cv(a.get(k).copied().ok_or("曲線の入力がありません。")?)
@@ -105,6 +114,7 @@ fn polyline(points:Vec<Point3>,closed:bool)->R<Value>{
     if points.len()<2 || closed&&points.len()<3 {return Err("閉じたポリラインには3点以上、開いたものには2点以上必要です。".into());}
     Ok(Value::Curve(Arc::new(Curve{points,closed,geometry:Some(geom)})))
 }
+fn branch<'a>(l:&[&'a [Value]],k:usize)->R<&'a [Value]>{l.get(k).copied().ok_or_else(||"リスト入力がありません。".into())}
 fn setting(l:&[&[Value]],k:usize)->R<f64>{l.get(k).and_then(|l|l.first()).ok_or("設定がありません。")?.number()}
 fn numbers(l:&[Value])->R<Vec<f64>>{l.iter().map(Value::number).collect()}
 fn pts(l:&[Value])->R<Vec<Point3>>{l.iter().map(point).collect()}
@@ -121,10 +131,14 @@ pub fn run_list(k:NodeKind,l:&[&[Value]],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
         CurvePolyline=>vec![polyline(pts(first)?,setting(l,1)?!=0.)?],
         CurveBezier=>vec![preview(CurveGeometry::nurbs(NurbsCurve::bezier(pts(first)?)?),setting(l,1)? as usize,cancel)?],
         CurveNurbs=>vec![preview(CurveGeometry::nurbs(NurbsCurve::uniform(pts(first)?,setting(l,1)? as usize,setting(l,2)?!=0.)?),setting(l,3)? as usize,cancel)?],
-        CurveWeightedNurbs=>vec![preview(CurveGeometry::nurbs(NurbsCurve::new(setting(l,3)? as usize,pts(first)?,numbers(l[1])?,numbers(l[2])?)?),setting(l,4)? as usize,cancel)?],
+        CurveWeightedNurbs=>vec![preview(CurveGeometry::nurbs(NurbsCurve::new(setting(l,3)? as usize,pts(first)?,numbers(branch(l,1)?)?,numbers(branch(l,2)?)?)?),setting(l,4)? as usize,cancel)?],
         CurveInterpolate=>vec![preview(CurveGeometry::nurbs(NurbsCurve::interpolate(&pts(first)?,setting(l,1)? as usize,cancel)?),setting(l,2)? as usize,cancel)?],
+        CurveJoin=>{
+            let curves=first.iter().map(|v|geometry(cv(v)?)).collect::<R<Vec<_>>>()?;
+            vec![preview(CurveGeometry::join_ordered(&curves,setting(l,1)?,cancel)?,setting(l,2)? as usize,cancel)?]
+        }
         CurveShatter=>{
-            let mut t=numbers(l[1])?;
+            let mut t=numbers(branch(l,1)?)?;
             if t.iter().any(|v|*v<0.||*v>1.) {return Err("分割パラメータは0〜1にしてください。".into());}
             t.extend([0.,1.]); t.sort_by(f64::total_cmp);t.dedup();
             if t.len()>513 || first.len().saturating_mul(t.len()-1)>MAX_ITEMS {return Err("分割結果が多すぎます。".into());}
@@ -145,6 +159,39 @@ pub fn run_list(k:NodeKind,l:&[&[Value]],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
         _=>return Err("曲線リストノードが無効です。".into()),
     };
     guard(&out)?;Ok(out)
+}
+fn exact_line(a:Point3,b:Point3)->R<CurveGeometry>{
+    if a==b{return Err("長さゼロの直線です。".into());}
+    Ok(CurveGeometry::nurbs(NurbsCurve::polyline(vec![a,b],false)?))
+}
+fn deviation(a:&CurveGeometry,b:&CurveGeometry,count:usize,cancel:&dyn Fn()->bool)->R<f64>{
+    if !(4..=64).contains(&count){return Err("偏差のサンプル数は4〜64にしてください。".into());}
+    let mut max: f64=0.;
+    for (src,dst) in [(a,b),(b,a)]{
+        for i in 0..count{
+            cancelled(cancel)?;
+            let p=src.point(i as f64/(count-1) as f64)?;
+            let q=dst.point(dst.closest_parameter(p,cancel)?)?;
+            max=max.max(cg::norm(cg::sub(p,q)));
+        }
+    }
+    if max.is_finite(){Ok(max)}else{Err("偏差が有限ではありません。".into())}
+}
+// A deterministic, sampled plane through well-separated points. Collinear inputs do
+// not define a unique plane, but are planar. Nonplanarity is tested against this plane.
+fn plane_sample(g:&CurveGeometry,segments:usize,tol:f64,cancel:&dyn Fn()->bool)->R<(bool,Option<Point3>)>{
+    let p=g.preview(segments,cancel)?;
+    let a=p.first().copied().ok_or("曲線の点がありません。")?;
+    let b=p.iter().copied().max_by(|b,c|cg::norm(cg::sub(*b,a)).total_cmp(&cg::norm(cg::sub(*c,a)))).unwrap_or(a);
+    let ab=cg::sub(b,a);
+    if cg::norm(ab)<=tol{return Ok((true,None));}
+    let u=cg::unit(ab)?;
+    let n=p.iter().map(|&c|cg::cross(u,cg::sub(c,a))).max_by(|b,c|cg::norm(*b).total_cmp(&cg::norm(*c))).unwrap_or([0.;3]);
+    if cg::norm(n)<=tol{return Ok((true,None));}
+    let n=cg::unit(n)?;
+    let mut planar=true;
+    for q in p{cancelled(cancel)?;if cg::dot(n,cg::sub(q,a)).abs()>tol{planar=false;break;}}
+    Ok((planar,Some(n)))
 }
 fn straight(c:&Curve)->R<(Point3,Point3)>{
     if c.closed{return Err("閉曲線は線分ではありません。".into());}
@@ -227,6 +274,17 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
         CurveLineLine=>return line_line(curve(a,0)?,curve(a,1)?,num(a,2)?),
         CurveLinePlane=>return line_plane(curve(a,0)?,arg(a,1)?,arg(a,2)?,num(a,3)?),
         CurveOffsetPreview=>offset(curve(a,0)?,num(a,1)?,cancel)?,
+        CurveBlend=>{
+            let ga=geometry(curve(a,0)?)?;let gb=geometry(curve(a,1)?)?;
+            let p=ga.point(1.)?;let q=gb.point(0.)?;
+            let distance=cg::norm(cg::sub(q,p));
+            if distance<=1e-12{return Err("ブレンドの両端が近すぎます。".into());}
+            let s=distance*num(a,2)?;
+            let n=NurbsCurve::bezier(vec![p,cg::add(p,cg::scale(ga.tangent(1.)?,s)),
+                cg::sub(q,cg::scale(gb.tangent(0.)?,s)),q])?;
+            preview(CurveGeometry::nurbs(n),num(a,3)? as usize,cancel)?
+        }
+        CurveDeviationApprox=>Value::Number(deviation(&geometry(curve(a,0)?)?,&geometry(curve(a,1)?)?,num(a,2)? as usize,cancel)?),
         CurveReverse=>{
             let c=curve(a,0)?;let mut pts=c.points.clone();
             if c.closed && pts.len()>1 {pts[1..].reverse();}else{pts.reverse();}
@@ -269,6 +327,51 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
                     return Ok(out);
                 }
                 CurveSubcurve=>preview(g.subcurve(num(a,1)?,num(a,2)?)?,num(a,3)? as usize,cancel)?,
+                CurveExplode=>{
+                    let seg=num(a,1)? as usize;
+                    let mut out=Vec::new();let mut weight=0usize;
+                    for part in g.explode()?{
+                        cancelled(cancel)?;
+                        let v=preview(part,seg,cancel)?;
+                        weight=weight.saturating_add(v.weight());
+                        if out.len()>=MAX_ITEMS || weight>MAX_TOTAL_WEIGHT/2{return Err("分解結果が大きすぎます。".into());}
+                        out.push(v);
+                    }
+                    return Ok(out);
+                }
+                CurveExtend=>{
+                    if g.closed()?{return Err("閉曲線は端点延長できません。".into());}
+                    let p=g.point(0.)?;let q=g.point(1.)?;
+                    let mut parts=Vec::new();
+                    let start=num(a,1)?;let end=num(a,2)?;
+                    if start>0.{parts.push(exact_line(cg::sub(p,cg::scale(g.tangent(0.)?,start)),p)?);}
+                    parts.push(g.clone());
+                    if end>0.{parts.push(exact_line(q,cg::add(q,cg::scale(g.tangent(1.)?,end)))?);}
+                    preview(CurveGeometry::join_ordered(&parts,1e-9,cancel)?,num(a,3)? as usize,cancel)?
+                }
+                CurveRebuildApprox=>{
+                    let count=num(a,1)? as usize;let degree=num(a,2)? as usize;
+                    if !(3..=128).contains(&count){return Err("近似再構築は3〜128点に対応します。".into());}
+                    let mut p=Vec::with_capacity(count);
+                    for i in 0..count{cancelled(cancel)?;p.push(g.point(i as f64/(count-1) as f64)?);}
+                    let fit=CurveGeometry::nurbs(NurbsCurve::interpolate(&p,degree,cancel)?).marked_approximate();
+                    preview(fit,num(a,3)? as usize,cancel)?
+                }
+                CurveOrientationXy=>{
+                    if !g.closed()?{return Err("向きの判定には閉曲線が必要です。".into());}
+                    let tol=num(a,1)?;let p=g.preview(num(a,2)? as usize,cancel)?;
+                    if p.iter().any(|v|(v[2]-p[0][2]).abs()>tol){return Err("XYに平行な閉曲線だけに対応します。".into());}
+                    let o=p[0];let mut area=0.;
+                    for i in 0..p.len(){cancelled(cancel)?;area+=cg::cross(cg::sub(p[i],o),cg::sub(p[(i+1)%p.len()],o))[2];}
+                    if !area.is_finite(){return Err("面積が有限ではありません。".into());}
+                    Value::Number(if area.abs()<=tol*tol{0.}else{area.signum()})
+                }
+                CurvePlanarityApprox|CurvePlaneNormalApprox=>{
+                    let (planar,normal)=plane_sample(&g,num(a,2)? as usize,num(a,1)?,cancel)?;
+                    if k==CurvePlanarityApprox{Value::Number(if planar{1.}else{0.})}
+                    else if !planar{ return Err("曲線のサンプルは平面上にありません。".into()); }
+                    else{Value::Point(normal.ok_or("直線または点では平面法線が一意に定まりません。")?)}
+                }
                 CurveControls|CurveWeights|CurveKnots|CurveDegree|CurveInsertKnot=>{
                     let n=g.as_nurbs().ok_or("NURBS基底を持つ曲線だけに対応しています。")?;
                     match k{
@@ -280,7 +383,9 @@ pub fn run_item(k:NodeKind,a:&[&Value],cancel:&dyn Fn()->bool)->R<Vec<Value>>{
                             if g.domain()!=n.domain(){return Err("部分曲線または反転曲線へのノット挿入は未対応です。".into());}
                             let [lo,hi]=n.domain();
                             let t=num(a,1)?;
-                            preview(CurveGeometry::nurbs(n.insert_knot(lo+(hi-lo)*t)?),num(a,2)? as usize,cancel)?
+                            let inserted=CurveGeometry::nurbs(n.insert_knot(lo+(hi-lo)*t)?);
+                            let inserted=if g.is_approximate(){inserted.marked_approximate()}else{inserted};
+                            preview(inserted,num(a,2)? as usize,cancel)?
                         }
                     }
                 }

@@ -17,14 +17,14 @@ Rhino/Grasshopperのコード・バイナリ・UI素材は取得・コピーし�
 ## 内部表現
 - model::Curve の points は描画と既存メッシュ化に使う点列、closed は表示の開閉状態。geometry は任意の数学的基底とパラメータ区間。
 - curve_geometry::NurbsCurve は f64、完全ノットベクトル（制御点数+次数+1）、正の重み、次数1〜12、最大8193制御点。重みは共通係数で正規化。
-- CurveGeometry はNURBS基底または解析らせん/スパイラルの共有基底と向き付き区間。point/derivatives は0〜1正規化入力、domainは元の区間。部分曲線と反転は点列を再フィットせず基底を保持する。
+- CurveGeometry はNURBS基底、解析らせん/スパイラル、複合曲線（最大128入力、入れ子8段）を共有する基底と向き付き区間。point/derivatives は0〜1正規化入力、domainは元の区間。部分曲線と反転は点列を再フィットせず基底を保持する。
 - 円・円弧・楕円は有理二次曲線（数学的に正確、浮動小数点誤差あり）。ポリライン、長方形、多角形は次数1の曲線。
 - ノットの多重度は内側で次数まで。周期一様B-splineは対応するが周期ノット挿入、任意の周期重み入力は未対応。
 - 既存Circle/Helixは旧描画分割数と点列を維持。アフィン変形は制御点/軸へ適用し基底を保持。非線形Twist/Wave/Noiseは点列に落とし、古い精密基底を残さない。
 - 既存メッシュLoft/Extrude/Revolveは引き続きpointsを使用するため精密B-repではない。表示用サンプリングはノットを含む均等パラメータ分割で、弦誤差の保証なし。
 - 既存保存形式v1は計算結果を保存せずノードとパラメータを保存するため、新フィールドはファイル形式に追加しない。新ノードのファイルを旧アプリが読む前方互換性はない。
 
-## ノード対応表（今回追加40種＋既存曲線ノード）
+## ノード対応表（今回追加49種＋既存曲線ノード）
 | 要求 | 状態 / 制限 |
 |---|---|
 | Line, Line SDL, Polyline, Rectangle, Polygon, Circle, Circle CNR, Circle 3Pt, Arc, Arc 3Pt, Ellipse | 実装。既存Rectangle/Polygon/CircleはXY、円弧/楕円もXY（3点円弧/法線指定円は3D）。GHのPlane型・全既定値互換なし |
@@ -36,7 +36,9 @@ Rhino/Grasshopperのコード・バイナリ・UI素材は取得・コピーし�
 | Offset | XYに平行な表示点列のマイター近似。自己交差解消・厳密NURBSオフセットなし。 |
 | Line-Line / Line-Plane | 有限線分に限定。空交点は空リスト、重複やほぼ平行な線分の非一意解はエラー。許容距離付き。 |
 | Curve–Curve / Curve–Plane / Circle–Circle / Self Intersection / 最短距離 | 一般形未対応。 |
-| Join / Explode / Polycurve / Extend / Fillet / Chamfer / Rebuild / Fit / Blend / Divide Distance / Curve Plane / Orientation | 未対応。Shatter / Sub Curveは一部のSplit/Trim用途を満たすが交差ベースのトリムではない。 |
+| Join / Explode / Polycurve / Extend / Blend | 順序付き連結、隙間の許容差内の線分補完、複合基底、次数1/複合曲線の分解、接線直線延長、G1 Bezierブレンド。自動並べ替えとG2ブレンドは未対応。 |
+| Rebuild / deviation / Orientation / Planarity / Curve Plane | サンプル再補間による近似再構築、両方向サンプル偏差、XYの向き、サンプル平面性・平面法線。真の最小二乗Fit、保証付き最大偏差、自己交差の判定、Plane型は未対応。 |
+| Fillet / Chamfer / Fit / Divide Distance | 未対応。Shatter / Sub Curveは一部のSplit/Trim用途を満たすが交差ベースのトリムではない。 |
 
 ## 数値と制約
 弧長はノットスパンごとの適応5点Gauss-Legendre（局所推定差1e-9基準、最大20万評価）。弧長逆算は同じ積分表と二分探索。証明された誤差上限ではなく、収束しない入力は拒否。
@@ -47,3 +49,5 @@ Rhino/Grasshopperのコード・バイナリ・UI素材は取得・コピーし�
 ## 検証と作例
 tests/curve_geometry_tests.rs: 有理1/4円の点・接線・曲率・弧長、ノット挿入による形状不変、周期シーム、弦長補間、パラメータと弧長の相違、解析らせん、逆方向と切出し、交差と平行・重複、異常入力、キャンセル、表示分割数からの独立、アフィン変形、データツリー、作例6ファイルの読み込み・評価・保存再読込。
 ローカルのRust環境なし。CIの実行結果は別途確認が必要。Windows画面操作は未確認。
+
+複合曲線は構成要素を保持するため、弧長と評価は表示点列に依存しない。構成要素に等しいパラメータ幅を割り当てる（等弧長幅ではない）。端点間隔が非ゼロかつ許容差以内の場合は明示的な直線を追加し、近似由来フラグを設定する。Rebuildと既存折れ線からの変換にも近似由来フラグを付け、部分曲線・反転・アフィン変形・ノット挿入でも伝える。値ビューで近似由来を表示する。

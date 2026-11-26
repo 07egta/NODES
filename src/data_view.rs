@@ -68,7 +68,14 @@ pub fn value_text(value: &Value) -> String {
         Value::Point(p) => format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2]),
         Value::Curve(c) => format!(
             "{} · 表示 {} 点 · {}",
-            match c.geometry.as_ref() { Some(g) if g.as_nurbs().is_some() => "NURBS", Some(_) => "解析曲線", None => "折れ線（近似を含む）" },
+            match c.geometry.as_ref() {
+                Some(g) if g.is_approximate() => "曲線（近似由来）",
+                Some(g) if g.is_composite() => "複合曲線",
+                Some(g) if g.as_nurbs().is_some_and(|n| n.degree()==1) => "折れ線",
+                Some(g) if g.as_nurbs().is_some() => "NURBS",
+                Some(_) => "解析曲線",
+                None => "折れ線（近似を含む）",
+            },
             c.points.len(),
             if c.closed { "閉じた" } else { "開いた" }
         ),

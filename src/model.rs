@@ -225,6 +225,15 @@ pub enum NodeKind {
     CurveFrameY,
     CurveLineLine,
     CurveLinePlane,
+    CurveJoin,
+    CurveExplode,
+    CurveExtend,
+    CurveBlend,
+    CurveRebuildApprox,
+    CurveDeviationApprox,
+    CurveOrientationXy,
+    CurvePlanarityApprox,
+    CurvePlaneNormalApprox,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -334,6 +343,15 @@ impl NodeKind {
             Self::CurveFrameY,
             Self::CurveLineLine,
             Self::CurveLinePlane,
+            Self::CurveJoin,
+            Self::CurveExplode,
+            Self::CurveExtend,
+            Self::CurveBlend,
+            Self::CurveRebuildApprox,
+            Self::CurveDeviationApprox,
+            Self::CurveOrientationXy,
+            Self::CurvePlanarityApprox,
+            Self::CurvePlaneNormalApprox,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

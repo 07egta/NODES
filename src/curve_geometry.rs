@@ -261,7 +261,7 @@ impl NurbsCurve {
         }
         Ok(c)
     }
-    fn affine(&self,f:&impl Fn(Point3)->Point3)->R<Self> {
+    fn affine(&self,f:&dyn Fn(Point3)->Point3)->R<Self> {
         let points=self.control_points().into_iter().map(f).collect();
         let mut c=Self::new(self.degree,points,self.weights(),self.knots.clone())?;
         c.periodic=self.periodic;
@@ -275,21 +275,91 @@ impl NurbsCurve {
 enum Basis {
     Nurbs(NurbsCurve),
     Helix { origin:Point3,x:Point3,y:Point3,rise:Point3,turns:f64,radial_change:f64 },
+    Composite { parts: Vec<CurveGeometry>, depth: usize },
 }
 #[derive(Clone,Debug,PartialEq)]
 pub struct CurveGeometry {
     basis:Arc<Basis>,
     interval:[f64;2],
+    approximate:bool,
 }
 impl CurveGeometry {
     pub fn nurbs(nurbs:NurbsCurve)->Self {
         let interval=nurbs.domain();
-        Self {basis:Arc::new(Basis::Nurbs(nurbs)),interval}
+        Self {basis:Arc::new(Basis::Nurbs(nurbs)),interval,approximate:false}
     }
     pub fn as_nurbs(&self)->Option<&NurbsCurve> {
         match self.basis.as_ref() {Basis::Nurbs(c)=>Some(c),_=>None}
     }
     pub fn domain(&self)->[f64;2] { self.interval }
+    /// True when the curve was produced by an explicitly approximate operation (e.g. rebuild).
+    /// This is distinct from the floating-point or display accuracy of the mathematical basis.
+    pub fn is_approximate(&self)->bool { self.approximate }
+    pub fn marked_approximate(mut self)->Self {self.approximate=true;self}
+    pub fn is_composite(&self)->bool {matches!(self.basis.as_ref(),Basis::Composite{..})}
+    fn depth(&self)->usize{
+        match self.basis.as_ref(){Basis::Composite{depth,..}=>*depth,_=>0}
+    }
+    /// Join in the supplied order, with a linear connector for any nonzero gap within
+    /// tolerance. This preserves both source curves instead of silently moving endpoints.
+    /// The resulting polycurve uses equal parameter intervals per component.
+    pub fn join_ordered(curves:&[Self],tol:f64,cancel:&dyn Fn()->bool)->R<Self>{
+        if curves.is_empty()||curves.len()>128||!tol.is_finite()||tol<0. {
+            return Err("連結は1〜128本の曲線と非負の許容差に対応します。".into());
+        }
+        if curves.len()==1{return Ok(curves[0].clone());}
+        let mut parts:Vec<Self>=Vec::new();
+        let mut approx=false;let mut depth=1;let mut weight=0usize;
+        for c in curves{
+            stopped(cancel)?;
+            if let Some(last)=parts.last(){
+                let a=last.point(1.)?;let b=c.point(0.)?;
+                let gap=norm(sub(a,b));
+                if !gap.is_finite()||gap>tol{return Err("連結する曲線の端点が離れすぎています。順序と向きを確認してください。".into());}
+                if gap>0.{
+                    let bridge=Self::nurbs(NurbsCurve::polyline(vec![a,b],false)?);
+                    weight=weight.saturating_add(bridge.weight());
+                    parts.push(bridge);approx=true;
+                }
+            }
+            approx|=c.approximate;
+            depth=depth.max(c.depth()+1);
+            weight=weight.saturating_add(c.weight());
+            if depth>8||weight>131072{return Err("複合曲線の深さまたはサイズが上限を超えました。".into());}
+            parts.push(c.clone());
+        }
+        Ok(Self{basis:Arc::new(Basis::Composite{parts,depth}),interval:[0.,1.],approximate:approx})
+    }
+    fn composite_parameter(parts:&[Self],u:f64)->(&Self,f64){
+        let q=u*parts.len() as f64;
+        let index=(q.floor() as usize).min(parts.len()-1);
+        (&parts[index],(q-index as f64).clamp(0.,1.))
+    }
+    /// Explode an oriented active interval into component curves (or line segments for
+    /// degree-one NURBS). Smooth higher-degree NURBS and analytic helices remain intact.
+    pub fn explode(&self)->R<Vec<Self>>{
+        if let Basis::Composite{parts,..}=self.basis.as_ref(){
+            let [a,b]=self.interval;let count=parts.len() as f64;
+            let mut out=Vec::new();
+            for (i,part) in parts.iter().enumerate(){
+                let l=a.min(b).max(i as f64/count);
+                let h=a.max(b).min((i+1) as f64/count);
+                if l>=h{continue;}
+                let start=(l*count-i as f64).clamp(0.,1.);
+                let end=(h*count-i as f64).clamp(0.,1.);
+                if start==end{continue;}
+                let mut sub=if a<b{part.subcurve(start,end)?}else{part.subcurve(end,start)?};
+                sub.approximate|=self.approximate;
+                out.push(sub);
+            }
+            if a>b{out.reverse();}
+            return Ok(out);
+        }
+        if self.as_nurbs().is_some_and(|n|n.degree()==1){
+            return self.breaks().windows(2).map(|w|self.subcurve(w[0],w[1])).collect();
+        }
+        Ok(vec![self.clone()])
+    }
     pub fn periodic(&self)->bool {
         self.as_nurbs().is_some_and(|c|c.periodic() &&
             (self.interval==c.domain() || self.interval==[c.domain()[1],c.domain()[0]]))
@@ -353,7 +423,7 @@ impl CurveGeometry {
             radial_change< -1.||radial_change>100. {
             return Err("らせんのパラメータが無効です。".into());
         }
-        Ok(Self {basis:Arc::new(Basis::Helix {origin,x,y,rise,turns,radial_change}),interval:[0.,1.]})
+        Ok(Self {basis:Arc::new(Basis::Helix {origin,x,y,rise,turns,radial_change}),interval:[0.,1.],approximate:false})
     }
     fn native(&self,t:f64)->R<f64> {
         check_t(t,0.,1.)?;
@@ -364,6 +434,7 @@ impl CurveGeometry {
         let u=self.native(t)?;
         match self.basis.as_ref() {
             Basis::Nurbs(c)=>c.point(u),
+            Basis::Composite{parts,..}=>{let (part,t)=Self::composite_parameter(parts,u);part.point(t)},
             Basis::Helix {origin,x,y,rise,turns,radial_change}=>{
                 let (s,c)=(TAU*turns*u).sin_cos();
                 checked(add(add(*origin,scale(*rise,u)),scale(add(scale(*x,c),scale(*y,s)),1.+radial_change*u)))
@@ -375,6 +446,12 @@ impl CurveGeometry {
         let u=self.native(t)?;
         let [p,d,dd]=match self.basis.as_ref() {
             Basis::Nurbs(c)=>c.derivatives(u)?,
+            Basis::Composite{parts,..}=>{
+                let (part,t)=Self::composite_parameter(parts,u);
+                let [p,d,dd]=part.derivatives(t)?;
+                let n=parts.len() as f64;
+                [p,scale(d,n),scale(dd,n*n)]
+            },
             Basis::Helix {origin,x,y,rise,turns,radial_change}=>{
                 let w=TAU*turns; let (s,c)=(w*u).sin_cos();
                 let r=1.+radial_change*u;
@@ -404,14 +481,16 @@ impl CurveGeometry {
     pub fn subcurve(&self,start:f64,end:f64)->R<Self> {
         let a=self.native(start)?; let b=self.native(end)?;
         if a==b {return Err("切り出し区間の長さがゼロです。".into());}
-        Ok(Self {basis:self.basis.clone(),interval:[a,b]})
+        Ok(Self {basis:self.basis.clone(),interval:[a,b],approximate:self.approximate})
     }
     pub fn reversed(&self)->Self {
-        Self {basis:self.basis.clone(),interval:[self.interval[1],self.interval[0]]}
+        Self {basis:self.basis.clone(),interval:[self.interval[1],self.interval[0]],approximate:self.approximate}
     }
-    pub fn affine(&self,f:impl Fn(Point3)->Point3)->R<Self> {
+    pub fn affine(&self,f:impl Fn(Point3)->Point3)->R<Self> {self.affine_impl(&f)}
+    fn affine_impl(&self,f:&dyn Fn(Point3)->Point3)->R<Self>{
         let basis=match self.basis.as_ref() {
-            Basis::Nurbs(n)=>Basis::Nurbs(n.affine(&f)?),
+            Basis::Nurbs(n)=>Basis::Nurbs(n.affine(f)?),
+            Basis::Composite{parts,depth}=>Basis::Composite{parts:parts.iter().map(|p|p.affine_impl(f)).collect::<R<Vec<_>>>()?,depth:*depth},
             Basis::Helix {origin,x,y,rise,turns,radial_change}=>{
                 let o=checked(f(*origin))?;
                 Basis::Helix {origin:o,x:checked(sub(f(add(*origin,*x)),o))?,
@@ -419,10 +498,14 @@ impl CurveGeometry {
                     turns:*turns,radial_change:*radial_change}
             }
         };
-        Ok(Self {basis:Arc::new(basis),interval:self.interval})
+        Ok(Self {basis:Arc::new(basis),interval:self.interval,approximate:self.approximate})
     }
     pub fn weight(&self)->usize {
-        match self.basis.as_ref() {Basis::Nurbs(n)=>n.h.len()*5+n.knots.len(),_=>16}
+        match self.basis.as_ref() {
+            Basis::Nurbs(n)=>n.h.len()*5+n.knots.len(),
+            Basis::Composite{parts,..}=>parts.iter().map(Self::weight).fold(parts.len(),usize::saturating_add),
+            _=>16,
+        }
     }
     /// Mandatory sampling breakpoints, including all active knot spans and sufficiently short
     /// helix intervals. The returned numbers are in normalized, increasing traversal order.
@@ -432,6 +515,15 @@ impl CurveGeometry {
         match self.basis.as_ref() {
             Basis::Nurbs(c)=>for &k in c.knots() {
                 if k>a.min(b)&&k<a.max(b) {out.push((k-a)/(b-a));}
+            },
+            Basis::Composite{parts,..}=>{
+                let count=parts.len() as f64;
+                for (i,p) in parts.iter().enumerate(){
+                    for t in p.breaks(){
+                        let k=(i as f64+t)/count;
+                        if k>a.min(b)&&k<a.max(b){out.push(((k-a)/(b-a)).clamp(0.,1.));}
+                    }
+                }
             },
             Basis::Helix {turns,..}=>{
                 let n=(turns.abs()*(b-a).abs()*8.).ceil().max(1.) as usize;
@@ -456,6 +548,7 @@ impl CurveGeometry {
         let mut table=LengthTable {leaves:vec![],total:0.};
         let mut work=0;
         let breaks=self.breaks();
+        if breaks.len()>MAX_CONTROLS+MAX_PREVIEW{return Err("弧長の区間数が多すぎます。".into());}
         for w in breaks.windows(2) {
             stopped(cancel)?;
             let whole=self.gauss(w[0],w[1],&mut work)?;
@@ -502,6 +595,7 @@ impl CurveGeometry {
     pub fn closest_parameter(&self,p:Point3,cancel:&dyn Fn()->bool)->R<f64> {
         if !finite(p){return Err("点の座標が無効です。".into());}
         let mut ts=self.breaks();
+        if ts.len()>MAX_CONTROLS+MAX_PREVIEW{return Err("最近接点の区間数が多すぎます。".into());}
         ts.extend((0..=128).map(|i|i as f64/128.));
         ts.sort_by(f64::total_cmp);ts.dedup();
         let dist=|t|->R<f64>{Ok(norm(sub(self.point(t)?,p)))};
