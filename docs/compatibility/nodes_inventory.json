@@ -18494,7 +18494,7 @@
   "picker_count": 298,
   "registered_count": 299,
   "schema_version": 2,
-  "source_revision": "0e1032fc5409ff0212ed4d9b6b88c4f56df896ca",
+  "source_revision": "b26d246341d359a6284a7b1036d1369a02e59a72",
   "source_revision_provenance": "caller_supplied; does not assert a clean worktree",
   "verification_note": "Registry enumeration cannot establish any verified-node count.",
   "verified_count": null

@@ -4,7 +4,9 @@
 use morphlet::data_tree as dt;
 use morphlet::engine::{Evaluation, Evaluator};
 use morphlet::mesh_fabrication;
-use morphlet::model::{Graph, MAX_ITEMS, MAX_NODES, Mesh, NodeId, NodeKind, Tree, Value as ModelValue};
+use morphlet::model::{
+    Graph, MAX_ITEMS, MAX_NODES, Mesh, NodeId, NodeKind, Tree, Value as ModelValue,
+};
 use morphlet::persistence::{self, Project};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -27,7 +29,11 @@ fn make_chain(n: usize) -> Result<(Graph, NodeId), String> {
         let next = graph.add(NodeKind::Add, [0., 0.])?;
         graph.node_mut(next).unwrap().params.insert("b".into(), 1.);
         // No per-wire full graph scan while constructing the benchmark fixture.
-        graph.node_mut(next).unwrap().inputs.insert("a".into(), previous);
+        graph
+            .node_mut(next)
+            .unwrap()
+            .inputs
+            .insert("a".into(), previous);
         previous = next;
     }
     graph.validate()?;
@@ -38,7 +44,13 @@ fn final_number(result: &Evaluation, id: NodeId) -> f64 {
     assert!(!result.cancelled && result.outputs.values().all(Result::is_ok));
     let tree = result.outputs[&id].as_ref().unwrap();
     assert_eq!(tree.item_count(), 1);
-    tree.branches.values().flatten().next().unwrap().number().unwrap()
+    tree.branches
+        .values()
+        .flatten()
+        .next()
+        .unwrap()
+        .number()
+        .unwrap()
 }
 
 fn sample(n: usize) -> Value {
@@ -58,7 +70,11 @@ fn sample(n: usize) -> Value {
     let mut times = Vec::new();
     for step in 0..50 {
         let number = step as f64 + 2.;
-        graph.node_mut(slider).unwrap().params.insert("value".into(), number);
+        graph
+            .node_mut(slider)
+            .unwrap()
+            .params
+            .insert("value".into(), number);
         let start = Instant::now();
         let result = engine.evaluate(&graph, &|| false);
         let elapsed = start.elapsed().as_secs_f64() * 1000.;
@@ -119,14 +135,18 @@ fn data_tree_sample() -> Value {
     assert_eq!(grafted.item_count(), item_count);
     for row in 0..ROWS {
         for col in 0..COLS {
-            let branch = dt::branch(&grafted, &[7, row as u32, col as u32])
-                .expect("grafted item path");
+            let branch =
+                dt::branch(&grafted, &[7, row as u32, col as u32]).expect("grafted item path");
             assert_eq!(branch.len(), 1);
             assert_eq!(branch[0].number().unwrap(), (row * COLS + col) as f64);
         }
     }
     for branch in 0..EMPTY_BRANCHES {
-        assert!(dt::branch(&grafted, &[9, branch as u32]).unwrap().is_empty());
+        assert!(
+            dt::branch(&grafted, &[9, branch as u32])
+                .unwrap()
+                .is_empty()
+        );
     }
 
     // Only the rectangular matrix is transposed; explicit empty branches are
@@ -143,7 +163,10 @@ fn data_tree_sample() -> Value {
     }
     let (restored, unflatten_ms) =
         timed(|| dt::unflatten(&flat, &tree).expect("restore tree topology"));
-    assert!(restored == tree, "unflatten must preserve all paths, values and empty branches");
+    assert!(
+        restored == tree,
+        "unflatten must preserve all paths, values and empty branches"
+    );
 
     json!({
         "status": "MEASURED",
@@ -249,7 +272,10 @@ fn mesh_sample() -> Value {
         export_report.bounds,
         Some([[0.0, 0.0, 0.0], [CELLS as f64, CELLS as f64, 0.0]])
     );
-    assert!(!export_report.is_closed(), "the grid is intentionally an open surface");
+    assert!(
+        !export_report.is_closed(),
+        "the grid is intentionally an open surface"
+    );
     near(export_report.signed_volume_mm3, 0.0);
 
     json!({
@@ -288,7 +314,10 @@ struct ScratchProject {
 
 impl ScratchProject {
     fn new() -> Self {
-        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
         for attempt in 0..16 {
             let directory = std::env::temp_dir().join(format!(
                 "nodes-perf-{}-{stamp}-{attempt}",
@@ -326,7 +355,11 @@ fn project_sample() -> Value {
     const EDITED: f64 = -3.5;
     let ((project, slider, last), fixture_ms) = timed(|| {
         let (mut graph, slider) = make_chain(NODES).expect("project graph fixture");
-        graph.node_mut(slider).unwrap().params.insert("value".into(), INITIAL);
+        graph
+            .node_mut(slider)
+            .unwrap()
+            .params
+            .insert("value".into(), INITIAL);
         let last = graph.nodes.last().unwrap().id;
         let mut project = Project::new("NODES 性能検証", graph);
         project.pan = [123.5, -45.25];
@@ -338,7 +371,10 @@ fn project_sample() -> Value {
     assert!(bytes.len() < persistence::MAX_PROJECT_BYTES);
     let (decoded, decode_validate_ms) =
         timed(|| persistence::decode_project(&bytes).expect("decode native project"));
-    assert!(decoded == project, "in-memory project roundtrip must preserve all fields");
+    assert!(
+        decoded == project,
+        "in-memory project roundtrip must preserve all fields"
+    );
 
     let scratch = ScratchProject::new();
     let path = scratch.path();
@@ -348,19 +384,30 @@ fn project_sample() -> Value {
     assert_eq!(native_bytes, (bytes.len() + 1) as u64);
     let (mut loaded, load_new_ms) =
         timed(|| persistence::load(&path).expect("load native project"));
-    assert!(loaded == project, "native save/load must preserve all project fields");
+    assert!(
+        loaded == project,
+        "native save/load must preserve all project fields"
+    );
     let mut engine = Evaluator::default();
     let first = engine.evaluate(&loaded.graph, &|| false);
     assert_eq!(final_number(&first, last), INITIAL + NODES as f64 - 1.0);
     assert_eq!(first.computed, NODES);
 
-    loaded.graph.node_mut(slider).unwrap().params.insert("value".into(), EDITED);
+    loaded
+        .graph
+        .node_mut(slider)
+        .unwrap()
+        .params
+        .insert("value".into(), EDITED);
     loaded.name = "NODES 再保存検証".into();
     let ((), overwrite_ms) =
         timed(|| persistence::save(&path, &loaded).expect("replace native project"));
     let (reloaded, load_overwritten_ms) =
         timed(|| persistence::load(&path).expect("reload edited native project"));
-    assert!(reloaded == loaded, "overwrite must preserve changed parameters and metadata");
+    assert!(
+        reloaded == loaded,
+        "overwrite must preserve changed parameters and metadata"
+    );
     let changed = engine.evaluate(&reloaded.graph, &|| false);
     assert_eq!(final_number(&changed, last), EDITED + NODES as f64 - 1.0);
     assert_eq!((changed.computed, changed.cached), (NODES, 0));
@@ -415,8 +462,14 @@ fn main() {
     let (mut report, exit_code) = match outcome {
         Ok(report) => (report, 0),
         Err(payload) => {
-            let message = payload.downcast_ref::<String>().cloned()
-                .or_else(|| payload.downcast_ref::<&str>().map(|text| (*text).to_owned()))
+            let message = payload
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| {
+                    payload
+                        .downcast_ref::<&str>()
+                        .map(|text| (*text).to_owned())
+                })
                 .unwrap_or_else(|| "benchmark invariant or operation failed".into());
             (json!({"error": message, "samples": []}), 1)
         }

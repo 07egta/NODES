@@ -55,7 +55,9 @@ fn problem(code: &'static str, message: impl AsRef<str>) -> CliError {
 
 fn node_problem(code: &'static str, node_id: u64, message: &str) -> CliError {
     let mut error = problem(code, message);
-    error.nodes.push(json!({"node_id": node_id, "message": error.message}));
+    error
+        .nodes
+        .push(json!({"node_id": node_id, "message": error.message}));
     error
 }
 
@@ -66,14 +68,24 @@ fn load_project(path: &Path) -> Result<Project, CliError> {
 fn read_request(path: &Path) -> Result<Request, CliError> {
     let metadata = fs::metadata(path).map_err(|error| problem("request_io", error.to_string()))?;
     if !metadata.is_file() {
-        return Err(problem("invalid_request", "Request must be a regular file."));
+        return Err(problem(
+            "invalid_request",
+            "Request must be a regular file.",
+        ));
     }
     if metadata.len() > MAX_REQUEST_BYTES as u64 {
         return Err(problem("request_size", "Request exceeds the 1 MiB limit."));
     }
     let file = File::open(path).map_err(|error| problem("request_io", error.to_string()))?;
-    if !file.metadata().map_err(|error| problem("request_io", error.to_string()))?.is_file() {
-        return Err(problem("invalid_request", "Request must be a regular file."));
+    if !file
+        .metadata()
+        .map_err(|error| problem("request_io", error.to_string()))?
+        .is_file()
+    {
+        return Err(problem(
+            "invalid_request",
+            "Request must be a regular file.",
+        ));
     }
     let mut bytes = Vec::new();
     file.take((MAX_REQUEST_BYTES + 1) as u64)
@@ -103,8 +115,15 @@ fn checked_evaluate(project: &Project) -> Result<Evaluation, CliError> {
     }
     if result.cancelled || !errors.is_empty() {
         return Err(CliError {
-            code: if result.cancelled { "evaluation_cancelled" } else { "evaluation_failed" },
-            message: format!("Evaluation did not complete successfully; {} node error(s).", errors.len()),
+            code: if result.cancelled {
+                "evaluation_cancelled"
+            } else {
+                "evaluation_failed"
+            },
+            message: format!(
+                "Evaluation did not complete successfully; {} node error(s).",
+                errors.len()
+            ),
             nodes: errors,
         });
     }
@@ -144,7 +163,13 @@ fn tree_summary(tree: &Tree) -> Json {
         *kinds.entry(value_kind(value)).or_default() += 1;
     }
     let items = tree.item_count();
-    let preview: Vec<_> = tree.branches.values().flatten().take(PREVIEW_ITEMS).map(preview).collect();
+    let preview: Vec<_> = tree
+        .branches
+        .values()
+        .flatten()
+        .take(PREVIEW_ITEMS)
+        .map(preview)
+        .collect();
     json!({
         "branch_count": tree.branches.len(),
         "empty_branches": tree.branches.values().filter(|items| items.is_empty()).count(),
@@ -164,16 +189,21 @@ fn project_summary(project: &Project) -> Json {
 }
 
 fn evaluation_summary(project: &Project, evaluation: &Evaluation) -> Json {
-    let nodes: Vec<_> = project.graph.nodes.iter().map(|node| {
-        let mut result = json!({
-            "node_id": node.id, "kind": node.kind, "disabled": node.off,
-            "elapsed_ms": evaluation.node_timings.get(&node.id).map(|timing| timing.elapsed_ms)
-        });
-        if let Some(Ok(tree)) = evaluation.outputs.get(&node.id) {
-            result["data"] = tree_summary(tree);
-        }
-        result
-    }).collect();
+    let nodes: Vec<_> = project
+        .graph
+        .nodes
+        .iter()
+        .map(|node| {
+            let mut result = json!({
+                "node_id": node.id, "kind": node.kind, "disabled": node.off,
+                "elapsed_ms": evaluation.node_timings.get(&node.id).map(|timing| timing.elapsed_ms)
+            });
+            if let Some(Ok(tree)) = evaluation.outputs.get(&node.id) {
+                result["data"] = tree_summary(tree);
+            }
+            result
+        })
+        .collect();
     json!({
         "computed": evaluation.computed, "cached": evaluation.cached,
         "elapsed_ms": evaluation.elapsed_ms, "cancelled": evaluation.cancelled,
@@ -196,36 +226,71 @@ fn export_stl(project_path: &Path, destination: &Path) -> Result<Json, CliError>
         || matches!((fs::canonicalize(project_path), fs::canonicalize(destination)),
             (Ok(source), Ok(target)) if source == target)
     {
-        return Err(problem("invalid_destination", "STL output must differ from the input project."));
+        return Err(problem(
+            "invalid_destination",
+            "STL output must differ from the input project.",
+        ));
     }
     let project = load_project(project_path)?;
     let mut evaluation = checked_evaluate(&project)?;
-    let outputs: Vec<_> = project.graph.nodes.iter().filter(|node| node.kind == NodeKind::Output).collect();
+    let outputs: Vec<_> = project
+        .graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == NodeKind::Output)
+        .collect();
     if outputs.is_empty() {
-        return Err(problem("output_required", "Connect the intended mesh to an explicit Output node."));
+        return Err(problem(
+            "output_required",
+            "Connect the intended mesh to an explicit Output node.",
+        ));
     }
     let mut trees = Vec::with_capacity(outputs.len());
     let mut output_ids = Vec::with_capacity(outputs.len());
     for node in outputs {
         if node.off {
-            return Err(node_problem("disabled_output", node.id, "An Output node is disabled."));
+            return Err(node_problem(
+                "disabled_output",
+                node.id,
+                "An Output node is disabled.",
+            ));
         }
-        let tree = evaluation.outputs.remove(&node.id)
-            .ok_or_else(|| node_problem("missing_output", node.id, "The Output node has no evaluation result."))?
+        let tree = evaluation
+            .outputs
+            .remove(&node.id)
+            .ok_or_else(|| {
+                node_problem(
+                    "missing_output",
+                    node.id,
+                    "The Output node has no evaluation result.",
+                )
+            })?
             .map_err(|message| node_problem("evaluation_failed", node.id, &message))?;
         if tree.item_count() == 0 {
-            return Err(node_problem("empty_output", node.id, "The Output node contains no mesh values."));
+            return Err(node_problem(
+                "empty_output",
+                node.id,
+                "The Output node contains no mesh values.",
+            ));
         }
         for value in tree.branches.values().flatten() {
             match value {
                 Value::Mesh(mesh) if !mesh.vertices.is_empty() && !mesh.triangles.is_empty() => {}
                 Value::Mesh(_) => {
-                    return Err(node_problem("empty_mesh", node.id, "The Output node contains an empty mesh."));
+                    return Err(node_problem(
+                        "empty_mesh",
+                        node.id,
+                        "The Output node contains an empty mesh.",
+                    ));
                 }
                 _ => {
                     return Err(node_problem(
-                        "unsupported_output", node.id,
-                        &format!("Output contains {} data. Explicit mesh conversion is required for STL.", value_kind(value)),
+                        "unsupported_output",
+                        node.id,
+                        &format!(
+                            "Output contains {} data. Explicit mesh conversion is required for STL.",
+                            value_kind(value)
+                        ),
                     ));
                 }
             }
@@ -268,7 +333,10 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
     if arguments.len() != expected {
-        return Err(problem("usage", "Incorrect argument count. Run nodes-cli --help."));
+        return Err(problem(
+            "usage",
+            "Incorrect argument count. Run nodes-cli --help.",
+        ));
     }
     match command {
         "catalog" => Ok(json!({"catalog": graph_api::catalog()})),
@@ -279,11 +347,14 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
         "evaluate" => {
             let project = load_project(Path::new(&arguments[0]))?;
             let evaluation = checked_evaluate(&project)?;
-            Ok(json!({"project": project_summary(&project), "evaluation": evaluation_summary(&project, &evaluation)}))
+            Ok(
+                json!({"project": project_summary(&project), "evaluation": evaluation_summary(&project, &evaluation)}),
+            )
         }
         "build" => {
             let request = read_request(Path::new(&arguments[0]))?;
-            let project = graph_api::build(&request).map_err(|message| problem("build_failed", message))?;
+            let project =
+                graph_api::build(&request).map_err(|message| problem("build_failed", message))?;
             save_evaluated(&project, Path::new(&arguments[1]))
         }
         "apply" => {
@@ -312,17 +383,27 @@ fn main() -> ExitCode {
     }
     let command = arguments[0].to_str().unwrap_or("<invalid-command>");
     let (result, status) = match run(command, &arguments[1..]) {
-        Ok(value) => (json!({
-            "cli_version": CLI_VERSION, "api_version": graph_api::API_VERSION,
-            "command": command, "ok": true, "result": value
-        }), ExitCode::SUCCESS),
-        Err(error) => {
-            let status = if error.code == "usage" { ExitCode::from(2) } else { ExitCode::FAILURE };
-            (json!({
+        Ok(value) => (
+            json!({
                 "cli_version": CLI_VERSION, "api_version": graph_api::API_VERSION,
-                "command": command, "ok": false,
-                "error": {"code": error.code, "message": error.message, "nodes": error.nodes}
-            }), status)
+                "command": command, "ok": true, "result": value
+            }),
+            ExitCode::SUCCESS,
+        ),
+        Err(error) => {
+            let status = if error.code == "usage" {
+                ExitCode::from(2)
+            } else {
+                ExitCode::FAILURE
+            };
+            (
+                json!({
+                    "cli_version": CLI_VERSION, "api_version": graph_api::API_VERSION,
+                    "command": command, "ok": false,
+                    "error": {"code": error.code, "message": error.message, "nodes": error.nodes}
+                }),
+                status,
+            )
         }
     };
     let mut stdout = io::stdout().lock();

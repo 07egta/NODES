@@ -4,11 +4,34 @@
 
 対象 Cargo.lock SHA-256: `39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca`
 
-本体の [MIT](../LICENSE-MIT) / [Apache-2.0](../LICENSE-APACHE) 方針は維持している。今回の CI・ライセンス作業では Cargo.toml、Cargo.lock、依存の機能フラグを変更していない。
+本体の [MIT](../LICENSE-MIT) / [Apache-2.0](../LICENSE-APACHE) 方針は維持している。今回の依存監査・notice 追補では Cargo.toml、Cargo.lock、依存の機能フラグを変更していない。
 
-## 実行環境中断後の回収状態
+## 最新の CI による宣言・同梱本文の確認
 
-ローカル実行環境が unavailable となり、作成済みの完全な inventory JSON と Cargo cache を読み出せなくなった。この文書と [dependency-inventory.json](development/dependency-inventory.json) は、GitHub に保存されていた監査、会話に記録された実際の検査結果、記録済みコミットから再取得した公式ファイルを使った**回収版**である。失われた JSON と同一のファイルであるとは主張しない。
+[CI run 45846736773](https://github.com/07egta/NODES/actions/runs/45846736773) の依存監査は成功した。`cargo metadata --locked --format-version 1` の実データを [audit_dependencies.py](../scripts/audit_dependencies.py) で処理した結果を、[dependency-manifests.json](development/dependency-manifests.json) に保存している。基点は `b26d246341d359a6284a7b1036d1369a02e59a72`。この run は Linux の formatter / Clippy 修正後の作業ツリーを検証したもので、統合コミットそのものの通常 CI は次の検証対象である。出典と検証範囲は [CI_INTEGRATION_VALIDATION.json](development/CI_INTEGRATION_VALIDATION.json) にある。
+
+| 項目 | この CI で確認した値 |
+|---|---:|
+| metadata 内のパッケージ | **303**（本体 1、第三者 302） |
+| license 宣言あり | **303** |
+| license 宣言欠落 | **0** |
+| Cargo.lock に存在し、metadata に含まれなかったパッケージ | **0** |
+| 同梱本文の SHA-256 が記録と一致 | **225 ファイル** |
+| 上記の本文が対応するパッケージ | **121 件** |
+| 構文を自動解釈しなかった license 宣言 | **14 件** |
+| 一つ以上の review reason が付いたパッケージ | **184 件** |
+| GNU 系トークンを含む宣言 | **1 件**（`r-efi 6.0.0`、MIT の選択肢あり） |
+| MPL 宣言 | **1 件**（`smartstring 1.0.1`） |
+
+14 件は `MIT/Apache-2.0`、`Unlicense/MIT` などの slash を使う宣言である。スクリプトはこれらを推測で `OR` に変換せず、`ambiguous` として原文を保持する。184 件の review reason には同梱本文の対応記録がないことや、この構文上の限定も含む。これは 184 件が使用不可という判定ではない。件数は本体を含む metadata 全体に対する値であり、ライセンスの自動承認を意味しない。
+
+225 ファイルの照合対象は、既存の Windows 台帳 114 package と Rhai 関連の追加台帳 7 package が指す Git 追跡済み本文である。名前・バージョン・registry checksum で対応を確かめ、実際の本文を SHA-256 と比較した。**registry archive 全体の再ハッシュ、各ターゲットへのリンク状況、最終配布物のランタイム監査はこの処理に含まれない。**
+
+`r-efi` の MIT notice は、この CI の後に別コミットで追加した追補である。上表と保存済み JSON は追加前の測定値を保持し、追補分を手作業で加算しない。追補の統合後に監査スクリプトを再実行する。
+
+## 実行環境中断後の回収状態（履歴）
+
+ローカル実行環境が unavailable となり、作成済みの完全な inventory JSON と Cargo cache を読み出せなくなった時点では、GitHub に保存されていた監査、実際の検査結果、記録済みコミットから再取得した公式ファイルを使って**回収版**を作成した。[dependency-inventory.json](development/dependency-inventory.json) はその履歴を保持するファイルであり、今回の実測 JSON で上書きしていない。失われた JSON と同一のファイルであるとは主張しない。
 
 | 項目 | 回収版の状態 |
 |---|---:|
@@ -21,7 +44,7 @@
 | 中断前には調査したが詳細な manifest 記録を回収できない | 80 件 |
 | 中断前から正確なバージョンの metadata が未取得 | 96 件 |
 
-回収できた 126 件の宣言には GPL / LGPL / AGPL はなかった。残る 176 件、OS ランタイム、最終実行ファイル全体について、その不在を保証する記録ではない。既存依存 `smartstring 1.0.1` の `MPL-2.0+` は明示的に保持している。
+当時回収できた 126 件の宣言には GPL / LGPL / AGPL はなかった。これは当時の部分集合についての記録であり、現在の全宣言に GNU 系トークンがないという意味ではない。最新の CI では残る宣言も取得し、`r-efi` の選択肢に `LGPL-2.1-or-later` が含まれることを確認している。既存依存 `smartstring 1.0.1` の `MPL-2.0+` も引き続き明示する。
 
 この一覧は **lock 全体**の記録であり、optional・別 OS 用の依存も含む。現在の特定ターゲットで使われる dependency graph や、全項目が実行ファイルに含まれるかを示すものではない。
 
@@ -33,7 +56,15 @@
 
 ## 機械可読 inventory の読み方
 
-全 302 件は [dependency-inventory.json](development/dependency-inventory.json) にある。`declared_license: null` は詳細未回収または未調査を表し、使用許可・拒否の判定ではない。
+| ファイル | 役割 |
+|---|---|
+| [dependency-manifests.json](development/dependency-manifests.json) | 最新の成功 CI で取得した 303 package の宣言と同梱本文照合結果。`r-efi` notice 追補前の実測値 |
+| [dependency-inventory.json](development/dependency-inventory.json) | 中断後の回収履歴。第三者 302 件の名前・version・checksum と、その時点で回収できた宣言を保持 |
+| [additional-dependency-audit.json](../licenses/additional-dependency-audit.json) | Rhai 関連の取得記録と、CI 後に保存した `r-efi` の MIT 選択・notice の追補 |
+
+新しい一覧は宣言の原文、演算子構造の限定的な解析、license-file の宣言、同梱本文の照合結果を分けて記録する。SPDX 識別子全体や例外の適用可能性を検証するものではない。構文上の `OR` 選択肢の存在と法的な使用可否を同一視しない。再生成方法と制限は [DEPENDENCY_METADATA.md](development/DEPENDENCY_METADATA.md) にある。
+
+以下は旧回収 JSON の区分である。旧ファイルの `declared_license: null` は**その時点の**詳細未回収または未調査を表し、現在の metadata に宣言がないという意味ではない。
 
 | metadata_status | 件数 | 意味 |
 |---|---:|---|
@@ -86,39 +117,58 @@ Cargo manifest の license フィールドは上流作者の宣言であり、�
 
 [MPL 2.0 第 3.2 節](https://www.mozilla.org/en-US/MPL/2.0/#distribution-of-executable-form) は実行形式を配布する場合のソース提供と入手方法の通知を規定している。配布担当者は、そのバージョンと変更内容に対応したソース・通知を維持する。MPL を本体の MIT / Apache-2.0 に読み替えるものではない。
 
+### r-efi 6.0.0 の MIT 選択（CI 後の追補）
+
+`r-efi 6.0.0` の宣言は `MIT OR Apache-2.0 OR LGPL-2.1-or-later`。この既存依存について **MIT の選択肢を明示的に選ぶ**。GNU 系トークンの存在だけで LGPL の採用や必須条件と判断せず、元の宣言もそのまま記録する。
+
+[追補コミット 3ed93188](https://github.com/07egta/NODES/commit/3ed93188c6eb56f0bb5c8f9f1e5246e7a6fb1a6f) は公式 `v6.0.0` タグと、その対象コミット `7e1b0322d31d625f81a5656096330934f9cd835d` の [Cargo.toml](https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/Cargo.toml) を照合した。MIT 本文と著作権表示を含む [公式 AUTHORS](https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/AUTHORS) をそのまま保存し、追加台帳の既存 7 件を変更せず 1 件を追記した。
+
+- 保存先: `licenses/crates/r-efi-6.0.0/AUTHORS`、出典: `SOURCE.txt`。
+- 本文サイズ: 3,733 UTF-8 bytes。
+- Git blob: `79c8b7c4a1dabcfbc718b7fe6d43b1892f9850cd`（公式ソースと一致）。
+- SHA-256: `d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111`。
+
+この追補は run 45846736773 の `225 ファイル / 121 package` に含まれていない。公式タグ・manifest・notice の照合を行ったもので、registry archive の再取得や SHA-256 再計算は実施していない。全依存・配布物の監査完了を意味しない。
+
 ### フォントとランタイム
 
 `epaint_default_fonts 0.33.3` の宣言は `(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0`。Morphlet JP と egui 同梱フォントの個別表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#フォント) と `licenses/` に残す。
 
-既存の Windows 監査と MinGW runtime 通知は **x86_64-pc-windows-gnullvm の過去の配布物**を対象とする。新しい CI artifact は Windows MSVC を使うため、古い監査をその実行ファイル全体の確認結果として扱わない。MSVC runtime の配布条件と、たとえば `windows_x86_64_msvc 0.52.6` の metadata は未確認である。
+既存の Windows 監査と MinGW runtime 通知は **x86_64-pc-windows-gnullvm の過去の配布物**を対象とする。新しい CI artifact は Windows MSVC を使うため、古い監査をその実行ファイル全体の確認結果として扱わない。今回の全 package の宣言取得は、Windows MSVC / Linux の実際のリンク対象、OS・コンパイラの runtime、各 artifact の配布条件・同梱義務の監査を代替しない。
 
 ## CI と Rust
 
-[実行用 workflow](../.github/workflows/windows.yml) は既存 Windows job を再利用し、Linux gate と Windows development artifact を 1 本にまとめる。回収時点では、この新 workflow 自体の実行結果はない。
+[Integration recovery diagnostics](../.github/workflows/integration-recovery.yml) の run 45846736773 は、Linux 上で formatter / Clippy による修正を適用した作業ツリーを検証し、Rust テスト **431 passed / 0 failed / 2 ignored**、`cargo check --all-targets --locked`、fmt、strict Clippy（`-D warnings`）に成功した。依存監査・registry 生成・性能測定の step も成功し、その出力を回収した。2 件の ignored test は成功件数に含めていない。
+
+これは元コミットまたは統合後コミットの未変更ソースが通常 gate を通過したという結果ではない。修正を保存した後、[通常の Check workflow](../.github/workflows/windows.yml) を実行して、コミットされたソースと Linux / Windows の artifact を検証する。
 
 | Job | 環境・制限 | 内容 |
 |---|---|---|
-| `linux` | Ubuntu 24.04、Rust 1.100.0、2 build jobs、35 分上限 | fmt / check / clippy（warnings を error）/ all-targets test |
-| `windows` | Linux 通過後、Windows Server 2022 x64 / MSVC、Rust 1.100.0、45 分上限 | all-targets test、release build、開発用 artifact（14 日保持） |
+| `linux` | Ubuntu 24.04、Rust 1.100.0、2 build jobs、35 分上限 | fmt / check / strict clippy / all-targets test、監査スクリプト・依存宣言の検証、GUI と CLI の release build、開発用 artifact |
+| `windows` | Linux 通過後、Windows Server 2022 x64 / MSVC、Rust 1.100.0、45 分上限 | all-targets test、GUI と CLI の release build、開発用 artifact（14 日保持） |
 
 PR、main / evolve / develop ブランチの push、手動実行に対応。使用 Actions は具体的 commit SHA に固定し、権限は `contents: read`。古い同一ブランチ実行をキャンセルし、公開 release は自動作成しない。
 
 本体の最低 Rust 宣言は **1.88**。中断前に確認した 198 manifest の最大宣言値も 1.88 / 1.88.0 だったが、Rust 1.88 での実ビルド検証はしていない。CI は [公式 Rust 1.100.0](https://github.com/rust-lang/rust/releases/tag/1.100.0) を明示する。`rust-toolchain.toml` は追加していない。
 
-中断前には workflow の YAML 構造、action SHA、入力、diff を確認した。復元時には GitHub へ保存したテキストを読み戻し、送信した内容と一致することを確認した。復元後の Cargo build / test は実行できていない。Windows CI の成功は Windows 11 GUI 操作、Intel Arc 描画、3D プリント実機の検証を代替しない。
+workflow の YAML 構造と必須 step の失敗・skip が成功扱いされないことを確認している。成功 CI の記録には回収した出力の SHA-256 と検証範囲を残す。通常 CI の次回結果はそれと分けて記録する。Windows CI が成功しても、Windows 11 GUI 操作、Intel Arc 描画、3D プリント実機の検証を代替しない。
 
 ## 再開する作業
 
-1. 利用可能になった環境で exact-version crate archive を取得し、SHA-256 と Cargo.lock を照合する。
-2. 80 件の未回収詳細と 96 件の未取得 metadata を補完する。全 302 件の名前・version・checksum は回収済み JSON を使う。
-3. Windows MSVC と Linux の実際の dependency graph を保存し、必要な本文・著作権表示を抽出する。
-4. 最終 artifact の MSVC runtime、フォント、選択機能の通知を確認する。
-5. Cargo.lock が変わったら一覧を再生成し、古い件数を流用しない。
+1. `r-efi` notice 追補を統合した後に manifest inventory を再生成し、今回の CI 結果と区別して記録する。
+2. 14 件の構文上の未解釈宣言と、本文記録がない package を exact-version の公式資料で確認する。184 件の review reason を個別の意味に沿って処理する。
+3. 必要な exact-version crate archive を取得し、archive bytes の SHA-256 と Cargo.lock を独立に照合する。
+4. Windows MSVC と Linux の実際の dependency graph、最終 artifact の runtime、フォント、選択機能と必要な通知を確認する。
+5. コミットされた統合ソースで通常 CI を実行する。Cargo.lock が変わった場合も一覧を再生成し、古い件数を流用しない。
 
-次は実行予定コマンドであり、回収中には実行していない。
+再生成には **`--filter-platform` を付けない** metadata を使う。監査スクリプトは packages と resolution nodes が一致する完全な入力を要求する。ターゲット別の graph は別途保存・確認する。
 
 ```sh
-cargo metadata --locked --format-version 1 --filter-platform x86_64-pc-windows-msvc
+python3 -B scripts/audit_dependencies.py --self-test
+cargo metadata --locked --format-version 1 > /tmp/nodes-cargo-metadata.json
+python3 -B scripts/audit_dependencies.py \
+  --metadata /tmp/nodes-cargo-metadata.json \
+  --output docs/development/dependency-manifests.json
 cargo tree --locked --target x86_64-pc-windows-msvc --edges normal,build --prefix none
 cargo tree --locked --target x86_64-unknown-linux-gnu --edges normal,build --prefix none
 cargo fmt --all -- --check

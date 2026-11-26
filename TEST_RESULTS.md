@@ -1,6 +1,6 @@
 # NODES 検証記録
 
-更新: 2026-11-26。成功は実行したコードに限定する。作業環境停止後に復旧・再実装したコードは、追加CIの結果で確定する。
+更新: 2026-11-27 JST。成功は実行したコードに限定する。作業環境停止後に復旧・再実装したコードは、追加CIの結果で確定する。
 
 ## 確定した全体チェックポイント
 
@@ -8,11 +8,43 @@
 |---|---|---|---|
 | `6349577399dd484a90fde5afe77ee173f8f9444a` | Linux x86_64 / Rust 1.100 | `cargo test --all-targets --locked` | 350 passed、0 failed、2 ignored、24 suites |
 | 同じSHA | GitHub Actions Windows / Rust 1.100.0 | 同じコマンド | 350 passed、0 failed、2 ignored、24 suites |
-| 同じSHA | 同じWindows runner | `cargo build --release --locked --bin Morphlet` | 成功 |
+| 同じSHA | 同じWindows runner | `cargo build --release --locked --bins` | 成功 |
 
 Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs/45822273755)、job 139917295799 の Test / Build Morphlet。ログ上のtest buildは4m11s、release buildは1m42s。これは起動時間やユーザーPCの性能ではない。
 
-2件のignoredはopt-inの性能/ストレス検証。失敗した試験を削除して成功にしたものではない。
+2件のignoredは `benchmark_sparse_slider_edit`（手動release計測）と `audit_stress`（10万頂点・50万三角形のopt-inストレス検証）。失敗した試験を削除して成功にしたものではない。
+
+## 復旧後のCIで確認したこと
+
+[diagnostics run 45836582370](https://github.com/07egta/NODES/actions/runs/45836582370) は、0e1032fc の作業ツリーに formatter / Clippy 修正を適用した上で実行した。
+
+| 対象 | 結果 |
+|---|---|
+| Rust 全ターゲット | **424 passed / 0 failed / 2 opt-in ignored、33 suites** |
+| コンパイル、整形確認 | 成功 |
+| 厳格な Clippy | 失敗。型の複雑さ、比較、初期化等を別途修正 |
+| ノード登録情報の生成 | 299件（picker 298 + Cluster） |
+| GH2公式index生成 | build 9.3.26329.6001、1,419件 |
+| releaseヘッドレス評価計測 | 成功。数値は下記および performance.json |
+
+その同一Rustソースを 2080af67 として保全した。369個のログ断片、52ファイルのSHA-256・UTF-8バイト数、元のGit blob IDを照合してから保存している。詳細は [CI_RECOVERY_VALIDATION.json](docs/development/CI_RECOVERY_VALIDATION.json)。
+
+この424件には、37作例の編集・保存再読込・再評価、STL往復、曲率境界、メッシュ修復、多角形分割、ノード時間、10,000ノードの回帰を含む。ノード単位の完全検証数ではない。
+
+厳格なlint修正、コンソールCLI、検索の追加表現、拡張benchmarkと監査scriptを b26d246 に統合した。その後の [diagnostics run 45846736773](https://github.com/07egta/NODES/actions/runs/45846736773)、job 140002253199 で、整形後の候補が次の結果になった。
+
+| 対象 | 結果 |
+|---|---|
+| Rust 全ターゲット | **431 passed / 0 failed / 2 opt-in ignored、35 suites** |
+| check / fmt / strict Clippy (`-D warnings`) | すべて成功 |
+| 実プロセスのCLI試験 | 7件成功。作成・編集・保存再読込・厳格なSTL出力・不正入力・日本語パス |
+| 登録metadata / GH2生成 | 成功、299登録 / 1,419公式index項目 |
+| 依存metadata監査 | 成功、303件のlicense宣言を取得。配布全体の法的承認を意味しない |
+| release計測 | スカラー評価、Data Tree、メッシュ、実ファイル保存再読込が成功 |
+
+候補の299個のログ断片、9ファイルのSHA-256・UTF-8バイト数と元のblobを照合した。Rustの変更はformatterによる整形のみ。詳細は [CI_INTEGRATION_VALIDATION.json](docs/development/CI_INTEGRATION_VALIDATION.json)。**この成功はCIの整形済み作業ツリーに対するもの。取り込んだコミットそのもののLinux/Windows Checkは次の必須ゲート**として区別する。
+
+復帰したローカル環境では、PythonのGH2 parser 3件、checkpoint exporter 6件、依存監査8件、合計 **17件が成功**。Rustは未インストールのため、最新Rust検証はCIへ委ねている。
 
 ## その後のローカル検証
 
@@ -20,7 +52,7 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 - 空List、SingleItem、API alias重複の回帰: 修正前 **1 passed / 4 failed**、共通評価/APIを修正後に成功。
 - Access/API tree/fabrication/sample/mesh repair/STL exportの6 suite: **42 passed / 0 failed / 1 ignored**。
 - 独立した平面多角形三角形化module: `rustc --test` で **5 passed / 0 failed**。統合Cargo試験はその時点では未実施。
-- 37作例の編集・保存再読込・再編集、および8作例のSTL往復: テストコードを作成・保全。停止前は未実行。
+- 37作例の編集・保存再読込・再編集、および8作例のSTL往復: 停止前は未実行。その後、上記424件のCIで実行に成功。
 
 これらのローカルコミットには `997183b`、`299f510`、`95a070e`、`cf0b6af`、`4d40820`、`7f59add` 等が含まれた。環境停止で一部のexact sourceが参照不能となり、GitHub復旧ブランチに保存した。復旧文書に原文回復と再実装の差を明記している。
 
@@ -35,6 +67,36 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 | 中間ノード変更 | 33.476 ms | 下流5000 computed、上流5000 cached |
 
 シリアライズ結果は1,287,793 bytes。構築時間を評価時間へ混ぜず、最終値と再読込の同値性も検査した。GUI frame、Windows/Intel Arc、実形状、RAM、同時負荷の性能保証へ一般化しない。release測定は `examples/coverage_perf.rs` の再実行結果を別途記録する。
+
+## release ヘッドレス評価の実測
+
+Linux x86_64 GitHub Actions runner、Rust 1.100.0、b26d246から整形した上記431件成功のCI候補で測定。`cargo run --release --locked --example coverage_perf`、`debug_assertions=false`。50回のslider更新は先頭入力を変更し、全下流を再計算する。前節のoptimized-debug・中間編集や別CI実行とは測定条件が異なるため、速度改善率を比較しない。
+
+| ノード数 | Cold | Warm | Slider p50 | Slider p95 |
+|---:|---:|---:|---:|---:|
+| 100 | 0.211 ms | 0.120 ms | 0.143 ms | 0.163 ms |
+| 1,000 | 2.218 ms | 1.270 ms | 1.841 ms | 1.884 ms |
+| 10,000 | 16.363 ms | 12.604 ms | 23.632 ms | 24.151 ms |
+| 16,384 | 41.851 ms | 27.206 ms | 43.826 ms | 47.470 ms |
+
+[performance.json](docs/development/performance.json) に生データを保存。GUI・起動・RAM・Windows/Intel Arcの計測ではない。前回の2080af67候補では10,000ノードのcold 24.616 ms、warm 16.926 msを観測したが、別実行の参考値である。
+
+### 大規模データと保存の実測
+
+追加workloadは各操作1回。fixture構築と独立期待値の検査を操作時間から分けている。
+
+| 対象 | 規模・独立検査 | 時間 |
+|---|---|---:|
+| Data Tree Flatten | 12,288 item、128×96枝データと空枝8本。全値とpathを照合 | 0.065 ms |
+| Data Tree Graft | 12,296枝、空枝を保持 | 2.466 ms |
+| Data Tree Transpose | 和75,491,328と各項目・pathを照合 | 0.755 ms |
+| Mesh診断 | 16,641頂点 / 32,768三角形、開境界512本 | 11.698 ms |
+| 中点細分化 | 66,049頂点 / 131,072三角形へ。面積16,384 mm²・重心(64,64,0)を照合 | 16.687 ms |
+| Native保存 | 2,000ノード / 1,999接続、589,908 bytes。検証・一時ファイル・flush/sync・renameを含む | 3.531 ms |
+| Native読込 | 同じproject全体の同値性と独立算術期待値を照合 | 2.193 ms |
+| 変更後の上書き / 再読込 | パラメータ・metadata変更と出力2016.25→1995.5を照合 | 3.276 / 2.317 ms |
+
+読み込みは書き込み直後でOS cacheを除去していない。ディスクの一般的なコールド読込性能を表さない。全workload所要は4,153.770 msだった。
 
 ## GUIで実際に確認したこと
 
@@ -60,7 +122,7 @@ cargo fmt --all -- --check
 cargo check --all-targets --locked
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --all-targets --locked
-cargo build --release --locked --bin Morphlet
+cargo build --release --locked --bins
 ```
 
 復旧後の最新SHAについて上記をCIで実行し、結果を追記する。fmt/clippyの未解消警告、未実行項目を成功へ読み替えない。GH1/GH2 oracle、Windows GUI、3Dプリンター実機は未検証。

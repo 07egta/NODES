@@ -16,10 +16,14 @@ struct TemporaryDirectory(PathBuf);
 
 impl TemporaryDirectory {
     fn new() -> Self {
-        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "nodes-cli-test-{}-{stamp}-{sequence}", std::process::id()
+            "nodes-cli-test-{}-{stamp}-{sequence}",
+            std::process::id()
         ));
         fs::create_dir(&path).unwrap();
         Self(path)
@@ -38,11 +42,15 @@ impl Drop for TemporaryDirectory {
 
 fn invoke(command: &str, paths: &[&Path]) -> (Output, Json) {
     let output = Command::new(env!("CARGO_BIN_EXE_nodes-cli"))
-        .arg(command).args(paths).output().unwrap();
+        .arg(command)
+        .args(paths)
+        .output()
+        .unwrap();
     let json = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
             "{command} did not return JSON: {error}; stdout={}; stderr={}",
-            String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
         )
     });
     (output, json)
@@ -50,7 +58,11 @@ fn invoke(command: &str, paths: &[&Path]) -> (Output, Json) {
 
 fn successful(command: &str, paths: &[&Path]) -> Json {
     let (output, report) = invoke(command, paths);
-    assert!(output.status.success(), "{command}: {report}; stderr={}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{command}: {report}; stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(report["ok"], true);
     assert_eq!(report["cli_version"], 1);
     assert_eq!(report["api_version"], graph_api::API_VERSION);
@@ -66,8 +78,12 @@ fn failed(command: &str, paths: &[&Path]) -> Json {
 }
 
 fn node(report: &Json, id: u64) -> &Json {
-    report["evaluation"]["nodes"].as_array().unwrap().iter()
-        .find(|node| node["node_id"] == id).unwrap()
+    report["evaluation"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["node_id"] == id)
+        .unwrap()
 }
 
 fn save_graph(path: &Path, graph: Graph) {
@@ -78,7 +94,11 @@ fn mesh_graph(with_output: bool) -> Graph {
     let mut graph = Graph::default();
     let shape = graph.add(NodeKind::Box, [0.0, 0.0]).unwrap();
     for (key, value) in [("width", 20.0), ("depth", 10.0), ("height", 12.0)] {
-        graph.node_mut(shape).unwrap().params.insert(key.into(), value);
+        graph
+            .node_mut(shape)
+            .unwrap()
+            .params
+            .insert(key.into(), value);
     }
     if with_output {
         let output = graph.add(NodeKind::Output, [240.0, 0.0]).unwrap();
@@ -89,19 +109,42 @@ fn mesh_graph(with_output: bool) -> Graph {
 
 #[test]
 fn console_help_catalog_and_usage_have_real_stdout_and_exit_codes() {
-    let help = Command::new(env!("CARGO_BIN_EXE_nodes-cli")).arg("--help").output().unwrap();
+    let help = Command::new(env!("CARGO_BIN_EXE_nodes-cli"))
+        .arg("--help")
+        .output()
+        .unwrap();
     assert!(help.status.success());
     let help_text = String::from_utf8(help.stdout).unwrap();
-    for command in ["catalog", "validate", "evaluate", "build", "apply", "export-stl"] {
+    for command in [
+        "catalog",
+        "validate",
+        "evaluate",
+        "build",
+        "apply",
+        "export-stl",
+    ] {
         assert!(help_text.contains(command));
     }
     let catalog = successful("catalog", &[]);
-    let kinds: Vec<_> = catalog["catalog"]["nodes"].as_array().unwrap().iter()
-        .map(|node| node["kind"].as_str().unwrap()).collect();
+    let kinds: Vec<_> = catalog["catalog"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["kind"].as_str().unwrap())
+        .collect();
     assert!(kinds.contains(&"box"));
     assert!(kinds.contains(&"add"));
-    for blocked in ["script", "expression", "import_mesh", "cluster", "path_mapper"] {
-        assert!(!kinds.contains(&blocked), "{blocked} must not be exposed by the safe CLI");
+    for blocked in [
+        "script",
+        "expression",
+        "import_mesh",
+        "cluster",
+        "path_mapper",
+    ] {
+        assert!(
+            !kinds.contains(&blocked),
+            "{blocked} must not be exposed by the safe CLI"
+        );
     }
     for (command, paths) in [
         ("not-a-command", Vec::<&Path>::new()),
@@ -134,13 +177,23 @@ fn build_edit_save_reload_and_evaluate_preserve_project_metadata() {
     persistence::save(&source, &project).unwrap();
     let source_bytes = fs::read(&source).unwrap();
     let edit = temporary.path("edit.json");
-    fs::write(&edit, serde_json::to_vec(&json!({
-        "api_version": 1,
-        "edits": [{"op":"set", "node":"0", "input":"value", "value":11}]
-    })).unwrap()).unwrap();
+    fs::write(
+        &edit,
+        serde_json::to_vec(&json!({
+            "api_version": 1,
+            "edits": [{"op":"set", "node":"0", "input":"value", "value":11}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let applied = successful("apply", &[&source, &edit, &edited]);
     assert_eq!(node(&applied, 2)["data"]["preview"][0]["value"], 16.0);
-    project.graph.node_mut(0).unwrap().params.insert("value".into(), 11.0);
+    project
+        .graph
+        .node_mut(0)
+        .unwrap()
+        .params
+        .insert("value".into(), 11.0);
     assert_eq!(persistence::load(&edited).unwrap(), project);
     assert_eq!(fs::read(&source).unwrap(), source_bytes);
 
@@ -161,23 +214,42 @@ fn evaluation_errors_have_node_ids_and_failed_apply_preserves_existing_destinati
     save_graph(&path, graph.clone());
     let before = fs::read(&path).unwrap();
     let request = temporary.path("zero.json");
-    fs::write(&request, serde_json::to_vec(&json!({
-        "api_version": 1,
-        "edits": [{"op":"set", "node":divide.to_string(), "input":"b", "value":0}]
-    })).unwrap()).unwrap();
+    fs::write(
+        &request,
+        serde_json::to_vec(&json!({
+            "api_version": 1,
+            "edits": [{"op":"set", "node":divide.to_string(), "input":"b", "value":0}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let error = failed("apply", &[&path, &request, &path]);
     assert_eq!(error["code"], "evaluation_failed");
-    assert!(error["nodes"].as_array().unwrap().iter().any(|node| node["node_id"] == divide));
+    assert!(
+        error["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|node| node["node_id"] == divide)
+    );
     assert_eq!(fs::read(&path).unwrap(), before);
 
-    graph.node_mut(divide).unwrap().params.insert("b".into(), 0.0);
+    graph
+        .node_mut(divide)
+        .unwrap()
+        .params
+        .insert("b".into(), 0.0);
     let invalid = temporary.path("evaluation-error.morph");
     save_graph(&invalid, graph);
     successful("validate", &[&invalid]);
     let error = failed("evaluate", &[&invalid]);
     assert_eq!(error["code"], "evaluation_failed");
     assert_eq!(error["nodes"][0]["node_id"], divide);
-    assert!(error["nodes"][0]["message"].as_str().is_some_and(|text| !text.is_empty()));
+    assert!(
+        error["nodes"][0]["message"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+    );
 }
 
 #[test]
@@ -187,26 +259,46 @@ fn blocked_capabilities_and_oversized_requests_never_replace_destination() {
     let destination = temporary.path("keep.morph");
     fs::write(&destination, b"KEEP EXISTING DESTINATION").unwrap();
     for kind in ["script", "expression", "import_mesh", "cluster"] {
-        fs::write(&request, serde_json::to_vec(&json!({
-            "api_version":1,
-            "edits":[{"op":"add","alias":"blocked","kind":kind,"position":[0,0]}]
-        })).unwrap()).unwrap();
+        fs::write(
+            &request,
+            serde_json::to_vec(&json!({
+                "api_version":1,
+                "edits":[{"op":"add","alias":"blocked","kind":kind,"position":[0,0]}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
         failed("build", &[&request, &destination]);
-        assert_eq!(fs::read(&destination).unwrap(), b"KEEP EXISTING DESTINATION");
+        assert_eq!(
+            fs::read(&destination).unwrap(),
+            b"KEEP EXISTING DESTINATION"
+        );
     }
     fs::write(&request, vec![b' '; 1024 * 1024 + 1]).unwrap();
-    assert_eq!(failed("build", &[&request, &destination])["code"], "request_size");
-    assert_eq!(fs::read(&destination).unwrap(), b"KEEP EXISTING DESTINATION");
+    assert_eq!(
+        failed("build", &[&request, &destination])["code"],
+        "request_size"
+    );
+    assert_eq!(
+        fs::read(&destination).unwrap(),
+        b"KEEP EXISTING DESTINATION"
+    );
 
     let mut graph = Graph::default();
     graph.add(NodeKind::Script, [0.0, 0.0]).unwrap();
     let script_project = temporary.path("script.morph");
     save_graph(&script_project, graph);
     for command in ["validate", "evaluate"] {
-        assert_eq!(failed(command, &[&script_project])["code"], "invalid_project");
+        assert_eq!(
+            failed(command, &[&script_project])["code"],
+            "invalid_project"
+        );
     }
     failed("export-stl", &[&script_project, &destination]);
-    assert_eq!(fs::read(&destination).unwrap(), b"KEEP EXISTING DESTINATION");
+    assert_eq!(
+        fs::read(&destination).unwrap(),
+        b"KEEP EXISTING DESTINATION"
+    );
 }
 
 #[test]
@@ -237,7 +329,10 @@ fn explicit_mesh_output_roundtrips_stl_and_excludes_intermediate_meshes() {
     assert_eq!(mesh.triangles.len(), 12);
     let imported = persistence::mesh_stats(&[Tree::single(Value::Mesh(Arc::new(mesh)))]).unwrap();
     assert!(imported.is_closed());
-    assert_eq!(imported.bounds.unwrap(), [[-10.0, -5.0, 0.0], [10.0, 5.0, 12.0]]);
+    assert_eq!(
+        imported.bounds.unwrap(),
+        [[-10.0, -5.0, 0.0], [10.0, 5.0, 12.0]]
+    );
     assert!((imported.signed_volume_mm3 - 2400.0).abs() < 1e-8);
 }
 
@@ -248,7 +343,10 @@ fn export_rejects_missing_mixed_and_disabled_outputs_before_writing() {
     let destination = temporary.path("keep.stl");
     fs::write(&destination, b"KEEP STL").unwrap();
     save_graph(&project, mesh_graph(false));
-    assert_eq!(failed("export-stl", &[&project, &destination])["code"], "output_required");
+    assert_eq!(
+        failed("export-stl", &[&project, &destination])["code"],
+        "output_required"
+    );
 
     let mut mixed = mesh_graph(true);
     let circle = mixed.add(NodeKind::Circle, [0.0, 200.0]).unwrap();
@@ -263,10 +361,16 @@ fn export_rejects_missing_mixed_and_disabled_outputs_before_writing() {
     let mut disabled = mesh_graph(true);
     disabled.node_mut(1).unwrap().off = true;
     save_graph(&project, disabled);
-    assert_eq!(failed("export-stl", &[&project, &destination])["code"], "disabled_output");
+    assert_eq!(
+        failed("export-stl", &[&project, &destination])["code"],
+        "disabled_output"
+    );
     assert_eq!(fs::read(&destination).unwrap(), b"KEEP STL");
     let before = fs::read(&project).unwrap();
-    assert_eq!(failed("export-stl", &[&project, &project])["code"], "invalid_destination");
+    assert_eq!(
+        failed("export-stl", &[&project, &project])["code"],
+        "invalid_destination"
+    );
     assert_eq!(fs::read(&project).unwrap(), before);
 }
 
@@ -276,7 +380,11 @@ fn evaluation_previews_are_bounded_even_for_large_number_lists() {
     let project = temporary.path("series.morph");
     let mut graph = Graph::default();
     let series = graph.add(NodeKind::Series, [0.0, 0.0]).unwrap();
-    graph.node_mut(series).unwrap().params.insert("count".into(), 25.0);
+    graph
+        .node_mut(series)
+        .unwrap()
+        .params
+        .insert("count".into(), 25.0);
     save_graph(&project, graph);
     let report = successful("evaluate", &[&project]);
     let data = &node(&report, series)["data"];

@@ -654,10 +654,7 @@ fn normalized(v: [f64; 3]) -> Option<[f64; 3]> {
 type MeshNormals = (Vec<Option<[f64; 3]>>, Vec<[f64; 3]>);
 
 /// Angle-weighted vertex normals; `None` where a vertex has no usable face.
-fn vertex_normals(
-    m: &Mesh,
-    cancel: &dyn Fn() -> bool,
-) -> Result<MeshNormals, String> {
+fn vertex_normals(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<MeshNormals, String> {
     let mut sums = vec![[0.; 3]; m.vertices.len()];
     let mut faces = Vec::with_capacity(m.triangles.len());
     for (k, t) in m.triangles.iter().enumerate() {

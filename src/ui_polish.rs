@@ -47,16 +47,54 @@ fn alias(token: &str) -> &str {
 fn intent(query: &str) -> Option<&'static [NodeKind]> {
     use NodeKind::*;
     match query {
-        "円を作りたい" | "円をつくりたい" | "まるを作りたい" | "まるをつくりたい" | "円を作る" | "円をつくる" | "まるを作る" | "まるをつくる" => Some(&[Circle]),
-        "花瓶を作りたい" | "花瓶をつくりたい" | "花器を作りたい" | "かびんをつくりたい" | "花瓶を作る" | "花瓶をつくる" | "花器を作る" | "かびんをつくる" |
-        "はなびんをつくる" | "vase" => Some(&[Vase]),
-        "点を作りたい" | "点をつくりたい" | "点を置きたい" | "点を作る" | "点をつくる" | "点を置く" | "constructpoint" => Some(&[Point]),
-        "点を並べたい" | "点をならべたい" | "点を並べる" | "点をならべる" | "点の配列" => Some(&[LinearArray, RadialArray, Populate]),
-        "面を作りたい" | "面をつくりたい" | "面を作る" | "面をつくる" => Some(&[Plane, Loft]),
-        "曲面を作りたい" | "曲面をつくりたい" | "曲面を作る" | "曲面をつくる" => Some(&[Loft, Revolve]),
-        "花瓶をねじりたい" | "花器をねじりたい" | "かびんをねじりたい" | "花瓶を捻りたい" | "ねじりたい" | "捻りたい" | "ねじる" | "捻る" => Some(&[Twist]),
-        "箱を作りたい" | "箱をつくりたい" | "箱を作る" | "箱をつくる" | "はこをつくる" => Some(&[Box]),
-        "押し出したい" | "押出したい" | "おしだしたい" | "押し出す" | "押出す" | "おしだす" => Some(&[Extrude]),
+        "円を作りたい"
+        | "円をつくりたい"
+        | "まるを作りたい"
+        | "まるをつくりたい"
+        | "円を作る"
+        | "円をつくる"
+        | "まるを作る"
+        | "まるをつくる" => Some(&[Circle]),
+        "花瓶を作りたい"
+        | "花瓶をつくりたい"
+        | "花器を作りたい"
+        | "かびんをつくりたい"
+        | "花瓶を作る"
+        | "花瓶をつくる"
+        | "花器を作る"
+        | "かびんをつくる"
+        | "はなびんをつくる"
+        | "vase" => Some(&[Vase]),
+        "点を作りたい"
+        | "点をつくりたい"
+        | "点を置きたい"
+        | "点を作る"
+        | "点をつくる"
+        | "点を置く"
+        | "constructpoint" => Some(&[Point]),
+        "点を並べたい" | "点をならべたい" | "点を並べる" | "点をならべる" | "点の配列" => {
+            Some(&[LinearArray, RadialArray, Populate])
+        }
+        "面を作りたい" | "面をつくりたい" | "面を作る" | "面をつくる" => {
+            Some(&[Plane, Loft])
+        }
+        "曲面を作りたい" | "曲面をつくりたい" | "曲面を作る" | "曲面をつくる" => {
+            Some(&[Loft, Revolve])
+        }
+        "花瓶をねじりたい"
+        | "花器をねじりたい"
+        | "かびんをねじりたい"
+        | "花瓶を捻りたい"
+        | "ねじりたい"
+        | "捻りたい"
+        | "ねじる"
+        | "捻る" => Some(&[Twist]),
+        "箱を作りたい" | "箱をつくりたい" | "箱を作る" | "箱をつくる" | "はこをつくる" => {
+            Some(&[Box])
+        }
+        "押し出したい" | "押出したい" | "おしだしたい" | "押し出す" | "押出す" | "おしだす" => {
+            Some(&[Extrude])
+        }
         "直線配列" | "lineararray" => Some(&[LinearArray]),
         "円形配列" | "polararray" | "radialarray" => Some(&[RadialArray]),
         "numberslider" => Some(&[Number]),
@@ -408,20 +446,44 @@ mod tests {
             ("Construct Point", NodeKind::Point),
             ("Number Slider", NodeKind::Number),
         ] {
-            assert_eq!(rank(&all(), query, &Recent::default(), None).first(), Some(&expected), "{query}");
+            assert_eq!(
+                rank(&all(), query, &Recent::default(), None).first(),
+                Some(&expected),
+                "{query}"
+            );
         }
     }
 
     #[test]
     fn wire_search_never_suggests_an_incompatible_node() {
-        for source in [DataType::Number, DataType::Point, DataType::Curve, DataType::Mesh, DataType::Geometry, DataType::Any] {
+        for source in [
+            DataType::Number,
+            DataType::Point,
+            DataType::Curve,
+            DataType::Mesh,
+            DataType::Geometry,
+            DataType::Any,
+        ] {
             let ranked = rank(&all(), "", &Recent::default(), Some(source));
             assert!(!ranked.is_empty());
             assert!(ranked.iter().all(|kind| accepts_from(*kind, source)));
         }
         assert!(rank(&all(), "円を作る", &Recent::default(), Some(DataType::Mesh)).is_empty());
-        assert!(rank(&all(), "円を作りたい", &Recent::default(), Some(DataType::Mesh)).is_empty());
-        let twists = rank(&all(), "花瓶をねじりたい", &Recent::default(), Some(DataType::Mesh));
+        assert!(
+            rank(
+                &all(),
+                "円を作りたい",
+                &Recent::default(),
+                Some(DataType::Mesh)
+            )
+            .is_empty()
+        );
+        let twists = rank(
+            &all(),
+            "花瓶をねじりたい",
+            &Recent::default(),
+            Some(DataType::Mesh),
+        );
         assert_eq!(twists, vec![NodeKind::Twist]);
     }
 

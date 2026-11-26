@@ -1,8 +1,8 @@
 {
   "audit_date": "2026-11-26",
-  "scope": "Seven pre-existing Rhai-related dependency notices recovered through recorded upstream commits after the execution environment became unavailable. Exact local archive bytes and the original local audit JSON are no longer accessible. This is not an executable or target-resolution audit.",
+  "scope": "Seven pre-existing Rhai-related dependency notices recovered through recorded upstream commits after the execution environment became unavailable. Exact local archive bytes and the original local audit JSON are no longer accessible. This is not an executable or target-resolution audit. A subsequent narrow follow-up adds the official r-efi 6.0.0 AUTHORS notice and explicitly selects its MIT alternative; registry archive bytes are not reverified by that addition.",
   "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
-  "package_count": 7,
+  "package_count": 8,
   "packages": [
     {
       "name": "const-random",
@@ -281,6 +281,55 @@
         "Recovered through the GitHub connector after the local execution environment became unavailable.",
         "Upstream commit identifiers were retained in the pre-outage crate VCS inspection. Current registry archive bytes are unavailable; archive SHA-256 has not been recomputed during recovery.",
         "These files are retrieved upstream license text, not invented reconstructions of unavailable local bytes."
+      ]
+    },
+    {
+      "name": "r-efi",
+      "version": "6.0.0",
+      "declared_license": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+      "selected_license": "MIT",
+      "selection_basis": "Explicit MIT alternative in the official v6.0.0 Cargo.toml, with the complete MIT permission notice and copyright statements retained verbatim in AUTHORS.",
+      "declared_rust_version": "1.68",
+      "registry_checksum": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
+      "repository": "https://github.com/r-efi/r-efi",
+      "source_archive_url": "https://static.crates.io/crates/r-efi/r-efi-6.0.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7e1b0322d31d625f81a5656096330934f9cd835d"
+        },
+        "path_in_vcs": ""
+      },
+      "upstream_tag": {
+        "name": "v6.0.0",
+        "tag_object_sha": "6322b4fc8548045080176f00558b6092698349f1",
+        "commit_sha": "7e1b0322d31d625f81a5656096330934f9cd835d",
+        "github_reported_signature_verified": true
+      },
+      "manifest_evidence": {
+        "url": "https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/Cargo.toml",
+        "git_blob_sha": "128d8beaa5b5c5d24d50c26e11997e16b036eb99",
+        "sha256": "b8e89c393831c2161b6d390bd40422910ac34f02903ad39edd85ec38d4513fef"
+      },
+      "license_files": [
+        {
+          "path": "licenses/crates/r-efi-6.0.0/AUTHORS",
+          "sha256": "d027e91dbc9cdbb2f1190068e498bd6b61cff022b6a032b191021ba658d96111",
+          "source_url": "https://github.com/r-efi/r-efi/blob/7e1b0322d31d625f81a5656096330934f9cd835d/AUTHORS",
+          "upstream_blob_sha": "79c8b7c4a1dabcfbc718b7fe6d43b1892f9850cd"
+        }
+      ],
+      "verification_status": "verified_official_tag_manifest_and_license_notice",
+      "archive_verification": {
+        "registry_archive_downloaded": false,
+        "registry_archive_sha256_recomputed": false,
+        "checksum_evidence": "Existing NODES Cargo.lock at b26d246341d359a6284a7b1036d1369a02e59a72"
+      },
+      "notes": [
+        "MIT is selected from the existing optional license expression; no Cargo dependency or dependency version is changed.",
+        "AUTHORS is copied verbatim from the official v6.0.0 commit. It includes the complete MIT notice and copyright statements, together with notices for the other upstream license alternatives.",
+        "GitHub reports the annotated release tag signature as verified; no independent signing-key verification was performed.",
+        "The registry archive was not downloaded or rehashed in this narrow follow-up. The source-tag and manifest evidence do not independently prove byte identity with that archive.",
+        "This single-package notice addition does not establish completion of the overall dependency or binary-distribution license audit."
       ]
     }
   ]

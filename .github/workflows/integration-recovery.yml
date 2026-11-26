@@ -1,24 +1,7 @@
 name: Integration recovery diagnostics
 
-# Temporary read-only recovery job. After the recovered changes pass the normal
-# committed-source quality gates, retain workflow_dispatch and remove push.
+# Read-only manual diagnostics; normal push/PR gates live in windows.yml.
 on:
-  push:
-    branches: ["develop/nodes-ultimate"]
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "examples/**/*.rs"
-      - "examples/**/*.morph"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".cargo/**"
-      - "rust-toolchain*"
-      - "scripts/update_gh2_inventory.py"
-      - "scripts/export_ci_checkpoint.py"
-      - "scripts/audit_dependencies.py"
-      - "licenses/**"
-      - ".github/workflows/integration-recovery.yml"
   workflow_dispatch:
 
 permissions:
