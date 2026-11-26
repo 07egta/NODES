@@ -41,7 +41,7 @@ cargo build --release --locked --bin Morphlet
 
 ## Known limitations / unverified
 
-- One output per node; value types and exact geometry differ across concurrent mission branches.
+- Mission 11 branch adds stable secondary outputs and multiple input wires; cluster public outputs and legacy scripting remain single-output. Full Grasshopper parity and compiler/GUI verification are pending on this branch.
 - Current MAX_NODES is 2048. No 10000-node support claim.
 - GH1/GH2 parity, robust B-rep booleans, CAD exchange and Windows GUI/Intel Arc behavior are not established.
 - Most concurrent mission PRs explicitly had not been compiled in their authoring environment.
@@ -66,3 +66,7 @@ Merged core 86aa816, Data Tree a44dead (+ public-adapter hardening), math 55ed4f
 Resolved duplicated ClosestPoint enum registration. Pending: preserve both mission port-name conventions, then compile the combined runtime and fix any non-exhaustive geometry matches. Initial independent Data Tree suite passed 182 tests. Shared Cargo target now reduces redundant compilation memory.
 
 Git CLI push lacks write credentials. Checkpoint publication uses authenticated GitHub tree/commit/ref APIs with expected old SHA and force=false, then fetches the remote commit and aligns only this local integration branch. No external developer branch is rewritten.
+
+## Mission 11 checkpoint (draft)
+
+See [multi-port architecture](../MISSION_11_MULTI_PORT.md). The work is isolated from the integration branch until review/CI. The connector authoring environment has no Rust toolchain or direct Git network access. Regression tests were authored, not executed there.

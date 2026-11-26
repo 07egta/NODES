@@ -106,7 +106,7 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         DeconstructMesh => component!("メッシュを分解","メッシュ","頂点リストと三角形頂点番号列。複数メッシュは別枝。","deconstruct mesh vertices faces",Point,[g("mesh","メッシュ",DataType::Mesh)]),
         Dispatch => component!("リストを振り分け","データ","0は偽、その他の有限数値は真。パターンを繰り返して2リストに分割。","dispatch pattern true false",Any,[g("list","リスト",DataType::Any),g("pattern","パターン",DataType::Number)]),
         SortListPaired => component!("対応リストを整列","データ","数値キーの安定昇順に対応する値を並べ替え。値は任意。","sort list paired keys values",Number,[g("keys","キー",DataType::Number),g("values","値",DataType::Any)]),
-        StreamGate => component!("出力を振り分け","データ","0始まりの出力位置を選択してツリーを保持したまま転送。","stream gate route",Any,[i("gate","出力位置",0.,0.,31.),g("stream","データ",DataType::Any)]),
+        StreamGate => component!("出力を振り分け","データ","永続出力 ID を選択してツリーを保持したまま転送。","stream gate route",Any,[i("gate","出力 ID",0.,0.,65535.),g("stream","データ",DataType::Any)]),
         StreamMerge => {
             static SPEC: NodeSpec = NodeSpec { label: "ストリーム結合", category: "データ",
                 description: "可変入力のデータツリーを表示順に結合。未接続入力は空。",
@@ -405,9 +405,9 @@ fn split_native(node: &Node, outputs: &BTreeMap<NodeId,Result<Tree,String>>, sto
         trees.insert(PRIMARY_PORT,dt::merge(&inputs)?);
     } else if node.kind == StreamGate {
         let mut gates = inputs[0].branches.values().flatten();
-        let index = gates.next().ok_or("出力位置を指定してください。")?.number()? as usize;
-        if gates.next().is_some() { return Err("出力位置は数値1個で指定してください。".into()); }
-        let port = node.output_ports().get(index).ok_or("出力位置が範囲外です。")?.id;
+        let port = gates.next().ok_or("出力 ID を指定してください。")?.number()? as PortId;
+        if gates.next().is_some() { return Err("出力 ID は数値1個で指定してください。".into()); }
+        if node.output_port(port).is_none() { return Err("指定された出力 ID は存在しません。".into()); }
         trees.insert(port,inputs[1].clone());
     } else {
         // The native list policy pairs branches by ordinal using the shared tree
@@ -458,8 +458,11 @@ fn split_native(node: &Node, outputs: &BTreeMap<NodeId,Result<Tree,String>>, sto
                 }
                 DeconstructMesh => {
                     if lists[0].is_empty() {
-                        emit(0,path.clone(),Vec::new())?;
-                        emit(1,path,Vec::new())?;
+                        let mut p = path;
+                        if p.len() >= 32 { return Err("メッシュ分解のパスが深すぎます。".into()); }
+                        p.push(0);
+                        emit(0,p.clone(),Vec::new())?;
+                        emit(1,p,Vec::new())?;
                     } else {
                         for (j,m) in lists[0].iter().enumerate() {
                             engine::cancelled(stop)?;

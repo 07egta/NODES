@@ -2,6 +2,7 @@
 //! cargo run --locked --example coverage_inventory -- --source-revision <git-sha>
 //! Regenerate after integration: counts and defaults are never copied by hand.
 use morphlet::model::NodeKind;
+use morphlet::multi_port;
 use serde_json::{Value, json};
 
 /// A deterministic change detector for metadata, not a security hash or a hash
@@ -31,17 +32,19 @@ fn inventory(source_revision: Option<&str>) -> Value {
                         "label": p.label,
                         "type": p.kind,
                         "default": p.default,
-                        "required_connection": p.default.is_none(),
+                        "required_connection": p.default.is_none() && !multi_port::optional_input(kind,p.key),
                         "min": p.default.map(|_| p.min),
                         "max": p.default.map(|_| p.max),
                         "step": p.default.map(|_| p.step),
                         "integer": p.integer,
-                        // NodeSpec on the baseline has no access declaration.
-                        // A type or a default does not establish Item/List/Tree.
-                        "access": null,
-                        "access_status": "NOT_DECLARED_IN_NODE_SPEC"
+                        "access": multi_port::input_access(kind,index),
+                        "access_status": "NODES_POLICY_NOT_GH_VERIFIED"
                     })
                 })
+                .collect();
+            let outputs: Vec<Value> = multi_port::declared_outputs(kind).into_iter().enumerate()
+                .map(|(index, p)| json!({"index":index,"key":p.id,"label":p.label,
+                    "type":p.kind,"access":p.access,"connection_encoding":"node_and_port_id"}))
                 .collect();
             let mut row = json!({
                 "nodes_id": kind,
@@ -51,12 +54,7 @@ fn inventory(source_revision: Option<&str>) -> Value {
                 "search_keywords": spec.keywords,
                 "inputs": inputs,
                 "output": spec.output,
-                "outputs": [{
-                    "index": 0,
-                    "key": null,
-                    "type": spec.output,
-                    "connection_encoding": "source_node_id"
-                }],
+                "outputs": outputs,
                 "registration": if kind == NodeKind::Cluster { "definition_only" } else { "picker" },
                 "evaluation_status": "NOT_INFERRED",
                 "compatibility": "NOT_INFERRED"
@@ -66,7 +64,7 @@ fn inventory(source_revision: Option<&str>) -> Value {
         })
         .collect();
     json!({
-        "schema_version": 2,
+        "schema_version": 3,
         "source_revision": source_revision,
         "source_revision_provenance": "caller_supplied; does not assert a clean worktree",
         "generator": "examples/coverage_inventory.rs",
@@ -146,7 +144,7 @@ mod tests {
         for (port, spec) in add["inputs"].as_array().unwrap().iter().zip(specs) {
             assert_eq!(port["key"], spec.key);
             assert_eq!(port["default"], json!(spec.default));
-            assert!(port["access"].is_null());
+            assert!(port["access"].is_string());
         }
         assert_ne!(fingerprint(b"default=1"), fingerprint(b"default=2"));
     }

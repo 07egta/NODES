@@ -1802,14 +1802,14 @@ mod tests {
         assert_eq!(engine.cache_order.len(), engine.cache.len());
         for (id, cached) in &engine.cache {
             assert!(engine.cache_order.contains(&(cached.revision, *id)));
-            assert_eq!(cached.weight, cached.result.as_ref().map(Tree::weight).unwrap_or(0));
+            assert_eq!(cached.weight, multi_port::result_weight(&cached.result));
         }
         assert_eq!(
             engine.cache_weight,
             engine
                 .cache
                 .values()
-                .map(|c| c.result.as_ref().map(Tree::weight).unwrap_or(0))
+                .map(|c| multi_port::result_weight(&c.result))
                 .sum::<usize>()
         );
     }
