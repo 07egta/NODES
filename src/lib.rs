@@ -12,3 +12,4 @@ pub mod raster;
 pub mod script;
 pub mod stl_export;
 pub mod templates;
+mod tree_nodes;

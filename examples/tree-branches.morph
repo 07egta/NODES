@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "name": "パスでツリーを確認する",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "series",
+        "name": "位置の数列",
+        "position": [
+          0,
+          0
+        ],
+        "params": {
+          "start": 10,
+          "step": 10,
+          "count": 3
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "graft",
+        "name": "位置を枝に分ける",
+        "position": [
+          225,
+          180
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "merge_trees",
+        "name": "パスでツリーを合流",
+        "position": [
+          465,
+          180
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "series",
+        "name": "パスの数値 0, 2",
+        "position": [
+          225,
+          350
+        ],
+        "params": {
+          "start": 0,
+          "step": 2,
+          "count": 2
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "tree_branch",
+        "name": "パス {0;2} を選ぶ",
+        "position": [
+          735,
+          180
+        ],
+        "params": {},
+        "inputs": {
+          "tree": 2,
+          "path": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "cull_index",
+        "name": "真ん中の番号を除く",
+        "position": [
+          225,
+          0
+        ],
+        "params": {
+          "index": 1,
+          "wrap": 0
+        },
+        "inputs": {
+          "list": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "box",
+        "name": "台座",
+        "position": [
+          460,
+          0
+        ],
+        "params": {
+          "width": 5,
+          "depth": 5,
+          "height": 7
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "move",
+        "name": "残った位置へ移動",
+        "position": [
+          735,
+          0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 6,
+          "x": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "output",
+        "name": "二つの台座",
+        "position": [
+          980,
+          0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 7
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 9
+  },
+  "pan": [
+    32,
+    100
+  ],
+  "zoom": 1.0
+}

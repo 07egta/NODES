@@ -5,8 +5,8 @@ use crate::theme;
 use eframe::egui::{self, RichText};
 use morphlet::model::{Tree, Value};
 
-/// At most this many value rows are listed; the rest are summarised as 「…ほか N 件」.
-pub const MAX_ROWS: usize = 500;
+/// Bound visible widget construction, not the inspected output.
+pub const ROWS_PER_PAGE: usize = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DataShape {
@@ -86,57 +86,154 @@ pub struct Row {
     pub text: String,
 }
 
-/// The first `limit` rows and the number of rows left out.
-pub fn rows(tree: &Tree, limit: usize) -> (Vec<Row>, usize) {
-    let mut out = Vec::new();
-    let mut hidden = 0usize;
-    for (path, values) in &tree.branches {
-        if values.is_empty() {
-            if out.len() < limit {
-                out.push(Row {
-                    path: path_text(path),
-                    index: None,
-                    text: "（空の枝）".into(),
-                });
-            } else {
-                hidden = hidden.saturating_add(1);
-            }
+/// Number of display rows including one marker for each empty branch.
+fn row_count(tree: &Tree, branch: Option<usize>) -> usize {
+    if let Some(ordinal) = branch {
+        return tree
+            .branches
+            .values()
+            .nth(ordinal)
+            .map_or(0, |items| items.len().max(1));
+    }
+    tree.branches.values().map(|items| items.len().max(1)).sum()
+}
+
+fn row_window(tree: &Tree, branch: Option<usize>, start: usize, limit: usize) -> Vec<Row> {
+    let mut rendered = Vec::new();
+    let mut skip = start;
+    for (ordinal, (path, values)) in tree.branches.iter().enumerate() {
+        if branch.is_some_and(|target| ordinal != target) {
             continue;
         }
-        for (index, value) in values.iter().enumerate() {
-            if out.len() < limit {
-                out.push(Row {
-                    path: path_text(path),
+        if rendered.len() >= limit {
+            break;
+        }
+        let count = values.len().max(1);
+        if skip >= count {
+            skip -= count;
+            continue;
+        }
+        let path = path_text(path);
+        if values.is_empty() {
+            rendered.push(Row {
+                path,
+                index: None,
+                text: "（空の枝）".into(),
+            });
+        } else {
+            for (index, value) in values
+                .iter()
+                .enumerate()
+                .skip(skip)
+                .take(limit - rendered.len())
+            {
+                rendered.push(Row {
+                    path: path.clone(),
                     index: Some(index),
                     text: value_text(value),
                 });
-            } else {
-                hidden = hidden.saturating_add(1);
             }
         }
+        skip = 0;
+        if branch.is_some() {
+            break;
+        }
     }
-    (out, hidden)
+    rendered
 }
 
-/// Scrollable table of a node's output tree.
-pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
+#[derive(Clone, Copy, Default)]
+struct Browse {
+    one_branch: bool,
+    branch: usize,
+    page: usize,
+}
+
+fn go(ui: &mut egui::Ui, current: &mut usize, total: usize, title: &str, salt: (&str, u64)) {
+    if total < 2 {
+        return;
+    }
+    ui.horizontal(|ui| {
+        ui.label(theme::small(title));
+        let last = ui.add_enabled(*current > 0, egui::Button::new("‹").small());
+        if last.clicked() {
+            *current -= 1;
+        }
+        let mut display = *current + 1;
+        if ui
+            .add(egui::DragValue::new(&mut display).range(1..=total).speed(1))
+            .changed()
+        {
+            *current = display - 1;
+        }
+        ui.label(theme::small(format!("/ {total}")));
+        let next = ui.add_enabled(*current + 1 < total, egui::Button::new("›").small());
+        if next.clicked() {
+            *current += 1;
+        }
+        #[cfg(test)]
+        ui.ctx()
+            .data_mut(|d| d.insert_temp(egui::Id::new(("data_view_next", salt, title)), next.rect));
+        let _ = salt;
+    });
+}
+
+/// Scrollable, paged table of a node's entire output tree.
+pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, node: u64, max_height: f32) {
     let shape = shape_of(tree);
     ui.label(
         RichText::new(format!("形: {}", shape.describe()))
             .size(12.)
             .color(theme::TEAL),
     );
-    if matches!(shape, DataShape::Empty) && tree.branches.is_empty() {
+    if tree.branches.is_empty() {
         ui.label(theme::small("値はありません。"));
         return;
     }
-    let (rows, hidden) = rows(tree, MAX_ROWS);
-    egui::ScrollArea::vertical()
-        .id_salt(("data_view_scroll", salt))
+    let id = ui.id().with(("data_view", salt, node));
+    let mut view = ui
+        .ctx()
+        .data_mut(|d| d.get_temp::<Browse>(id))
+        .unwrap_or_default();
+    view.branch = view.branch.min(tree.branches.len() - 1);
+    let old_filter = (view.one_branch, view.branch);
+    if tree.branches.len() > 1 {
+        ui.checkbox(&mut view.one_branch, "枝を 1 本だけ表示");
+        if view.one_branch {
+            go(
+                ui,
+                &mut view.branch,
+                tree.branches.len(),
+                "枝の順番",
+                (salt, node),
+            );
+        }
+    } else {
+        view.one_branch = false;
+    }
+    if old_filter != (view.one_branch, view.branch) {
+        view.page = 0;
+    }
+    let branch = view.one_branch.then_some(view.branch);
+    let total = row_count(tree, branch);
+    let pages = total.div_ceil(ROWS_PER_PAGE).max(1);
+    view.page = view.page.min(pages - 1);
+    go(ui, &mut view.page, pages, "ページ", (salt, node));
+    let start = view.page * ROWS_PER_PAGE;
+    let rows = row_window(tree, branch, start, ROWS_PER_PAGE);
+    if total > ROWS_PER_PAGE {
+        ui.label(theme::small(format!(
+            "{}–{} 行 / {total}",
+            start + 1,
+            start + rows.len()
+        )));
+    }
+    egui::ScrollArea::both()
+        .id_salt(("data_view_scroll", salt, node, branch, view.page))
         .max_height(max_height)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            egui::Grid::new(("data_view_grid", salt))
+            egui::Grid::new(("data_view_grid", salt, node))
                 .num_columns(3)
                 .striped(true)
                 .spacing([14., 4.])
@@ -156,10 +253,8 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
                         ui.end_row();
                     }
                 });
-            if hidden > 0 {
-                ui.label(theme::small(format!("…ほか {hidden} 件")));
-            }
         });
+    ui.ctx().data_mut(|d| d.insert_temp(id, view));
 }
 
 #[cfg(test)]
@@ -193,12 +288,89 @@ mod tests {
     }
 
     #[test]
-    fn rows_are_capped_and_counted() {
-        let t = numbers(&[(&[0], 600), (&[1], 0)]);
-        let (rows, hidden) = rows(&t, MAX_ROWS);
-        assert_eq!(rows.len(), MAX_ROWS);
-        assert_eq!(hidden, 101);
-        assert_eq!(rows[0].text, "0.0000");
-        assert_eq!(rows[0].path, "{0}");
+    fn real_pager_clicks_can_reach_beyond_the_old_row_cutoff() {
+        let ctx = egui::Context::default();
+        let tree = numbers(&[(&[0], 600), (&[1], 0), (&[2, 0], 12)]);
+        let mut time = 0.;
+        let mut step = |events| {
+            time += 1. / 60.;
+            let raw = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(700., 640.),
+                )),
+                events,
+                time: Some(time),
+                ..Default::default()
+            };
+            ctx.run(raw, |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| show_tree(ui, &tree, "test", 5, 450.));
+            })
+        };
+        step(Vec::new());
+        for _ in 0..16 {
+            let at = ctx
+                .data_mut(|d| {
+                    d.get_temp::<egui::Rect>(egui::Id::new((
+                        "data_view_next",
+                        ("test", 5u64),
+                        "ページ",
+                    )))
+                })
+                .unwrap()
+                .center();
+            for pressed in [true, false] {
+                step(vec![
+                    egui::Event::PointerMoved(at),
+                    egui::Event::PointerButton {
+                        pos: at,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ]);
+            }
+            step(Vec::new());
+        }
+        fn has(shape: &egui::epaint::Shape, expected: &str) -> bool {
+            match shape {
+                egui::epaint::Shape::Text(t) => t.galley.job.text == expected,
+                egui::epaint::Shape::Vec(children) => children.iter().any(|s| has(s, expected)),
+                _ => false,
+            }
+        }
+        let last = step(Vec::new());
+        assert!(
+            last.shapes
+                .iter()
+                .any(|s| has(&s.shape, "513–544 行 / 613"))
+        );
+        assert!(last.shapes.iter().any(|s| has(&s.shape, "512.0000")));
+    }
+
+    #[test]
+    fn every_row_is_reachable_and_empty_paths_count_as_one_row() {
+        let t = numbers(&[(&[0], 600), (&[1], 0), (&[2, 0], 45)]);
+        assert_eq!(row_count(&t, None), 646);
+        let last_root = row_window(&t, None, 599, ROWS_PER_PAGE);
+        assert_eq!(last_root.len(), ROWS_PER_PAGE);
+        assert_eq!(
+            (last_root[0].path.as_str(), last_root[0].index),
+            ("{0}", Some(599))
+        );
+        assert_eq!(
+            (last_root[1].path.as_str(), last_root[1].index),
+            ("{1}", None)
+        );
+        assert_eq!(
+            (last_root[2].path.as_str(), last_root[2].index),
+            ("{2;0}", Some(0))
+        );
+        let last = row_window(&t, Some(2), 32, ROWS_PER_PAGE);
+        assert_eq!(last.len(), 13);
+        assert_eq!(
+            (last[12].path.as_str(), last[12].index),
+            ("{2;0}", Some(44))
+        );
     }
 }

@@ -184,6 +184,9 @@ pub enum NodeKind {
     PointComponent,
     /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
+    CullIndex,
+    MergeTrees,
+    TreeBranch,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -253,6 +256,9 @@ impl NodeKind {
             Self::Distance,
             Self::PointComponent,
             Self::ImportMesh,
+            Self::CullIndex,
+            Self::MergeTrees,
+            Self::TreeBranch,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -863,6 +869,9 @@ impl NodeKind {
             }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            Self::CullIndex => &crate::tree_nodes::CULL_INDEX,
+            Self::MergeTrees => &crate::tree_nodes::MERGE_TREES,
+            Self::TreeBranch => &crate::tree_nodes::TREE_BRANCH,
             other => crate::gh_nodes::spec(other),
         }
     }

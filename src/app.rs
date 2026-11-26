@@ -1319,7 +1319,7 @@ impl MorphletApp {
                     return;
                 }
                 match evaluation.and_then(|e| e.outputs.get(&id)) {
-                    Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
+                    Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", id, 240.),
                     Some(Err(e)) => {
                         ui.colored_label(theme::ERROR, e);
                     }
@@ -1949,7 +1949,7 @@ impl MorphletApp {
                 match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
                     Some(Ok(tree)) => {
                         let h = (ui.available_height() - 30.).max(160.);
-                        data_view::show_tree(ui, tree, "window", h);
+                        data_view::show_tree(ui, tree, "window", id, h);
                     }
                     Some(Err(e)) => {
                         ui.colored_label(theme::ERROR, e);
@@ -1959,8 +1959,8 @@ impl MorphletApp {
                     }
                 }
                 ui.label(theme::small(format!(
-                    "数値は小数 4 桁、最大 {} 行まで表示します。",
-                    data_view::MAX_ROWS
+                    "数値は小数 4 桁。1 ページは最大 {} 行で、すべての値を確認できます。",
+                    data_view::ROWS_PER_PAGE
                 )));
             });
         self.values_open = open;

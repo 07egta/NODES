@@ -217,6 +217,9 @@ pub(crate) fn evaluate_node(
         }
         inputs.push(tree);
     }
+    if let Some(result) = crate::tree_nodes::evaluate(node.kind, &inputs, cancel) {
+        return checked_tree(result?, cancel);
+    }
     if node.kind == NodeKind::Flatten {
         let t = inputs.first().ok_or("入力がありません。")?;
         return checked_tree(
@@ -234,7 +237,7 @@ pub(crate) fn evaluate_node(
         for (path, items) in &inputs.first().ok_or("入力がありません。")?.branches {
             cancelled(cancel)?;
             if items.is_empty() {
-                tree.branches.insert(path.clone(), Vec::new());
+                tree.branches.entry(path.clone()).or_default();
             }
             for (index, v) in items.iter().enumerate() {
                 let mut p = path.clone();
@@ -796,7 +799,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
         | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
-        | Remap | Expression | GraphProfile | ImportMesh => {
+        | Remap | Expression | GraphProfile | ImportMesh | CullIndex | MergeTrees | TreeBranch => {
             Err("このノードはリスト評価が必要です。".into())
         }
     }
