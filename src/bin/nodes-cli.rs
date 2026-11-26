@@ -201,16 +201,26 @@ fn evaluation_summary(project: &Project, evaluation: &Evaluation) -> Json {
             if let Some(Ok(tree)) = evaluation.outputs.get(&node.id) {
                 result["data"] = tree_summary(tree);
             }
-            let ports: Vec<_> = node.output_ports().into_iter().map(|port| {
-                let source = morphlet::multi_port::PortRef { node: node.id, port: port.id };
-                let mut entry = json!({"id":port.id,"label":port.label,"type":port.kind});
-                match evaluation.output(source) {
-                    Some(Ok(tree)) => entry["data"] = tree_summary(tree),
-                    Some(Err(message)) => entry["error"] = json!(message.chars().take(MAX_ERROR_CHARS).collect::<String>()),
-                    None => entry["error"] = json!("No output result"),
-                }
-                entry
-            }).collect();
+            let ports: Vec<_> = node
+                .output_ports()
+                .into_iter()
+                .map(|port| {
+                    let source = morphlet::multi_port::PortRef {
+                        node: node.id,
+                        port: port.id,
+                    };
+                    let mut entry = json!({"id":port.id,"label":port.label,"type":port.kind});
+                    match evaluation.output(source) {
+                        Some(Ok(tree)) => entry["data"] = tree_summary(tree),
+                        Some(Err(message)) => {
+                            entry["error"] =
+                                json!(message.chars().take(MAX_ERROR_CHARS).collect::<String>())
+                        }
+                        None => entry["error"] = json!("No output result"),
+                    }
+                    entry
+                })
+                .collect();
             result["ports"] = json!(ports);
             result
         })

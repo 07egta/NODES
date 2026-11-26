@@ -9,8 +9,8 @@
 //! * `.morphpart` files hold one definition plus the definitions it needs (JSON, validated,
 //!   1 MiB cap). Ids are renumbered on import so parts can move between works.
 use crate::engine;
-use crate::multi_port::{self, PortResults, PRIMARY_PORT};
 use crate::model::*;
+use crate::multi_port::{self, PRIMARY_PORT, PortResults};
 use crate::script::MAX_SCRIPT_BYTES;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
@@ -226,17 +226,27 @@ pub fn evaluate_any(
 /// Port-aware entry point. Legacy script/cluster APIs receive a temporary view
 /// of the merged input trees; persistent endpoint IDs never become fake graph IDs.
 pub(crate) fn evaluate_ports(
-    graph: &Graph, node: &Node, outputs: &engine::Evaluation, cancel: &dyn Fn() -> bool,
+    graph: &Graph,
+    node: &Node,
+    outputs: &engine::Evaluation,
+    cancel: &dyn Fn() -> bool,
 ) -> PortResults {
-    let prepared = if node.port_links.is_empty() { None } else {
+    let prepared = if node.port_links.is_empty() {
+        None
+    } else {
         match multi_port::materialize(node, outputs, cancel) {
             Ok(p) => Some(p),
             Err(e) => return multi_port::failed(node, e),
         }
     };
-    let (node, data) = prepared.as_ref().map(|(n, d)| (n, d)).unwrap_or((node, &outputs.outputs));
+    let (node, data) = prepared
+        .as_ref()
+        .map(|(n, d)| (n, d))
+        .unwrap_or((node, &outputs.outputs));
     match node.kind {
-        NodeKind::Script | NodeKind::Cluster => BTreeMap::from([(PRIMARY_PORT, evaluate_any(graph, node, data, cancel))]),
+        NodeKind::Script | NodeKind::Cluster => {
+            BTreeMap::from([(PRIMARY_PORT, evaluate_any(graph, node, data, cancel))])
+        }
         _ => multi_port::evaluate(node, data, cancel),
     }
 }
@@ -344,13 +354,24 @@ fn run_def(
                     .insert(port.key.clone(), VIRTUAL_BASE + k as u64);
             }
         }
-        let prepared = if node.port_links.is_empty() { None } else {
+        let prepared = if node.port_links.is_empty() {
+            None
+        } else {
             Some(multi_port::materialize(&node, &local, cancel)?)
         };
-        let (node, inputs) = prepared.as_ref().map(|(n, d)| (n, d)).unwrap_or((&node, &local.outputs));
+        let (node, inputs) = prepared
+            .as_ref()
+            .map(|(n, d)| (n, d))
+            .unwrap_or((&node, &local.outputs));
         let results = match node.kind {
-            NodeKind::Script => BTreeMap::from([(PRIMARY_PORT, crate::script::evaluate_node(node, inputs, cancel))]),
-            NodeKind::Cluster => BTreeMap::from([(PRIMARY_PORT, eval_cluster_node(defs, node, inputs, depth + 1, stack, budget, cancel))]),
+            NodeKind::Script => BTreeMap::from([(
+                PRIMARY_PORT,
+                crate::script::evaluate_node(node, inputs, cancel),
+            )]),
+            NodeKind::Cluster => BTreeMap::from([(
+                PRIMARY_PORT,
+                eval_cluster_node(defs, node, inputs, depth + 1, stack, budget, cancel),
+            )]),
             _ => multi_port::evaluate(node, inputs, cancel),
         };
         if let Some(Err(e)) = results.get(&PRIMARY_PORT) {
@@ -391,7 +412,8 @@ pub fn input_label(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -
 }
 /// The Script node's shape input `g` may stay unconnected.
 pub fn input_is_optional(node: &Node, spec: &InputSpec) -> bool {
-    (node.kind == NodeKind::Script && spec.key == "g") || multi_port::optional_input(node.kind,spec.key)
+    (node.kind == NodeKind::Script && spec.key == "g")
+        || multi_port::optional_input(node.kind, spec.key)
 }
 /// True when an unconnected input cannot use a slider value (a shape must be connected).
 pub fn input_needs_link(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -> bool {
@@ -609,10 +631,18 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
     // The current exposed cluster interface has a single output. Never collapse
     // a selected multi-output node or a new-style boundary wire into a legacy one.
     if graph.nodes.iter().any(|n| {
-        (set.contains(&n.id) && (n.output_ports().len() != 1 || n.kind == NodeKind::StreamMerge || !n.port_links.is_empty()))
-        || n.port_links.values().flatten().any(|s| set.contains(&s.node))
+        (set.contains(&n.id)
+            && (n.output_ports().len() != 1
+                || n.kind == NodeKind::StreamMerge
+                || !n.port_links.is_empty()))
+            || n.port_links
+                .values()
+                .flatten()
+                .any(|s| set.contains(&s.node))
     }) {
-        return Err("複数ポートを含む選択はまだ部品化できません。配線を保持するため中止しました。".into());
+        return Err(
+            "複数ポートを含む選択はまだ部品化できません。配線を保持するため中止しました。".into(),
+        );
     }
     let name: String = name.trim().chars().take(64).collect();
     let name = if name.is_empty() {

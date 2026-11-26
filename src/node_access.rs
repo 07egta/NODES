@@ -122,8 +122,13 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
 /// The UI and graph validator must not expose those controls for list or tree
 /// adapters: their branches may be matched ordinally, but their items are not.
 pub fn supports_item_matching(kind: NodeKind) -> bool {
-    !matches!(kind, NodeKind::StreamGate | NodeKind::StreamMerge | NodeKind::Dispatch | NodeKind::SortListPaired)
-        && kind.spec().inputs.len() > 1
+    !matches!(
+        kind,
+        NodeKind::StreamGate
+            | NodeKind::StreamMerge
+            | NodeKind::Dispatch
+            | NodeKind::SortListPaired
+    ) && kind.spec().inputs.len() > 1
         && kind
             .spec()
             .inputs
