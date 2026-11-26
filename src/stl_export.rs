@@ -21,6 +21,7 @@ const WELD_REPAIR_MM: f64 = 1.0e-4;
 const WELD_SPLIT_MM: f64 = 1.0e-6;
 const DEGENERATE_NORMAL_SQ: f64 = 1.0e-16;
 const MAX_HOLE_EDGES: usize = 64;
+const MAX_HOLE_LOOPS: usize = 256;
 const MIN_SIZE_MM: f64 = 1.0;
 const JST_OFFSET_SECS: i64 = 9 * 3600;
 
@@ -260,7 +261,7 @@ impl RepairReport {
         }
         if self.kept_open_holes > 0 {
             lines.push(format!(
-                "大きい・複雑な穴 {} か所は、そのまま残しました",
+                "大きい・非平面・重なる境界など、安全に埋められない穴 {} か所は残しました",
                 self.kept_open_holes
             ));
         }
@@ -350,8 +351,8 @@ fn repair_one(
     // 3. Make neighbouring faces agree. A disconnected negative shell can be
     // the inside boundary of a hollow solid, so do not flip it independently.
     orient_faces(&mut tris, &points, report, allow_global_flip);
-    // 4. Fill small simple holes with a fan from the loop centroid.
-    fill_small_holes(&mut points, &mut tris, report);
+    // 4. Triangulate only simple planar holes, preserving existing vertices.
+    fill_small_holes(&points, &mut tris, report);
     let triangles: Vec<[u32; 3]> = tris
         .iter()
         .map(|&t| t.map(|i| i as u32))
@@ -439,7 +440,7 @@ fn orient_faces(
 }
 
 fn fill_small_holes(
-    points: &mut Vec<[f64; 3]>,
+    points: &[[f64; 3]],
     tris: &mut Vec<[usize; 3]>,
     report: &mut RepairReport,
 ) {
@@ -451,24 +452,28 @@ fn fill_small_holes(
     }
     // A boundary edge a->b is left by the hole in the direction b->a.
     let mut hole_out: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut hole_in: HashMap<usize, usize> = HashMap::new();
     for &tri in tris.iter() {
         for (a, b) in edges_of(tri) {
             if count_of_edge.get(&undirected(a, b)) == Some(&1) {
                 hole_out.entry(b).or_default().push(a);
+                *hole_in.entry(a).or_insert(0) += 1;
             }
         }
     }
     let mut starts: Vec<usize> = hole_out.keys().copied().collect();
     starts.sort_unstable();
     let mut done: HashSet<usize> = HashSet::new();
+    let mut rings = Vec::new();
+    let mut overflow = 0;
+    let mut incomplete_boundary = false;
     for start in starts {
-        if done.contains(&start) {
-            continue;
-        }
+        if done.contains(&start) { continue; }
         let mut ring = vec![start];
         let mut current = start;
         let mut closed = false;
         loop {
+            if hole_in.get(&current) != Some(&1) { break; }
             let to = match hole_out.get(&current).map(Vec::as_slice) {
                 Some([only]) => *only,
                 _ => break,
@@ -477,7 +482,7 @@ fn fill_small_holes(
                 closed = ring.len() >= 3;
                 break;
             }
-            if ring.contains(&to) || ring.len() >= MAX_HOLE_EDGES {
+            if done.contains(&to) || ring.contains(&to) || ring.len() >= MAX_HOLE_EDGES {
                 break;
             }
             ring.push(to);
@@ -486,24 +491,61 @@ fn fill_small_holes(
         done.extend(ring.iter().copied());
         if !closed {
             report.kept_open_holes += 1;
-            continue;
+            incomplete_boundary = true;
+        } else if rings.len() < MAX_HOLE_LOOPS {
+            rings.push(ring);
+        } else {
+            overflow += 1;
         }
-        let count = ring.len();
-        let mut sum = [0.0f64; 3];
-        for &v in &ring {
-            if let Some(p) = points.get(v) {
-                sum = [sum[0] + p[0], sum[1] + p[1], sum[2] + p[2]];
+    }
+    if overflow > 0 || incomplete_boundary {
+        // An unclassified loop might lie inside another opening. Do not fill
+        // the enclosing ring while silently ignoring a large/branched hole.
+        // Also bound pair work for hundreds of independent openings.
+        report.kept_open_holes += rings.len() + overflow;
+        return;
+    }
+    let boxes: Vec<([f64; 3], [f64; 3])> = rings.iter().map(|ring| {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for &v in ring {
+            for axis in 0..3 {
+                lo[axis] = lo[axis].min(points[v][axis]);
+                hi[axis] = hi[axis].max(points[v][axis]);
             }
         }
-        let apex = sum.map(|s| s / count as f64);
-        let apex_index = points.len();
-        points.push(apex);
-        for (index, &from) in ring.iter().enumerate() {
-            let to = ring.get((index + 1) % count).copied().unwrap_or(from);
-            tris.push([from, to, apex_index]);
+        (lo, hi)
+    }).collect();
+    let mut ambiguous = vec![false; rings.len()];
+    for i in 0..boxes.len() {
+        for j in i + 1..boxes.len() {
+            let (a, b) = boxes[i];
+            let (c, d) = boxes[j];
+            let scale = (0..3).map(|axis| (b[axis] - a[axis]).max(d[axis] - c[axis]))
+                .fold(0., f64::max);
+            let tolerance = 1.0e-9 * scale + 1.0e-12;
+            if (0..3).all(|axis| a[axis] <= d[axis] + tolerance && c[axis] <= b[axis] + tolerance) {
+                // Conservative: nested coplanar loops can describe a face with
+                // a hole. Filling each independently would erase that hole.
+                // Disjoint polygons with overlapping boxes are also left open.
+                ambiguous[i] = true;
+                ambiguous[j] = true;
+            }
         }
-        report.filled_holes += 1;
-        report.added_triangles += count;
+    }
+    for (index, ring) in rings.iter().enumerate() {
+        if ambiguous[index] {
+            report.kept_open_holes += 1;
+            continue;
+        }
+        match crate::polygon_triangulation::triangulate_indexed(points, ring, &|| false) {
+            Ok(caps) if tris.len().saturating_add(caps.len()) <= MAX_TRIANGLES => {
+                report.filled_holes += 1;
+                report.added_triangles += caps.len();
+                tris.extend(caps);
+            }
+            _ => report.kept_open_holes += 1,
+        }
     }
 }
 

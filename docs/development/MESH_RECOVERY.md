@@ -4,28 +4,50 @@
 - Recovery branch: `recovery/mesh-review`
 - Safe remote base: `6349577399dd484a90fde5afe77ee173f8f9444a`
 - Original local worktree base: `2a72c7c`
-- Recovered local change: `cf0b6afdff276416e59576a1e65790077323ab40`
-- Pending recovery: `4d40820e12145cfcc2ae7eb6c692f8edb2c8d7ac`
+- Recovered local changes:
+  - `cf0b6afdff276416e59576a1e65790077323ab40` — shell winding and print diagnostics
+  - `4d40820e12145cfcc2ae7eb6c692f8edb2c8d7ac` — concave OBJ and planar hole triangulation
+- First verified remote recovery checkpoint: `74ef321424d07b1ff6b55a9514e9cbc4574243a0`
 
 The execution environment became unavailable and the orchestration runtime lost
 stored values. Recovery uses the exact edit inputs and diffs retained in the
 conversation, applied to GitHub files whose blob hashes match the original
 worktree base. No local execution environment remains available.
 
-The integration owner reported that the six mesh-repair regressions passed
-before the outage. The restored branch has **not been rebuilt or retested**.
-The base commit's 350 passing tests describe the base, not this recovered change.
-Do not merge this recovery branch as a verified release.
+The original source changes were recovered without new implementation decisions.
+The new polygon module and its integration tests are restored from the exact
+creation inputs before rustfmt and the subsequent added test input; whitespace
+may differ from the original local commit. They require formatting and a fresh
+build. These recovery commits are intentionally not claimed to retain the
+original commit IDs.
 
-The recovered `src/stl_export.rs` is checked against its original diff blob
-prefix `b27b70e`. New test and documentation source is recovered from the exact
-creation input and formatting diff; rerun formatting and all related tests.
+Before the outage:
+- The integration owner reported the six mesh-repair regressions passed.
+- The isolated pure polygon module passed five tests with rustc --test.
+- The seven OBJ/hole-repair integration tests had not been run.
+- The base commit's 350 passing tests describe the base only.
+
+The restored branch has **not been rebuilt or retested**. No Windows, GUI,
+printability or Grasshopper compatibility claim is made. Do not merge this
+recovery branch as a verified release. Original design/test notes are retained
+in `MESH_REVIEW.md`; their historical results do not validate this restored tree.
+
+The first recovered `src/stl_export.rs` exactly matches original blob
+`b27b70e44771af08ee35c1878e6622331d676425`. Source base blobs:
+- stl_export.rs: `b594c556645f31f188e9dfadb58021e04dd80c18`
+- import.rs: `27d48c6b089ab97e36a73880cc3bd5adcda28e93`
+- lib.rs: `fffb71e09fbd23ca6e8227a97b4dc3f63b7ae2c4`
+- tests/stl_export_tests.rs: `c3cc0c78b6673d32a1feb9827753bf383f91fa7b`
 
 Next commands after restoring an execution environment:
 
 ```sh
-cargo test --locked --test mesh_repair_regressions --test stl_export_tests --test fabrication_tests
-cargo fmt --all -- --check
+cargo fmt --all
+cargo test --locked --lib polygon_triangulation
+cargo test --locked --test polygon_import_repair --test mesh_repair_regressions --test import_tests --test stl_export_tests --test fabrication_tests
+cargo test --all-targets --locked
 ```
 
 Keep `main` and `develop/nodes-ultimate` unchanged during recovery.
+The separate curvature follow-up `997183b` requires its own recovery audit;
+it is not silently included in this mesh checkpoint.

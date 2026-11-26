@@ -15,6 +15,7 @@ pub mod node_access;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod persistence;
+pub mod polygon_triangulation;
 pub mod print_info;
 pub mod raster;
 pub mod script;
