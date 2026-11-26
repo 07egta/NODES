@@ -23,10 +23,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dev libgl1-mesa-dri libxkbcommon-x11-0
       - name: Build app
         run: cargo build --locked --bin Morphlet
-      - name: Capture representative frames
+      - name: Capture full 54-frame matrix
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 2560x1600x24" python3 scripts/capture_ui.py --binary target/debug/Morphlet --out ui-captures --quick --strict-pixels
+        run: xvfb-run -a -s "-screen 0 2560x1600x24" python3 scripts/capture_ui.py --binary target/debug/Morphlet --out ui-captures --strict-pixels
       - uses: actions/upload-artifact@v4
         if: always()
         with:

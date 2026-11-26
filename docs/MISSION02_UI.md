@@ -34,3 +34,19 @@ Linux CI の仮想ディスプレイによるスクリーンショットは Wind
 
 ## 残課題
 任意の自然言語理解、OS 間／作品間のクリップボード、ショートカット変更、グループ折り畳み、ポートへの複数ソース、ワイヤー上へ既存ノードをドラッグ挿入、経路全体強調、ノードごとの計算時間、完全な英語 UI、初回対話チュートリアルは未実装。3Dエンジンは既存実装のまま。
+
+## 調査と設計判断
+
+操作の参考資料（公開ドキュメント。実装コード、画像、アイコンは流用していない）:
+
+| 製品 | 資料 | NODES への反映 |
+|---|---|---|
+| Grasshopper | [Grasshopper Primer: The Grasshopper UI](https://grasshopperprimer.com/en/1-foundations/1-1/2_the-grasshopper-ui.html) | 空白ダブルクリック検索、カテゴリ、グループ、選択整列、データ表示を継承 |
+| Blender | [Blender 5.0 Manual: Editing Nodes](https://docs.blender.org/manual/en/5.0/interface/controls/nodes/editing.html) | 型の合うソケット、リンク挿入・再接続（このPRでは右クリックで明示） |
+| Houdini | [Network navigation](https://www.sidefx.com/docs/houdini/network/navigate.html)、[Wiring nodes](https://www.sidefx.com/docs/houdini/network/wire) | 選択範囲フィット、ナビゲーション概要図、配線からのノード追加 |
+| Fusion | [キーボードショートカットの参照](https://help.autodesk.com/cloudhelp/JPN/Fusion-GetStarted/files/GUID-F0491540-0324-470A-B651-2238D0EFAC30.htm) | キーボードからアクセスできる検索・共通編集コマンド |
+| Plasticity | [Command Palette](https://plasticity-document-revisions.vercel.app/plasticity-essentials/plasticity-interface/command-palette) | 候補リスト、キーボード確定、お気に入り、コンパクトな操作面 |
+
+このPRの検索は辞書・キーワード・曖昧一致によるもので、AIサービスや他社のコンポーネントカタログを組み込まない。
+型候補の絞り込みは既存の静的 DataType::accepts に準拠する。Any/Geometry は広い型であり実データの検証は評価時にも必要。
+1000ノードで縮小率の下限に達する場合はミニマップとパンを使用する。完全な表示性能の測定は別途必要。

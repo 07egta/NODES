@@ -616,7 +616,11 @@ impl MorphletApp {
                 self.palette_query.clear();
                 self.notify(format!("「{}」を追加しました", kind.spec().label), false);
             }
-            Err(e) => self.notify(e, true),
+            Err(e) => {
+                self.wire_source = wire;
+                self.wire_insert = insert;
+                self.notify(e, true);
+            }
         }
     }
     fn group_selected(&mut self) {

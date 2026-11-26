@@ -78,8 +78,7 @@ fn main() -> eframe::Result<()> {
     let size = value("--ui-size").and_then(|s| {
         let (w, h) = s.split_once('x')?;
         let size = [w.parse::<f32>().ok()?, h.parse::<f32>().ok()?];
-        size.iter().all(|v| (640.0..=7680.0).contains(v)).then_some(size)
-            .or_else(|| (size[0] >= 640. && size[0] <= 7680. && size[1] >= 360. && size[1] <= 4320.).then_some(size))
+        ((640.0..=7680.0).contains(&size[0]) && (360.0..=4320.0).contains(&size[1])).then_some(size)
     }).unwrap_or([1380., 920.]);
     let scale = value("--ui-scale").and_then(|s| s.parse::<f32>().ok())
         .filter(|v| (0.75..=2.0).contains(v));

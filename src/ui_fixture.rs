@@ -10,9 +10,10 @@ pub fn make(count: usize) -> Result<Project, String> {
     }
     project.name = format!("UI fixture · {count} nodes");
     let mut previous = None;
+    let columns = ((count-initial) as f64).sqrt().ceil().max(1.) as usize;
     for i in 0..count-initial {
-        let col = i % 8;
-        let row = i / 8;
+        let col = i % columns;
+        let row = i / columns;
         let kind = if col == 0 { NodeKind::Number } else { NodeKind::Add };
         let id = project.graph.add(kind, [650. + col as f32 * 290., 30. + row as f32 * 175.])?;
         if col != 0 && let Some(from) = previous {

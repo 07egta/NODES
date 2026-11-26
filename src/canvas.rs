@@ -259,7 +259,7 @@ impl GraphCanvas {
             && self.connecting.is_none() && self.dragging.is_none() && self.box_start.is_none())
             .then(|| Rect::from_min_size(rect.right_bottom() - egui::vec2(166., 138.), egui::vec2(154., 96.)));
         let over_map = pointer.is_some_and(|pos| map_rect.is_some_and(|r| r.contains(pos)));
-        if !over_map && response.hovered() && !ui.ctx().wants_keyboard_input() {
+        if !over_map && response.contains_pointer() && !ui.ctx().wants_keyboard_input() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
             if scroll.abs() > 0.1
                 && let Some(pos) = pointer
@@ -270,7 +270,8 @@ impl GraphCanvas {
         let pan_active = ui.input(|i| {
             i.pointer.middle_down() || (i.key_down(egui::Key::Space) && i.pointer.primary_down())
         });
-        if !over_map && response.hovered() && pan_active {
+        if !over_map && pan_active && !ui.ctx().wants_keyboard_input()
+            && (response.contains_pointer() || response.dragged_by(egui::PointerButton::Middle)) {
             let d = ui.input(|i| i.pointer.delta());
             p.pan[0] = (p.pan[0] + d.x).clamp(-1.0e7, 1.0e7);
             p.pan[1] = (p.pan[1] + d.y).clamp(-1.0e7, 1.0e7);
@@ -624,6 +625,7 @@ impl GraphCanvas {
                 .interact(eye, Id::new(("node_preview", n.id)), Sense::click())
                 .on_hover_text("表示対象を切替（「表示中」モード）")
                 .clicked()
+                && !over_map
                 && let Some(m) = p.graph.node_mut(n.id)
             {
                 m.preview = !m.preview;
@@ -665,7 +667,7 @@ impl GraphCanvas {
                     Id::new(("in", n.id, spec.key)),
                     Sense::click_and_drag(),
                 );
-                if !over_map && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
+                if !over_map && (pr.clicked() || pr.contains_pointer() && ui.input(|i| i.pointer.primary_released()))
                     && self.connecting.is_some()
                 {
                     to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
@@ -928,7 +930,9 @@ impl GraphCanvas {
         painter.text(
             rect.left_bottom() + egui::vec2(16., -15.),
             Align2::LEFT_CENTER,
-            if rect.width() < 520. {
+            if zoom < 0.38 && self.connecting.is_none() {
+                "概要表示 · 拡大または Shift+F で編集"
+            } else if rect.width() < 520. {
                 if self.connecting.is_some() { "入力へ接続 · Esc で中止" } else { "Tab: 追加 · ?: 操作一覧" }
             } else { hint },
             FontId::proportional(10.5),
