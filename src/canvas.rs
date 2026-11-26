@@ -1,5 +1,6 @@
 use crate::data_view::{self, DataShape};
 use crate::theme;
+use crate::ui_polish;
 use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, Stroke, Vec2};
 use morphlet::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
@@ -12,6 +13,10 @@ use std::collections::{BTreeMap, BTreeSet};
 const WIDTH: f32 = 218.0;
 const HEADER: f32 = 43.0;
 const ROW: f32 = 28.0;
+/// Snap grid in world units (matches the dot grid drawn at zoom 1).
+pub const GRID: f32 = 24.0;
+/// How many numeric inputs of a card are drawn as sliders.
+const CARD_SLIDERS: usize = 3;
 
 #[derive(Default)]
 pub struct GraphCanvas {
@@ -19,7 +24,11 @@ pub struct GraphCanvas {
     pub connecting: Option<NodeId>,
     pub fit_requested: bool,
     pub last_rect: Option<Rect>,
+    /// 格子に吸着: nodes snap to the grid when a drag ends.
+    pub snap: bool,
     dragging: Option<NodeId>,
+    /// A wire was pulled out of an output port and the mouse button is still held.
+    wire_drag: bool,
     box_start: Option<Pos2>,
     /// Note being edited in place, and whether its text box still needs focus.
     editing_note: Option<usize>,
@@ -46,6 +55,8 @@ pub struct CanvasOutcome {
     pub view_values: bool,
     /// Add an empty note at this world position.
     pub add_note_at: Option<[f32; 2]>,
+    /// A wire was dropped on empty canvas: the source node and the world position.
+    pub drop_wire: Option<(NodeId, [f32; 2])>,
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
@@ -70,7 +81,11 @@ fn group_rect(p: &Project, members: &[NodeId], rect: Rect) -> Option<Rect> {
 }
 const NOTE_WIDTH: f32 = 210.0;
 fn note_fill() -> Color32 {
-    Color32::from_rgb(255, 248, 214)
+    if theme::is_dark() {
+        Color32::from_rgb(72, 66, 42)
+    } else {
+        Color32::from_rgb(255, 248, 214)
+    }
 }
 
 fn height(node: &Node) -> f32 {
@@ -116,6 +131,17 @@ impl GraphCanvas {
     pub fn select_only(&mut self, id: NodeId) {
         self.selected.clear();
         self.selected.insert(id);
+    }
+    /// Moves every selected node onto the nearest grid point (used when 吸着 is on).
+    fn snap_selected(&self, p: &mut Project) {
+        for id in &self.selected {
+            if let Some(m) = p.graph.node_mut(*id) {
+                m.position = [
+                    ui_polish::snap(m.position[0], GRID),
+                    ui_polish::snap(m.position[1], GRID),
+                ];
+            }
+        }
     }
     pub fn fit(&self, project: &mut Project, rect: Rect) {
         if project.graph.nodes.is_empty() {
@@ -179,9 +205,9 @@ impl GraphCanvas {
             self.fit_requested = false;
         }
         let painter = ui.painter_at(rect);
-        painter.rect_filled(rect, 0, theme::CANVAS);
+        painter.rect_filled(rect, 0, theme::canvas_bg());
         let zoom = p.zoom;
-        let spacing = 24. * zoom;
+        let spacing = GRID * zoom;
         if spacing >= 8. {
             let sx = rect.left() + p.pan[0].rem_euclid(spacing);
             let sy = rect.top() + p.pan[1].rem_euclid(spacing);
@@ -189,7 +215,7 @@ impl GraphCanvas {
             while x < rect.right() {
                 let mut y = sy;
                 while y < rect.bottom() {
-                    painter.circle_filled(egui::pos2(x, y), 0.8, Color32::from_rgb(205, 214, 207));
+                    painter.circle_filled(egui::pos2(x, y), 0.8, theme::grid_dot());
                     y += spacing;
                 }
                 x += spacing;
@@ -314,9 +340,9 @@ impl GraphCanvas {
                     let b = input_pos(n, index, rect, p.pan, p.zoom);
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
                     let color = if selected {
-                        theme::TEAL
+                        theme::teal()
                     } else {
-                        Color32::from_rgb(156, 180, 169)
+                        theme::wire_idle()
                     };
                     let shape = evaluation
                         .and_then(|e| e.outputs.get(from))
@@ -347,9 +373,9 @@ impl GraphCanvas {
                 nr,
                 9,
                 if n.off {
-                    Color32::from_rgb(234, 236, 232)
+                    theme::card_off_bg()
                 } else {
-                    Color32::from_rgb(253, 254, 251)
+                    theme::card_bg()
                 },
             );
             painter.rect_stroke(
@@ -358,21 +384,33 @@ impl GraphCanvas {
                 Stroke::new(
                     if selected { 2. } else { 1_f32 },
                     if selected {
-                        theme::TEAL
+                        theme::teal()
                     } else if error.is_some() {
                         theme::ERROR
                     } else {
-                        Color32::from_rgb(211, 220, 211)
+                        theme::card_border()
                     },
                 ),
                 egui::StrokeKind::Inside,
+            );
+            // Header tinted with the category colour, so categories are visible at a glance.
+            let header_band = Rect::from_min_size(pos, egui::vec2(WIDTH, HEADER) * p.zoom);
+            painter.rect_filled(
+                header_band,
+                egui::CornerRadius {
+                    nw: 9,
+                    ne: 9,
+                    sw: 0,
+                    se: 0,
+                },
+                col.gamma_multiply(if n.off { 0.06 } else { 0.18 }),
             );
             painter.line_segment(
                 [
                     pos + egui::vec2(12., HEADER - 2.) * p.zoom,
                     pos + egui::vec2(WIDTH - 12., HEADER - 2.) * p.zoom,
                 ],
-                Stroke::new(1_f32, theme::LINE),
+                Stroke::new(1_f32, theme::line()),
             );
             let col = if n.off { Color32::from_gray(170) } else { col };
             painter.circle_filled(pos + egui::vec2(19., 21.) * p.zoom, 4.4 * p.zoom, col);
@@ -385,7 +423,7 @@ impl GraphCanvas {
                     n.name.clone()
                 },
                 FontId::proportional(13.5 * p.zoom),
-                if n.off { theme::MUTED } else { theme::INK },
+                if n.off { theme::muted() } else { theme::ink() },
             );
             let header = Rect::from_min_size(pos, egui::vec2(WIDTH - 26., HEADER) * p.zoom);
             let hr = ui.interact(
@@ -416,6 +454,9 @@ impl GraphCanvas {
                         m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
                     }
                 }
+            }
+            if hr.drag_stopped() && self.dragging == Some(n.id) && self.snap {
+                self.snap_selected(p);
             }
             hr.context_menu(|ui| {
                 if ui.button("このノードを選択").clicked() {
@@ -469,13 +510,13 @@ impl GraphCanvas {
                     pos + egui::vec2(WIDTH - 38., 20.) * p.zoom,
                     egui::vec2(18., 18.) * p.zoom,
                 );
-                painter.circle_stroke(q.center(), 7. * p.zoom, Stroke::new(1_f32, theme::MUTED));
+                painter.circle_stroke(q.center(), 7. * p.zoom, Stroke::new(1_f32, theme::muted()));
                 painter.text(
                     q.center(),
                     Align2::CENTER_CENTER,
                     "?",
                     FontId::proportional(10.5 * p.zoom),
-                    theme::MUTED,
+                    theme::muted(),
                 );
                 if ui
                     .interact(q, Id::new(("node_help", n.id)), Sense::click())
@@ -492,7 +533,7 @@ impl GraphCanvas {
             painter.circle_stroke(
                 eye.center(),
                 4.5 * p.zoom,
-                Stroke::new(1_f32, if n.preview { col } else { theme::MUTED }),
+                Stroke::new(1_f32, if n.preview { col } else { theme::muted() }),
             );
             if n.preview {
                 painter.circle_filled(eye.center(), 2. * p.zoom, col);
@@ -505,6 +546,15 @@ impl GraphCanvas {
             {
                 m.preview = !m.preview;
             }
+            let slider_keys: Vec<&str> = n
+                .kind
+                .spec()
+                .inputs
+                .iter()
+                .filter(|s| s.default.is_some() && !n.inputs.contains_key(s.key))
+                .take(CARD_SLIDERS)
+                .map(|s| s.key)
+                .collect();
             for (index, spec) in n.kind.spec().inputs.iter().enumerate() {
                 let ip = input_pos(n, index, rect, p.pan, p.zoom);
                 let linked = n.inputs.contains_key(spec.key);
@@ -553,9 +603,49 @@ impl GraphCanvas {
                     Align2::LEFT_CENTER,
                     spec.label,
                     FontId::proportional(11. * p.zoom),
-                    if linked { theme::TEAL } else { theme::MUTED },
+                    if linked { theme::teal() } else { theme::muted() },
                 );
                 if p.zoom > 0.62
+                    && let Some(default) = spec.default
+                    && slider_keys.contains(&spec.key)
+                    && !linked
+                    && let Some(m) = p.graph.node_mut(n.id)
+                {
+                    // The first numeric inputs of a card are drawn as small sliders.
+                    let value = m.params.entry(spec.key.into()).or_insert(default);
+                    let (low, high) =
+                        crate::app::friendly_range(spec.key, spec.min, spec.max, *value);
+                    let track = Rect::from_min_size(
+                        ip + egui::vec2(88., -9.) * p.zoom,
+                        egui::vec2(60., 18.) * p.zoom,
+                    );
+                    let width = 60. * p.zoom;
+                    let slider = egui::Slider::new(&mut *value, low..=high)
+                        .show_value(false)
+                        .trailing_fill(true)
+                        .step_by(spec.step);
+                    let response = ui
+                        .scope(|ui| {
+                            ui.spacing_mut().slider_width = width;
+                            ui.put(track, slider)
+                        })
+                        .inner;
+                    if response.changed() && spec.integer {
+                        *value = value.round();
+                    }
+                    let shown = if spec.integer {
+                        format!("{:.0}", *value)
+                    } else {
+                        format!("{:.2}", *value)
+                    };
+                    painter.text(
+                        ip + egui::vec2(153., 0.) * p.zoom,
+                        Align2::LEFT_CENTER,
+                        shown,
+                        FontId::proportional(10. * p.zoom),
+                        theme::ink(),
+                    );
+                } else if p.zoom > 0.62
                     && let Some(default) = spec.default
                 {
                     let vr = Rect::from_min_size(
@@ -616,6 +706,9 @@ impl GraphCanvas {
             if or.clicked() || or.drag_started() {
                 self.connecting = Some(n.id);
             }
+            if or.drag_started() {
+                self.wire_drag = true;
+            }
             let shape = evaluation
                 .and_then(|e| e.outputs.get(&n.id))
                 .and_then(|r| r.as_ref().ok())
@@ -673,7 +766,7 @@ impl GraphCanvas {
                 if error.is_some() {
                     theme::ERROR
                 } else {
-                    theme::MUTED
+                    theme::muted()
                 },
             );
             if let Some(message) = error {
@@ -681,7 +774,7 @@ impl GraphCanvas {
                     nr.left_bottom() + egui::vec2(0., 4. * p.zoom),
                     egui::vec2(WIDTH, 22.) * p.zoom,
                 );
-                painter.rect_filled(strip, 6, Color32::from_rgb(252, 231, 224));
+                painter.rect_filled(strip, 6, theme::error_fill());
                 painter.text(
                     strip.left_center() + egui::vec2(8. * p.zoom, 0.),
                     Align2::LEFT_CENTER,
@@ -708,6 +801,17 @@ impl GraphCanvas {
         if let Some((to, key)) = to_disconnect {
             p.graph.disconnect(to, key);
         }
+        // A wire released on empty canvas (not on a port or a card) opens the node search,
+        // and the chosen node gets connected to the wire's source.
+        if self.wire_drag && !ui.input(|i| i.pointer.primary_down()) {
+            self.wire_drag = false;
+            if !card_under
+                && let Some(at) = pointer
+                && let Some(from) = self.connecting.take()
+            {
+                out.drop_wire = Some((from, to_world(at, rect, p.pan, p.zoom)));
+            }
+        }
         if let (Some(id), Some(pointer)) = (self.connecting, pointer)
             && let Some(n) = p.graph.node(id)
         {
@@ -731,20 +835,20 @@ impl GraphCanvas {
                 Align2::CENTER_CENTER,
                 "ここから、形をつくろう。",
                 FontId::proportional(24.),
-                theme::INK,
+                theme::ink(),
             );
             painter.text(
                 rect.center() + egui::vec2(0., 15.),
                 Align2::CENTER_CENTER,
                 "左のライブラリから追加、またはダブルクリックで検索",
                 FontId::proportional(12.),
-                theme::MUTED,
+                theme::muted(),
             );
         }
         let hint = if self.connecting.is_some() {
-            "入力の丸をクリックして接続  ·  Esc で中止"
+            "入力の丸をクリックして接続  ·  Esc で中止  ·  空いた所で離すと検索して追加"
         } else {
-            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  右クリックでメモ"
+            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でショートカット一覧"
         };
         painter.rect_filled(
             Rect::from_min_max(
@@ -752,14 +856,14 @@ impl GraphCanvas {
                 rect.right_bottom(),
             ),
             0,
-            theme::CANVAS.gamma_multiply(0.98),
+            theme::canvas_bg().gamma_multiply(0.98),
         );
         painter.text(
             rect.left_bottom() + egui::vec2(16., -15.),
             Align2::LEFT_CENTER,
             hint,
             FontId::proportional(10.5),
-            theme::MUTED,
+            theme::muted(),
         );
         out
     }
@@ -850,7 +954,7 @@ impl GraphCanvas {
                                 ui.painter().circle_stroke(
                                     sw.center(),
                                     8.5,
-                                    Stroke::new(1.5_f32, theme::INK),
+                                    Stroke::new(1.5_f32, theme::ink()),
                                 );
                             }
                             if resp.clicked() {
@@ -889,9 +993,9 @@ impl GraphCanvas {
             let pos = to_screen(note.position, rect, p.pan, p.zoom);
             let editing = self.editing_note == Some(ni);
             let (text, color) = if note.text.is_empty() {
-                ("ダブルクリックでメモを書く".to_owned(), theme::MUTED)
+                ("ダブルクリックでメモを書く".to_owned(), theme::muted())
             } else {
-                (note.text.clone(), theme::INK)
+                (note.text.clone(), theme::ink())
             };
             let galley = painter.layout(
                 text,
@@ -1022,7 +1126,7 @@ fn wire(
     match shape {
         Some(DataShape::List(_)) => {
             bezier(painter, a, b, Stroke::new(w + 2.8, color));
-            bezier(painter, a, b, Stroke::new(1.3_f32, theme::CANVAS));
+            bezier(painter, a, b, Stroke::new(1.3_f32, theme::canvas_bg()));
         }
         Some(DataShape::Tree { .. }) => {
             let points = cubic(a, b, 40);

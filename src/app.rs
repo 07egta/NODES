@@ -5,6 +5,7 @@ use crate::{
     gcode_ui::GcodeDialog,
     help::HelpWindow,
     theme,
+    ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
 };
 use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
@@ -12,7 +13,7 @@ use morphlet::{
     annotations, cluster,
     engine::{Evaluation, Evaluator},
     gcode,
-    model::{Graph, NodeId, NodeKind, Tree},
+    model::{DataType, Graph, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
@@ -128,6 +129,16 @@ pub struct MorphletApp {
     values_open: bool,
     /// ファイル読み込み node that the next picked mesh file is loaded into.
     import_target: Option<NodeId>,
+    /// Node whose output wire was dropped on empty canvas; the search connects to it.
+    wire_source: Option<NodeId>,
+    /// Nodes added recently, shown first in the search popup.
+    recent: Recent,
+    /// Highlighted row of the search popup (↑ ↓ move it, Enter adds it).
+    palette_cursor: usize,
+    /// ショートカット一覧 window (?).
+    shortcuts_open: bool,
+    /// Dark theme is on (saved in the settings file).
+    dark: bool,
 }
 
 impl MorphletApp {
@@ -136,7 +147,8 @@ impl MorphletApp {
         open_file: Option<PathBuf>,
         screenshot: Option<PathBuf>,
     ) -> Self {
-        theme::configure(&cc.egui_ctx);
+        let dark = ui_polish::load_dark();
+        theme::configure(&cc.egui_ctx, dark);
         let mut project = templates::create(0);
         let mut file_path = None;
         let mut initial_error = None;
@@ -205,6 +217,11 @@ impl MorphletApp {
             help_window: HelpWindow::default(),
             values_open: false,
             import_target: None,
+            wire_source: None,
+            recent: Recent::default(),
+            palette_cursor: 0,
+            shortcuts_open: false,
+            dark,
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -545,6 +562,8 @@ impl MorphletApp {
     }
 
     fn add_node(&mut self, kind: NodeKind, position: Option<[f32; 2]>) {
+        // A wire dropped on the canvas takes precedence over the selection.
+        let wire = self.wire_source.take();
         let selected = self.canvas.selected.iter().next_back().copied();
         let at = position.unwrap_or_else(|| {
             selected
@@ -554,7 +573,20 @@ impl MorphletApp {
         });
         match self.project.graph.add(kind, at) {
             Ok(id) => {
-                if let Some(source) = selected {
+                let mut connected = true;
+                if let Some(source) = wire {
+                    let output = self
+                        .project
+                        .graph
+                        .node(source)
+                        .map(|n| n.kind.spec().output);
+                    match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
+                        Some(key) => {
+                            let _ = self.project.graph.connect(source, id, key);
+                        }
+                        None => connected = false,
+                    }
+                } else if let Some(source) = selected {
                     let output = self
                         .project
                         .graph
@@ -568,10 +600,18 @@ impl MorphletApp {
                         let _ = self.project.graph.connect(source, id, port.key);
                     }
                 }
+                self.recent.push(kind);
                 self.canvas.select_only(id);
                 self.palette_open = false;
                 self.search.clear();
-                self.notify(format!("「{}」を追加しました", kind.spec().label), false);
+                if connected {
+                    self.notify(format!("「{}」を追加しました", kind.spec().label), false);
+                } else {
+                    self.notify(
+                        format!("「{}」を追加しましたが、線をつなげる入力がありません", kind.spec().label),
+                        true,
+                    );
+                }
             }
             Err(e) => self.notify(e, true),
         }
@@ -729,6 +769,23 @@ impl MorphletApp {
             None => self.help_window.open_index(),
         }
     }
+    fn toggle_snap(&mut self) {
+        self.canvas.snap = !self.canvas.snap;
+        let text = if self.canvas.snap {
+            "格子に吸着: ON（ノードは離したときに格子点へ揃います）"
+        } else {
+            "格子に吸着: OFF"
+        };
+        self.notify(text, false);
+    }
+    fn toggle_theme(&mut self, ctx: &egui::Context) {
+        self.dark = !self.dark;
+        theme::set_dark(self.dark);
+        theme::apply_style(ctx);
+        if let Err(e) = ui_polish::save_dark(self.dark) {
+            self.notify(e, true);
+        }
+    }
     fn undo(&mut self) {
         if self.history.undo(&mut self.project) {
             self.gesture_before = None;
@@ -783,8 +840,27 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
                 self.toggle_off_selected();
             }
-            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::G)) {
+            // Checked before Ctrl+G: a pattern without Shift also matches Ctrl+Shift+G.
+            if ctx.input_mut(|i| {
+                i.consume_key(
+                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                    egui::Key::G,
+                )
+            }) {
+                self.toggle_snap();
+            } else if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::G)) {
                 self.make_group();
+            }
+            if ctx.input(|i| i.key_pressed(egui::Key::Home)) {
+                self.canvas.fit_requested = true;
+            }
+            let question = ctx.input(|i| {
+                i.events
+                    .iter()
+                    .any(|e| matches!(e, egui::Event::Text(t) if t == "?" || t == "？"))
+            });
+            if question {
+                self.shortcuts_open = !self.shortcuts_open;
             }
             if ctx
                 .input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
@@ -924,6 +1000,21 @@ impl MorphletApp {
                         if ui.button("?").on_hover_text("使い方").clicked() {
                             self.help_open = true;
                         }
+                        if ui
+                            .button("キー")
+                            .on_hover_text("キーボードショートカット一覧 · ?")
+                            .clicked()
+                        {
+                            self.shortcuts_open = true;
+                        }
+                        let theme_label = if self.dark { "明るく" } else { "暗く" };
+                        if ui
+                            .button(theme_label)
+                            .on_hover_text("画面の色を切り替えます（選択は次回も保たれます）")
+                            .clicked()
+                        {
+                            self.toggle_theme(ctx);
+                        }
                     });
                 });
             });
@@ -934,7 +1025,7 @@ impl MorphletApp {
             .resizable(false)
             .frame(
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(249, 251, 247))
+                    .fill(theme::panel_bg())
                     .inner_margin(egui::Margin::symmetric(14, 14)),
             )
             .show(ctx, |ui| {
@@ -1026,7 +1117,7 @@ impl MorphletApp {
                 ui.label(
                     RichText::new("小さな操作から、\n思いがけない形へ。")
                         .size(12.)
-                        .color(theme::MUTED),
+                        .color(theme::muted()),
                 );
                 ui.add_space(8.);
                 if ui
@@ -1045,7 +1136,7 @@ impl MorphletApp {
             .exact_height(30.)
             .frame(
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(237, 242, 234))
+                    .fill(theme::status_bg())
                     .inner_margin(egui::Margin::symmetric(14, 5)),
             )
             .show(ctx, |ui| {
@@ -1150,7 +1241,7 @@ impl MorphletApp {
         }
         if let Some(Err(message)) = self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
             egui::Frame::new()
-                .fill(Color32::from_rgb(252, 231, 224))
+                .fill(theme::error_fill())
                 .corner_radius(6)
                 .inner_margin(8)
                 .show(ui, |ui| {
@@ -1297,7 +1388,7 @@ impl MorphletApp {
             .min_width(390.)
             .max_width(850.)
             .resizable(true)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(251, 253, 249)))
+            .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
                 let items = self.previews();
                 egui::Frame::new()
@@ -1335,7 +1426,7 @@ impl MorphletApp {
                             egui::Align2::CENTER_CENTER,
                             "形を更新しています…",
                             FontId::proportional(13.),
-                            theme::MUTED,
+                            theme::muted(),
                         );
                     }
                 });
@@ -1357,10 +1448,10 @@ impl MorphletApp {
     }
     fn center_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(theme::CANVAS))
+            .frame(egui::Frame::new().fill(theme::canvas_bg()))
             .show(ctx, |ui| {
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(253, 254, 250))
+                    .fill(theme::toolbar_bg())
                     .inner_margin(egui::Margin::symmetric(15, 10))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
@@ -1397,6 +1488,8 @@ impl MorphletApp {
                                 if ui.small_button("整列").clicked() {
                                     self.canvas.auto_arrange(&mut self.project);
                                 }
+                                ui.toggle_value(&mut self.canvas.snap, "格子")
+                                    .on_hover_text("格子に吸着: ノードを離すと格子点に揃います · Ctrl+Shift+G");
                                 if ui.small_button("全体").clicked() {
                                     self.canvas.fit_requested = true;
                                 }
@@ -1453,58 +1546,124 @@ impl MorphletApp {
                     self.palette_focus = true;
                     self.palette_position = at;
                     self.search.clear();
+                    self.palette_cursor = 0;
+                }
+                if let Some((from, at)) = outcome.drop_wire {
+                    // Released on empty canvas: search, then connect the chosen node to `from`.
+                    self.wire_source = Some(from);
+                    self.palette_open = true;
+                    self.palette_focus = true;
+                    self.palette_position = at;
+                    self.search.clear();
+                    self.palette_cursor = 0;
                 }
             });
     }
+    /// Node search popup (Tab / Ctrl+K / double-click / a wire dropped on empty canvas).
+    /// Fuzzy ranking, recently used nodes first, ↑ ↓ to move and Enter to add.
     fn palette(&mut self, ctx: &egui::Context) {
         if !self.palette_open {
+            self.wire_source = None;
             return;
         }
         let mut open = true;
         let mut add = None;
+        let ordered = ordered_kinds();
+        let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
+        let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
+        let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
+        let matches = ui_polish::rank(&ordered, &self.search, &self.recent, wire_type);
+        let last = matches.len().saturating_sub(1);
+        // Keys are consumed here so the text box does not also act on them.
+        let down = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
+        let up = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
+        if down {
+            self.palette_cursor = (self.palette_cursor + 1).min(last);
+        }
+        if up {
+            self.palette_cursor = self.palette_cursor.saturating_sub(1);
+        }
+        self.palette_cursor = self.palette_cursor.min(last);
+        // IME Enter belongs to the input method while composing; only a plain Enter adds.
+        let composing = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Ime(_))));
+        let enter = !composing
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+        if enter {
+            add = matches.get(self.palette_cursor).copied();
+        }
+        let cursor = self.palette_cursor;
         egui::Window::new("ノードを追加")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(440.)
+            .default_width(460.)
             .anchor(egui::Align2::CENTER_CENTER, [0., -60.])
             .show(ctx, |ui| {
                 let r = ui.add(
                     egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("何をしたい？  円 / twist / 並べる")
+                        .hint_text("何をしたい？  円 / twist / まる / 並べる")
                         .desired_width(f32::INFINITY),
                 );
                 if self.palette_focus {
                     r.request_focus();
                     self.palette_focus = false;
                 }
-                ui.add_space(7.);
-                let matches: Vec<_> = NodeKind::all()
-                    .iter()
-                    .copied()
-                    .filter(|k| matches_search(*k, &self.search))
-                    .collect();
-                // IME Enter belongs to the input method; selecting a result is always explicit.
+                if r.changed() {
+                    self.palette_cursor = 0;
+                }
+                if let Some(name) = &wire_name {
+                    ui.label(theme::small(format!(
+                        "「{name}」の出力をつなぎます。つなげられるノードを上に出しています"
+                    )));
+                }
+                ui.add_space(5.);
                 egui::ScrollArea::vertical()
-                    .max_height(360.)
+                    .max_height(380.)
                     .show(ui, |ui| {
-                        for kind in &matches {
+                        for (index, kind) in matches.iter().enumerate() {
                             let spec = kind.spec();
-                            if ui
-                                .add_sized(
-                                    [410., 34.],
-                                    egui::Button::new(
-                                        RichText::new(format!(
-                                            "{}     ·     {}",
-                                            spec.label, spec.category
-                                        ))
-                                        .color(theme::category_color(spec.category)),
-                                    )
-                                    .frame(false),
-                                )
-                                .on_hover_text(spec.description)
-                                .clicked()
-                            {
+                            let (rect, response) = ui.allocate_exact_size(
+                                egui::vec2(430., 40.),
+                                Sense::click(),
+                            );
+                            let active = index == cursor;
+                            if active || response.hovered() {
+                                ui.painter().rect_filled(
+                                    rect,
+                                    6,
+                                    if active {
+                                        theme::teal().gamma_multiply(0.22)
+                                    } else {
+                                        theme::line().gamma_multiply(0.35)
+                                    },
+                                );
+                            }
+                            if active {
+                                response.scroll_to_me(None);
+                            }
+                            let painter = ui.painter();
+                            painter.text(
+                                rect.left_top() + egui::vec2(12., 11.),
+                                egui::Align2::LEFT_CENTER,
+                                spec.label,
+                                FontId::proportional(13.),
+                                theme::ink(),
+                            );
+                            painter.text(
+                                rect.right_top() + egui::vec2(-12., 11.),
+                                egui::Align2::RIGHT_CENTER,
+                                spec.category,
+                                FontId::proportional(10.5),
+                                theme::category_color(spec.category),
+                            );
+                            painter.text(
+                                rect.left_top() + egui::vec2(12., 29.),
+                                egui::Align2::LEFT_CENTER,
+                                ui_polish::one_line(spec.description, 46),
+                                FontId::proportional(10.5),
+                                theme::muted(),
+                            );
+                            if response.clicked() {
                                 add = Some(*kind);
                             }
                         }
@@ -1514,13 +1673,43 @@ impl MorphletApp {
                             );
                         }
                     });
-                ui.label(theme::small("クリックで追加  ·  Esc で閉じる"));
+                ui.add_space(4.);
+                ui.label(theme::small(
+                    "↑ ↓ で選ぶ  ·  Enter かクリックで追加  ·  Esc で閉じる",
+                ));
             });
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
             self.palette_open = open && !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         }
+    }
+    /// ショートカット一覧 (?): every keyboard shortcut, in Japanese.
+    fn shortcuts_dialog(&mut self, ctx: &egui::Context) {
+        if !self.shortcuts_open {
+            return;
+        }
+        let mut open = true;
+        egui::Window::new("キーボードショートカット")
+            .open(&mut open)
+            .collapsible(false)
+            .default_width(520.)
+            .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
+            .show(ctx, |ui| {
+                ui.label(theme::small("? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。"));
+                ui.add_space(8.);
+                egui::Grid::new("shortcut_grid")
+                    .num_columns(2)
+                    .spacing([28., 7.])
+                    .show(ui, |ui| {
+                        for (keys, what) in ui_polish::SHORTCUTS {
+                            ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
+                            ui.label(RichText::new(*what).size(12.));
+                            ui.end_row();
+                        }
+                    });
+            });
+        self.shortcuts_open = open;
     }
     fn template_dialog(&mut self, ctx: &egui::Context) {
         if !self.template_open {
@@ -1539,7 +1728,7 @@ impl MorphletApp {
                 ui.add_space(12.);
                 for (index, t) in templates::TEMPLATES.iter().enumerate() {
                     egui::Frame::new()
-                        .fill(Color32::from_rgb(240, 245, 237))
+                        .fill(theme::card_bg())
                         .corner_radius(8)
                         .inner_margin(14)
                         .show(ui, |ui| {
@@ -1803,6 +1992,7 @@ impl eframe::App for MorphletApp {
         self.right_panel(ctx);
         self.center_panel(ctx);
         self.palette(ctx);
+        self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
         self.export_dialog(ctx);
         self.gcode_dialog(ctx);
@@ -1854,7 +2044,7 @@ impl eframe::App for MorphletApp {
                 .show(ctx, |ui| {
                     egui::Frame::new()
                         .fill(if *error {
-                            Color32::from_rgb(252, 231, 224)
+                            theme::error_fill()
                         } else {
                             Color32::from_rgb(32, 66, 53)
                         })
@@ -1963,25 +2153,13 @@ fn same_calculation(a: &Graph, b: &Graph) -> bool {
         })
 }
 fn matches_search(kind: NodeKind, query: &str) -> bool {
-    let q = query.trim().to_lowercase().replace('　', " ");
-    if q.is_empty() {
-        return true;
-    }
-    let s = kind.spec();
-    let hay = format!("{} {} {}", s.label, s.keywords, s.category).to_lowercase();
-    q.split_whitespace().all(|word| {
-        let alias = match word {
-            "まる" | "えん" => "円",
-            "はこ" => "箱",
-            "しかく" => "長方形",
-            "はなびん" | "かびん" => "花器",
-            "ならべる" => "配列",
-            "おしだし" => "押し出し",
-            "らせん" => "らせん",
-            _ => word,
-        };
-        hay.contains(alias)
-    })
+    ui_polish::query_score(kind, query).is_some()
+}
+/// Node kinds in library order: by category, then by the order in `NodeKind::all`.
+fn ordered_kinds() -> Vec<NodeKind> {
+    let mut ordered: Vec<_> = NodeKind::all().to_vec();
+    ordered.sort_by_key(|kind| category_rank(kind.spec().category));
+    ordered
 }
 fn category_rank(category: &str) -> usize {
     ["立体", "曲線", "変形", "配列", "数値", "データ", "出力"]
@@ -2012,7 +2190,7 @@ fn recovery_path() -> Option<PathBuf> {
             .map(|p| p.join("morphlet/recovery.morph"))
     }
 }
-fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
+pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
         "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
         "height" => (min, 240.),
