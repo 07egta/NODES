@@ -540,6 +540,18 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    // Mathematical and biomorphic patterns (append-only IDs).
+    Phyllotaxis,
+    FibonacciSphere,
+    RoseCurve,
+    SuperformulaCurve,
+    TorusKnot,
+    Lissajous3d,
+    HilbertCurve,
+    KochSnowflake,
+    SierpinskiCells,
+    ReactionDiffusion,
+    PoissonDisk2d,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -926,6 +938,17 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::Phyllotaxis,
+            Self::FibonacciSphere,
+            Self::RoseCurve,
+            Self::SuperformulaCurve,
+            Self::TorusKnot,
+            Self::Lissajous3d,
+            Self::HilbertCurve,
+            Self::KochSnowflake,
+            Self::SierpinskiCells,
+            Self::ReactionDiffusion,
+            Self::PoissonDisk2d,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1542,6 +1565,7 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::bio_patterns::is_kind(other) => crate::bio_patterns::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
