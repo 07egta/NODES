@@ -517,3 +517,229 @@ mod tests {
         assert!(divide(&curve, 4, &stop).unwrap_err().contains("停止"));
     }
 }
+
+pub(super) fn catenary_segments(n: f64) -> Result<usize, String> {
+    division_count(n)
+        .ok()
+        .filter(|count| *count >= 4)
+        .ok_or_else(|| format!("近似の分割数は 4〜{MAX_CURVE_DIVISIONS} の整数にしてください。"))
+}
+
+/// Monotone sinh(b)/b - 1, where b = horizontal_span / (2*a).
+fn sinhc_excess(b: f64) -> f64 {
+    if b < 0.05 {
+        let sq = b * b;
+        sq / 6. * (1. + sq / 20. * (1. + sq / 42. * (1. + sq / 72.)))
+    } else {
+        b.sinh() / b - 1.
+    }
+}
+
+pub(super) fn catenary(
+    start: &Value,
+    end: &Value,
+    length: f64,
+    gravity: Point,
+    segments: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Value, String> {
+    use super::{cross, dot, sub};
+    cancelled(cancel)?;
+    let start = point(start)?;
+    let end = point(end)?;
+    let norm = |[x, y, z]: Point| x.hypot(y).hypot(z);
+    let delta = sub(end, start);
+    let chord = norm(delta);
+    if chord == 0. {
+        return Err("懸垂線の始点と終点は異なる座標にしてください。".into());
+    }
+    let g = norm(gravity);
+    if !g.is_finite() || g == 0. {
+        return Err("重力の向きを指定してください（X・Y・Z をすべて 0 にできません）。".into());
+    }
+    if !length.is_finite() || length <= chord {
+        return Err("ひもの長さは始点と終点の直線距離より長くしてください。".into());
+    }
+    let up = gravity.map(|g_i| -(g_i / g));
+    let h = dot(delta, up);
+    let span = norm(cross(delta, up));
+    if span <= chord * 1e-12 {
+        return Err(
+            "両端が重力方向に並ぶため懸垂線を作れません。どちらかの点を横にずらしてください。"
+                .into(),
+        );
+    }
+    // (L² - h²) / span² - 1 = (L - chord)(L + chord) / span².
+    // Rationalize sqrt(1 + excess) - 1 to retain almost taut cases.
+    let slack = ((length - chord) / span) * ((length + chord) / span);
+    let target = slack / ((1. + slack).sqrt() + 1.);
+    if !target.is_finite() || target <= 0. {
+        return Err("ひもの長さと両端の間隔の比が計算可能な範囲を超えています。".into());
+    }
+    // sinh(512) already bounds the target for every finite binary64 slack,
+    // since target is at most sqrt(slack).
+    let mut hi = 1.;
+    while hi < 512. && sinhc_excess(hi) < target {
+        hi *= 2.;
+    }
+    let mut lo = 0.;
+    for _ in 0..64 {
+        let b = (lo + hi) * 0.5;
+        if sinhc_excess(b) < target {
+            lo = b;
+        } else {
+            hi = b;
+        }
+    }
+    let b = (lo + hi) * 0.5;
+    let denom = -(-2. * b).exp_m1();
+    let half_rise_plus_length = (h + length) * 0.5;
+    let half_rise_minus_length = (h - length) * 0.5;
+    let mut points = Vec::with_capacity(segments + 1);
+    points.push(start);
+    for i in 1..segments {
+        if i % 32 == 0 {
+            cancelled(cancel)?;
+        }
+        let t = i as f64 / segments as f64;
+        // Difference of hyperbolic cosines written with bounded exp/expm1.
+        // y(0)=0 and y(1)=h; do not subtract large absolute heights.
+        let v = b * (1. - t);
+        let scale = -(-2. * b * t).exp_m1() / denom;
+        let local_height = if v < 0.5 {
+            h + half_rise_plus_length * (-2. * v).exp_m1()
+        } else {
+            half_rise_minus_length + half_rise_plus_length * (-2. * v).exp()
+        };
+        let sag = scale * local_height - h * t;
+        let p = std::array::from_fn(|axis| start[axis] + delta[axis] * t + up[axis] * sag);
+        if !finite_point(p) || points.last() == Some(&p) || p == end {
+            return Err(
+                "懸垂線をこの座標範囲で近似できません。長さ・座標・分割数を確認してください。"
+                    .into(),
+            );
+        }
+        points.push(p);
+    }
+    points.push(end);
+    Ok(Value::Curve(Arc::new(Curve {
+        points,
+        closed: false,
+    })))
+}
+
+#[cfg(test)]
+mod catenary_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    fn curve(a: Point, b: Point, cable: f64, gravity: Point, count: usize) -> Arc<Curve> {
+        match catenary(
+            &Value::Point(a),
+            &Value::Point(b),
+            cable,
+            gravity,
+            count,
+            &|| false,
+        )
+        .unwrap()
+        {
+            Value::Curve(c) => c,
+            other => panic!("expected curve, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn true_cosh_oracle_and_bounded_polyline_length() {
+        let a = [0., 0., 0.];
+        let b = [24., 0., 0.];
+        let l = 30.189_227_108_243_45;
+        let c = curve(a, b, l, [0., 0., -1.], 128);
+        assert_eq!(c.points.len(), 129);
+        assert!(!c.closed);
+        assert_eq!(c.points[0], a);
+        assert_eq!(c.points[128], b);
+        for (i, [x, y, z]) in c.points.iter().copied().enumerate() {
+            let x_exact = 24. * i as f64 / 128.;
+            let z_exact = 10. * (((x_exact - 12.) / 10.).cosh() - 1.2_f64.cosh());
+            assert_eq!(x, x_exact);
+            assert_eq!(y, 0.);
+            assert!((z - z_exact).abs() < 1e-12, "{i}: {z} != {z_exact}");
+        }
+        let coarse = length(&curve(a, b, l, [0., 0., -1.], 32), &|| false).unwrap();
+        let fine = length(&c, &|| false).unwrap();
+        assert!(coarse < fine && fine < l && l - fine < 0.001);
+    }
+
+    #[test]
+    fn unequal_height_reversal_and_rotated_gravity() {
+        let a = [0., 0., 0.];
+        let b = [24., 0., 10.783_281_862_713_832];
+        let l = 32.057_270_643_706_3;
+        let c = curve(a, b, l, [0., 0., -1.], 48);
+        let r = curve(b, a, l, [0., 0., -5.], 48);
+        let d = curve(a, [b[2], 24., 0.], l, [-9., 0., 0.], 48);
+        assert!((c.points[24][2] - (-3.216_530_727_813_734)).abs() < 1e-12);
+        assert!((c.points[17][2] - (-3.835_308_919_373_588)).abs() < 1e-12);
+        for (([x, y, z], [xr, yr, zr]), [u, v, w]) in c
+            .points
+            .iter()
+            .copied()
+            .zip(r.points.iter().rev().copied())
+            .zip(d.points.iter().copied())
+        {
+            assert!((x - xr).abs() + (y - yr).abs() + (z - zr).abs() < 1e-12);
+            assert!((x - v).abs() + (y - w).abs() + (z - u).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn almost_taut_and_extreme_slack_remain_finite() {
+        let a = [0., 0., 0.];
+        let b = [1., 0., 0.];
+        let c = curve(a, b, 1.0_f64.next_up(), [0., 0., -1.], 64);
+        assert!(c.points[32][2] < -1e-9 && c.points[32][2] > -1e-7);
+        let c = curve(a, [1e-8, 0., 0.], 1e8, [0., 0., -1.], 64);
+        assert!(c.points.iter().copied().all(finite_point));
+        assert!((c.points[32][2] + 5e7).abs() < 1.);
+    }
+
+    #[test]
+    fn invalid_configuration_and_cancellation_are_rejected() {
+        let a = Value::Point([0., 0., 0.]);
+        let b = Value::Point([1., 0., 0.]);
+        let vertical = Value::Point([0., 0., 1.]);
+        let g = [0., 0., -1.];
+        assert!(
+            catenary(&a, &a, 3., g, 64, &|| false)
+                .unwrap_err()
+                .contains("異なる")
+        );
+        assert!(
+            catenary(&a, &vertical, 3., g, 64, &|| false)
+                .unwrap_err()
+                .contains("重力方向")
+        );
+        assert!(
+            catenary(&a, &b, 1., g, 64, &|| false)
+                .unwrap_err()
+                .contains("直線距離")
+        );
+        assert!(
+            catenary(&a, &b, 3., [0.; 3], 64, &|| false)
+                .unwrap_err()
+                .contains("向き")
+        );
+        for n in [0., 3., 4.5, 1025., f64::NAN] {
+            assert!(catenary_segments(n).is_err());
+        }
+        assert_eq!(catenary_segments(1024.).unwrap(), 1024);
+        let checks = Cell::new(0);
+        let cancelled_during_sampling = catenary(&a, &b, 3., g, 128, &|| {
+            checks.set(checks.get() + 1);
+            checks.get() >= 2
+        });
+        assert!(cancelled_during_sampling.is_err());
+        assert_eq!(checks.get(), 2);
+    }
+}

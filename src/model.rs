@@ -192,6 +192,7 @@ pub enum NodeKind {
     Polyline,
     CurveLength,
     DivideCurve,
+    Catenary,
 }
 impl NodeKind {
     pub fn all() -> &'static [Self] {
@@ -268,6 +269,7 @@ impl NodeKind {
             Self::Polyline,
             Self::CurveLength,
             Self::DivideCurve,
+            Self::Catenary,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -590,6 +592,31 @@ impl NodeKind {
                         i("count", "分割数", 8., 1., MAX_CURVE_DIVISIONS as f64),
                     ],
                     output: DataType::Point,
+                };
+                &SPEC
+            }
+            Self::Catenary => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "懸垂線",
+                    category: "曲線",
+                    description: "始点・終点とひもの長さから、重力方向にたるむ曲線を折れ線で近似します。重力に沿う両端には使えません。",
+                    keywords: "catenary from length cable chain sag 懸垂線 カテナリー たるみ 鎖",
+                    inputs: &[
+                        g("start", "始点", DataType::Point),
+                        g("end", "終点", DataType::Point),
+                        n("length", "ひもの長さ", 30., 0., 5e9, 0.1),
+                        n("gravity_x", "重力 X", 0., -1e9, 1e9, 0.1),
+                        n("gravity_y", "重力 Y", 0., -1e9, 1e9, 0.1),
+                        n("gravity_z", "重力 Z", -1., -1e9, 1e9, 0.1),
+                        i(
+                            "segments",
+                            "近似の分割数",
+                            64.,
+                            4.,
+                            MAX_CURVE_DIVISIONS as f64,
+                        ),
+                    ],
+                    output: DataType::Curve,
                 };
                 &SPEC
             }

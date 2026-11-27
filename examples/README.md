@@ -22,3 +22,17 @@
 追加機能に対応したソース版では [`tree-branches.morph`](tree-branches.morph) で、枝のパスを保った合流・抽出、指定番号の削除と配置を確認できます。
 
 [`curve-basics.morph`](curve-basics.morph) では直線・折れ線・長さ・曲線の等分割を確認できます。
+
+### 懸垂線：糸やケーブルのたるみ
+
+[`catenary-cable.morph`](catenary-cable.morph) を開くと、24 mm 離れた両端に
+約 30.189 mm の糸を掛けた形を確認できます。「ひもの形」ノードの長さを増やすと
+たるみが深くなります。長さは両端の直線距離より大きくしてください。
+重力は既定で −Z です。X・Y・Z で任意方向を指定できますが、ゼロベクトルや
+両端が重力方向に並ぶ場合は作れません。出力は端点を厳密に通る開いた折れ線
+（4〜1024 分割）です。測った折れ線長は指定した連続曲線の長さより少し短くなります。
+形状や荷重に関する構造計算ではありません。
+
+操作上の参考: [McNeel Rhino 8 の Catenary](https://docs.mcneel.com/rhino/8/help/en-us/commands/catenary.htm)、
+[Grasshopper 2 の Catenary From Length](https://www.rhino3d.com/docs/grasshopper2/specs/00000000a9c64cb18f0850a66f112603.html)。
+本ノードは独立実装で、出力は曲線 1 本です。NURBS や別の頂点出力はありません。

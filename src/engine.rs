@@ -454,6 +454,10 @@ fn preflight_run(
             let count = num(args, 2)? as usize;
             (count, count)
         }
+        NodeKind::Catenary => {
+            let count = curve_nodes::catenary_segments(num(args, 6)?)? + 1;
+            (count, 1)
+        }
         NodeKind::DivideCurve => {
             let count =
                 curve_nodes::division_count(num(args, 1)?)? + usize::from(!curve(args)?.closed);
@@ -610,6 +614,14 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         Line => Ok(vec![curve_nodes::two_point(
             shape(a)?,
             a.get(1).ok_or("終点を接続してください。")?,
+        )?]),
+        Catenary => Ok(vec![curve_nodes::catenary(
+            shape(a)?,
+            a.get(1).ok_or("終点を接続してください。")?,
+            num(a, 2)?,
+            [num(a, 3)?, num(a, 4)?, num(a, 5)?],
+            curve_nodes::catenary_segments(num(a, 6)?)?,
+            cancel,
         )?]),
         CurveLength => Ok(vec![Value::Number(curve_nodes::length(
             curve(a)?.as_ref(),

@@ -414,7 +414,7 @@ fn new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged() {
     }
     // 42 geometry/data nodes, the Script node, the 20 list/pattern/print nodes and the
     // ImportMesh node (Cluster is created from a definition).
-    assert_eq!(NodeKind::all().len(), 71);
+    assert_eq!(NodeKind::all().len(), 72);
     let mut seen = std::collections::BTreeSet::new();
     assert!(NodeKind::all().iter().all(|k| seen.insert(*k)));
 }
@@ -1450,4 +1450,35 @@ fn hostile_settings_on_new_nodes_are_errors_not_panics() {
             }
         }
     }
+}
+
+#[test]
+fn shipped_catenary_graph_evaluates_and_reopens() {
+    let project = persistence::load(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/catenary-cable.morph"),
+    )
+    .unwrap();
+    let dir = TempDir::new();
+    let saved = dir.file("懸垂線.morph");
+    persistence::save(&saved, &project).unwrap();
+    let reopen = persistence::load(&saved).unwrap();
+    assert_eq!(reopen, project);
+    assert_eq!(reopen.graph.nodes[2].kind, NodeKind::Catenary);
+    assert_eq!(
+        serde_json::to_string(&NodeKind::Catenary).unwrap(),
+        "\"catenary\""
+    );
+    let result = Evaluator::default().evaluate(&reopen.graph, &|| false);
+    let curve = result.outputs[&2].as_ref().unwrap();
+    let Some(Value::Curve(c)) = curve.branches[&vec![0]].first() else {
+        panic!("a single catenary was expected")
+    };
+    assert_eq!(c.points.len(), 129);
+    assert_eq!(c.points[0], [0., 0., 0.]);
+    assert_eq!(c.points[128], [24., 0., 0.]);
+    assert!((c.points[64][2] - (-8.106_555_673_243_747)).abs() < 1e-12);
+    let length = result.outputs[&3].as_ref().unwrap().branches[&vec![0]][0]
+        .number()
+        .unwrap();
+    assert!((30.188..30.189_227_108_243_45).contains(&length));
 }

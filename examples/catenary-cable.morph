@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "name": "懸垂線でつくる糸のたるみ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "point",
+        "name": "始点",
+        "position": [
+          20,
+          50
+        ],
+        "params": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "point",
+        "name": "終点",
+        "position": [
+          20,
+          220
+        ],
+        "params": {
+          "x": 24.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "catenary",
+        "name": "ひもの形",
+        "position": [
+          285,
+          70
+        ],
+        "params": {
+          "length": 30.18922710824345,
+          "segments": 128.0
+        },
+        "inputs": {
+          "start": 0,
+          "end": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "curve_length",
+        "name": "折れ線の長さ",
+        "position": [
+          590,
+          75
+        ],
+        "params": {},
+        "inputs": {
+          "curve": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "output",
+        "name": "完成形",
+        "position": [
+          590,
+          215
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    0,
+    0
+  ],
+  "zoom": 1.0
+}
