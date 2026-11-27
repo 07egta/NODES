@@ -2,9 +2,36 @@
 
 更新: 2026-11-27 JST。成功は実行したコードに限定する。作業環境停止後に復旧・再実装したコードは、追加CIの結果で確定する。
 
-## 最新の確定結果
+## Ω 開発ブランチの検証（PR #16）
 
-最新ソース **`c44a897a22072c6694d1dbf2233ae9557955f49e`** の [Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) は Linux・Windows ともに成功した。
+[PR #16](https://github.com/07egta/NODES/pull/16) は `a1ffa40071c0c3508b890065bd12220c5abb80d9` を基点とする。現在の正確な保存位置と進行中作業は [STATUS](docs/development/STATUS.md) を読む。以下は**それぞれのソースに対して実行した結果**であり、後続の変更へ自動的に転用しない。
+
+| ソース | 検証 | 結果 |
+|---|---|---|
+| `0aa286a` | Linux CI / Windows CI [45914152032](https://github.com/07egta/NODES/actions/runs/45914152032) | 520 / 518 passed、各0 failed・3 ignored、48 targets。両release配布成功 |
+| `0aa286a` | ローカル fmt / check / strict Clippy / Python | 全成功。Python17件、独立Fraction oracle各128例の再生成一致 |
+| `25f981b` | ローカル全ターゲット | **523 passed / 0 failed / 3 ignored、48 targets**。fmt・strict Clippy・release --bins成功 |
+| `25f981b` | actual GraphCanvas の入力回帰 | 修正前0/3 → 修正後3/0。符号付きゼロ・長い値の領域・並替え後のfocusを検査 |
+| `25f981b` | Linux native GUI | キャンバス数値入力、Atan2の符号、Undo/Redo、保存、日本語ヘルプ、分割STLを実操作 |
+
+Linux/Windowsの2件差はUnix限定のproject/part FIFO回帰である。ignoredは明示的に実行する計測・ストレス試験であり、失敗試験を削除していない。新しいCI [45916077764](https://github.com/07egta/NODES/actions/runs/45916077764) とソース・tree・配布物の対応は [OMEGA_CI_RESULTS.json](docs/development/OMEGA_CI_RESULTS.json) に記録する。前のCIの成功件数を新しいソースの検証件数として扱わない。
+
+### 修正と独立検証
+
+- MassAddition/MassMultiplicationの旧経路を共通評価へ統合。総和・平均・補間はbinary64の有限入力から整数累積して最後に丸める。Fractionで作った独立期待値を用い、overflow/cancellation/subnormal/signed zeroを検査した。計算コスト増も測定している。
+- 曲線の端点最近接探索と閉曲線判定、曲面のnative knot区間を使う適応面積積分、skew平面最近接点と平行移動後の微分を修正。面積の誤差指標は厳密な誤差上限ではない。上限未収束はエラーにする。
+- OBJの固定小数点丸めによる薄い三角形の破損を防止。頂点fan/重複面を共有診断し、閉多様体でない形の体積・重量を「未判定」とした。
+- partの通常ファイル検査と有界読込、分割書出しの全ファイル準備・実際の部分成功報告を検査。複数renameの完全transactionとは主張しない。
+
+### 実操作・性能の再現資料
+
+[OMEGA_NATIVE_GUI.json](docs/development/OMEGA_NATIVE_GUI.json) にバイナリhash、スクリーンショット、操作列を保存。GUIが書き出した2つのSTLを独立Python parserで確認し、各684 bytes、12三角形、8頂点、18辺、閉じた辺の向き、面積2400 mm²、体積8000 mm³、期待する座標範囲が一致した。`python3 scripts/validate_omega_gui_exports.py` で再確認できる。これは一般の自己交差・肉厚・実機印刷の検証ではない。
+
+性能の生データは [OMEGA_GEOMETRY_PERFORMANCE.json](docs/development/OMEGA_GEOMETRY_PERFORMANCE.json)、[OMEGA_AGGREGATE_PERFORMANCE.json](docs/development/OMEGA_AGGREGATE_PERFORMANCE.json)、[OMEGA_INTERPOLATION_PERFORMANCE.json](docs/development/OMEGA_INTERPOLATION_PERFORMANCE.json)、[OMEGA_WORKLOAD_PERFORMANCE.json](docs/development/OMEGA_WORKLOAD_PERFORMANCE.json)。同じ正しい曲面計算の局所基底最適化は大モデルの中央値27.094→11.569 ms。一方、16384個の普通の値の総和・平均は約1.6倍のコストになり、精度との交換条件を隠していない。10000ノードのslider編集p50は34.099 ms、p95は43.893 ms、最大389.601 msで、共有VMの外れ値も保持している。これらはWindowsノートPCのGUIフレーム時間ではない。
+
+## 以前の統合チェックポイント（c44a897a）
+
+この過去のソース **`c44a897a22072c6694d1dbf2233ae9557955f49e`** の [Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) は Linux・Windows ともに成功した。
 
 | 環境・job | Rust 全ターゲット | その他の成功した検証 |
 |---|---|---|

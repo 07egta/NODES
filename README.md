@@ -2,17 +2,19 @@
 
 **ノードをつないで、形を作る。** 日本語を中心にした、独立型デスクトップのパラメトリックCADです。Rhino・Grasshopperのインストールやログインは不要で、基本のモデリング、保存、書き出しはオフラインで利用できます。
 
-現在の統合開発は [develop/nodes-ultimate](https://github.com/07egta/NODES/tree/develop/nodes-ultimate) と [Draft PR #11](https://github.com/07egta/NODES/pull/11) で進めています。**開発版であり、Grasshopperの完全互換版ではありません。** 最新の実行結果、既知の制限、再開手順は [TEST_RESULTS.md](TEST_RESULTS.md) と [開発チェックポイント](docs/development/STATUS.md) を参照してください。
+現在のΩ開発は [feat/nodes-omega-geometry](https://github.com/07egta/NODES/tree/feat/nodes-omega-geometry) と [Draft PR #16](https://github.com/07egta/NODES/pull/16) で進めています。以前の統合成果・関連PRの履歴も保全しています。**開発版であり、Grasshopperの完全互換版ではありません。** 最新の実行結果、既知の制限、再開手順は [TEST_RESULTS.md](TEST_RESULTS.md) と [開発チェックポイント](docs/development/STATUS.md) を参照してください。
 
 [使い方](docs/USER_GUIDE_JA.md) · [ノード対応表](NODE_COVERAGE.md) · [設計](docs/ARCHITECTURE.md) · [ロードマップ](ROADMAP.md) · [CI](https://github.com/07egta/NODES/actions)
 
 ## 入手する
 
-- **検証済み開発版:** ソース `c44a897a22072c6694d1dbf2233ae9557955f49e` の [Windows ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15135989980) / [Linux ZIP](https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15137335621) を取得できます。CI成果物は安定リリースではありません。最新Windowsの実画面操作と実機造形は未検証です。
+- **検証済み開発版:** 数値・幾何・書き出し修正のソース `0aa286a93a8b61f23ce691b1d15a025780ec1fc8` の [Windows ZIP](https://github.com/07egta/NODES/actions/runs/45914152032/artifacts/15161918291) / [Linux ZIP](https://github.com/07egta/NODES/actions/runs/45914152032/artifacts/15160604959) を取得できます。CI成果物は安定リリースではありません。最新Windowsの実画面操作と実機造形は未検証です。
 - **旧公開版:** [Morphlet 0.1.0 Windows ZIP](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip)。この旧版には現在の開発ブランチで追加した機能は含まれません。
 - **ソースから:** 下記のビルド手順を使います。実行ファイル名は互換性のため `Morphlet.exe` を維持しています。
 
-[Check 45857217255](https://github.com/07egta/NODES/actions/runs/45857217255) はLinux **437 passed**、Windows **436 passed**、各0 failed / 2 ignoredで成功しました。両OSのGUI/CLI release buildと、Linuxのfmt/check/strict Clippy・Python17件・依存監査も成功しています。件数差はUnix限定FIFO回帰1件です。この結果はc44a897aのソースに対するもので、後続の証拠文書更新とは区別します。[ソース・配布物の検証記録](docs/development/CI_NUMERIC_VALIDATION.json)
+[Check 45914152032](https://github.com/07egta/NODES/actions/runs/45914152032) はLinux **520 passed**、Windows **518 passed**、各0 failed / 3 ignoredで成功しました。両OSのGUI/CLI release buildと、Linuxのfmt/check/strict Clippy・Python17件・独立数値oracle・依存監査も成功しています。件数差はUnix限定FIFO回帰2件です。UI追加版 `25f981b` はローカル523件と実GUIの直接数値入力・保存・分割STL出力を確認済み。ソース別のCI・配布物は [検証記録](docs/development/OMEGA_CI_RESULTS.json) を参照してください。
+
+WindowsでランタイムDLLが見つからない場合は、[Microsoft公式の実行時ランタイム導入手順](docs/WINDOWS_RUNTIME.md)を参照してください。配布exeを使うためにRustやC++ Build Toolsを導入する必要はありません。
 
 ## 最初のモデルを編集する
 

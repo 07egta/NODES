@@ -1,50 +1,51 @@
 # NODES Omega development checkpoint
 
-- Updated: 2026-11-27T09:14:56+09:00.
-- Active development branch: `feat/nodes-omega-geometry`; draft PR https://github.com/07egta/NODES/pull/16 (base `feat/rhino-modeling-and-latency`).
-- Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR15, includes PR12 and earlier integration).
-- Last published numerical/export source: `0aa286a93a8b61f23ce691b1d15a025780ec1fc8`; tree `231ad326e4a6ef2f20af1b8f8c0c5afdab2861d5`.
-- Additional UI work is being saved first on `checkpoint/nodes-omega-ui-20261127` so the existing Windows CI can finish. After that, fast-forward PR16 to the checkpoint; never force-push or merge unverified code.
+- Updated: 2026-11-27T09:28:11+09:00.
+- Active branch: `feat/nodes-omega-geometry`; draft [PR #16](https://github.com/07egta/NODES/pull/16), base `feat/rhino-modeling-and-latency`.
+- Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR15, includes PR12 and older integration).
+- Last published product source: `25f981b794e3e0f037cd664915ce144347b49f40`, tree `d541b1b6e05378003f0ad87ffc384287e787252e`.
+- Evidence updates are saved on `checkpoint/nodes-omega-ui-20261127` while Windows run45916077764 finishes. Compare both refs before resuming and fast-forward PR16 with expected-head verification; never force-push.
 - Checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust/Cargo1.100.0 at `/home/agent/.cargo/bin`.
 
-## Completed and preserved
+## Completed work
 
-1. Legacy MassAddition/MassMultiplication now share the bounded math path.
-2. Exact binary64 summation/mean and affine interpolation, with independent Python Fraction128-case oracles checked in CI. Exactness has measured CPU costs; no blanket speedup claim.
-3. Curve endpoint closest-point refinement and geometric closure probes; signed-zero edit/history/cache preservation.
-4. Native-knot-cell adaptive surface area, skew-plane closest point and stable translated rational derivatives; local-support/basis optimization after correctness regressions exposed a performance cost.
-5. OBJ round-trip coordinate formatting preserves very thin validated geometry.
-6. Shared vertex-fan/duplicate-face topology diagnostics across viewport/export/CLI; invalid closed-manifold volume/weight are undetermined.
-7. Regular-file part input guards and FIFO regression; split exports prepare all files before replacement and report real partial completion.
-8. Canvas direct numeric entry, stable node/port widget IDs, clipped long fields and real-canvas regression3/3; compact truthful help and readable responsive export dialog. Native verification of these latest UI changes is next.
-9. Actual Linux0aa GUI Inspector -0/atan2 edit, Undo/Redo, save/close/restart and vertex-contact diagnostics. Screenshots, saved editable graphs and exact numeric verification are in OMEGA_NATIVE_GUI.json.
+- Legacy MassAddition/MassMultiplication share the bounded math path. Exact binary64 sum/mean and affine interpolation have independent Fraction oracles and measured cost tradeoffs.
+- Curve endpoint/closure bugs, signed-zero editing/history/cache, adaptive native-knot surface area, skew-plane closest point, translated derivatives, and local-support/basis performance are corrected.
+- OBJ roundtrip coordinates, shared vertex-fan/duplicate-face diagnostics, unknown volume for invalid solids, regular part input/FIFO guards, staged split exports and accurate partial-failure reports are implemented.
+- Canvas direct numeric entry uses stable node/port IDs and clipped controls. Help/export/shortcuts are scrollable and theme-aware; Japanese guide matches the actual feature limits.
+- Actual Linux25f GUI: canvas 0↔-0 changes Atan2 ±π; Undo/Redo/save; help scrolling; vertex-contact diagnostics; 24 faces exported to2 binary STLs. Independent parser verified each684bytes/12triangles/8vertices/18edges, volume8000mm³ and area2400mm². Earlier0aa Inspector save/close/restart evidence is preserved separately.
+- 0aa Linux and Windows CI/release artifacts verified by download, digest and build-info. Windows PE import analysis identified VCRUNTIME140.dll; docs/WINDOWS_RUNTIME.md explains the official runtime requirement without bundling an installer.
 
-## Verification and performance
+## Tests and measurements
 
-- Baseline a1ffa4 CI: Linux448/Windows447 successful tests,0failed,3manual ignored.
-- Current numerical source0aa local: fmt,all-target check,strict Clippy,520Rust tests/0failed/3manual ignored,17Python tests and both128-case oracle generator checks pass. See OMEGA_LOCAL_GATES.json.
-- CI run45914152032: Linux completed520/0/3 with strict gates/release/artifact; Windows test step passed and release is running at last check. Record actual final counts/artifacts in OMEGA_CI_RESULTS.json when complete.
-- Local release --bins succeeded in Cargo-reported61s; exact binary hashes in OMEGA_RELEASE_BUILD.json.
-- Additional UI: actual-canvas tests0/3 before→3/0 after; GUI44/0/1manual ignored; format/all-target strict Clippy pass. OMEGA_UI_VALIDATION.json distinguishes these from the520-test source checkpoint.
-- Reproducible measurements: OMEGA_GEOMETRY_PERFORMANCE.json (large surface27.094→11.569ms, plus earlier stage); OMEGA_AGGREGATE_PERFORMANCE.json (precision/cost tradeoffs); OMEGA_INTERPOLATION_PERFORMANCE.json (~125–134ns exact kernel per nonconstant input on this host); OMEGA_WORKLOAD_PERFORMANCE.json (100/1000/10000/16384node chains, trees, meshes, save/load). Not laptop/Intel Arc/GUI latency claims.
-- Registered299 kinds =298picker+definition-only Cluster. Fully implemented or fully verified node count remains unestablished. Versioned external Grasshopper oracle VERIFIED=0.
+- 0aa full local/CI Linux520 pass; Windows518 pass; all0fail/3manual ignored,48targets. Both release packages passed. Linux fmt/check/strict Clippy, Python17 and two128-case oracle regeneration checks pass.
+- 25f local523 pass/0fail/3ignored,48targets; fmt/strict Clippy/release pass. Actual-canvas new regressions0/3 before→3/0 after. CI run45916077764: Linux523/0/3 and release success; Windows still in progress at this checkpoint. See OMEGA_CI_RESULTS.json for actual source-specific final state.
+- Performance: OMEGA_GEOMETRY_PERFORMANCE.json (large surface local-basis27.094→11.569ms), OMEGA_AGGREGATE_PERFORMANCE.json (including~1.6×ordinary16k sum/mean cost), OMEGA_INTERPOLATION_PERFORMANCE.json (~125–134ns/nonconstant exact kernel), OMEGA_WORKLOAD_PERFORMANCE.json (100/1000/10000/16384 nodes,large trees,meshes,save/load). Shared Linux VM measurements are not Windows/Intel Arc GUI latency claims.
+- Registered299 kinds=298picker+Cluster. Fully implemented/fully verified node counts remain unestablished. External versioned Grasshopper oracle VERIFIED=0.
 
-## Resume without prior conversation
+## Current work
 
-1. Fetch PR16 and `checkpoint/nodes-omega-ui-20261127`; compare head/source trees and read this file plus OMEGA_NEXT_TASKS.md. Keep the newer verified descendant. Do not overwrite other active PRs.
-2. Finish Windows run45914152032 evidence; then fast-forward PR16 if its current head is still0aa. Preserve expected-head checks.
-3. Rebuild current UI with `env PATH=/home/agent/.cargo/bin:$PATH CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo build --release --locked --offline --bins`.
-4. Native-test canvas numeric entry/zoom/port interaction; help/export/shortcuts at small window and high UI scale, light/dark; actual split output with independent STL parse. Repeat only affected gates if new fixes are needed.
-5. Update NODE_COVERAGE.md,ROADMAP.md,TEST_RESULTS.md,docs/ARCHITECTURE.md and PR16 body with exact new source/CI/native evidence.
+- kernel_research owns `src/viewport.rs`, `src/viewport_cache_tests.rs`, app preview/right-panel/F/menu-fit/scene-revision fields. It reproduced a pending frame discarding unchanged geometry (2112→0triangles) even though only an unrelated Number recomputed and mesh Arc stayed identical. Before/after test and145920triangle benchmark are in progress.
+- multiport_audit independently reviews empty/error, hidden panels, camera/selection/fit, stale revision/export contracts. Hidden-panel completed-empty→new-pending must not resurrect an older displayed scene.
+- integration_audit tracks25f Windows CI and only updates OMEGA_CI_RESULTS.json. Root owns integration, native GUI, top-level docs and GitHub publication. No agents may commit/ref-update independently.
 
-## Current work and known limitations
+## Resume commands and next files
 
-- Next files: `src/canvas.rs`,`src/getting_started.rs`,`src/stl_export_ui.rs` for native UI follow-up; `src/app.rs`,`src/viewport.rs` for measured preview cache/clone work; evidence files above and top-level development docs.
-- Remaining architectural priorities: independent multi-port PR14/17 integration, consumed-port error propagation, runtime Null, general trimmed B-rep/robust Boolean, broader file interchange. OMEGA_NEXT_TASKS.md has11 concrete tasks with current branch heads/conflicts and commands.
-- Viewport audit: scene statistics are cached for unchanged camera frames, but preview Tree containers clone on redraw and stale empty scenes may cause unnecessary rebuilds. This is a code finding, not a measured speed improvement.
-- Windows GUI/Intel Arc, broad DPI, peak memory/startup, mesh self-intersection/minimum wall thickness and physical printing remain unverified.
-- Disk was exhausted once by debug artifacts; this checkout target was cleaned without deleting source. Use the env flags above; do not clean other developers' directories.
-- No main push,force push,merge,dependency addition or license-policy change. Other PRs remain separate. Direct git push lacked credentials; GitHub Git-object/ref publication with verified tree and remote SHA preserves every checkpoint.
+1. Fetch PR16 and auxiliary checkpoint; read git history, this file and OMEGA_NEXT_TASKS.md. Respect current modifications from other agents/PRs. Reuse the newest verified descendant.
+2. Complete the pending-preview regression fix and independent review; update TEST_RESULTS/ARCHITECTURE/STATUS with actual tests and timings. Do not claim it fixed from this checkpoint alone.
+3. Run relevant tests, then full gates for the final source:
+   `env PATH=/home/agent/.cargo/bin:$PATH CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --all-targets --locked --offline`
+   Use the same env for fmt/check/clippy (`-- -D warnings`) and `cargo build --release --locked --offline --bins`.
+4. Native-test latest viewport change and light/small/high-DPI dialogs. Recheck actual exported files with `python3 scripts/validate_omega_gui_exports.py`.
+5. Save each coherent unit, verify remote SHA, update PR16 body and retain source/tree/artifact distinction. Direct git push has no credentials; authorized GitHub Git-object/ref tools work.
+
+## Remaining priorities and limits
+
+- OMEGA_NEXT_TASKS.md records11 actionable items and concurrent PR conflicts: multiport PR14/17, consumed-output errors, unknown native node preservation, Null/mixed access, graph diff signed zero, file picker contracts, etc. Do not blindly integrate a branch with CI failures.
+- General trimmed B-rep, robust general Boolean/intersections, STEP/IGES/3DM/GH binary, persistent SubD and plugin ABI remain incomplete.
+- Latest Windows GUI/Intel Arc, broad DPI, startup/peak memory, self-intersection/minimum-wall-thickness and physical printing remain unverified.
+- Before pending-cache work, viewport cached unchanged camera frames but clones preview Tree containers on redraw. Actual geometry-change topology audit is still synchronous. Do not claim those separate costs solved.
+- Debug artifacts once exhausted disk; use the env flags above. Do not clean other developers' directories. No main push,force push,merge,dependency addition or license-policy change.
 
 ---
 

@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-11-27T09:14:56+09:00",
+  "updated_at": "2026-11-27T09:27:26+09:00",
   "parent_commit": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
-  "status": "Local checks pass; native retest and full final CI pending",
+  "status": "Local full gates and native dark-theme numeric/save/split-export workflow pass; latest Windows CI and broader DPI checks tracked separately",
   "canvas_direct_entry": {
     "before": {
       "passed": 0,
@@ -36,6 +36,22 @@
     "cargo_check_gui": "pass",
     "cargo_fmt_all": "pass",
     "cargo_clippy_all_targets_strict": "pass; 1.02s",
-    "native_after": "pending"
+    "native_after": "pass for recorded dark-theme workflow; see OMEGA_NATIVE_GUI.json"
+  },
+  "source_commit": "25f981b794e3e0f037cd664915ce144347b49f40",
+  "full_rust_tests": {
+    "source_commit": "25f981b794e3e0f037cd664915ce144347b49f40",
+    "command": "cargo test --all-targets --locked --offline",
+    "targets": 48,
+    "passed": 523,
+    "failed": 0,
+    "ignored": 3,
+    "all_targets_ok": true,
+    "log_sha256": "da793e9eaadf4557c612ff1acb24aaf4e97c0dd010008a1347f3b429c7da2c4d"
+  },
+  "release_build": {
+    "cargo_reported_seconds": 20.62,
+    "exit_code": 0,
+    "Morphlet_sha256": "b06ee291445a6c5a7faa8ff4b9055257a4dd9c7f56cf91adf51459dc31a19f44"
   }
 }
