@@ -1590,6 +1590,7 @@ mod batch_commit_tests {
             OutputFormat::StlBinary,
             &base,
             &[mesh.clone(), mesh.clone(), mesh],
+            false,
         )
         .unwrap();
         for target in &targets {
