@@ -8,6 +8,7 @@ mod gcode_ui;
 mod getting_started;
 mod help;
 mod math_mapper_ui;
+mod melt;
 mod node_icons;
 mod node_shelf;
 mod script_ui;

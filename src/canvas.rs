@@ -1,4 +1,5 @@
 use crate::data_view::{self, DataShape};
+use crate::melt;
 use crate::theme;
 use crate::ui_polish;
 use eframe::egui::epaint::{RectShape, TessellationOptions, Tessellator};
@@ -581,7 +582,9 @@ impl GraphCanvas {
                         continue;
                     }
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
-                    let color = if selected {
+                    let color = if theme::is_melt() {
+                        melt::wire_color(src.kind.spec().output, selected)
+                    } else if selected {
                         theme::teal()
                     } else {
                         theme::wire_idle()
@@ -837,12 +840,15 @@ impl GraphCanvas {
                 } else {
                     theme::port_color(spec.kind)
                 };
-                painter.circle_filled(
+                melt::port_marker(
+                    &painter,
                     ip,
                     5. * p.zoom,
+                    spec.kind,
                     if linked { port_col } else { theme::card_bg() },
+                    port_col,
+                    1.6,
                 );
-                painter.circle_stroke(ip, 5. * p.zoom, Stroke::new(1.6_f32, port_col));
                 if can == Some(true) {
                     painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4_f32, theme::teal()));
                 }
@@ -965,7 +971,16 @@ impl GraphCanvas {
                 }
             }
             let op = output_pos(n, rect, p.pan, p.zoom);
-            painter.circle_filled(op, 6. * p.zoom, theme::port_color(n.kind.spec().output));
+            let out_col = theme::port_color(n.kind.spec().output);
+            melt::port_marker(
+                &painter,
+                op,
+                6. * p.zoom,
+                n.kind.spec().output,
+                out_col,
+                out_col,
+                1.0,
+            );
             painter.circle_filled(op, 2. * p.zoom, Color32::WHITE);
             let or = ui.interact(
                 Rect::from_center_size(op, egui::vec2(24., 24.) * p.zoom),
@@ -1552,7 +1567,13 @@ fn wire(
     selected: bool,
     zoom: f32,
 ) {
-    let w = if selected { 2.4 } else { 1.7_f32 };
+    let w = if theme::is_melt() {
+        melt::wire_width(selected)
+    } else if selected {
+        2.4
+    } else {
+        1.7_f32
+    };
     match shape {
         Some(DataShape::List(_)) => {
             bezier(painter, a, b, Stroke::new(w + 2.8, color));
