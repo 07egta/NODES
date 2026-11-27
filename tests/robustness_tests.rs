@@ -36,6 +36,7 @@ fn check_tree(t: &Tree, what: &str) {
             Value::Point(p) => assert!(finite3(p), "{what}: non-finite point"),
             Value::Curve(c) => assert!(c.points.iter().all(finite3), "{what}: non-finite curve"),
             Value::Mesh(m) => check_mesh(m, what),
+            Value::Surface(_) | Value::Solid(_) => {}
         }
     }
 }
