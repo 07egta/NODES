@@ -22,6 +22,36 @@ pub const MAX_REPORTED_AFFECTED: usize = 256;
 /// changing the evaluator's original result or splitting a UTF-8 character.
 pub const MAX_DIAGNOSTIC_MESSAGE_BYTES: usize = 8_192;
 
+// Polling is cooperative, not a wall-time deadline. Count small units of work so
+// large root-set operations cannot postpone every check until the next node.
+const CANCEL_CHECK_INTERVAL: usize = 256;
+
+struct Cancellation<F> {
+    should_cancel: F,
+    remaining: usize,
+}
+
+impl<F: Fn() -> bool> Cancellation<F> {
+    fn check_now(&mut self) -> Option<()> {
+        self.remaining = CANCEL_CHECK_INTERVAL;
+        (!(self.should_cancel)()).then_some(())
+    }
+
+    fn step(&mut self) -> Option<()> {
+        self.remaining -= 1;
+        if self.remaining == 0 {
+            self.check_now()
+        } else {
+            Some(())
+        }
+    }
+
+    fn finish(&mut self, report: DiagnosticReport) -> Option<DiagnosticReport> {
+        self.check_now()?;
+        Some(report)
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct DiagnosticReport {
     pub schema_version: u32,
@@ -132,57 +162,88 @@ impl Roots {
         }
     }
 
-    fn union(&self, other: &Self) -> Self {
+    fn union<F: Fn() -> bool>(
+        &self,
+        other: &Self,
+        cancellation: &mut Cancellation<F>,
+    ) -> Option<Self> {
+        cancellation.step()?;
         match (self, other) {
-            (_, Self::One(index)) if self.contains(*index) => self.clone(),
-            (Self::One(_), Self::Many(_)) => other.union(self),
-            (Self::Many(a), Self::Many(b))
-                if Arc::ptr_eq(a, b)
-                    || b.iter()
-                        .enumerate()
-                        .all(|(i, word)| word & !a.get(i).copied().unwrap_or(0) == 0) =>
-            {
-                self.clone()
-            }
-            _ => {
-                let mut words = match self {
-                    Self::One(index) => {
-                        let mut words = vec![0; index / 64 + 1];
-                        words[index / 64] |= 1 << (index % 64);
-                        words
-                    }
-                    Self::Many(words) => words.to_vec(),
-                };
-                match other {
-                    Self::One(index) => {
-                        words.resize(words.len().max(index / 64 + 1), 0);
-                        words[index / 64] |= 1 << (index % 64);
-                    }
-                    Self::Many(other) => {
-                        words.resize(words.len().max(other.len()), 0);
-                        for (to, from) in words.iter_mut().zip(other.iter()) {
-                            *to |= from;
-                        }
+            (_, Self::One(index)) if self.contains(*index) => return Some(self.clone()),
+            (Self::One(_), Self::Many(_)) => return other.union(self, cancellation),
+            (Self::Many(a), Self::Many(b)) => {
+                if Arc::ptr_eq(a, b) {
+                    return Some(self.clone());
+                }
+                let mut subset = true;
+                for (i, word) in b.iter().enumerate() {
+                    cancellation.step()?;
+                    if word & !a.get(i).copied().unwrap_or(0) != 0 {
+                        subset = false;
+                        break;
                     }
                 }
-                Self::Many(words.into())
+                if subset {
+                    return Some(self.clone());
+                }
+            }
+            _ => {}
+        }
+        let mut words = match self {
+            Self::One(index) => {
+                let mut words = vec![0; index / 64 + 1];
+                words[index / 64] |= 1 << (index % 64);
+                words
+            }
+            Self::Many(source) => {
+                // Topology validation bounds a bitset to MAX_NODES / 64 words.
+                // Keep this small bulk copy; the word-wise set work is polled.
+                cancellation.step()?;
+                source.to_vec()
+            }
+        };
+        match other {
+            Self::One(index) => {
+                words.resize(words.len().max(index / 64 + 1), 0);
+                words[index / 64] |= 1 << (index % 64);
+            }
+            Self::Many(other) => {
+                words.resize(words.len().max(other.len()), 0);
+                for (to, from) in words.iter_mut().zip(other.iter()) {
+                    cancellation.step()?;
+                    *to |= from;
+                }
             }
         }
+        Some(Self::Many(words.into()))
     }
 
-    fn for_each(&self, mut f: impl FnMut(usize)) {
+    fn for_each<F: Fn() -> bool>(
+        &self,
+        cancellation: &mut Cancellation<F>,
+        mut f: impl FnMut(usize, &mut Cancellation<F>) -> Option<()>,
+    ) -> Option<()> {
         match self {
-            Self::One(index) => f(*index),
+            Self::One(index) => {
+                cancellation.step()?;
+                f(*index, cancellation)?;
+            }
             Self::Many(words) => {
                 for (word_index, word) in words.iter().enumerate() {
+                    cancellation.step()?;
                     let mut left = *word;
                     while left != 0 {
-                        f(word_index * 64 + left.trailing_zeros() as usize);
+                        cancellation.step()?;
+                        f(
+                            word_index * 64 + left.trailing_zeros() as usize,
+                            cancellation,
+                        )?;
                         left &= left - 1;
                     }
                 }
             }
         }
+        Some(())
     }
 
     // Pointer identity only groups shared internal allocations for work reduction.
@@ -210,13 +271,49 @@ struct AffectedGroup {
 /// Analyze one evaluation without recomputing it. Lists are bounded independently
 /// of exact counts. Output order depends on IDs/timings, never graph storage order.
 pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
-    let mut nodes: Vec<_> = graph.nodes.iter().collect();
+    diagnose_cancellable(graph, evaluation, || false).expect("diagnostic cancellation is disabled")
+}
+
+/// Analyze a matching graph/evaluation snapshot with cooperative cancellation.
+///
+/// `None` means report construction was abandoned because `should_cancel`
+/// requested it. No partial report is published and neither input is modified.
+/// An already-cancelled Evaluation still produces its normal report when this
+/// callback remains false; evaluation and diagnostic cancellation are distinct.
+///
+/// Keep the callback inexpensive and nonblocking. It is polled at phase boundaries
+/// and periodically within node, edge, bitset, root-membership and preview loops.
+/// Poll frequency is an implementation detail, not a latency guarantee. Standard
+/// sorts, existing graph validation, individual allocation/copy and destruction
+/// remain synchronous operations; cancellation does not forcibly stop a thread.
+pub fn diagnose_cancellable(
+    graph: &Graph,
+    evaluation: &Evaluation,
+    should_cancel: impl Fn() -> bool,
+) -> Option<DiagnosticReport> {
+    let mut cancellation = Cancellation {
+        should_cancel,
+        remaining: CANCEL_CHECK_INTERVAL,
+    };
+    cancellation.check_now()?;
+    let mut nodes = Vec::with_capacity(graph.nodes.len());
+    for node in &graph.nodes {
+        cancellation.step()?;
+        nodes.push(node);
+    }
+    cancellation.check_now()?;
     nodes.sort_unstable_by_key(|node| node.id);
+    cancellation.check_now()?;
+    let mut connection_count = 0;
+    for node in &nodes {
+        cancellation.step()?;
+        connection_count += node.inputs.len();
+    }
     let mut report = DiagnosticReport {
         schema_version: DIAGNOSTIC_SCHEMA_VERSION,
         summary: DiagnosticSummary {
             node_count: nodes.len(),
-            connection_count: nodes.iter().map(|node| node.inputs.len()).sum(),
+            connection_count,
             computed_count: evaluation.computed,
             cached_count: evaluation.cached,
             cancelled: evaluation.cancelled,
@@ -232,6 +329,7 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
         hotspots: Vec::new(),
     };
     for node in &nodes {
+        cancellation.step()?;
         let result = evaluation.outputs.get(&node.id);
         report.summary.completed_count += usize::from(result.is_some());
         if node.off {
@@ -263,35 +361,41 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     // overflowing synthetic sum, saturate the reported total but normalize shares
     // in scaled units so they still do not exceed 100% in aggregate.
     if !report.summary.measured_node_ms.is_finite() {
-        let largest = report
-            .hotspots
-            .iter()
-            .map(|hotspot| hotspot.elapsed_ms)
-            .fold(0., f64::max);
-        let scaled_total: f64 = report
-            .hotspots
-            .iter()
-            .map(|hotspot| hotspot.elapsed_ms / largest)
-            .sum();
+        let mut largest = 0.0_f64;
+        for hotspot in &report.hotspots {
+            cancellation.step()?;
+            largest = largest.max(hotspot.elapsed_ms);
+        }
+        let mut scaled_total = 0.0;
+        for hotspot in &report.hotspots {
+            cancellation.step()?;
+            scaled_total += hotspot.elapsed_ms / largest;
+        }
         for hotspot in &mut report.hotspots {
+            cancellation.step()?;
             hotspot.share_percent = (hotspot.elapsed_ms / largest) / scaled_total * 100.;
         }
         report.summary.measured_node_ms = f64::MAX;
     } else if report.summary.measured_node_ms > 0. {
         for hotspot in &mut report.hotspots {
+            cancellation.step()?;
             hotspot.share_percent = hotspot.elapsed_ms / report.summary.measured_node_ms * 100.;
         }
     }
+    cancellation.check_now()?;
     report.hotspots.sort_unstable_by(|a, b| {
         b.elapsed_ms
             .total_cmp(&a.elapsed_ms)
             .then_with(|| a.node.id.cmp(&b.node.id))
     });
-    let order = match graph.topological_nodes() {
+    cancellation.check_now()?;
+    let validation = graph.topological_nodes();
+    cancellation.check_now()?;
+    let order = match validation {
         Ok(order) => order,
         Err(error) => {
             report.graph_error = Some(error);
-            return report;
+            return cancellation.finish(report);
         }
     };
     report.summary.complete =
@@ -299,50 +403,64 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     if report.summary.failed_count == 0 {
         // Validation and visit/timing summaries still apply to successful,
         // disabled or interrupted graphs; no failure relationships need indexing.
-        return report;
+        return cancellation.finish(report);
     }
-    let indices: BTreeMap<_, _> = nodes
+    cancellation.check_now()?;
+    let mut failed = Vec::with_capacity(nodes.len());
+    let indices = nodes
         .iter()
         .enumerate()
-        .map(|(index, node)| (node.id, index))
-        .collect();
-    let failed: Vec<_> = nodes
-        .iter()
-        .map(|node| !node.off && evaluation.outputs.get(&node.id).is_some_and(Result::is_err))
-        .collect();
+        .map(|(index, node)| {
+            cancellation.step()?;
+            failed.push(!node.off && evaluation.outputs.get(&node.id).is_some_and(Result::is_err));
+            Some((node.id, index))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
     // In a valid DAG every consumed parent precedes its child. The propagation
     // pass therefore creates a root exactly when this local test finds no enabled
     // failed parent. Successful, disabled and unevaluated parents all break the
     // failure chain, just as they do in the propagation pass below.
     let mut root_node_ids = Vec::new();
     for (index, node) in nodes.iter().enumerate() {
+        cancellation.step()?;
         if !failed[index] {
             continue;
         }
-        let has_failed_parent = node
+        let mut has_failed_parent = false;
+        for spec in node
             .kind
             .spec()
             .inputs
             .iter()
             .take(crate::cluster::real_input_count(graph, node))
-            .any(|spec| {
-                node.inputs
-                    .get(spec.key)
-                    .is_some_and(|source| failed[indices[source]])
-            });
+        {
+            cancellation.step()?;
+            if node
+                .inputs
+                .get(spec.key)
+                .is_some_and(|source| failed[indices[source]])
+            {
+                has_failed_parent = true;
+                break;
+            }
+        }
         if !has_failed_parent {
             root_node_ids.push(node.id);
         }
     }
     // `nodes` is ID-sorted, so bit iteration still emits root IDs in sorted order
     // even when their topological discovery order is different.
-    let root_ordinals: BTreeMap<_, _> = root_node_ids
+    let root_ordinals = root_node_ids
         .iter()
         .enumerate()
-        .map(|(ordinal, &id)| (id, ordinal))
-        .collect();
+        .map(|(ordinal, &id)| {
+            cancellation.step()?;
+            Some((id, ordinal))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
     let mut failures: BTreeMap<NodeId, FailureRoots> = BTreeMap::new();
     for node in order {
+        cancellation.step()?;
         if !failed[indices[&node.id]] {
             continue;
         }
@@ -356,12 +474,13 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             .iter()
             .take(crate::cluster::real_input_count(graph, node))
         {
+            cancellation.step()?;
             if let Some(source) = node.inputs.get(spec.key)
                 && let Some(failure) = failures.get(source)
             {
                 upstream = Some(match upstream {
                     None => failure.roots.clone(),
-                    Some(roots) => roots.union(&failure.roots),
+                    Some(roots) => roots.union(&failure.roots, &mut cancellation)?,
                 });
             }
         }
@@ -375,10 +494,12 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     }
     // Only ordinals set by actual root failures are ever read from this vector.
     // Direct indexing avoids a map lookup for each root/group membership.
+    cancellation.check_now()?;
     let mut root_positions = vec![0; root_node_ids.len()];
     let mut previews = Vec::new();
     let mut groups: BTreeMap<(bool, usize), AffectedGroup> = BTreeMap::new();
     for (id, failure) in failures {
+        cancellation.step()?;
         let node = nodes[indices[&id]];
         let Some(Err(message)) = evaluation.outputs.get(&id) else {
             continue;
@@ -400,23 +521,27 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
             report.root_failures.push(entry);
             previews.push(AffectedPreview::default());
         } else {
-            let group = groups.entry(failure.roots.key()).or_insert_with(|| {
-                let mut root_ids = Vec::new();
-                let mut root_count = 0;
-                failure.roots.for_each(|index| {
-                    root_count += 1;
-                    if root_ids.len() < MAX_REPORTED_ROOTS {
-                        root_ids.push(root_node_ids[index]);
-                    }
-                });
-                AffectedGroup {
-                    roots: failure.roots.clone(),
-                    root_ids,
-                    root_count,
-                    count: 0,
-                    preview: Vec::new(),
+            let group = match groups.entry(failure.roots.key()) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    let mut root_ids = Vec::new();
+                    let mut root_count = 0;
+                    failure.roots.for_each(&mut cancellation, |index, _| {
+                        root_count += 1;
+                        if root_ids.len() < MAX_REPORTED_ROOTS {
+                            root_ids.push(root_node_ids[index]);
+                        }
+                        Some(())
+                    })?;
+                    entry.insert(AffectedGroup {
+                        roots: failure.roots.clone(),
+                        root_ids,
+                        root_count,
+                        count: 0,
+                        preview: Vec::new(),
+                    })
                 }
-            });
+            };
             group.count += 1;
             if group.preview.len() < MAX_REPORTED_AFFECTED {
                 group.preview.push(id);
@@ -434,23 +559,36 @@ pub fn diagnose(graph: &Graph, evaluation: &Evaluation) -> DiagnosticReport {
     // groups update exact counts without updating already-full lists. Interleaved
     // IDs switch the affected root to a bounded heap, avoiding a full vector copy
     // for each newly admitted smaller ID.
-    let mut groups: Vec<_> = groups.values().collect();
+    cancellation.check_now()?;
+    let mut groups_to_visit = Vec::with_capacity(groups.len());
+    for group in groups.values() {
+        cancellation.step()?;
+        groups_to_visit.push(group);
+    }
+    cancellation.check_now()?;
+    let mut groups = groups_to_visit;
     groups.sort_unstable_by_key(|group| group.preview.first().copied());
+    cancellation.check_now()?;
     for group in groups {
-        group.roots.for_each(|index| {
-            let position = root_positions[index];
-            let root = &mut report.root_failures[position];
-            root.affected_count += group.count;
-            previews[position].extend(&group.preview);
-        });
+        cancellation.step()?;
+        group
+            .roots
+            .for_each(&mut cancellation, |index, cancellation| {
+                let position = root_positions[index];
+                let root = &mut report.root_failures[position];
+                root.affected_count += group.count;
+                previews[position].extend(&group.preview, cancellation)?;
+                Some(())
+            })?;
     }
     for (root, preview) in report.root_failures.iter_mut().zip(previews) {
-        root.affected_nodes = preview.finish();
+        cancellation.step()?;
+        root.affected_nodes = preview.finish(&mut cancellation)?;
         root.affected_nodes_truncated = root.affected_count > root.affected_nodes.len();
     }
     report.summary.root_failure_count = report.root_failures.len();
     report.summary.blocked_count = report.blocked_nodes.len();
-    report
+    cancellation.finish(report)
 }
 
 fn valid_time(time: f64) -> Option<f64> {
@@ -483,39 +621,51 @@ impl Default for AffectedPreview {
 }
 
 impl AffectedPreview {
-    fn extend(&mut self, incoming: &[NodeId]) {
+    fn extend<F: Fn() -> bool>(
+        &mut self,
+        incoming: &[NodeId],
+        cancellation: &mut Cancellation<F>,
+    ) -> Option<()> {
+        cancellation.step()?;
         let Some(&first) = incoming.first() else {
-            return;
+            return Some(());
         };
         match self {
             Self::Sorted(current) => {
                 if current.len() == MAX_REPORTED_AFFECTED
                     && current.last().is_some_and(|last| first >= *last)
                 {
-                    return;
+                    return Some(());
                 }
                 if current.last().is_none_or(|last| *last < first) {
-                    current.extend(
-                        incoming
-                            .iter()
-                            .take(MAX_REPORTED_AFFECTED - current.len())
-                            .copied(),
-                    );
-                    return;
+                    let remaining = MAX_REPORTED_AFFECTED - current.len();
+                    current.reserve(remaining.min(incoming.len()));
+                    for &id in incoming.iter().take(remaining) {
+                        cancellation.step()?;
+                        current.push(id);
+                    }
+                    return Some(());
                 }
                 // Reuse the existing allocation and heapify once. A succession of
                 // interleaving singleton groups then needs O(log K) replacements,
                 // instead of allocating/copying K entries for every singleton.
+                cancellation.step()?;
                 let mut heap = BinaryHeap::from(std::mem::take(current));
-                Self::extend_heap(&mut heap, incoming);
+                Self::extend_heap(&mut heap, incoming, cancellation)?;
                 *self = Self::Heap(heap);
             }
-            Self::Heap(heap) => Self::extend_heap(heap, incoming),
+            Self::Heap(heap) => Self::extend_heap(heap, incoming, cancellation)?,
         }
+        Some(())
     }
 
-    fn extend_heap(heap: &mut BinaryHeap<NodeId>, incoming: &[NodeId]) {
+    fn extend_heap<F: Fn() -> bool>(
+        heap: &mut BinaryHeap<NodeId>,
+        incoming: &[NodeId],
+        cancellation: &mut Cancellation<F>,
+    ) -> Option<()> {
         for &id in incoming {
+            cancellation.step()?;
             if heap.len() < MAX_REPORTED_AFFECTED {
                 heap.push(id);
             } else {
@@ -527,12 +677,20 @@ impl AffectedPreview {
                 }
             }
         }
+        Some(())
     }
 
-    fn finish(self) -> Vec<NodeId> {
+    fn finish<F: Fn() -> bool>(self, cancellation: &mut Cancellation<F>) -> Option<Vec<NodeId>> {
         match self {
-            Self::Sorted(ids) => ids,
-            Self::Heap(heap) => heap.into_sorted_vec(),
+            Self::Sorted(ids) => Some(ids),
+            Self::Heap(heap) => {
+                // Each heap is capped at 256 entries. Preserve its in-place sort,
+                // while polling between roots during final report assembly.
+                cancellation.check_now()?;
+                let ids = heap.into_sorted_vec();
+                cancellation.check_now()?;
+                Some(ids)
+            }
         }
     }
 }

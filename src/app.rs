@@ -60,8 +60,15 @@ impl Worker {
                 });
                 if !result.cancelled && revision.load(Ordering::Relaxed) == request.revision {
                     // Derive diagnostics once from the matching graph snapshot, away
-                    // from the UI thread. Drop it if a newer edit arrived meanwhile.
-                    let diagnostics = diagnostics::diagnose(&request.graph, &result);
+                    // from the UI thread. Stop obsolete analysis so a newer edit can
+                    // reach the evaluator without waiting for the whole report.
+                    let Some(diagnostics) =
+                        diagnostics::diagnose_cancellable(&request.graph, &result, || {
+                            revision.load(Ordering::Relaxed) != request.revision
+                        })
+                    else {
+                        continue;
+                    };
                     if revision.load(Ordering::Relaxed) != request.revision {
                         continue;
                     }
@@ -88,7 +95,7 @@ impl Worker {
 }
 impl Drop for Worker {
     fn drop(&mut self) {
-        // Cooperatively cancel the active evaluation when the UI is destroyed.
+        // Cooperatively cancel active evaluation/diagnosis when the UI is destroyed.
         self.latest.fetch_add(1, Ordering::Relaxed);
     }
 }

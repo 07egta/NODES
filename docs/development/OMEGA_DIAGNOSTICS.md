@@ -465,3 +465,39 @@ memory improvements do not establish a global bound for arbitrary error text.
 The final [handoff](OMEGA_HANDOFF_20261127.md) records the single-contract
 integration sequence for PR #20, preserves the separate tested project-diff WIP
 at `fa56fb1`, and distinguishes actual CI/source results from pending runs.
+
+## Functional checkpoint 9: interruptible diagnosis and a reproduced UI defect
+
+After checkpoint `f858186b6d8907ca1184054a25ff127d71564b15`, development continued
+with two issues found by independent audit and actual use.
+
+`diagnose_cancellable` now accepts a cheap caller-supplied cancellation callback
+and returns `None` when report construction is abandoned. The existing `diagnose`
+API remains the always-false wrapper, with unchanged report schema and ordering.
+Worker uses the revision token in both evaluation and diagnosis, and still checks
+revision after diagnosis and at UI receipt. Abandoning a diagnostic never publishes
+the evaluation alone or an incomplete/default report. `Evaluation.cancelled`
+keeps its existing meaning, distinct from report-construction cancellation.
+
+Checks occur at phase boundaries and periodically inside node/edge/root-set,
+membership-transpose and preview loops. Bulk small-bitset copies and sorted
+BTreeMap construction are preserved. Standard sorting, graph validation,
+individual allocations/copies and destruction remain synchronous; there is no
+hard latency bound, forced thread stop or measured zero-overhead claim. Frozen
+earlier performance tables are still attributed only to their recorded source pairs.
+
+All **19 focused diagnosis tests** passed, including four new cancellation tests
+and the existing independent BFS/interleaved/root-ordinal suites. The new tests
+use a 512-root/300-tail analytic graph, one-shot entry/interior/final cancellation,
+invalid/empty/success/disabled/partial inputs, unchanged input state and a fresh
+diagnosis after interruption. Both separate reviewers approved the API and Worker
+publication boundaries. A new full-tree/build run is the next gate.
+
+Native GUI checks also verified the 101st cause, navigation to node #100, exact-ID
+and name-fragment filtering. They exposed a real layout feedback defect: the
+search field's margin and the actual clear-button width exceeded the row budget,
+making the window wider every frame. The fix allocates the button first and fits
+the field into the remaining width. A 60-frame real-theme egui regression failed
+on the old code and passed after the fix; all **five diagnostic UI tests** passed.
+The [GUI record](DIAGNOSTICS_GUI_CHECK.md) and saved paging fixture preserve the
+reproduction and distinguish native checks from automated layout verification.

@@ -106,19 +106,28 @@ impl DiagnosticsWindow {
                     ui.selectable_value(&mut self.timings, true, "処理時間");
                 });
                 ui.horizontal(|ui| {
-                    let changed = ui
-                        .add(
-                            egui::TextEdit::singleline(&mut self.query)
-                                .id(egui::Id::new("diagnostics_query"))
-                                .hint_text("名前で絞り込む / #123 で ID")
-                                .char_limit(160)
-                                .desired_width((ui.available_width() - 55.).max(120.)),
-                        )
-                        .changed();
-                    let cleared = !self.query.is_empty() && ui.small_button("クリア").clicked();
-                    if cleared {
-                        self.query.clear();
-                    }
+                    // Allocate the actual button and spacing first. TextEdit's
+                    // desired width excludes its margins: guessing a reservation
+                    // could overflow the row and grow this window every frame.
+                    let (changed, cleared) = ui
+                        .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let cleared =
+                                !self.query.is_empty() && ui.small_button("クリア").clicked();
+                            if cleared {
+                                self.query.clear();
+                            }
+                            let changed = ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut self.query)
+                                        .id(egui::Id::new("diagnostics_query"))
+                                        .hint_text("名前で絞り込む / #123 で ID")
+                                        .char_limit(160)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed();
+                            (changed, cleared)
+                        })
+                        .inner;
                     if changed || cleared {
                         self.pages = [0; 5];
                     }
@@ -537,6 +546,51 @@ fn node_link(ui: &mut egui::Ui, nodes: &IndexedNodes<'_>, node: &NodeRef, stale:
 mod tests {
     use super::*;
     use morphlet::{diagnostics::diagnose, engine::Evaluator, model::NodeKind};
+
+    #[test]
+    fn nonempty_filter_does_not_expand_the_window_each_frame() {
+        let ctx = egui::Context::default();
+        theme::configure(&ctx, true);
+        let mut graph = Graph::default();
+        let id = graph.add(NodeKind::Divide, [0.; 2]).unwrap();
+        graph.node_mut(id).unwrap().params.insert("b".into(), 0.);
+        let evaluation = Evaluator::default().evaluate(&graph, &|| false);
+        let report = diagnose(&graph, &evaluation);
+        let mut window = DiagnosticsWindow {
+            open: true,
+            query: format!("#{id}"),
+            ..Default::default()
+        };
+        let mut widths = Vec::new();
+        for frame in 0..60 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1364., 920.),
+                )),
+                time: Some(frame as f64 / 60.),
+                ..Default::default()
+            };
+            let _ = ctx.run(input, |ctx| {
+                window.show(ctx, Some(&report), &graph, false, 1);
+            });
+            widths.push(ctx.memory(|memory| {
+                memory
+                    .area_rect(egui::Id::new("graph_diagnostics"))
+                    .unwrap()
+                    .width()
+            }));
+        }
+        assert!(
+            widths
+                .iter()
+                .all(|width| width.is_finite() && *width <= 650.)
+        );
+        let settled = &widths[10..];
+        let min = settled.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = settled.iter().copied().fold(0., f32::max);
+        assert!(max - min <= 1., "window kept growing: {widths:?}");
+    }
 
     #[test]
     fn incomplete_or_cancelled_results_never_display_success() {

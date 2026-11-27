@@ -50,7 +50,7 @@ fixture and these exact steps make the check reproducible after that session end
 ## Limits and remaining checks
 
 - The name/ID filter, 101st-row paging and live-renaming behavior have automated
-  logic tests. They were not typed through during this GUI check because bound
+  logic tests. They were not typed through during this first GUI check because bound
   keyboard input did not reach the native numeric field in this environment.
   Pointer/sliders worked after moving the pointer before clicking. This is an
   automation limitation; it does not establish an application keyboard defect.
@@ -97,3 +97,34 @@ unqualified UI pass:
   remained compact. Parameter editing is owned by concurrent PR #16; reproduce
   this case there when integrating its signed-zero editor. This branch does not
   claim to have fixed that separate input layout issue.
+
+## Paging, node navigation and filtering
+
+A third native workflow used the debug binary from `f858186` and
+[`paging.morph`](../../tests/fixtures/diagnostics/paging.morph). Actual release CLI
+diagnosis first confirmed 101 independent roots, zero blocked nodes and one
+disabled node; its exit code was 1 and the fixture checksum was unchanged.
+
+1. Opened **診断** and observed 101 causes with **1–100件目** on the first page.
+2. Clicked **次の100件**. The page showed **101–101件目**, the sole entry
+   **#100 最後の原因**, and the separate disabled-node section.
+3. Clicked that entry and observed the selected/framed node and inspector ID
+   **#100** with its original division error.
+4. Focused the filter and entered **#100** through native printable-key input.
+   The root section showed **該当1件 / 全101件** and the expected node.
+5. Replaced the query with **001**. Name-fragment filtering showed exactly
+   **#01 原因001**. The disabled section showed zero matching out of one total.
+
+Japanese key injection was attempted but the desktop provider rejected the
+keysym before entering Japanese characters. This does not establish a Japanese
+input defect in NODES; Japanese normalization remains covered by the logic tests.
+Live renaming and keyboard parameter editing were not part of this workflow.
+
+This check discovered a real UI defect: a nonempty query made the resizable
+diagnostic window grow horizontally on successive frames. The code reserved a
+fixed width for the clear button without including TextEdit's outer margins and
+the actual button/spacing width. The follow-up lays out the button first at the
+right, then lets the text field consume the remaining width. A real-theme,
+60-frame headless egui regression failed on the old layout and passed after this
+change. All five diagnostic UI tests passed. Native confirmation of the fixed
+window width is recorded separately when performed.
