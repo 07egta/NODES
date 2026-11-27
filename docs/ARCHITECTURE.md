@@ -1,6 +1,6 @@
 # NODES architecture
 
-更新: 2026-11-27 JST。現在の実装を記す。目標機能は [ROADMAP](../ROADMAP.md)、検証範囲は [TEST_RESULTS](../TEST_RESULTS.md) に分ける。crate名と実行ファイル名は既存互換のため `morphlet` / `Morphlet`、画面上の製品名はNODES。
+更新: 2026-11-27 JST。現在の実装を記す。目標機能は [ROADMAP](../ROADMAP.md)、検証範囲は [TEST_RESULTS](../TEST_RESULTS.md) に分ける。crate名と実行ファイル名は既存互換のため `morphlet` / `NODES`、画面上の製品名はNODES。
 
 ## 構成
 

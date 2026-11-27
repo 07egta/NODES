@@ -1,8 +1,8 @@
 //! Registry and compatibility-catalog contracts. These are NODES tests, not
 //! Grasshopper oracle comparisons. No Rhino installation is required.
-use morphlet::engine::Evaluator;
-use morphlet::model::{DataType, Graph, MAX_NODES, NodeId, NodeKind, Tree, Value};
-use morphlet::persistence::Project;
+use nodes::engine::Evaluator;
+use nodes::model::{DataType, Graph, MAX_NODES, NodeId, NodeKind, Tree, Value};
+use nodes::persistence::Project;
 use serde_json::Value as Json;
 use std::collections::BTreeSet;
 

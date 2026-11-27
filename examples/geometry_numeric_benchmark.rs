@@ -9,8 +9,8 @@
 //! Fixtures, validation, printing and compilation are outside operation timers.
 //! Timed batches include black_box and storage in a preallocated result buffer.
 //! The fixed workload is headless; it does not measure GUI, startup or memory.
-use morphlet::curve_geometry::{CurveGeometry, NurbsCurve};
-use morphlet::surface_kernel::{NurbsSurface, PlaneSurface, Surface};
+use nodes::curve_geometry::{CurveGeometry, NurbsCurve};
+use nodes::surface_kernel::{NurbsSurface, PlaneSurface, Surface};
 use serde_json::{Value, json};
 use std::hint::black_box;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};

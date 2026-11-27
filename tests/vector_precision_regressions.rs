@@ -1,8 +1,8 @@
 //! Exact integer reference cases for cancellation inside the existing 1e9 bound.
 //! Compensated products do not promise exact real arithmetic or eliminate underflow.
-use morphlet::engine::Evaluator;
-use morphlet::math_nodes;
-use morphlet::model::{Graph, NodeId, NodeKind, Value};
+use nodes::engine::Evaluator;
+use nodes::math_nodes;
+use nodes::model::{Graph, NodeId, NodeKind, Value};
 
 fn run(kind: NodeKind, a: [f64; 3], b: [f64; 3]) -> Result<Value, String> {
     let values = [Value::Point(a), Value::Point(b)];

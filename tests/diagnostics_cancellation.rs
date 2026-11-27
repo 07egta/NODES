@@ -1,11 +1,11 @@
 //! Cooperative diagnostic cancellation never publishes a partially built report.
 //! Poll counts are observed per run, rather than assuming a callback schedule or
 //! imposing a machine-dependent wall-time deadline.
-use morphlet::diagnostics::{
+use nodes::diagnostics::{
     DiagnosticReport, MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, diagnose, diagnose_cancellable,
 };
-use morphlet::engine::{Evaluation, Evaluator};
-use morphlet::model::{Graph, NodeId, NodeKind};
+use nodes::engine::{Evaluation, Evaluator};
+use nodes::model::{Graph, NodeId, NodeKind};
 use std::cell::Cell;
 
 fn add(graph: &mut Graph, kind: NodeKind, inputs: &[(&str, NodeId)]) -> NodeId {

@@ -2,7 +2,7 @@
 /dist/
 *.tmp
 
-/Morphlet.exe
+/NODES.exe
 
 # Python diagnostic scripts must not add interpreter caches.
 __pycache__/

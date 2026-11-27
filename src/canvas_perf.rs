@@ -1,6 +1,6 @@
 use super::{GraphCanvas, NodeId, NodeKind, Project};
 use eframe::egui;
-use morphlet::{
+use nodes::{
     engine::Evaluation,
     model::{Graph, Tree},
 };
@@ -63,7 +63,7 @@ fn long_empty_wires() -> (Graph, Evaluation) {
     (graph, evaluation)
 }
 
-/// Run with cargo test --release --locked --bin Morphlet benchmark_canvas_pan -- --ignored --nocapture
+/// Run with cargo test --release --locked --bin NODES benchmark_canvas_pan -- --ignored --nocapture
 #[test]
 #[ignore = "manual release benchmark of egui canvas drawing and tessellation"]
 fn benchmark_canvas_pan() {

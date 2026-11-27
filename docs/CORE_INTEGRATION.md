@@ -23,7 +23,7 @@ The validated topological traversal now supplies references to nodes directly, r
 
 ```powershell
 cargo test --all-targets --locked
-cargo build --release --locked --bin Morphlet
+cargo build --release --locked --bin NODES
 cargo test --release --locked --test core_integration benchmark_sparse_slider_edit -- --ignored --nocapture
 ```
 

@@ -1,10 +1,10 @@
-//! The Japanese STL / 3MF / OBJ export dialog. Logic lives in `morphlet::stl_export`.
+//! The Japanese STL / 3MF / OBJ export dialog. Logic lives in `nodes::stl_export`.
 
 use crate::file_picker::FileTask;
 use crate::theme;
 use eframe::egui::{self, Align2, Color32, RichText};
-use morphlet::model::{Mesh, Tree};
-use morphlet::stl_export::{
+use nodes::model::{Mesh, Tree};
+use nodes::stl_export::{
     BodyStats, Check, ExportOptions, Level, OutputFormat, RepairReport, StoredSettings,
     WriteFailure, WriteSummary, check_bodies, config_path, default_file_name, detect_slicer,
     gather_meshes, launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored,

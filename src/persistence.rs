@@ -487,7 +487,7 @@ pub fn export_stl(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
     }
     atomic_write(path, |file| {
         let mut header = [0u8; 80];
-        let label = b"Morphlet binary STL | units: millimeters | mesh geometry";
+        let label = b"NODES binary STL | units: millimeters | mesh geometry";
         header[..label.len()].copy_from_slice(label);
         file.write_all(&header)?;
         file.write_all(&(report.triangles as u32).to_le_bytes())?;
@@ -520,11 +520,11 @@ pub fn export_obj(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
     atomic_write(path, |file| {
         writeln!(
             file,
-            "# Morphlet OBJ\n# Units: millimeters\n# Triangulated mesh geometry"
+            "# NODES OBJ\n# Units: millimeters\n# Triangulated mesh geometry"
         )?;
         let mut offset = 1usize;
         for (object, mesh) in all_meshes.iter().enumerate() {
-            writeln!(file, "o Morphlet_{}", object + 1)?;
+            writeln!(file, "o NODES_{}", object + 1)?;
             for point in &mesh.vertices {
                 // Preserve the validated binary64 coordinates on text round-trip.
                 // Fixed decimals can flatten valid thin triangles after checking.

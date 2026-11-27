@@ -1,4 +1,4 @@
-use morphlet::{
+use nodes::{
     engine::Evaluator,
     model::{Graph, NodeId, NodeKind as K, Value},
     persistence,
@@ -15,7 +15,7 @@ fn node(g: &mut Graph, k: K, p: &[(&str, f64)]) -> NodeId {
 fn link(g: &mut Graph, from: NodeId, to: NodeId, key: &str) {
     g.connect(from, to, key).unwrap();
 }
-fn first(e: &morphlet::engine::Evaluation, id: NodeId) -> &Value {
+fn first(e: &nodes::engine::Evaluation, id: NodeId) -> &Value {
     e.outputs[&id]
         .as_ref()
         .unwrap_or_else(|x| panic!("node {id}: {x}"))
@@ -33,7 +33,7 @@ fn xyz(x: [f64; 3], y: [f64; 3]) {
         near(x[i], y[i]);
     }
 }
-fn number(e: &morphlet::engine::Evaluation, id: NodeId) -> f64 {
+fn number(e: &nodes::engine::Evaluation, id: NodeId) -> f64 {
     first(e, id).number().unwrap()
 }
 #[test]
@@ -168,7 +168,7 @@ fn all_precise_nodes_have_stable_specs_and_evaluate_on_examples() {
     let raised = node(&mut g, Move, &[("z", 20.)]);
     link(&mut g, curve, raised, "geometry");
     let mut ids = Vec::new();
-    for &kind in morphlet::surface_nodes::KINDS {
+    for &kind in nodes::surface_nodes::KINDS {
         let id = node(&mut g, kind, &[]);
         assert!(K::all().contains(&kind));
         let encoded = serde_json::to_string(&kind).unwrap();

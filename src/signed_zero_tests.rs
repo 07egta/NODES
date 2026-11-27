@@ -1,5 +1,5 @@
 use super::*;
-use morphlet::model::Value;
+use nodes::model::Value;
 
 fn angle_graph() -> (Graph, NodeId, NodeId) {
     let mut graph = Graph::default();

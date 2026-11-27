@@ -1,6 +1,6 @@
 //! Spiral vase G-code: layer count, monotonic Z and E, bed bounds, and rejection cases.
-use morphlet::gcode::{self, GcodeSettings};
-use morphlet::model::{Mesh, Tree, Value};
+use nodes::gcode::{self, GcodeSettings};
+use nodes::model::{Mesh, Tree, Value};
 use std::sync::Arc;
 
 /// Closed cylinder, outward-facing triangles, bottom at z = 0.

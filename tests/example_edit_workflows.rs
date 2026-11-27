@@ -2,7 +2,7 @@
 //! reload, evaluate with a fresh cache, and edit again. No invalid sample is skipped.
 //! STL checks preserve triangle count and bounds within f32/1e-6 mm welding error;
 //! they are interchange regressions, not evidence of successful physical printing.
-use morphlet::{
+use nodes::{
     engine::{Evaluation, Evaluator},
     import,
     model::{DataType, Mesh, NodeId, Tree, Value},

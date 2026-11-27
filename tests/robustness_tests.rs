@@ -1,7 +1,7 @@
 //! Every node must survive hostile parameters and typical upstream data: evaluation never
 //! panics, and every result is either an `Err` message or a tree of finite, in-range values.
-use morphlet::engine::Evaluator;
-use morphlet::model::{DataType, Graph, Mesh, NodeId, NodeKind, Tree, Value};
+use nodes::engine::Evaluator;
+use nodes::model::{DataType, Graph, Mesh, NodeId, NodeKind, Tree, Value};
 use std::time::Instant;
 
 /// Small deterministic xorshift generator (no dependencies).
@@ -342,8 +342,7 @@ fn shipped_examples_load_and_evaluate_finite() {
         if path.extension().and_then(|e| e.to_str()) != Some("morph") {
             continue;
         }
-        let project =
-            morphlet::persistence::load(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let project = nodes::persistence::load(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let result = Evaluator::default().evaluate(&project.graph, &|| false);
         for (id, out) in &result.outputs {
             let t = out
@@ -368,7 +367,7 @@ fn bench_examples_evaluation_time() {
         .collect();
     files.sort();
     for path in files {
-        let project = morphlet::persistence::load(&path).unwrap();
+        let project = nodes::persistence::load(&path).unwrap();
         let cold = (0..5)
             .map(|_| {
                 let t = Instant::now();

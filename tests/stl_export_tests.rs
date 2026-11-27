@@ -1,6 +1,6 @@
-use morphlet::model::{Mesh, Tree, Value};
-use morphlet::persistence;
-use morphlet::stl_export::{
+use nodes::model::{Mesh, Tree, Value};
+use nodes::persistence;
+use nodes::stl_export::{
     ExportOptions, OutputFormat, check_bodies, crc32, encode_3mf, gather_meshes, numbered_path,
     prepare_bodies, repair_meshes, slicer_command, split_bodies, timestamp_jst, write_bodies,
 };
@@ -93,7 +93,7 @@ fn binary_stl_has_correct_header_count_and_size() {
         u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]),
         12
     );
-    assert!(bytes[..80].starts_with(b"Morphlet binary STL"));
+    assert!(bytes[..80].starts_with(b"NODES binary STL"));
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn ascii_stl_parses_back_to_the_same_triangles() {
     write_bodies(OutputFormat::StlAscii, &path, &[cube()], false).unwrap();
     let text = fs::read_to_string(&path).unwrap();
     assert!(text.starts_with("solid "));
-    assert!(text.trim_end().ends_with("endsolid Morphlet"));
+    assert!(text.trim_end().ends_with("endsolid NODES"));
     assert_eq!(text.matches("facet normal").count(), 12);
     assert_eq!(text.matches("vertex ").count(), 36);
 }
@@ -196,7 +196,7 @@ fn check_flags_oversize_and_tiny_models() {
     assert!(
         checks
             .iter()
-            .any(|c| c.level == morphlet::stl_export::Level::Error)
+            .any(|c| c.level == nodes::stl_export::Level::Error)
     );
     let mut tiny = cube();
     for p in &mut tiny.vertices {
@@ -208,7 +208,7 @@ fn check_flags_oversize_and_tiny_models() {
     assert!(
         checks
             .iter()
-            .any(|c| c.level == morphlet::stl_export::Level::Warn)
+            .any(|c| c.level == nodes::stl_export::Level::Warn)
     );
 }
 

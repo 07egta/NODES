@@ -1,10 +1,10 @@
 //! Settings window for 「その他の書き出し → G-code（花瓶モード）」.
-//! The geometry and file work lives in morphlet::gcode.
+//! The geometry and file work lives in nodes::gcode.
 
 use crate::theme;
 use eframe::egui::{self, RichText};
-use morphlet::gcode::{self, GcodeReport, GcodeSettings, Preset};
-use morphlet::model::Tree;
+use nodes::gcode::{self, GcodeReport, GcodeSettings, Preset};
+use nodes::model::Tree;
 
 #[derive(Default)]
 pub struct GcodeDialog {

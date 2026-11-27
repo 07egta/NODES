@@ -1,8 +1,8 @@
 //! Independent geometric expectations for print preparation. These tests do not
 //! treat an edge count or positive volume as proof of a valid printable solid.
-use morphlet::mesh_fabrication::{audit, signed_volume};
-use morphlet::model::Mesh;
-use morphlet::stl_export::{Level, check_bodies, repair_meshes};
+use nodes::mesh_fabrication::{audit, signed_volume};
+use nodes::model::Mesh;
+use nodes::stl_export::{Level, check_bodies, repair_meshes};
 
 fn cube(side: f64, origin: [f64; 3]) -> Mesh {
     let mut mesh = Mesh {

@@ -14,7 +14,7 @@
 #[path = "../src/number_aggregates.rs"]
 mod exact_arithmetic;
 
-use morphlet::{
+use nodes::{
     math_nodes,
     model::{MAX_ITEMS, NodeKind, Value as ModelValue},
 };

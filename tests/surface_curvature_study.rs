@@ -1,7 +1,7 @@
 //! Analytical graph-level checks for the newly recreated curvature study.
 //! This sample is not claimed to reproduce the unavailable local JSON bytewise.
-use morphlet::engine::Evaluator;
-use morphlet::persistence;
+use nodes::engine::Evaluator;
+use nodes::persistence;
 use std::f64::consts::TAU;
 
 fn near(actual: f64, expected: f64) {

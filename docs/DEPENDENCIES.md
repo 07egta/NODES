@@ -138,7 +138,7 @@ Cargo manifest の license フィールドは上流作者の宣言であり、�
 
 ### フォントとランタイム
 
-`epaint_default_fonts 0.33.3` の宣言は `(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0`。Morphlet JP と egui 同梱フォントの個別表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#フォント) と `licenses/` に残す。
+`epaint_default_fonts 0.33.3` の宣言は `(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0`。NODES JP と egui 同梱フォントの個別表示は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#フォント) と `licenses/` に残す。
 
 既存の Windows 監査と MinGW runtime 通知は **x86_64-pc-windows-gnullvm の過去の配布物**を対象とする。新しい CI artifact は Windows MSVC を使うため、古い監査をその実行ファイル全体の確認結果として扱わない。今回の全 package の宣言取得は、Windows MSVC / Linux の実際のリンク対象、OS・コンパイラの runtime、各 artifact の配布条件・同梱義務の監査を代替しない。
 

@@ -1,7 +1,7 @@
 //! Direct public adapters must enforce the same contracts as graph evaluation.
-use morphlet::data_tree::{self, ItemMatches, MatchMode};
-use morphlet::data_tree_nodes::{run_list, run_tree};
-use morphlet::model::{Graph, MAX_ITEMS, MAX_TOTAL_WEIGHT, NodeKind, Tree, Value};
+use nodes::data_tree::{self, ItemMatches, MatchMode};
+use nodes::data_tree_nodes::{run_list, run_tree};
+use nodes::model::{Graph, MAX_ITEMS, MAX_TOTAL_WEIGHT, NodeKind, Tree, Value};
 
 fn values(input: &[f64]) -> Vec<Value> {
     input.iter().copied().map(Value::Number).collect()
@@ -230,7 +230,7 @@ fn item_matching_rejects_overflow_before_enumeration_and_is_empty_if_any_port_em
 
 #[test]
 fn member_search_budgets_geometry_comparison_work() {
-    use morphlet::model::Curve;
+    use nodes::model::Curve;
     use std::sync::Arc;
     let shape = Value::Curve(Arc::new(Curve {
         points: vec![[1., 2., 3.]; 200],
@@ -275,7 +275,7 @@ fn singleton_simplification_follows_documented_nodes_api_policy() {
 
 #[test]
 fn public_tree_combinators_limit_ports_and_logical_payload_weight() {
-    use morphlet::model::Curve;
+    use nodes::model::Curve;
     use std::sync::Arc;
     let one = values(&[1.]);
     let too_many = vec![one.as_slice(); 65];

@@ -1,10 +1,10 @@
 //! Render the actual application panel and viewport across evaluation revisions.
 use super::*;
-use morphlet::model::{Mesh, Value};
+use nodes::model::{Mesh, Value};
 
 struct PreviewTest {
     context: egui::Context,
-    app: MorphletApp,
+    app: NodesApp,
     evaluator: Evaluator,
     results: LatestSender<ComputeResult>,
     _requests: LatestReceiver<ComputeRequest>,
@@ -40,7 +40,7 @@ impl PreviewTest {
         let cc = eframe::CreationContext::_new_kittest(context.clone());
         // A screenshot argument only suppresses recovery-file loading. We call
         // right_panel, never App::update, so no screenshots or autosaves run.
-        let mut app = MorphletApp::new(&cc, None, Some(PathBuf::from("unused-preview-test.png")));
+        let mut app = NodesApp::new(&cc, None, Some(PathBuf::from("unused-preview-test.png")));
         let (sender, requests) = latest_channel::channel();
         let (results, receiver) = latest_channel::channel();
         // Feed actual completion mailboxes deterministically, without sleeps or
@@ -363,7 +363,7 @@ fn pending_pick_cannot_select_a_reused_node_id_after_undo() {
     );
 }
 
-/// cargo test --locked --bin Morphlet benchmark_pending_preview -- --ignored --nocapture --test-threads=1
+/// cargo test --locked --bin NODES benchmark_pending_preview -- --ignored --nocapture --test-threads=1
 #[test]
 #[ignore = "manual measurement of actual app/viewport pending and completion frames"]
 fn benchmark_pending_preview() {
@@ -413,7 +413,7 @@ fn benchmark_pending_preview() {
                 "completed_ms": completed_ms,
                 "pending_median_ms": p[3],
                 "completed_median_ms": c[3],
-                "timed": "egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery"
+                "timed": "egui Context::run -> actual NodesApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery"
             })
         );
     }

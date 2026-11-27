@@ -1,5 +1,5 @@
 //! Independent analytic checks at the curve/surface kernel boundary.
-use morphlet::{
+use nodes::{
     curve_geometry::{CurveGeometry, NurbsCurve},
     engine::Evaluator,
     model::{Curve, Graph, NodeKind as K, Value},
@@ -23,7 +23,7 @@ fn curve(g: CurveGeometry, steps: usize) -> Curve {
         geometry: Some(g),
     }
 }
-fn first(e: &morphlet::engine::Evaluation, id: u64) -> &Value {
+fn first(e: &nodes::engine::Evaluation, id: u64) -> &Value {
     e.outputs[&id]
         .as_ref()
         .unwrap()
@@ -269,7 +269,7 @@ fn editable_exact_cylinder_example_loads_and_evaluates() {
 
 #[test]
 fn surface_tessellation_preserves_nonuniform_polyline_corners() {
-    use morphlet::curve_geometry::{cross, norm, sub};
+    use nodes::curve_geometry::{cross, norm, sub};
     let g = CurveGeometry::nurbs(
         NurbsCurve::new(
             1,

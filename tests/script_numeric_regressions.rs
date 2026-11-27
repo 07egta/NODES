@@ -1,6 +1,6 @@
 //! Script interpolation uses the same finite endpoint behavior as math nodes.
-use morphlet::model::{Tree, Value};
-use morphlet::script::{ScriptInputs, run_script};
+use nodes::model::{Tree, Value};
+use nodes::script::{ScriptInputs, run_script};
 
 fn run(source: &str) -> Result<Tree, String> {
     run_script(source, &ScriptInputs::default(), &|| false)
@@ -93,8 +93,8 @@ fn shared_lerp_keeps_finite_extrapolation_and_tiny_constants() {
             assert!((actual - expected).abs() <= expected.abs() * 4e-16);
         }
         // The node and Script paths must use the same numeric contract.
-        let node_result = morphlet::math_nodes::run_item(
-            morphlet::model::NodeKind::Lerp,
+        let node_result = nodes::math_nodes::run_item(
+            nodes::model::NodeKind::Lerp,
             &[&Value::Number(a), &Value::Number(b), &Value::Number(t)],
             &|| false,
         )
@@ -120,8 +120,8 @@ fn shared_lerp_retains_the_low_part_of_rounded_endpoint_differences() {
             geometry: None,
         };
         let scripted = run_script("lerp(a, b, c)", &inputs, &|| false).unwrap();
-        let node = morphlet::math_nodes::run_item(
-            morphlet::model::NodeKind::Lerp,
+        let node = nodes::math_nodes::run_item(
+            nodes::model::NodeKind::Lerp,
             &[&Value::Number(a), &Value::Number(b), &Value::Number(t)],
             &|| false,
         )

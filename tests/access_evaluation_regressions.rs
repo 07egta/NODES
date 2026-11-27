@@ -1,6 +1,6 @@
 //! Independent adapter contracts at the graph boundary, including empty lists.
 //! These regressions require the root engine/API fixes; they do not claim GH parity.
-use morphlet::{
+use nodes::{
     engine::Evaluator,
     graph_api::{self, API_VERSION, Edit, Request},
     model::{Graph, NodeId, NodeKind as K, Tree, Value},

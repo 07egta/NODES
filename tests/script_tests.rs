@@ -1,10 +1,10 @@
 //! Script node (Rhai sandbox) and cluster (まとめノード) tests.
 //! NOTE: written without being compiled or run locally; CI is the first real check.
-use morphlet::cluster::{self, ClusterDef};
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeId, NodeKind, Tree, Value};
-use morphlet::persistence::{self, Project};
-use morphlet::script::{self, ScriptInputs};
+use nodes::cluster::{self, ClusterDef};
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, NodeId, NodeKind, Tree, Value};
+use nodes::persistence::{self, Project};
+use nodes::script::{self, ScriptInputs};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -51,7 +51,7 @@ fn numbers(tree: &Tree) -> Vec<f64> {
         })
         .collect()
 }
-fn evaluate(graph: &Graph) -> morphlet::engine::Evaluation {
+fn evaluate(graph: &Graph) -> nodes::engine::Evaluation {
     Evaluator::default().evaluate(graph, &|| false)
 }
 fn script_graph(source: &str) -> (Graph, NodeId) {

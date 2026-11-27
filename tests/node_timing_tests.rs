@@ -1,6 +1,6 @@
 //! Recreated after runtime loss; observed times have no hardware speed threshold.
-use morphlet::engine::{Evaluation, Evaluator};
-use morphlet::model::{Graph, NodeId, NodeKind};
+use nodes::engine::{Evaluation, Evaluator};
+use nodes::model::{Graph, NodeId, NodeKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 fn node(g: &mut Graph, k: NodeKind) -> NodeId {
     g.add(k, [0.; 2]).unwrap()

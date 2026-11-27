@@ -1,5 +1,5 @@
 //! Independent line/arc expectations for endpoint projection and geometric closure.
-use morphlet::curve_geometry::{CurveGeometry, NurbsCurve};
+use nodes::curve_geometry::{CurveGeometry, NurbsCurve};
 use std::{cell::Cell, f64::consts::FRAC_PI_2};
 
 fn line() -> CurveGeometry {

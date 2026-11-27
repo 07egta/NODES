@@ -17,10 +17,10 @@ use std::sync::Arc;
 use eframe::egui::{
     self, Align2, Color32, FontId, PointerButton, Pos2, Rect, Sense, Shape, Stroke, Vec2,
 };
-use morphlet::model::{Curve, Mesh, Tree, Value};
-use morphlet::persistence::{self, ExportReport};
-use morphlet::print_info::{self, Printer};
-use morphlet::raster::{Frame, Vertex as RasterVertex};
+use nodes::model::{Curve, Mesh, Tree, Value};
+use nodes::persistence::{self, ExportReport};
+use nodes::print_info::{self, Printer};
+use nodes::raster::{Frame, Vertex as RasterVertex};
 
 type V3 = [f64; 3];
 

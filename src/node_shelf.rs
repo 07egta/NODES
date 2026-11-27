@@ -8,7 +8,7 @@
 
 use crate::{node_icons, theme, ui_polish};
 use eframe::egui::{self, Align, Align2, FontId, Layout, Pos2, Rect, RichText, Sense};
-use morphlet::model::{DataType, Graph, NodeId, NodeKind};
+use nodes::model::{DataType, Graph, NodeId, NodeKind};
 
 /// Most suggestions shown for the selected node.
 pub const SUGGESTION_LIMIT: usize = 6;

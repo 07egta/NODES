@@ -56,7 +56,7 @@ Linux/Windowsの2件差はUnix限定のproject/part FIFO回帰である。ignore
 | 同じSHA | GitHub Actions Windows / Rust 1.100.0 | 同じコマンド | 350 passed、0 failed、2 ignored、24 suites |
 | 同じSHA | 同じWindows runner | GUI release build | 成功 |
 
-Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs/45822273755)、job 139917295799 の Test / Build Morphlet。ログ上のtest buildは4m11s、release buildは1m42s。これは起動時間やユーザーPCの性能ではない。
+Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs/45822273755)、job 139917295799 の Test / Build NODES。ログ上のtest buildは4m11s、release buildは1m42s。これは起動時間やユーザーPCの性能ではない。
 
 2件のignoredは `benchmark_sparse_slider_edit`（手動release計測）と `audit_stress`（10万頂点・50万三角形のopt-inストレス検証）。失敗した試験を削除して成功にしたものではない。
 
@@ -102,7 +102,7 @@ Windowsの根拠: [run 45822273755](https://github.com/07egta/NODES/actions/runs
 
 前回ソース `2f94df459533774f83593835ba1e22d4924a3c42` の [Check 45852634502](https://github.com/07egta/NODES/actions/runs/45852634502)、Linux job `140022721574` は **433 passed / 0 failed / 2 ignored、35 suites**。fmt/check/strict Clippy、Python17件、両バイナリのrelease build、artifact uploadも成功。実checkout `19717e70917718af1374e387720b29b619c1c1ed` のtreeとsource headのtree一致をAPIで確認した。Windows job `140024871303` も **432 passed / 0 failed / 2 ignored、35 suites**、両バイナリrelease build・artifact uploadに成功した。Linuxとの差1件はUnix専用FIFO回帰である。
 
-配布用Linux ZIP artifact `15134610988` のSHA-256と展開バイナリを照合した上で、FIFO拒否を4入口で実行した。`nodes-cli validate` / `evaluate`、`Morphlet --build-graph` / `--inspect-ghx` は全てexit 1で通常ファイルを要求し、各1.3〜2.3msで終了、既存出力のbytesを保持した。修正前の2秒timeout、各コマンド・時刻・バイナリの根拠は [FIFO_VALIDATION.json](docs/development/FIFO_VALIDATION.json)。敵対的なファイル差し替え競合の完全防止を主張しない。
+配布用Linux ZIP artifact `15134610988` のSHA-256と展開バイナリを照合した上で、FIFO拒否を4入口で実行した。`nodes-cli validate` / `evaluate`、`NODES --build-graph` / `--inspect-ghx` は全てexit 1で通常ファイルを要求し、各1.3〜2.3msで終了、既存出力のbytesを保持した。修正前の2秒timeout、各コマンド・時刻・バイナリの根拠は [FIFO_VALIDATION.json](docs/development/FIFO_VALIDATION.json)。敵対的なファイル差し替え競合の完全防止を主張しない。
 
 ### 実CLIの花器ワークフロー
 

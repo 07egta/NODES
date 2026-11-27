@@ -1,9 +1,9 @@
 //! Node on/off, groups and notes: file compatibility, evaluation and size caps.
-use morphlet::annotations::{self, Group, MAX_GROUPS, MAX_NOTE_BYTES, MAX_NOTES, Note};
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeKind, Tree, Value};
-use morphlet::persistence::{self, Project};
-use morphlet::templates;
+use nodes::annotations::{self, Group, MAX_GROUPS, MAX_NOTE_BYTES, MAX_NOTES, Note};
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, NodeKind, Tree, Value};
+use nodes::persistence::{self, Project};
+use nodes::templates;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};

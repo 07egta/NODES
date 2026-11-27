@@ -1,5 +1,5 @@
 //! Independent numeric answers for representable spreads and extreme products.
-use morphlet::{
+use nodes::{
     math_nodes,
     model::{NodeKind, Value},
 };

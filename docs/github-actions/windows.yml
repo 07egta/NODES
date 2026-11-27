@@ -17,5 +17,5 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Test
         run: cargo test --all-targets --locked
-      - name: Build Morphlet
-        run: cargo build --release --locked --bin Morphlet
+      - name: Build NODES
+        run: cargo build --release --locked --bin NODES

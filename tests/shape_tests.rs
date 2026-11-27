@@ -1,7 +1,7 @@
 //! Curve, tube, mesh-repair, transform and gyroid nodes (`src/nodes_shape.rs`).
 //! Written without compiling or running; CI is the first check.
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, Mesh, NodeId, NodeKind, Tree, Value};
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, Mesh, NodeId, NodeKind, Tree, Value};
 use std::collections::BTreeMap;
 
 /// Adds a node and sets some of its numbers.

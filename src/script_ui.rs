@@ -1,7 +1,7 @@
 //! egui pieces for the script node editor and for cluster parts (kept out of app.rs).
 use crate::theme;
 use eframe::egui::{self, RichText};
-use morphlet::{
+use nodes::{
     cluster,
     model::{Graph, NodeId},
     script,
@@ -106,15 +106,15 @@ pub fn expression_editor(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) {
             egui::TextEdit::singleline(&mut buffer)
                 .code_editor()
                 .desired_width(220.)
-                .char_limit(morphlet::expr::MAX_EXPR_LEN)
-                .hint_text(morphlet::expr::DEFAULT_EXPRESSION),
+                .char_limit(nodes::expr::MAX_EXPR_LEN)
+                .hint_text(nodes::expr::DEFAULT_EXPRESSION),
         );
         apply = response.lost_focus();
         if ui.button("適用").clicked() {
             apply = true;
         }
     });
-    if let Err(e) = morphlet::expr::parse(&buffer) {
+    if let Err(e) = nodes::expr::parse(&buffer) {
         ui.label(RichText::new(e).size(11.).color(theme::ERROR));
     }
     if apply && buffer != node.script {

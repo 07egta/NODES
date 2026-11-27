@@ -1134,7 +1134,7 @@ fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usiz
 
 fn write_ascii(path: &Path, bodies: &[Mesh]) -> Result<(), String> {
     persistence::atomic_write(path, |file| {
-        writeln!(file, "solid Morphlet")?;
+        writeln!(file, "solid NODES")?;
         for body in bodies {
             for &t in &body.triangles {
                 let Some((a, b, c)) = tri_points(body, t) else {
@@ -1150,7 +1150,7 @@ fn write_ascii(path: &Path, bodies: &[Mesh]) -> Result<(), String> {
                 writeln!(file, "  endfacet")?;
             }
         }
-        writeln!(file, "endsolid Morphlet")
+        writeln!(file, "endsolid NODES")
     })
 }
 
@@ -1389,7 +1389,7 @@ pub fn config_path() -> Option<PathBuf> {
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
     };
-    base.map(|dir| dir.join("Morphlet").join("stl_export.json"))
+    base.map(|dir| dir.join("NODES").join("stl_export.json"))
 }
 
 pub fn load_stored(path: &Path) -> StoredSettings {

@@ -44,7 +44,7 @@ Undo/Redo は最大 64 回分の作品スナップショット。新たな編集
 - [Rust 標準ライブラリ: File](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_all) — flush、sync、バッファ付き I/O の役割。
 - [米国議会図書館: Binary STL](https://www.loc.gov/preservation/digital/formats/fdd/fdd000505.shtml) — バイナリ STL のレコード構造。
 
-実装とテストは Morphlet 用に作成した。外部の CAD のソース、画像、アイコン、テンプレートのコピーは含まない。
+実装とテストは NODES 用に作成した。外部の CAD のソース、画像、アイコン、テンプレートのコピーは含まない。
 
 ## 12. G-code（花瓶モード・未検証）
 
@@ -70,7 +70,7 @@ Undo/Redo は最大 64 回分の作品スナップショット。新たな編集
 - 3MF: 単一オブジェクト、`unit="millimeter"`、無圧縮（stored）の ZIP を手組みで作成。CRC32 は自前実装。
 - スライサー連携: 既定の場所（Bambu Studio・OrcaSlicer・PrusaSlicer）を探し、見つからなければ exe を一度選んで記憶する。起動は `Command` で exe に 1 引数（ファイル）を渡すだけで、シェルは使わない。
 - すぐ書き出し（Ctrl+Shift+E）: 前回と同じファイルへ上書きする。スライサーの再読み込み用。
-- 設定の保存先: Windows は `%APPDATA%\Morphlet\stl_export.json`、それ以外は `$XDG_CONFIG_HOME` または `~/.config` 配下。
+- 設定の保存先: Windows は `%APPDATA%\NODES\stl_export.json`、それ以外は `$XDG_CONFIG_HOME` または `~/.config` 配下。
 - 既定の保存名の時刻は JST 固定（`<作品名>_<YYYYMMDD-HHMM>`）。
 
 確認状況: コンパイルもテスト実行もしていません。CI が最初の確認になります。OrcaSlicer の exe 名（`orca-slicer.exe`）は未確認です。

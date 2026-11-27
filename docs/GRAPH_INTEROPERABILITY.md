@@ -20,11 +20,11 @@ Unknown components and source references stay in the report; conversion refuses 
 
 From the project root (Linux/macOS CLI; Windows GUI-subsystem binaries may not display stdout, so prefer library APIs or CI until a console tool is provided):
 
-    cargo run --bin Morphlet -- --inspect-ghx examples/interop/scalar-point.ghx report.json
-    cargo run --bin Morphlet -- --convert-ghx examples/interop/scalar-point.ghx sample.morph
-    cargo run --bin Morphlet -- --node-catalog
-    cargo run --bin Morphlet -- --build-graph examples/interop/ai-add.json sum.morph
-    cargo run --bin Morphlet -- --validate sum.morph
+    cargo run --bin NODES -- --inspect-ghx examples/interop/scalar-point.ghx report.json
+    cargo run --bin NODES -- --convert-ghx examples/interop/scalar-point.ghx sample.morph
+    cargo run --bin NODES -- --node-catalog
+    cargo run --bin NODES -- --build-graph examples/interop/ai-add.json sum.morph
+    cargo run --bin NODES -- --validate sum.morph
 
 The GHX fixture is synthetic (no McNeel code or third-party archive copied). Expected point: (7,2,3); graph API fixture: 7+5=12. These are analytically derived test expectations; not Grasshopper runtime recordings.
 

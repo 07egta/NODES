@@ -1,5 +1,5 @@
 //! Cross-mission regressions: persisted ports, exact geometry and editable examples.
-use morphlet::{
+use nodes::{
     engine::Evaluator,
     model::{Graph, NodeKind as K, Value},
     persistence::{self, Project},
@@ -168,7 +168,7 @@ fn every_editable_example_roundtrips_evaluates_and_uses_the_cache() {
 
 #[test]
 fn api_catalog_exposes_pure_integrated_nodes_with_access_and_keeps_execution_restricted() {
-    let catalog = morphlet::graph_api::catalog();
+    let catalog = nodes::graph_api::catalog();
     for kind in [
         K::Variance,
         K::CurveNurbs,
@@ -188,7 +188,7 @@ fn api_catalog_exposes_pure_integrated_nodes_with_access_and_keeps_execution_res
         K::Expression,
         K::PathMapper,
     ] {
-        assert!(!morphlet::graph_api::permitted(kind));
+        assert!(!nodes::graph_api::permitted(kind));
     }
 }
 
@@ -217,7 +217,7 @@ fn obsolete_list_matching_option_migrates_to_the_shared_ordinal_default() {
         .node_mut(sum)
         .unwrap()
         .params
-        .insert(morphlet::data_tree::MATCH_PARAM.into(), 2.);
+        .insert(nodes::data_tree::MATCH_PARAM.into(), 2.);
     let bytes = serde_json::to_vec(&Project::new("legacy list mode", graph)).unwrap();
     let project = persistence::decode_project(&bytes).unwrap();
     assert!(
@@ -226,7 +226,7 @@ fn obsolete_list_matching_option_migrates_to_the_shared_ordinal_default() {
             .node(sum)
             .unwrap()
             .params
-            .contains_key(morphlet::data_tree::MATCH_PARAM)
+            .contains_key(nodes::data_tree::MATCH_PARAM)
     );
     assert!(
         Evaluator::default()

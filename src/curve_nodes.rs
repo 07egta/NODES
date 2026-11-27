@@ -1,4 +1,4 @@
-//! Native curve nodes. Single-output adapters for Morphlet's existing graph and data trees.
+//! Native curve nodes. Single-output adapters for NODES's existing graph and data trees.
 //! The geometry module is independent of the renderer. Only explicitly marked preview operations
 //! use sampled polylines. Node labels and semantics are original, not GH file compatibility.
 use crate::curve_geometry::{self as cg, CurveGeometry, NurbsCurve, Point3};

@@ -1,8 +1,8 @@
 //! Public diagnostics semantics for high-ID roots and successful failure cuts.
 //! Expected relationships come from the fixtures, not internal bitset indices.
-use morphlet::diagnostics::{MAX_REPORTED_AFFECTED, diagnose};
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeId, NodeKind};
+use nodes::diagnostics::{MAX_REPORTED_AFFECTED, diagnose};
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, NodeId, NodeKind};
 
 fn add(graph: &mut Graph, kind: NodeKind, inputs: &[(&str, NodeId)]) -> NodeId {
     let id = graph.add(kind, [0.; 2]).unwrap();

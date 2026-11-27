@@ -1,12 +1,12 @@
 # Windows 版の実行時ランタイム
 
-Windows MSVC 版の開発用 ZIP に含まれる `Morphlet.exe` と `nodes-cli.exe` は、Microsoft の `VCRUNTIME140.dll` を参照します。ZIP にこの DLL は同梱していません。対応するランタイムが入っていない PC では、起動前に **Microsoft Visual C++ v14 再頒布可能パッケージ（x64）** が必要です。
+Windows MSVC 版の開発用 ZIP に含まれる `NODES.exe` と `nodes-cli.exe` は、Microsoft の `VCRUNTIME140.dll` を参照します。ZIP にこの DLL は同梱していません。対応するランタイムが入っていない PC では、起動前に **Microsoft Visual C++ v14 再頒布可能パッケージ（x64）** が必要です。
 
 ## 起動に必要な場合の手順
 
 1. [Microsoft 公式の x64 パッケージ](https://aka.ms/vc14/vc_redist.x64.exe)をダウンロードします。配布先と対応条件は [Microsoft の公式説明](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)でも確認できます。
 2. Microsoft のインストーラーの案内に従って導入します。再起動を求められた場合は、その案内に従ってください。
-3. `Morphlet.exe` または `nodes-cli.exe` を開き直します。
+3. `NODES.exe` または `nodes-cli.exe` を開き直します。
 
 `VCRUNTIME140.dll` が見つからないというエラーが出た場合も、上記の公式パッケージを利用してください。アプリを作成した MSVC Build Tools と同じか、それより新しいランタイムが必要です。公式の v14 x64 配布先は更新されるため、古い DLL を個別にコピーする方法は案内していません。
 

@@ -1,6 +1,6 @@
 //! Headless capacity/cache contracts. UI responsiveness is not measured here.
-use morphlet::engine::{Evaluation, Evaluator};
-use morphlet::model::{Graph, MAX_NODES, NodeId, NodeKind};
+use nodes::engine::{Evaluation, Evaluator};
+use nodes::model::{Graph, MAX_NODES, NodeId, NodeKind};
 
 fn number(evaluation: &Evaluation, id: NodeId) -> f64 {
     evaluation.outputs[&id].as_ref().unwrap().branches[&vec![0]][0]

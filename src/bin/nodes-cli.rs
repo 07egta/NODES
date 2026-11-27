@@ -1,10 +1,10 @@
 //! Offline console entry point. Keep the Windows console subsystem default:
-//! the separate Morphlet GUI binary intentionally uses the Windows GUI subsystem.
-use morphlet::diagnostics::{self, DiagnosticReport};
-use morphlet::engine::Evaluation;
-use morphlet::graph_api::{self, Request};
-use morphlet::model::{NodeKind, Tree, Value};
-use morphlet::persistence::{self, Project};
+//! the separate NODES GUI binary intentionally uses the Windows GUI subsystem.
+use nodes::diagnostics::{self, DiagnosticReport};
+use nodes::engine::Evaluation;
+use nodes::graph_api::{self, Request};
+use nodes::model::{NodeKind, Tree, Value};
+use nodes::persistence::{self, Project};
 use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
 use std::ffi::OsString;

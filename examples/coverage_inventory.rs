@@ -1,7 +1,7 @@
 //! Export the compiled registry without implying evaluator/GH verification.
 //! cargo run --locked --example coverage_inventory -- --source-revision <git-sha>
 //! Regenerate after integration: counts and defaults are never copied by hand.
-use morphlet::model::NodeKind;
+use nodes::model::NodeKind;
 use serde_json::{Value, json};
 
 /// A deterministic change detector for metadata, not a security hash or a hash
@@ -45,8 +45,8 @@ fn inventory(source_revision: Option<&str>) -> Value {
                         "max": p.default.map(|_| p.max),
                         "step": p.default.map(|_| p.step),
                         "integer": p.integer,
-                        "access": morphlet::node_access::for_input(kind, index).map(|a| a.label()),
-                        "access_description": morphlet::node_access::for_input(kind, index).map(|a| a.description()),
+                        "access": nodes::node_access::for_input(kind, index).map(|a| a.label()),
+                        "access_description": nodes::node_access::for_input(kind, index).map(|a| a.description()),
                         "access_status": "NODES_RUNTIME_CONTRACT"
                     })
                 })
@@ -66,8 +66,8 @@ fn inventory(source_revision: Option<&str>) -> Value {
                     "connection_encoding": "source_node_id"
                 }],
                 "registration": if kind == NodeKind::Cluster { "definition_only" } else { "picker" },
-                "branch_matching": if morphlet::node_access::uses_ordinal_matching(kind) { "ordinal" } else { "legacy_paths_unless_explicit" },
-                "item_matching_configurable": morphlet::node_access::supports_item_matching(kind),
+                "branch_matching": if nodes::node_access::uses_ordinal_matching(kind) { "ordinal" } else { "legacy_paths_unless_explicit" },
+                "item_matching_configurable": nodes::node_access::supports_item_matching(kind),
                 "evaluation_status": "NOT_INFERRED",
                 "compatibility": "NOT_INFERRED"
             });

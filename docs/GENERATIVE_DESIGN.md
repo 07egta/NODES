@@ -37,4 +37,4 @@ Public interface research (not copied code): [Grasshopper 1 component index](htt
 
 ## Verification
 
-Unit tests exercise duplicate, near-collinear, out-of-domain, bounds, cancellation, counts, tie ordering, rotation and cylinder radius. Integration tests load all examples, require non-empty output, edit a parameter, and check branch preservation. Run `cargo test --all-targets --locked` and `cargo build --release --locked --bin Morphlet` on Windows. Local Rust/compiler and GUI unavailable in the authoring environment; no claim of successful compile, rendering or exact GH equivalence until CI/manual verification.
+Unit tests exercise duplicate, near-collinear, out-of-domain, bounds, cancellation, counts, tie ordering, rotation and cylinder radius. Integration tests load all examples, require non-empty output, edit a parameter, and check branch preservation. Run `cargo test --all-targets --locked` and `cargo build --release --locked --bin NODES` on Windows. Local Rust/compiler and GUI unavailable in the authoring environment; no claim of successful compile, rendering or exact GH equivalence until CI/manual verification.

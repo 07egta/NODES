@@ -3,7 +3,7 @@ use crate::theme;
 use crate::ui_polish;
 use eframe::egui::epaint::{RectShape, TessellationOptions, Tessellator};
 use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, Stroke, Vec2};
-use morphlet::{
+use nodes::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
     model::{InputSpec, Node, NodeId, NodeKind},
@@ -939,7 +939,7 @@ impl GraphCanvas {
                                         .flatten()
                                         .next()
                                         .map(|v| match v {
-                                            morphlet::model::Value::Number(n) => {
+                                            nodes::model::Value::Number(n) => {
                                                 format!("{n:.2}")
                                             }
                                             _ => "接続済み".into(),
@@ -1678,7 +1678,7 @@ mod premium_tests {
 
     #[test]
     fn canvas_node_lookup_follows_reordered_and_replaced_graphs() {
-        let mut graph = morphlet::model::Graph::default();
+        let mut graph = nodes::model::Graph::default();
         let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
         let b = graph.add(NodeKind::Add, [300., 0.]).unwrap();
         let mut indices = NodeIndices::default();
@@ -1699,7 +1699,7 @@ mod premium_tests {
     fn canvas_slider_still_edits_its_node_and_panning_reuses_the_minimap() {
         let ctx = egui::Context::default();
         let mut canvas = GraphCanvas::default();
-        let mut graph = morphlet::model::Graph::default();
+        let mut graph = nodes::model::Graph::default();
         let id = graph.add(NodeKind::Number, [40., 40.]).unwrap();
         for row in 0..11 {
             graph

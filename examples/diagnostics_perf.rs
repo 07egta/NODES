@@ -2,11 +2,11 @@
 //! cargo run --release --locked --example diagnostics_perf -- --quick
 //! cargo run --release --locked --example diagnostics_perf -- --full
 //! Use --case prefix-1024 to select a fixed workload without running larger cases.
-use morphlet::diagnostics::{
+use nodes::diagnostics::{
     DiagnosticReport, MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, NodeFailure, diagnose,
 };
-use morphlet::engine::{Evaluation, Evaluator};
-use morphlet::model::{Graph, MAX_NODES, Node, NodeId, NodeKind};
+use nodes::engine::{Evaluation, Evaluator};
+use nodes::model::{Graph, MAX_NODES, Node, NodeId, NodeKind};
 use serde_json::{Value, json};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 

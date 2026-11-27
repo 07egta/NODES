@@ -5,7 +5,7 @@
 //! generic one, so node kinds added later still get an icon without code changes here.
 
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke};
-use morphlet::model::NodeKind;
+use nodes::model::NodeKind;
 
 /// One piece of an icon, in a 0..1 square.
 #[derive(Clone, Copy)]

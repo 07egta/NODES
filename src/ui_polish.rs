@@ -2,7 +2,7 @@
 //! the saved theme choice and the shortcut cheat-sheet. No egui drawing happens here,
 //! so the ranking and persistence rules can be unit tested on their own.
 
-use morphlet::model::{DataType, NodeKind};
+use nodes::model::{DataType, NodeKind};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -274,7 +274,7 @@ pub fn format_dark(dark: bool) -> &'static str {
 pub fn settings_path() -> Option<PathBuf> {
     if cfg!(target_os = "windows") {
         std::env::var_os("LOCALAPPDATA")
-            .map(|p| PathBuf::from(p).join("Morphlet").join("settings.txt"))
+            .map(|p| PathBuf::from(p).join("NODES").join("settings.txt"))
     } else {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)

@@ -1,15 +1,15 @@
-# Morphlet 第三者ライセンスと著作権表示
+# NODES 第三者ライセンスと著作権表示
 
 確認日: 2026-11-26  
-対象: Windows x64 (`x86_64-pc-windows-gnullvm`) / Morphlet 0.1.0
+対象: Windows x64 (`x86_64-pc-windows-gnullvm`) / NODES 0.1.0
 
 この文書の 114 件の監査と MinGW runtime 記録は、その時点の Windows gnullvm 配布物を対象とする。現在の Cargo.lock 全体、Windows MSVC CI、実行環境中断後の回収範囲は [DEPENDENCIES.md](DEPENDENCIES.md) を参照する。Rhai 関連 7 件の本文は記録済み公式コミットから回収し、旧監査とは分けて保存した。
 
-## Morphlet 本体
+## NODES 本体
 
-Morphlet は、このプロジェクトのために新しく記述した独立した実装です。Arclet CAD の方針・既存構造を参考にしていますが、Arclet CAD / SolidCraft のソースコードをこの配布物へコピーしていません。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
+NODES は、このプロジェクトのために新しく記述した独立した実装です。Arclet CAD の方針・既存構造を参考にしていますが、Arclet CAD / SolidCraft のソースコードをこの配布物へコピーしていません。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
 
-Morphlet 本体のソースコードは **MIT または Apache-2.0** から選択できます。本文は [LICENSE-MIT](../LICENSE-MIT) と [LICENSE-APACHE](../LICENSE-APACHE) です。本体のライセンスは、下記の第三者コードやフォントの著作権・ライセンスを変更しません。
+NODES 本体のソースコードは **MIT または Apache-2.0** から選択できます。本文は [LICENSE-MIT](../LICENSE-MIT) と [LICENSE-APACHE](../LICENSE-APACHE) です。本体のライセンスは、下記の第三者コードやフォントの著作権・ライセンスを変更しません。
 
 ## 確認対象と結果
 
@@ -43,9 +43,9 @@ Cargo の情報形式: [公式 cargo metadata ドキュメント](https://doc.ru
 
 ## フォント
 
-### Morphlet JP
+### NODES JP
 
-`assets/MorphletJP.ttf` は Google Fonts が配布する Noto Sans JP の可変フォントをウェイト 400 に固定し、内部名称を Morphlet JP へ変更したものです。元フォントの著作権表示は **Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'** です。フォント自体は **SIL Open Font License 1.1** のまま配布します。
+`assets/MorphletJP.ttf` は Google Fonts が配布する Noto Sans JP の可変フォントをウェイト 400 に固定し、内部名称を NODES JP へ変更したものです。元フォントの著作権表示は **Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'** です。フォント自体は **SIL Open Font License 1.1** のまま配布します。
 
 本文: [Noto-Sans-JP-OFL.txt](../licenses/fonts/Noto-Sans-JP-OFL.txt)。アプリ側の同じ表示: [FONT-LICENSE.txt](../assets/FONT-LICENSE.txt)。[Google Fonts の Noto Sans JP 公式ライセンス](https://github.com/google/fonts/blob/main/ofl/notosansjp/OFL.txt)。フォント名の変更は本ソフト向けの変更を示すものであり、Adobe や Noto プロジェクトによる推奨を意味しません。
 

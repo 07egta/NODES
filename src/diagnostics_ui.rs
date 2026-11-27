@@ -4,7 +4,7 @@
 //! uses current node IDs and labels; stale snapshots cannot change the selection.
 use crate::{theme, ui_polish};
 use eframe::egui::{self, RichText};
-use morphlet::{
+use nodes::{
     diagnostics::{DiagnosticReport, NodeFailure, NodeRef},
     model::{Graph, Node, NodeId},
 };
@@ -545,7 +545,7 @@ fn node_link(ui: &mut egui::Ui, nodes: &IndexedNodes<'_>, node: &NodeRef, stale:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morphlet::{diagnostics::diagnose, engine::Evaluator, model::NodeKind};
+    use nodes::{diagnostics::diagnose, engine::Evaluator, model::NodeKind};
 
     #[test]
     fn nonempty_filter_does_not_expand_the_window_each_frame() {

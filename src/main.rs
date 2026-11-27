@@ -16,13 +16,13 @@ mod theme;
 mod ui_polish;
 mod viewport;
 
-use morphlet::{engine::Evaluator, model::NodeKind, persistence, templates};
+use nodes::{engine::Evaluator, model::NodeKind, persistence, templates};
 use std::path::{Path, PathBuf};
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().is_some_and(|a| a == "--node-catalog") {
-        match serde_json::to_string_pretty(&morphlet::graph_api::catalog()) {
+        match serde_json::to_string_pretty(&nodes::graph_api::catalog()) {
             Ok(json) => println!("{json}"),
             Err(e) => {
                 eprintln!("{e}");
@@ -34,7 +34,7 @@ fn main() -> eframe::Result<()> {
     if args.first().is_some_and(|a| a == "--build-graph") {
         let result = match (args.get(1), args.get(2), args.len()) {
             (Some(input), Some(output), 3) => {
-                morphlet::graph_api::build_file(Path::new(input), Path::new(output))
+                nodes::graph_api::build_file(Path::new(input), Path::new(output))
             }
             _ => Err("Usage: --build-graph request.json output.morph".into()),
         };
@@ -50,10 +50,10 @@ fn main() -> eframe::Result<()> {
     ) {
         let result = match (args.get(1), args.get(2), args.len()) {
             (Some(input), Some(output), 3) if args[0] == "--inspect-ghx" => {
-                morphlet::ghx::inspect_file(Path::new(input), Path::new(output))
+                nodes::ghx::inspect_file(Path::new(input), Path::new(output))
             }
             (Some(input), Some(output), 3) => {
-                morphlet::ghx::convert_file(Path::new(input), Path::new(output))
+                nodes::ghx::convert_file(Path::new(input), Path::new(output))
             }
             _ => Err(
                 "Usage: --inspect-ghx input.ghx report.json | --convert-ghx input.ghx output.morph"
@@ -127,9 +127,9 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "Morphlet",
+        "NODES",
         options,
-        Box::new(move |cc| Ok(Box::new(app::MorphletApp::new(cc, open_file, screenshot)))),
+        Box::new(move |cc| Ok(Box::new(app::NodesApp::new(cc, open_file, screenshot)))),
     )
 }
 
@@ -186,7 +186,7 @@ fn export_demos(dir: &Path) -> Result<(), String> {
             t.branches
                 .values()
                 .flatten()
-                .any(|v| matches!(v, morphlet::model::Value::Mesh(_)))
+                .any(|v| matches!(v, nodes::model::Value::Mesh(_)))
         }) {
             let r = persistence::export_stl(&dir.join(format!("{:02}.stl", index + 1)), &trees)?;
             println!(

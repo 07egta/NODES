@@ -1,7 +1,7 @@
 //! Integration tests execute the real console binary, including on Windows.
-use morphlet::graph_api;
-use morphlet::model::{Graph, NodeKind, Tree, Value};
-use morphlet::persistence::{self, Project};
+use nodes::graph_api;
+use nodes::model::{Graph, NodeKind, Tree, Value};
+use nodes::persistence::{self, Project};
 use serde_json::{Value as Json, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -218,7 +218,7 @@ fn console_apply_supports_transactional_structural_edits() {
     )
     .unwrap();
     project.name = "構造編集".into();
-    morphlet::annotations::add_group(&mut project.graph, &[0, 1], "inputs").unwrap();
+    nodes::annotations::add_group(&mut project.graph, &[0, 1], "inputs").unwrap();
     persistence::save(&source, &project).unwrap();
     let source_bytes = fs::read(&source).unwrap();
 
@@ -477,7 +477,7 @@ fn explicit_mesh_output_roundtrips_stl_and_excludes_intermediate_meshes() {
     assert_eq!(report["printability_verified"], false);
     let bytes = fs::read(stl).unwrap();
     assert_eq!(bytes.len(), 84 + 50 * 12);
-    let mesh = morphlet::import::parse_stl(&bytes, &|| false).unwrap();
+    let mesh = nodes::import::parse_stl(&bytes, &|| false).unwrap();
     assert_eq!(mesh.triangles.len(), 12);
     let imported = persistence::mesh_stats(&[Tree::single(Value::Mesh(Arc::new(mesh)))]).unwrap();
     assert!(imported.is_closed());

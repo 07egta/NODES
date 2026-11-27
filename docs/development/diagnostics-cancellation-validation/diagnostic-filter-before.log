@@ -1,6 +1,6 @@
    Compiling morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES)
     Finished `test` profile [optimized] target(s) in 24.92s
-     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)
+     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/NODES-9d17213954843cf7)
 
 running 1 test
 test diagnostics_ui::tests::nonempty_filter_does_not_expand_the_window_each_frame ... FAILED
@@ -19,4 +19,4 @@ failures:
 
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.01s
 
-error: test failed, to rerun pass `--bin Morphlet`
+error: test failed, to rerun pass `--bin NODES`

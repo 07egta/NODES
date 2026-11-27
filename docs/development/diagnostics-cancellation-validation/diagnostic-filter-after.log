@@ -1,6 +1,6 @@
    Compiling morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES)
     Finished `test` profile [optimized] target(s) in 4.64s
-     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)
+     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/NODES-9d17213954843cf7)
 
 running 5 tests
 test diagnostics_ui::tests::cached_node_lookup_keeps_live_names_and_rejects_reordered_indices ... ok

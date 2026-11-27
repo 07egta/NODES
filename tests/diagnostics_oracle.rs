@@ -1,9 +1,9 @@
 //! Independent reachability oracle for diagnostics; no bitsets or shared root sets.
 //! Real evaluator outcomes decide which edges can carry a failure. A simple BFS
 //! from each earliest failed node supplies expected descendants and causes.
-use morphlet::diagnostics::{MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, diagnose};
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeId, NodeKind};
+use nodes::diagnostics::{MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, diagnose};
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, NodeId, NodeKind};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 struct FixedRandom(u64);

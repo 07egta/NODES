@@ -1,5 +1,5 @@
 //! Local-support evaluation must retain endpoint and one-sided derivatives.
-use morphlet::surface_kernel::NurbsSurface;
+use nodes::surface_kernel::NurbsSurface;
 use std::cell::Cell;
 
 fn point_near(actual: [f64; 3], expected: [f64; 3], tolerance: f64) {

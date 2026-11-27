@@ -1,7 +1,7 @@
 //! Core integration contracts: these tests intentionally use the public model API.
-use morphlet::cluster::{self, ClusterDef};
-use morphlet::engine::{Evaluation, Evaluator};
-use morphlet::model::{Graph, MAX_NODES, NodeId, NodeKind, Tree, Value};
+use nodes::cluster::{self, ClusterDef};
+use nodes::engine::{Evaluation, Evaluator};
+use nodes::model::{Graph, MAX_NODES, NodeId, NodeKind, Tree, Value};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -362,7 +362,7 @@ fn part_save_replaces_only_with_complete_valid_data() {
 
 #[test]
 fn unknown_project_content_is_rejected_without_rewriting_the_original() {
-    use morphlet::persistence::{self, Project};
+    use nodes::persistence::{self, Project};
     let dir =
         TempDir(std::env::temp_dir().join(format!("morphlet-core-unknown-{}", std::process::id())));
     fs::create_dir(&dir.0).unwrap();
@@ -393,7 +393,7 @@ fn unknown_project_content_is_rejected_without_rewriting_the_original() {
 
 #[test]
 fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
-    use morphlet::persistence::{self, Project};
+    use nodes::persistence::{self, Project};
     let dir = TempDir(
         std::env::temp_dir().join(format!("morphlet-core-save-limit-{}", std::process::id())),
     );
@@ -407,7 +407,7 @@ fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
     // The graph is individually valid, but its total JSON exceeds the 8 MiB file cap.
     for _ in 0..1_100 {
         let id = add(&mut large, NodeKind::Script);
-        large.node_mut(id).unwrap().script = "x".repeat(morphlet::script::MAX_SCRIPT_BYTES);
+        large.node_mut(id).unwrap().script = "x".repeat(nodes::script::MAX_SCRIPT_BYTES);
     }
     let oversized = Project::new("large", large);
     oversized.validate().unwrap();
@@ -420,7 +420,7 @@ fn oversized_streaming_save_preserves_the_previous_project_and_removes_temp() {
 
 #[test]
 fn all_checked_in_project_examples_round_trip_without_schema_changes() {
-    use morphlet::persistence;
+    use nodes::persistence;
     let dir = TempDir(
         std::env::temp_dir().join(format!("morphlet-core-roundtrip-{}", std::process::id())),
     );

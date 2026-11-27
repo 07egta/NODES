@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDirectory 'Cargo.lock') -Pat
 $buildSucceeded = $false
 Push-Location -LiteralPath $projectDirectory
 try {
-    Write-Host 'Morphlet: 使用する Rust を確認しています。'
+    Write-Host 'NODES: 使用する Rust を確認しています。'
     & rustc --version
     $versionExitCode = $LASTEXITCODE
     if ($versionExitCode -ne 0) {
@@ -50,12 +50,12 @@ try {
         throw "リリースビルドに失敗しました (exit $buildExitCode)。"
     }
 
-    $standardExecutable = Join-Path $projectDirectory 'target\release\Morphlet.exe'
+    $standardExecutable = Join-Path $projectDirectory 'target\release\NODES.exe'
     Write-Host 'テストとリリースビルドが完了しました。'
     if (Test-Path -LiteralPath $standardExecutable -PathType Leaf) {
         Write-Host "実行ファイル: $standardExecutable"
     } else {
-        Write-Host 'Cargo の独自設定を使用している場合は、設定した生成先の Morphlet.exe を確認してください。'
+        Write-Host 'Cargo の独自設定を使用している場合は、設定した生成先の NODES.exe を確認してください。'
     }
     $buildSucceeded = $true
 }

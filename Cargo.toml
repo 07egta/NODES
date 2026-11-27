@@ -1,6 +1,6 @@
 [package]
-name = "morphlet"
-default-run = "Morphlet"
+name = "nodes"
+default-run = "NODES"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
@@ -31,6 +31,6 @@ opt-level = 1
 opt-level = 2
 
 [[bin]]
-name = "Morphlet"
+name = "NODES"
 path = "src/main.rs"
 

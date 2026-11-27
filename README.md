@@ -15,8 +15,8 @@
 ## 入手する
 
 - **検証済み開発版:** 数値・幾何・書き出し・直接数値入力のソース `25f981b794e3e0f037cd664915ce144347b49f40` の [Windows ZIP](https://github.com/07egta/NODES/actions/runs/45916077764/artifacts/15163120765) / [Linux ZIP](https://github.com/07egta/NODES/actions/runs/45916077764/artifacts/15162711183) を取得できます。CI成果物は安定リリースではありません。最新Windowsの実画面操作と実機造形は未検証です。
-- **旧公開版:** [Morphlet 0.1.0 Windows ZIP](https://github.com/07egta/NODES/releases/download/v0.1.0/Morphlet-0.1.0-Windows-x64.zip)。この旧版には現在の開発ブランチで追加した機能は含まれません。
-- **ソースから:** 下記のビルド手順を使います。実行ファイル名は互換性のため `Morphlet.exe` を維持しています。
+- **旧公開版:** [NODES 0.1.0 Windows ZIP](https://github.com/07egta/NODES/releases/download/v0.1.0/NODES-0.1.0-Windows-x64.zip)。この旧版には現在の開発ブランチで追加した機能は含まれません。
+- **ソースから:** 下記のビルド手順を使います。実行ファイル名は互換性のため `NODES.exe` を維持しています。
 
 [Check 45916077764](https://github.com/07egta/NODES/actions/runs/45916077764) はLinux **523 passed**、Windows **521 passed**、各0 failed / 3 ignoredで成功しました。両OSのGUI/CLI release buildと、Linuxのfmt/check/strict Clippy・Python17件・独立数値oracle・依存監査も成功しています。件数差はUnix限定FIFO回帰2件です。`25f981b` の実GUIでは直接数値入力・保存・分割STL出力・light/darkの案内表示を確認しました。後続preview-cache修正の結果と混同せず、ソース別のCI・配布物を [検証記録](docs/development/OMEGA_CI_RESULTS.json) に記録します。
 
@@ -24,7 +24,7 @@ WindowsでランタイムDLLが見つからない場合は、[Microsoft公式の
 
 ## 最初のモデルを編集する
 
-1. ZIPを展開し、`Morphlet.exe` を起動します。
+1. ZIPを展開し、`NODES.exe` を起動します。
 2. 「ねじれの花器」の花器ノードを選び、高さ・半径・凹凸を変更します。ねじりノードでねじり角を調整できます。
 3. 左の検索で「円」「点を並べたい」「ねじり」や `circle`、`array`、`twist` を探し、必要なノードを追加します。
 4. 保存操作から編集可能な `.morph` グラフを残します。配布サンプルとは別名で保存すると元の作例を維持できます。
@@ -84,7 +84,7 @@ cargo test --all-targets --locked
 cargo build --release --locked --bins
 ```
 
-Windowsの生成先は `target\release\Morphlet.exe` です。`--locked` は同梱の `Cargo.lock` を維持します。ビルドを簡略化する [scripts/build-windows.ps1](scripts/build-windows.ps1) もあります。実行したコマンドと環境は [検証結果](TEST_RESULTS.md) に記録しています。
+Windowsの生成先は `target\release\NODES.exe` です。`--locked` は同梱の `Cargo.lock` を維持します。ビルドを簡略化する [scripts/build-windows.ps1](scripts/build-windows.ps1) もあります。実行したコマンドと環境は [検証結果](TEST_RESULTS.md) に記録しています。
 
 ## オフラインCLI
 

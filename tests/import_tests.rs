@@ -1,7 +1,7 @@
 //! Mesh import (STL and OBJ) on small in-memory samples. Not compiled or run in the
 //! session that wrote it; CI is the first check.
-use morphlet::import::{Format, format_of, parse_obj, parse_stl, place, read_file};
-use morphlet::model::{Mesh, NodeKind};
+use nodes::import::{Format, format_of, parse_obj, parse_stl, place, read_file};
+use nodes::model::{Mesh, NodeKind};
 use std::collections::BTreeSet;
 use std::path::Path;
 

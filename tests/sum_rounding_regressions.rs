@@ -1,5 +1,5 @@
 //! Independently known binary64 sum/mean answers, rounded once to nearest/even.
-use morphlet::{
+use nodes::{
     math_nodes,
     model::{NodeKind, Value},
 };

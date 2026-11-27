@@ -1,8 +1,8 @@
 # NODES 開発版 — はじめての使い方
 
-NODES は、ノードをつないで形や数値を作る独立型のパラメトリック CAD です。Rhino・Grasshopper のインストールやログインは不要で、基本のモデリング、保存、書き出しはオフラインで使えます。実行ファイル名は互換性のため **`Morphlet.exe`** を維持しています。
+NODES は、ノードをつないで形や数値を作る独立型のパラメトリック CAD です。Rhino・Grasshopper のインストールやログインは不要で、基本のモデリング、保存、書き出しはオフラインで使えます。実行ファイル名は互換性のため **`NODES.exe`** を維持しています。
 
-このガイドは **2026-11-27 の Ω 開発版**を対象にしています。メッシュ、数値、Data Tree に加え、対応範囲を限定した数学的な NURBS 曲線・曲面と B-rep を扱います。選択欄には **298 種類**、部品定義から作る Cluster を含めて **299 種類の登録**があります。登録数は、全機能の完成数や Grasshopper 互換性の検証数ではありません。旧公開版 Morphlet 0.1.0 に、本書のすべての機能が含まれているわけではありません。
+このガイドは **2026-11-27 の Ω 開発版**を対象にしています。メッシュ、数値、Data Tree に加え、対応範囲を限定した数学的な NURBS 曲線・曲面と B-rep を扱います。選択欄には **298 種類**、部品定義から作る Cluster を含めて **299 種類の登録**があります。登録数は、全機能の完成数や Grasshopper 互換性の検証数ではありません。旧公開版 NODES 0.1.0 に、本書のすべての機能が含まれているわけではありません。
 
 [最新の検証結果](../TEST_RESULTS.md) · [ノード対応表](../NODE_COVERAGE.md) · [開発状況](development/STATUS.md)
 
@@ -10,7 +10,7 @@ NODES は、ノードをつないで形や数値を作る独立型のパラメ�
 
 ### 起動して作例を開く
 
-配布物を展開し、`Morphlet.exe` を起動します。通常の初期作品は「ねじれの花器」です。復旧データなど別の作品が開いている場合は、上部の **作例・ヘルプ → 作品例**から選び直せます。
+配布物を展開し、`NODES.exe` を起動します。通常の初期作品は「ねじれの花器」です。復旧データなど別の作品が開いている場合は、上部の **作例・ヘルプ → 作品例**から選び直せます。
 
 画面は、左のノードライブラリ、中央のキャンバス、右の 3D プレビューとノード設定で構成されます。ライブラリや右側が見えないときは **表示 → ノードライブラリ / 3D と設定**を確認してください。
 
@@ -433,8 +433,8 @@ out
 開発者向けには、GHX の内容を JSON report に保存する inspect と、ごく小さい scalar subset を `.morph` へ変換するコマンドがあります。リポジトリルートからの例です。
 
 ```sh
-cargo run --locked --bin Morphlet -- --inspect-ghx examples/interop/scalar-point.ghx report.json
-cargo run --locked --bin Morphlet -- --convert-ghx examples/interop/scalar-point.ghx converted.morph
+cargo run --locked --bin NODES -- --inspect-ghx examples/interop/scalar-point.ghx report.json
+cargo run --locked --bin NODES -- --convert-ghx examples/interop/scalar-point.ghx converted.morph
 ```
 
 変換対象は、対応する **Number Slider と Construct Point**の scalar 入力などに限定されます。Panel、Toggle、Group、未知の component や設定は report に調査情報を残しますが、未対応のものを含む graph を不完全な `.morph` として変換しません。取り込んだスクリプトを実行する機能ではありません。report は調査用データで、GUI の未対応ノードを編集・再保存できる仕組みとは異なります。

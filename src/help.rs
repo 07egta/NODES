@@ -4,7 +4,7 @@
 //! still get a page; they fall back to [`FALLBACK_TIP`] until someone writes one.
 use crate::theme;
 use eframe::egui::{self, Align, Layout, RichText};
-use morphlet::model::{DataType, NodeKind};
+use nodes::model::{DataType, NodeKind};
 
 pub const FALLBACK_TIP: &str = "このノードの使い方のヒントはまだありません。上の説明と入力の一覧を参考に、作品例のグラフにつないで値を少しずつ変えてみてください。";
 

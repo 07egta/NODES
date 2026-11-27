@@ -1,6 +1,6 @@
 # NODES オフライン CLI
 
-`nodes-cli` は Windows のコンソール、PowerShell、バッチ、外部ツールから使う専用実行ファイルです。GUI の `Morphlet.exe` と独立しており、標準出力と終了コードを使用できます。基本操作に Rhino、Grasshopper、ネットワーク接続は必要ありません。
+`nodes-cli` は Windows のコンソール、PowerShell、バッチ、外部ツールから使う専用実行ファイルです。GUI の `NODES.exe` と独立しており、標準出力と終了コードを使用できます。基本操作に Rhino、Grasshopper、ネットワーク接続は必要ありません。
 
 ## ビルドと起動
 

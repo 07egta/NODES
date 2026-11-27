@@ -1,7 +1,7 @@
 //! Reusable parts follow the same bounded regular-file contract as projects.
-use morphlet::cluster;
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, NodeKind, Value};
+use nodes::cluster;
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, NodeKind, Value};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};

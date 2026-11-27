@@ -1,6 +1,6 @@
 //! New implementation after the runtime outage; not a byte-for-byte recovery
 //! of local commit 997183b. CI must validate these regressions.
-use morphlet::surface_kernel::NurbsSurface;
+use nodes::surface_kernel::NurbsSurface;
 
 fn crease(v_axis: bool) -> NurbsSurface {
     let creased = vec![0., 0., 0., 0.7, 0.7, 10., 10., 10.];

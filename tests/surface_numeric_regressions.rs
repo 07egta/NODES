@@ -1,5 +1,5 @@
 //! Independent numerical regressions for exact planar geometry and NURBS area.
-use morphlet::surface_kernel::{NurbsSurface, PlaneSurface, Surface};
+use nodes::surface_kernel::{NurbsSurface, PlaneSurface, Surface};
 use std::cell::Cell;
 use std::f64::consts::PI;
 

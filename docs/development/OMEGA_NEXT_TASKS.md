@@ -160,7 +160,7 @@ PR18 は bounded root/affected lists、snapshot revision、実 GUI/性能記録�
 **根拠:** PR19 は raw scan 10,000 / visible 2,000 に分離し、bounded selection と tie-break を追加する。ただし main 基点の新テストは `read_directory(path, "morph")` を呼ぶ。現在の Ω は `read_directory(path, task: FileTask)` で、ImportMesh は STL と OBJ の両方を受け入れる。text merge が成功しても新テストの文字列引数は型に一致しない。これは静的確認であり、この監査ではコンパイルしていない。
 
 - **編集:** `src/file_picker.rs` の限定的な統合。現 `FileTask::accepts` / import / part / export filters を保持する。
-- **検証:** `cargo test --locked --bin Morphlet directory_listing_tests`; `cargo test --locked --test ux_tests --test import_tests`。mixed extensions、case ties、directory-first、非対象ファイルが 2,000 を超える directory を確認する。
+- **検証:** `cargo test --locked --bin NODES directory_listing_tests`; `cargo test --locked --test ux_tests --test import_tests`。mixed extensions、case ties、directory-first、非対象ファイルが 2,000 を超える directory を確認する。
 - **性能:** scan cap を増やすので UI 応答の改善は件数別の実測後に判断する。全 directory の完全なソートや全件表示を保証しない。
 - **依存:** 独立作業として並列化できる。現在の task filter API を旧 extension-only API に戻さない。
 

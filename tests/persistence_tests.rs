@@ -1,7 +1,7 @@
-use morphlet::engine::Evaluator;
-use morphlet::model::{Graph, Mesh, NodeId, NodeKind, Tree, Value};
-use morphlet::persistence::{self, HISTORY_LIMIT, History, MAX_PROJECT_BYTES, Project};
-use morphlet::templates;
+use nodes::engine::Evaluator;
+use nodes::model::{Graph, Mesh, NodeId, NodeKind, Tree, Value};
+use nodes::persistence::{self, HISTORY_LIMIT, History, MAX_PROJECT_BYTES, Project};
+use nodes::templates;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -109,17 +109,17 @@ fn non_file_sources_are_rejected_without_replacing_destinations() {
             .contains("通常のファイル")
     );
     assert!(
-        morphlet::graph_api::load_safe(&source)
+        nodes::graph_api::load_safe(&source)
             .unwrap_err()
             .contains("regular file")
     );
     assert!(
-        morphlet::graph_api::build_file(&source, &destination)
+        nodes::graph_api::build_file(&source, &destination)
             .unwrap_err()
             .contains("regular file")
     );
     assert!(
-        morphlet::ghx::inspect_file(&source, &destination)
+        nodes::ghx::inspect_file(&source, &destination)
             .unwrap_err()
             .contains("regular file")
     );
@@ -318,7 +318,7 @@ fn every_template_is_valid_and_names_and_defaults_are_preserved() {
 
 #[test]
 fn templates_evaluate_and_solid_presets_are_closed() {
-    let mut evaluator = morphlet::engine::Evaluator::default();
+    let mut evaluator = nodes::engine::Evaluator::default();
     for index in 0..templates::TEMPLATES.len() {
         let project = templates::create(index);
         let result = evaluator.evaluate(&project.graph, &|| false);
@@ -430,7 +430,7 @@ fn eval_numbers(kind: NodeKind, params: &[(&str, f64)]) -> Result<Vec<f64>, Stri
         .collect())
 }
 
-fn first_mesh_stats(graph: &Graph, id: NodeId) -> morphlet::persistence::ExportReport {
+fn first_mesh_stats(graph: &Graph, id: NodeId) -> nodes::persistence::ExportReport {
     let tree = evaluate_one(graph, id).unwrap();
     persistence::mesh_stats(&[tree]).unwrap()
 }
@@ -835,7 +835,7 @@ fn shipped_example_files_load_and_evaluate() {
         }
     }
     // The newest example files are written to match their templates exactly.
-    // If this fails after a template edit, regenerate with `Morphlet --export-demos examples`.
+    // If this fails after a template edit, regenerate with `NODES --export-demos examples`.
     for index in [6, 7, 8, 9, 10, 11] {
         let path = dir.join(format!("{:02}.morph", index + 1));
         assert_eq!(persistence::load(&path).unwrap(), templates::create(index));
@@ -955,8 +955,8 @@ fn gh_nodes_evaluate_to_finite_non_empty_results_with_defaults() {
         let id = graph.add(kind, [0., 0.]).unwrap();
         for spec in kind.spec().inputs.iter().filter(|s| s.default.is_none()) {
             let from = match spec.kind {
-                morphlet::model::DataType::Point => points,
-                morphlet::model::DataType::Mesh | morphlet::model::DataType::Geometry => cube,
+                nodes::model::DataType::Point => points,
+                nodes::model::DataType::Mesh | nodes::model::DataType::Geometry => cube,
                 _ => series,
             };
             graph.connect(from, id, spec.key).unwrap();
@@ -1097,7 +1097,7 @@ fn list_nodes_keep_branches_separate() {
 
 #[test]
 fn expression_parses_evaluates_and_rejects_garbage() {
-    use morphlet::expr::{MAX_EXPR_LEN, parse};
+    use nodes::expr::{MAX_EXPR_LEN, parse};
     let eval = |src: &str, vars: [f64; 4]| parse(src).and_then(|e| e.eval(vars));
     assert_eq!(eval("x * 2 + y", [3., 1., 0., 0.]).unwrap(), 7.);
     assert_eq!(eval("x + y + z + w", [1., 2., 3., 4.]).unwrap(), 10.);
@@ -1108,7 +1108,7 @@ fn expression_parses_evaluates_and_rejects_garbage() {
     assert!((eval("sin(pi / 2)", [0.; 4]).unwrap() - 1.).abs() < 1e-12);
     // Full-width characters typed through a Japanese IME are accepted.
     assert_eq!(eval("ｘ＊２＋１", [4., 0., 0., 0.]).unwrap(), 9.);
-    assert!(parse(morphlet::expr::DEFAULT_EXPRESSION).is_ok());
+    assert!(parse(nodes::expr::DEFAULT_EXPRESSION).is_ok());
     // Bad text is a Japanese error, never a panic.
     for bad in [
         "",
@@ -1165,7 +1165,7 @@ fn expression_node_maps_lists_and_keeps_its_text_in_files() {
     let formula = graph.add(NodeKind::Expression, [0., 0.]).unwrap();
     assert_eq!(
         graph.node(formula).unwrap().script,
-        morphlet::expr::DEFAULT_EXPRESSION
+        nodes::expr::DEFAULT_EXPRESSION
     );
     graph.node_mut(formula).unwrap().script = "x * x + y".into();
     set(&mut graph, formula, &[("y", 1.)]);
@@ -1462,10 +1462,8 @@ fn hostile_settings_on_new_nodes_are_errors_not_panics() {
                 let id = g.add(kind, [0., 0.]).unwrap();
                 for input in kind.spec().inputs.iter().filter(|s| s.default.is_none()) {
                     let from = match input.kind {
-                        morphlet::model::DataType::Point => points,
-                        morphlet::model::DataType::Mesh | morphlet::model::DataType::Geometry => {
-                            cube
-                        }
+                        nodes::model::DataType::Point => points,
+                        nodes::model::DataType::Mesh | nodes::model::DataType::Geometry => cube,
                         _ => series,
                     };
                     g.connect(from, id, input.key).unwrap();

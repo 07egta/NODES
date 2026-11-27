@@ -1,8 +1,8 @@
 //! Analytic solutions and inverse identities across extreme row scales.
 //! These are finite-precision tests, not an arbitrary-conditioning guarantee.
-use morphlet::engine::Evaluator;
-use morphlet::math_nodes;
-use morphlet::model::{Graph, NodeKind, Value};
+use nodes::engine::Evaluator;
+use nodes::math_nodes;
+use nodes::model::{Graph, NodeKind, Value};
 use std::cell::Cell;
 
 fn solve_with(

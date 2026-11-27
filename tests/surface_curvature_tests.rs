@@ -1,5 +1,5 @@
 //! Independent analytic expectations, without reference to tessellated meshes.
-use morphlet::{
+use nodes::{
     engine::Evaluator,
     model::{Graph, NodeKind as K, Value},
     persistence::{self, Project},
@@ -262,7 +262,7 @@ fn simple_cubic_interior_knot_is_c2_and_allowed() {
             .is_ok()
     );
 }
-fn numbers(e: &morphlet::engine::Evaluation, id: u64) -> Vec<f64> {
+fn numbers(e: &nodes::engine::Evaluation, id: u64) -> Vec<f64> {
     e.outputs[&id]
         .as_ref()
         .unwrap()

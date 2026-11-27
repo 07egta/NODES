@@ -13,7 +13,7 @@ use crate::{
     viewport::{PreviewItem, Viewport},
 };
 use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
-use morphlet::{
+use nodes::{
     annotations, cluster,
     diagnostics::{self, DiagnosticReport},
     engine::{Evaluation, Evaluator},
@@ -110,7 +110,7 @@ enum PendingAction {
     Exit,
 }
 
-pub struct MorphletApp {
+pub struct NodesApp {
     project: Project,
     history: History,
     canvas: GraphCanvas,
@@ -182,7 +182,7 @@ pub struct MorphletApp {
     saved_lists: (Vec<NodeKind>, Vec<NodeKind>),
 }
 
-impl MorphletApp {
+impl NodesApp {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         open_file: Option<PathBuf>,
@@ -604,7 +604,7 @@ impl MorphletApp {
             );
             return;
         };
-        if text.len() > morphlet::script::MAX_SCRIPT_BYTES {
+        if text.len() > nodes::script::MAX_SCRIPT_BYTES {
             self.notify(
                 "ファイルのパスが長すぎます。フォルダーを近くへ移すか、名前を短くしてください。",
                 true,
@@ -1601,9 +1601,9 @@ impl MorphletApp {
                         .on_hover_text(format!(
                             "{} · {}\n{}",
                             input.kind.label(),
-                            morphlet::node_access::for_input(node.kind, index)
+                            nodes::node_access::for_input(node.kind, index)
                                 .map_or("Custom", |a| a.label()),
-                            morphlet::node_access::for_input(node.kind, index)
+                            nodes::node_access::for_input(node.kind, index)
                                 .map_or("", |a| a.description())
                         ));
                         if let Some(source) = linked {
@@ -1642,18 +1642,18 @@ impl MorphletApp {
         if let Some(key) = disconnect {
             self.project.graph.disconnect(id, key);
         }
-        if morphlet::data_tree_nodes::supports_transform(node.kind) {
+        if nodes::data_tree_nodes::supports_transform(node.kind) {
             egui::CollapsingHeader::new("データツリー設定")
                 .id_salt(("tree_settings", id))
                 .show(ui, |ui| {
-                    use morphlet::data_tree::{MATCH_PARAM, PORT_PREFIX};
+                    use nodes::data_tree::{MATCH_PARAM, PORT_PREFIX};
                     if let Some(n) = self.project.graph.node_mut(id) {
-                        if morphlet::data_tree_nodes::supports_matching(node.kind) {
+                        if nodes::data_tree_nodes::supports_matching(node.kind) {
                             let mut choice =
                                 n.params.get(MATCH_PARAM).copied().unwrap_or(-1.) as i32;
                             let previous = choice;
                             let default_name =
-                                if morphlet::node_access::uses_ordinal_matching(node.kind) {
+                                if nodes::node_access::uses_ordinal_matching(node.kind) {
                                     "既定（枝順・Longest）"
                                 } else {
                                     "旧互換（同じパス）"
@@ -1683,7 +1683,7 @@ impl MorphletApp {
                                 "{} · {} · {}",
                                 input.label,
                                 input.kind.label(),
-                                morphlet::data_tree_nodes::access_label(node.kind, index)
+                                nodes::data_tree_nodes::access_label(node.kind, index)
                             ));
                             egui::ComboBox::from_id_salt(("tree_port", id, input.key))
                                 .selected_text(names[choice.min(3)])
@@ -2448,7 +2448,7 @@ impl MorphletApp {
     }
 }
 
-impl eframe::App for MorphletApp {
+impl eframe::App for NodesApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.compute_tick(ctx);
         self.suppress_history = false;
@@ -2508,7 +2508,7 @@ impl eframe::App for MorphletApp {
         // checkpointed and computed in this frame.
         for dropped in ctx.input(|i| i.raw.dropped_files.clone()) {
             if let Some(path) = dropped.path {
-                if morphlet::import::format_of(&path).is_some() {
+                if nodes::import::format_of(&path).is_some() {
                     // The drop itself carries no position; the last pointer position is used.
                     let at = ctx
                         .input(|i| i.pointer.latest_pos())
@@ -2602,7 +2602,7 @@ fn insert_nodes(
     offset: [f32; 2],
     retain_external: bool,
 ) -> Result<BTreeSet<NodeId>, String> {
-    if nodes.len() > morphlet::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
+    if nodes.len() > nodes::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
         return Err("ノード数の上限を超えるため追加できません。".into());
     }
     let mut candidate = graph.clone();
@@ -2808,7 +2808,7 @@ fn safe_name(name: &str) -> String {
         .take(70)
         .collect();
     if result.trim().is_empty() {
-        "Morphlet".into()
+        "NODES".into()
     } else {
         result
     }
@@ -2816,7 +2816,7 @@ fn safe_name(name: &str) -> String {
 fn recovery_path() -> Option<PathBuf> {
     if cfg!(target_os = "windows") {
         std::env::var_os("LOCALAPPDATA")
-            .map(|p| PathBuf::from(p).join("Morphlet").join("recovery.morph"))
+            .map(|p| PathBuf::from(p).join("NODES").join("recovery.morph"))
     } else {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
@@ -3040,7 +3040,7 @@ mod tests {
     #[test]
     fn file_name_is_path_safe() {
         assert_eq!(safe_name("a/b:c*"), "abc");
-        assert_eq!(safe_name(""), "Morphlet");
+        assert_eq!(safe_name(""), "NODES");
     }
     #[test]
     fn export_never_silently_drops_a_failed_output() {

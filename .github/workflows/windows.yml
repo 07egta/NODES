@@ -80,7 +80,7 @@ jobs:
         run: |
           package="$RUNNER_TEMP/NODES-linux-x64"
           mkdir -p "$package"
-          cp target/release/Morphlet target/release/nodes-cli README.md LICENSE-MIT LICENSE-APACHE Cargo.lock "$package/"
+          cp target/release/NODES target/release/nodes-cli README.md LICENSE-MIT LICENSE-APACHE Cargo.lock "$package/"
           cp -R examples licenses docs "$package/"
           cp "$RUNNER_TEMP/dependency-manifests.json" "$package/docs/development/dependency-manifests.json"
           printf 'NODES development build\nCommit: %s\nTarget: x86_64-unknown-linux-gnu\nGUI and physical 3D printing validation are separate from CI.\n' "$GITHUB_SHA" > "$package/BUILD-INFO.txt"
@@ -126,7 +126,7 @@ jobs:
         run: |
           $package = Join-Path $env:RUNNER_TEMP "NODES-windows-x64"
           New-Item -ItemType Directory -Path $package -Force | Out-Null
-          Copy-Item target/release/Morphlet.exe,target/release/nodes-cli.exe $package
+          Copy-Item target/release/NODES.exe,target/release/nodes-cli.exe $package
           Copy-Item README.md,LICENSE-MIT,LICENSE-APACHE,Cargo.lock $package
           Copy-Item examples,licenses,docs $package -Recurse
           @(
@@ -149,19 +149,19 @@ jobs:
       - name: Package Windows zip
         shell: pwsh
         run: |
-          $d = "Morphlet-windows"
+          $d = "NODES-windows"
           New-Item -ItemType Directory -Force $d | Out-Null
-          Copy-Item target/release/Morphlet.exe $d/
+          Copy-Item target/release/NODES.exe $d/
           Copy-Item examples $d/examples -Recurse
           New-Item -ItemType Directory -Force $d/docs | Out-Null
           Copy-Item docs/USER_GUIDE_JA.md $d/docs/ -ErrorAction SilentlyContinue
           Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE $d/
           Copy-Item "はじめに.txt" $d/ -ErrorAction SilentlyContinue
           Copy-Item licenses $d/licenses -Recurse -ErrorAction SilentlyContinue
-          Compress-Archive -Path $d -DestinationPath Morphlet-windows.zip
+          Compress-Archive -Path $d -DestinationPath NODES-windows.zip
       - name: Upload Windows zip
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Morphlet-windows
-          path: Morphlet-windows.zip
+          name: NODES-windows
+          path: NODES-windows.zip
           retention-days: 30

@@ -1,9 +1,9 @@
-use morphlet::cluster::ClusterDef;
-use morphlet::diagnostics::{
+use nodes::cluster::ClusterDef;
+use nodes::diagnostics::{
     MAX_DIAGNOSTIC_MESSAGE_BYTES, MAX_REPORTED_AFFECTED, MAX_REPORTED_ROOTS, NodeFailure, diagnose,
 };
-use morphlet::engine::{Evaluation, Evaluator, NodeTiming};
-use morphlet::model::{Graph, NodeId, NodeKind, Tree};
+use nodes::engine::{Evaluation, Evaluator, NodeTiming};
+use nodes::model::{Graph, NodeId, NodeKind, Tree};
 
 fn add(graph: &mut Graph, kind: NodeKind) -> NodeId {
     graph.add(kind, [0.; 2]).unwrap()

@@ -1,8 +1,8 @@
 //! Direction-preserving angle calculations, including a representable tiny angle.
 //! References use exact integer geometry; ordinary floating-point limits remain.
-use morphlet::engine::Evaluator;
-use morphlet::math_nodes;
-use morphlet::model::{Graph, NodeId, NodeKind, Value};
+use nodes::engine::Evaluator;
+use nodes::math_nodes;
+use nodes::model::{Graph, NodeId, NodeKind, Value};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 fn angle(a: [f64; 3], b: [f64; 3]) -> Result<f64, String> {

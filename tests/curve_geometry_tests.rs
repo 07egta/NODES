@@ -1,9 +1,9 @@
 //! Mathematical expectations and graph regressions. CI must compile and execute these.
-use morphlet::curve_geometry::{self as cg, CurveGeometry, NurbsCurve};
-use morphlet::curve_nodes;
-use morphlet::engine::Evaluator;
-use morphlet::model::{Curve, Graph, NodeKind, Tree, Value};
-use morphlet::persistence;
+use nodes::curve_geometry::{self as cg, CurveGeometry, NurbsCurve};
+use nodes::curve_nodes;
+use nodes::engine::Evaluator;
+use nodes::model::{Curve, Graph, NodeKind, Tree, Value};
+use nodes::persistence;
 use std::{
     f64::consts::{PI, TAU},
     sync::Arc,

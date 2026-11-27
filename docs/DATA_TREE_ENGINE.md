@@ -146,7 +146,7 @@ safety, invalid mapper rules, 10,001 values, Cartesian limits, graph
 arithmetic and points, save/reopen, Undo/Redo, cache invalidation. A Slot
 test is not a runtime null test. Tests written but not executed here.
 
-Run: cargo test --all-targets --locked; cargo build --release --locked --bin Morphlet.
+Run: cargo test --all-targets --locked; cargo build --release --locked --bin NODES.
 Then compare GH1 native component outputs including mixed depths, ragged
 matrix, null/default insertion, seeded random indices and branch error
 behavior. UI was not launched in this environment. Need native null,

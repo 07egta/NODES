@@ -3,7 +3,7 @@
 //! Everything here reads the latest evaluation the app already holds; nothing evaluates.
 use crate::theme;
 use eframe::egui::{self, RichText};
-use morphlet::model::{Tree, Value};
+use nodes::model::{Tree, Value};
 
 /// At most this many value rows are listed; the rest are summarised as 「…ほか N 件」.
 pub const MAX_ROWS: usize = 500;

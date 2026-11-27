@@ -1,6 +1,6 @@
 //! Preparing a later body must never overwrite an earlier destination first.
-use morphlet::model::Mesh;
-use morphlet::stl_export::{OutputFormat, numbered_path, write_bodies, write_bodies_detailed};
+use nodes::model::Mesh;
+use nodes::stl_export::{OutputFormat, numbered_path, write_bodies, write_bodies_detailed};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};

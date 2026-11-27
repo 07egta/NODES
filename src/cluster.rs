@@ -838,7 +838,7 @@ pub fn parse_part(bytes: &[u8]) -> Result<PartFile, String> {
         )
     })?;
     if file.format != PART_FORMAT {
-        return Err("これは Morphlet の部品ファイルではありません。".into());
+        return Err("これは NODES の部品ファイルではありません。".into());
     }
     if file.version != PART_VERSION {
         return Err(format!(

@@ -213,8 +213,8 @@ pub fn category_color(category: &str) -> Color32 {
 
 /// Port colors describe the data type, not the component category. The tooltip also
 /// spells the type out, so connections never rely on color alone.
-pub fn port_color(kind: morphlet::model::DataType) -> Color32 {
-    use morphlet::model::DataType::*;
+pub fn port_color(kind: nodes::model::DataType) -> Color32 {
+    use nodes::model::DataType::*;
     let (light, dark) = match kind {
         Number => ((149, 95, 26), (239, 186, 95)),
         Point => ((158, 61, 112), (242, 154, 203)),

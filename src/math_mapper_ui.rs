@@ -1,6 +1,6 @@
 //! Interactive numeric graph mapper inspector, sharing the evaluator's curve function.
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2};
-use morphlet::{math_nodes::mapper, model::Node};
+use nodes::{math_nodes::mapper, model::Node};
 
 const MODES: [&str; 6] = ["線形", "ベジェ", "正弦", "余弦", "ガウス", "指数"];
 

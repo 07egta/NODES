@@ -155,7 +155,7 @@ cargo build --release --locked --bins
 cargo run --release --locked --example coverage_perf
 ```
 
-The GUI binary is Morphlet; the console binary is nodes-cli. Cargo's default run remains Morphlet. The build-windows.ps1 helper builds both. No dependency versions were added or changed for the console or audit work.
+The GUI binary is NODES; the console binary is nodes-cli. Cargo's default run remains NODES. The build-windows.ps1 helper builds both. No dependency versions were added or changed for the console or audit work.
 
 ## Known limitations / unfinished work
 
@@ -173,7 +173,7 @@ The GUI binary is Morphlet; the console binary is nodes-cli. Cargo's default run
 1. Fetch `develop/nodes-ultimate`, inspect PR #11 and this file; do not restart the completed branch/Grasshopper inventory recovery. Verify the remote head, then distinguish evidence-only descendants from source c44a897a, which passed Check 45857217255 on Linux and Windows and the recorded Linux GUI workflow.
 2. Next substantial feature is backward-compatible multiple output endpoints; follow [MULTI_OUTPUT_MIGRATION.md](MULTI_OUTPUT_MIGRATION.md) for the reviewed contracts and Dispatch proof. Start with `src/model.rs`, `src/persistence.rs` and migration fixtures; keep old v1 single-output graphs readable and preserve connections. Then update `src/engine.rs`, `src/node_access.rs`, `src/graph_api.rs`, `src/canvas.rs` and cluster code together.
 3. Preserve opaque unsupported-native-node payloads/ports/wires without executing them. Then introduce runtime Null with explicit missing-input versus empty-branch semantics and independent matching fixtures; do not conflate it with the existing generic Slot type or silently introduce Boolean/Vector/Domain conversions.
-4. First commands: `git fetch origin develop/nodes-ultimate`, `git log -8 --oneline`, `cargo fmt --all -- --check`, `cargo test --locked --test persistence_tests`, `cargo test --locked --bin Morphlet numeric_editor_tests`. Run the full normal Check after source changes. Rust is absent in the restored local container; use CI if that remains true.
+4. First commands: `git fetch origin develop/nodes-ultimate`, `git log -8 --oneline`, `cargo fmt --all -- --check`, `cargo test --locked --test persistence_tests`, `cargo test --locked --bin NODES numeric_editor_tests`. Run the full normal Check after source changes. Rust is absent in the restored local container; use CI if that remains true.
 5. Native GUI evidence can be reproduced by opening `docs/development/gui-sphere-exact.morph` or `docs/development/gui-vase-36.morph` in the exact recorded artifact with an isolated user-data directory. Recheck exact numeric entry, focus loss, Undo and save/restart when changing UI. The independent CLI example uses `python3 -B scripts/validate_cli_vase.py --cli <release nodes-cli> --request examples/interop/ai-vase.json --output-dir <new-empty-directory>`.
 6. For every implementation unit, commit to a development branch, advance the remote with an expected-head check, and record actual tests. Never reset main, discard other branches or call a repaired diagnostic working tree an unmodified-source test.
 
