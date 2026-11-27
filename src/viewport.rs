@@ -35,6 +35,10 @@ const MAX_COORDINATE: f64 = 1.0e14;
 /// Pixel budget for the z-buffer texture. Above this the supersampling scale
 /// is reduced so that large windows keep a usable frame rate.
 const MAX_RASTER_PIXELS: f32 = 1_500_000.0;
+/// Scenes with more triangles than this thin out triangles smaller than one pixel (LOD).
+const LOD_MIN_TRIANGLES: usize = 100_000;
+/// Of those sub-pixel triangles, every n-th one is still drawn so the shape does not vanish.
+const LOD_KEEP_EVERY: usize = 4; // must stay a power of two
 /// Build-plate grid spacing in mm.
 const BED_GRID_MM: f64 = 10.0;
 
@@ -70,6 +74,10 @@ pub struct Viewport {
     last_size: Vec2,
     geometry_hash: Option<u64>,
     selection_hash: Option<u64>,
+    /// The shared item list the scene was last built from. While the caller hands over the
+    /// same allocation, the per-frame fingerprint of every value is skipped. Holding the Arc
+    /// keeps the allocation alive, so pointer equality cannot be a reused address.
+    last_items: Option<Arc<Vec<PreviewItem>>>,
     scene: Scene,
     generation: u64,
     projected: Option<Projection>,
@@ -101,6 +109,7 @@ impl Default for Viewport {
             last_size: Vec2::new(700.0, 600.0),
             geometry_hash: None,
             selection_hash: None,
+            last_items: None,
             scene: Scene::default(),
             generation: 0,
             projected: None,
@@ -355,19 +364,38 @@ impl Viewport {
 
     /// Fill the remaining UI area and return the picked geometry's source node.
     pub fn show(&mut self, ui: &mut egui::Ui, items: &[PreviewItem]) -> Option<u64> {
-        self.show_snapshot(ui, Some(items))
+        self.show_snapshot(ui, Some(items), false)
+    }
+
+    /// Same as `show`, for an item list the caller keeps between frames. The same `Arc` is
+    /// known to hold the same data, so the scene is neither fingerprinted nor rebuilt.
+    pub fn show_shared(&mut self, ui: &mut egui::Ui, items: &Arc<Vec<PreviewItem>>) -> Option<u64> {
+        let unchanged = self
+            .last_items
+            .as_ref()
+            .is_some_and(|last| Arc::ptr_eq(last, items));
+        let picked = self.show_snapshot(ui, Some(items.as_slice()), unchanged);
+        self.last_items = Some(Arc::clone(items));
+        picked
     }
 
     /// Keep the completed scene while another evaluation is pending. Camera
     /// controls and picking remain live; the caller labels this as a previous result.
     pub fn show_previous(&mut self, ui: &mut egui::Ui) -> Option<u64> {
-        self.show_snapshot(ui, None)
+        self.show_snapshot(ui, None, false)
     }
 
-    fn show_snapshot(&mut self, ui: &mut egui::Ui, items: Option<&[PreviewItem]>) -> Option<u64> {
+    fn show_snapshot(
+        &mut self,
+        ui: &mut egui::Ui,
+        items: Option<&[PreviewItem]>,
+        unchanged: bool,
+    ) -> Option<u64> {
         // Accept a completed snapshot even if a temporarily tiny viewport cannot
         // paint it; the caller can then safely record which revision is installed.
-        if let Some(items) = items {
+        if let Some(items) = items
+            && !unchanged
+        {
             self.ensure_scene(items);
         }
         let rect = ui.available_rect_before_wrap();
@@ -883,6 +911,8 @@ impl Viewport {
     }
 
     fn ensure_scene(&mut self, items: &[PreviewItem]) {
+        // The scene may stop matching the shared list `show_shared` remembered.
+        self.last_items = None;
         let mut hasher = DefaultHasher::new();
         let mut selection_hasher = DefaultHasher::new();
         let mut hashed_values = 0usize;
@@ -1034,8 +1064,7 @@ impl Viewport {
                 }
             }
         }
-        let trees: Vec<Tree> = items.iter().map(|item| item.tree.clone()).collect();
-        scene.report = persistence::mesh_stats(&trees).ok();
+        scene.report = persistence::mesh_stats_refs(items.iter().map(|item| &item.tree)).ok();
         #[cfg(test)]
         {
             self.cache_work.diagnostic_attempts += 1;
@@ -1101,17 +1130,22 @@ impl Viewport {
             add(mul(camera.eye, 0.6), mul(camera.up, 0.9)),
             mul(camera.right, -0.65),
         ));
+        let lod = self.scene.triangles.len() > LOD_MIN_TRIANGLES;
         let mut projected: Vec<_> = self
             .scene
             .triangles
             .iter()
-            .filter_map(|triangle| {
+            .enumerate()
+            .filter_map(|(index, triangle)| {
                 let p = triangle.p.map(|v| camera.project(v));
                 if p.iter().any(|v| !v.x.is_finite() || !v.y.is_finite()) {
                     return None;
                 }
                 let bbox = Rect::from_points(&p);
                 if !bbox.intersects(rect) {
+                    return None;
+                }
+                if skip_tiny(lod, index, bbox.width(), bbox.height()) {
                     return None;
                 }
                 let depth = triangle.p.iter().map(|v| camera.depth(*v)).sum::<f64>() / 3.0;
@@ -1539,6 +1573,13 @@ fn add_mesh(scene: &mut Scene, mesh: &Mesh, node_id: u64, selected: bool) {
     }
 }
 
+/// Level of detail: in a big scene a triangle under one pixel in both directions is drawn only
+/// for every `LOD_KEEP_EVERY`-th index. Small scenes (`lod == false`) are never thinned.
+fn skip_tiny(lod: bool, index: usize, width: f32, height: f32) -> bool {
+    // `LOD_KEEP_EVERY` is a power of two, so the mask is the remainder.
+    lod && width < 1.0 && height < 1.0 && index & (LOD_KEEP_EVERY - 1) != 0
+}
+
 fn paint_grid(shapes: &mut Vec<Shape>, camera: Camera, span: f64, z: f64, dark: bool) {
     let desired = (span / 13.0).max(1.0e-9);
     let power = 10.0_f64.powf(desired.log10().floor());
@@ -1835,5 +1876,24 @@ fn normalize(a: V3) -> V3 {
         mul(a, 1.0 / l)
     } else {
         [0.0, 0.0, 1.0]
+    }
+}
+
+#[cfg(test)]
+mod lod_tests {
+    use super::*;
+
+    #[test]
+    fn small_scenes_and_big_triangles_are_never_thinned() {
+        assert!((0..64).all(|i| !skip_tiny(false, i, 0.1, 0.1)));
+        assert!((0..64).all(|i| !skip_tiny(true, i, 1.0, 0.1)));
+        assert!((0..64).all(|i| !skip_tiny(true, i, 0.1, 5.0)));
+    }
+
+    #[test]
+    fn tiny_triangles_keep_every_fourth() {
+        let kept = (0..64).filter(|&i| !skip_tiny(true, i, 0.2, 0.2)).count();
+        assert_eq!(kept, 64 / LOD_KEEP_EVERY);
+        assert!(!skip_tiny(true, 0, 0.2, 0.2));
     }
 }

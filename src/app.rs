@@ -110,6 +110,15 @@ enum PendingAction {
     Exit,
 }
 
+/// Preview items kept between frames: the viewport would otherwise get a deep copy of every
+/// shown tree each frame and hash it again.
+struct PreviewCache {
+    serial: u64,
+    /// Shown node ids with their selected flag, in display order.
+    key: Vec<(NodeId, bool)>,
+    items: Arc<Vec<PreviewItem>>,
+}
+
 pub struct NodesApp {
     project: Project,
     history: History,
@@ -117,6 +126,10 @@ pub struct NodesApp {
     viewport: Viewport,
     worker: Worker,
     evaluation: Option<Evaluation>,
+    /// Bumped whenever `evaluation` is replaced; keys the preview-item cache.
+    evaluation_serial: u64,
+    /// Preview items of the last frame, reused while nothing they depend on changed.
+    preview_cache: Option<PreviewCache>,
     diagnostics: Option<DiagnosticReport>,
     diagnostics_window: DiagnosticsWindow,
     revision: u64,
@@ -238,6 +251,8 @@ impl NodesApp {
             viewport: Viewport::default(),
             worker: Worker::new(cc.egui_ctx.clone()),
             evaluation: None,
+            evaluation_serial: 0,
+            preview_cache: None,
             diagnostics: None,
             diagnostics_window: DiagnosticsWindow::default(),
             revision: 0,
@@ -313,6 +328,7 @@ impl NodesApp {
             if result.revision == self.revision {
                 self.result_revision = result.revision;
                 self.evaluation = Some(result.evaluation);
+                self.evaluation_serial = self.evaluation_serial.wrapping_add(1);
                 self.diagnostics = Some(result.diagnostics);
             }
         }
@@ -363,12 +379,12 @@ impl NodesApp {
         collect_export_trees(&self.project.graph, e, &self.canvas.selected)
     }
     /// Pending has no new snapshot; a completed empty/error result is Some([]).
-    fn previews(&self) -> Option<Vec<PreviewItem>> {
+    fn previews(&mut self) -> Option<Arc<Vec<PreviewItem>>> {
         if self.stale() {
             return None;
         }
         let Some(e) = &self.evaluation else {
-            return Some(vec![]);
+            return Some(Arc::new(Vec::new()));
         };
         let ids: Vec<_> = match self.preview_mode {
             1 => self.canvas.selected.iter().copied().collect(),
@@ -396,20 +412,41 @@ impl NodesApp {
                 }
             }
         };
-        Some(
-            ids.into_iter()
-                .filter_map(|id| {
+        let key: Vec<(NodeId, bool)> = ids
+            .into_iter()
+            .map(|id| {
+                (
+                    id,
+                    self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                )
+            })
+            .collect();
+        if let Some(cache) = &self.preview_cache
+            && cache.serial == self.evaluation_serial
+            && cache.key == key
+        {
+            return Some(Arc::clone(&cache.items));
+        }
+        let items: Arc<Vec<PreviewItem>> = Arc::new(
+            key.iter()
+                .filter_map(|&(id, selected)| {
                     e.outputs
                         .get(&id)
                         .and_then(|r| r.as_ref().ok())
                         .map(|tree| PreviewItem {
                             node_id: id,
                             tree: tree.clone(),
-                            selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                            selected,
                         })
                 })
                 .collect(),
-        )
+        );
+        self.preview_cache = Some(PreviewCache {
+            serial: self.evaluation_serial,
+            key,
+            items: Arc::clone(&items),
+        });
+        Some(items)
     }
     fn discard_outdated_preview(&mut self) {
         // An evaluation may finish while the 3D panel is hidden. If another edit
@@ -499,6 +536,8 @@ impl NodesApp {
             self.viewport = Viewport::default();
             self.preview_revision = None;
             self.evaluation = None;
+            self.evaluation_serial = self.evaluation_serial.wrapping_add(1);
+            self.preview_cache = None;
             self.diagnostics = None;
             self.queue_compute();
             self.preview_mode = 0;
@@ -2131,7 +2170,7 @@ impl NodesApp {
                         .cage_edit
                         .overlay(&self.project.graph, self.evaluation.as_ref());
                     let picked = if let Some(items) = &items {
-                        let picked = self.viewport.show(ui, items);
+                        let picked = self.viewport.show_shared(ui, items);
                         self.preview_revision = Some(self.result_revision);
                         picked
                     } else {
