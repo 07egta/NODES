@@ -1,10 +1,10 @@
 # NODES Omega development checkpoint
 
-- Updated: 2026-11-27T09:28:11+09:00.
+- Updated: 2026-11-27T09:37:45+09:00.
 - Active branch: `feat/nodes-omega-geometry`; draft [PR #16](https://github.com/07egta/NODES/pull/16), base `feat/rhino-modeling-and-latency`.
 - Starting commit: `a1ffa40071c0c3508b890065bd12220c5abb80d9` (PR15, includes PR12 and older integration).
 - Last published product source: `25f981b794e3e0f037cd664915ce144347b49f40`, tree `d541b1b6e05378003f0ad87ffc384287e787252e`.
-- Evidence updates are saved on `checkpoint/nodes-omega-ui-20261127` while Windows run45916077764 finishes. Compare both refs before resuming and fast-forward PR16 with expected-head verification; never force-push.
+- Native/CI evidence checkpoint `0acd6b7ba3c0d61de591e9a0f4919109ef09fdfc` is saved on `checkpoint/nodes-omega-ui-20261127`. The preview-cache unit is saved next on PR16 before broad gates; compare refs and continue without force-push.
 - Checkout: `/workspace/scratch/a294e49d5e0f/NODES-omega`; Rust/Cargo1.100.0 at `/home/agent/.cargo/bin`.
 
 ## Completed work
@@ -19,24 +19,26 @@
 ## Tests and measurements
 
 - 0aa full local/CI Linux520 pass; Windows518 pass; all0fail/3manual ignored,48targets. Both release packages passed. Linux fmt/check/strict Clippy, Python17 and two128-case oracle regeneration checks pass.
-- 25f local523 pass/0fail/3ignored,48targets; fmt/strict Clippy/release pass. Actual-canvas new regressions0/3 before→3/0 after. CI run45916077764: Linux523/0/3 and release success; Windows still in progress at this checkpoint. See OMEGA_CI_RESULTS.json for actual source-specific final state.
+- 25f local523 pass/0fail/3ignored,48targets; fmt/strict Clippy/release pass. Actual-canvas new regressions0/3 before→3/0 after. CI run45916077764 completed: Linux523/0/3, Windows521/0/3, both release packages independently verified. See OMEGA_CI_RESULTS.json for actual source-specific final state.
 - Performance: OMEGA_GEOMETRY_PERFORMANCE.json (large surface local-basis27.094→11.569ms), OMEGA_AGGREGATE_PERFORMANCE.json (including~1.6×ordinary16k sum/mean cost), OMEGA_INTERPOLATION_PERFORMANCE.json (~125–134ns/nonconstant exact kernel), OMEGA_WORKLOAD_PERFORMANCE.json (100/1000/10000/16384 nodes,large trees,meshes,save/load). Shared Linux VM measurements are not Windows/Intel Arc GUI latency claims.
 - Registered299 kinds=298picker+Cluster. Fully implemented/fully verified node counts remain unestablished. External versioned Grasshopper oracle VERIFIED=0.
 
 ## Current work
 
-- kernel_research owns `src/viewport.rs`, `src/viewport_cache_tests.rs`, app preview/right-panel/F/menu-fit/scene-revision fields. It reproduced a pending frame discarding unchanged geometry (2112→0triangles) even though only an unrelated Number recomputed and mesh Arc stayed identical. Before/after test and145920triangle benchmark are in progress.
-- multiport_audit independently reviews empty/error, hidden panels, camera/selection/fit, stale revision/export contracts. Hidden-panel completed-empty→new-pending must not resurrect an older displayed scene.
-- integration_audit tracks25f Windows CI and only updates OMEGA_CI_RESULTS.json. Root owns integration, native GUI, top-level docs and GitHub publication. No agents may commit/ref-update independently.
+- Pending-preview correction is implemented and independently reviewed. A pending frame retains the last completed scene/diagnostics with a label; latest empty/error clears it. Hidden completions, tiny drawable regions, F/menu fit, camera and stale result/export rules are covered.
+- Pending picks do not alter current selection. A real History Undo→reused NodeId regression failed before the guard and passes after it. Focused tests:4pass/0fail/1manual ignored. The existing main/full gates have not yet been rerun on this exact source; run them next.
+- Local viewport benchmark:145920triangles,7 unrelated edits with identical output Arc. Completion-frame median191.568295→0.049934ms; scene builds15→1,successful diagnostics8→1. This is headless egui/software viewport timing, not native GPU FPS. Full records/source hashes/reproduction patch are in OMEGA_VIEWPORT_PERFORMANCE.json. The final selection guard was added after timing and was not separately benchmarked.
+- Native source25f also passed light theme,1107×725 window and1.35 UI scale help/shortcuts/export scrolling; more screenshots/evidence will be saved in the next documentation unit. Fixed file-picker accent colors for dark mode need the new native build verification.
+- Ownership returns to root for publication/full gates/release/native retest. integration_audit will append a separate CI record for the next published head, preserving0aa/25f results.
 
 ## Resume commands and next files
 
 1. Fetch PR16 and auxiliary checkpoint; read git history, this file and OMEGA_NEXT_TASKS.md. Respect current modifications from other agents/PRs. Reuse the newest verified descendant.
-2. Complete the pending-preview regression fix and independent review; update TEST_RESULTS/ARCHITECTURE/STATUS with actual tests and timings. Do not claim it fixed from this checkpoint alone.
+2. Run full gates for this preview-cache unit and verify the next CI source/tree. Preserve the focused test/performance evidence and update exact counts after execution.
 3. Run relevant tests, then full gates for the final source:
    `env PATH=/home/agent/.cargo/bin:$PATH CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --all-targets --locked --offline`
    Use the same env for fmt/check/clippy (`-- -D warnings`) and `cargo build --release --locked --offline --bins`.
-4. Native-test latest viewport change and light/small/high-DPI dialogs. Recheck actual exported files with `python3 scripts/validate_omega_gui_exports.py`.
+4. Native-test latest viewport change and file-picker colors; save the already captured25f light/compact/scaled dialog evidence. Recheck actual exported files with `python3 scripts/validate_omega_gui_exports.py`.
 5. Save each coherent unit, verify remote SHA, update PR16 body and retain source/tree/artifact distinction. Direct git push has no credentials; authorized GitHub Git-object/ref tools work.
 
 ## Remaining priorities and limits

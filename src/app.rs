@@ -127,6 +127,8 @@ pub struct MorphletApp {
     confirm_action: Option<PendingAction>,
     allow_close: bool,
     preview_mode: u8,
+    /// Completed evaluation represented by the viewport, including an empty scene.
+    preview_revision: Option<u64>,
     edits: EditTracker,
     last_autosave: Instant,
     recovery: Option<Project>,
@@ -226,6 +228,7 @@ impl MorphletApp {
             confirm_action: None,
             allow_close: false,
             preview_mode: 0,
+            preview_revision: None,
             last_autosave: Instant::now(),
             recovery,
             ui_scale: 1.,
@@ -299,12 +302,13 @@ impl MorphletApp {
         };
         collect_export_trees(&self.project.graph, e, &self.canvas.selected)
     }
-    fn previews(&self) -> Vec<PreviewItem> {
+    /// Pending has no new snapshot; a completed empty/error result is Some([]).
+    fn previews(&self) -> Option<Vec<PreviewItem>> {
         if self.stale() {
-            return vec![];
+            return None;
         }
         let Some(e) = &self.evaluation else {
-            return vec![];
+            return Some(vec![]);
         };
         let ids: Vec<_> = match self.preview_mode {
             1 => self.canvas.selected.iter().copied().collect(),
@@ -332,18 +336,41 @@ impl MorphletApp {
                 }
             }
         };
-        ids.into_iter()
-            .filter_map(|id| {
-                e.outputs
-                    .get(&id)
-                    .and_then(|r| r.as_ref().ok())
-                    .map(|tree| PreviewItem {
-                        node_id: id,
-                        tree: tree.clone(),
-                        selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
-                    })
-            })
-            .collect()
+        Some(
+            ids.into_iter()
+                .filter_map(|id| {
+                    e.outputs
+                        .get(&id)
+                        .and_then(|r| r.as_ref().ok())
+                        .map(|tree| PreviewItem {
+                            node_id: id,
+                            tree: tree.clone(),
+                            selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                        })
+                })
+                .collect(),
+        )
+    }
+    fn discard_outdated_preview(&mut self) {
+        // An evaluation may finish while the 3D panel is hidden. If another edit
+        // is pending when it reopens, never resurrect a scene older than that
+        // completed result (which may now be empty or an error).
+        if self
+            .preview_revision
+            .is_some_and(|revision| revision != self.result_revision)
+        {
+            self.viewport.clear();
+            self.preview_revision = None;
+        }
+    }
+    fn fit_preview(&mut self) {
+        if let Some(items) = self.previews() {
+            self.viewport.fit(&items);
+            self.preview_revision = Some(self.result_revision);
+        } else {
+            self.discard_outdated_preview();
+            self.viewport.fit_previous();
+        }
     }
     fn save(&mut self, save_as: bool) -> bool {
         if save_as || self.file_path.is_none() {
@@ -410,6 +437,7 @@ impl MorphletApp {
             self.canvas.connecting = None;
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
+            self.preview_revision = None;
             self.evaluation = None;
             self.queue_compute();
             self.preview_mode = 0;
@@ -928,8 +956,7 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F)) {
                 self.canvas.fit_selection_requested = true;
             } else if ctx.input(|i| i.key_pressed(egui::Key::F)) {
-                let items = self.previews();
-                self.viewport.fit(&items);
+                self.fit_preview();
                 self.canvas.fit_requested = true;
             }
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
@@ -1071,8 +1098,7 @@ impl MorphletApp {
                         }
                         if ui.button("全体表示  F").clicked() {
                             self.canvas.fit_requested = true;
-                            let items = self.previews();
-                            self.viewport.fit(&items);
+                            self.fit_preview();
                             ui.close();
                         }
                         if ui
@@ -1635,14 +1661,17 @@ impl MorphletApp {
             .resizable(true)
             .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
-                let items = self.previews();
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(14, 10))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("3D プレビュー").strong().size(13.));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(theme::small("LIVE"));
+                                ui.label(theme::small(if self.stale() {
+                                    "更新中"
+                                } else {
+                                    "LIVE"
+                                }));
                             });
                         });
                         ui.horizontal_wrapped(|ui| {
@@ -1654,22 +1683,44 @@ impl MorphletApp {
                                 .on_hover_text("形を画面に収める · F")
                                 .clicked()
                             {
-                                self.viewport.fit(&items);
+                                self.fit_preview();
                             }
                         });
                     });
+                // Read the mode after its controls so a completed snapshot uses
+                // the current selection/filter immediately.
+                let items = self.previews();
+                if items.is_none() {
+                    self.discard_outdated_preview();
+                }
                 let h = (ui.available_height() * 0.48).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                    if let Some(id) = self.viewport.show(ui, &items) {
+                    let picked = if let Some(items) = &items {
+                        let picked = self.viewport.show(ui, items);
+                        self.preview_revision = Some(self.result_revision);
+                        picked
+                    } else {
+                        self.viewport.show_previous(ui)
+                    };
+                    // Undo can reuse a previous shape's node ID for a different
+                    // node. Only a completed current preview may select nodes;
+                    // camera controls remain live while showing previous geometry.
+                    if items.is_some()
+                        && let Some(id) = picked.filter(|id| self.project.graph.node(*id).is_some())
+                    {
                         self.canvas.select_only(id);
                     }
-                    if self.stale() {
+                    if items.is_none() {
                         ui.painter().text(
                             rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            "形を更新しています…",
+                            if self.preview_revision.is_some() {
+                                "更新中\n前回の形状を表示"
+                            } else {
+                                "形を更新しています…"
+                            },
                             FontId::proportional(13.),
                             theme::muted(),
                         );
@@ -2692,6 +2743,10 @@ pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64,
 #[cfg(test)]
 #[path = "numeric_editor_tests.rs"]
 mod numeric_editor_tests;
+
+#[cfg(test)]
+#[path = "viewport_cache_tests.rs"]
+mod viewport_cache_tests;
 
 #[cfg(test)]
 mod tests {

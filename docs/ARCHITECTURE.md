@@ -52,6 +52,12 @@ UIと計算workerはlatest-only mailboxを使用し、未受信snapshotを各方
 
 NodeTimingは入力/cache key準備からkernelまたはcache取得、資源検査、出力格納までの壁時計時間。Cluster内部は外側へ含める。validation前の中止には偽のnode時間を作らず、途中中止はpartial timingだけ残す。表示は計測値であり、CPU使用率やframe時間ではない。
 
+### 計算待ちの3D表示
+
+プレビューは `None`（新しい結果を計算中）と `Some([])`（最新評価が空またはエラー）を区別する。前者では最後の完了scene・診断・投影cacheを保持して「更新中／前回の形状を表示」と明示し、カメラ操作を継続する。最新の空結果は必ずsceneを消す。非表示中に評価が完了した場合は表示済みrevisionを照合し、それ以前の形状を復活させない。
+
+前回の形状から現在のグラフの選択を推測せず、pending中のpickは選択へ採用しない。Undo後に同じNodeIdが別ノードへ再利用された場合も誤選択しない。出力ファイルには最新評価が必須であり、保持した表示sceneをexportへ流用しない。preview用Tree containerのcloneと、本当に形状が変わった時のUI thread上のtopology診断は、別の未解消コストとして残る。
+
 ## 数値核と編集の精度
 
 総和・平均は正負を分けた固定長整数累積（単位2^-1074）を使い、平均は整数除算後に1回だけnearest/evenへ丸める。補間は `a + t*b - t*a` の積を単位2^-2148で保持して最後に丸める。有限入力・範囲・overflowの扱いは呼出し側と区別し、Python Fraction oracleとbit単位で比較する。NURBSや任意の数学ノードをすべてexact arithmeticへ置換したわけではない。

@@ -10,11 +10,17 @@
 |---|---|---|
 | `0aa286a` | Linux CI / Windows CI [45914152032](https://github.com/07egta/NODES/actions/runs/45914152032) | 520 / 518 passed、各0 failed・3 ignored、48 targets。両release配布成功 |
 | `0aa286a` | ローカル fmt / check / strict Clippy / Python | 全成功。Python17件、独立Fraction oracle各128例の再生成一致 |
-| `25f981b` | ローカル全ターゲット | **523 passed / 0 failed / 3 ignored、48 targets**。fmt・strict Clippy・release --bins成功 |
+| `25f981b` | ローカル全ターゲット・両OS CI | ローカル/Linux CI **523 passed**、Windows CI **521 passed**、各0 failed / 3 ignored、48 targets。両release成功 |
 | `25f981b` | actual GraphCanvas の入力回帰 | 修正前0/3 → 修正後3/0。符号付きゼロ・長い値の領域・並替え後のfocusを検査 |
 | `25f981b` | Linux native GUI | キャンバス数値入力、Atan2の符号、Undo/Redo、保存、日本語ヘルプ、分割STLを実操作 |
 
 Linux/Windowsの2件差はUnix限定のproject/part FIFO回帰である。ignoredは明示的に実行する計測・ストレス試験であり、失敗試験を削除していない。新しいCI [45916077764](https://github.com/07egta/NODES/actions/runs/45916077764) とソース・tree・配布物の対応は [OMEGA_CI_RESULTS.json](docs/development/OMEGA_CI_RESULTS.json) に記録する。前のCIの成功件数を新しいソースの検証件数として扱わない。
+
+### 後続のプレビュー保持修正（全体CIは別に追跡）
+
+未接続のNumberだけを変更すると、計算側では既存MeshのArcを再利用しているのに、pendingの空配列が3Dキャッシュを消していた。実際のright_panel/Viewportを使う回帰で2112面→0面を再現し、評価待ちと最新の空結果を分離した。最新empty/error、hidden panel中の完了、tiny viewport、カメラ/fit、old worker拒否、stale export禁止を検査。さらにHistoryのUndo後に再利用されたNodeIdを古い形状のpickで選んでしまう再現を追加した。最終関連回帰は **4 passed / 0 failed / 1 manual benchmark ignored**。全体gate/CIの最新状態はSTATUS/OMEGA_CI_RESULTSに追記する。
+
+145920面を使う7回の無関係編集で、完了フレーム中央値 **191.568295→0.049934 ms**、pendingフレーム **1.506245→0.057935 ms**。scene構築15→1回、完了した診断8→1回となり、pending中も7/7回で形状を保持した。2112面では完了3.018779→0.042783 ms。これは評価時間とnative GPU描画を含まない、headless egui/software viewportの限定比較である。最終selection guardは計測後の修正なので再計測済みとは扱わない。[全サンプル・条件・再現patch](docs/development/OMEGA_VIEWPORT_PERFORMANCE.json)。
 
 ### 修正と独立検証
 

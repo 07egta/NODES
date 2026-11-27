@@ -9,7 +9,7 @@
 | ノード選択欄の登録 | 実行したGUIで298種類を確認 |
 | Cluster | 選択欄に含めず、定義から生成する1種類 |
 | 完全実装済みノード数 | 未集計。登録には限定・近似の演算を含むため、298を完全実装数としない |
-| 機能検証 | 0aaのCIでLinux520件・Windows518件（各0 failed / 3 ignored / 48 targets）、両release成功。UI25fはローカル523/0/3。テスト件数は個別ノードの完全検証数ではない。最新source別結果はOMEGA_CI_RESULTS.json |
+| 機能検証 | UI25fのCIでLinux523件・Windows521件（各0 failed / 3 ignored / 48 targets）、両release成功。後続preview-cache関連4件は別ソース。テスト件数はノード完全検証数ではない。最新source別結果はOMEGA_CI_RESULTS.json |
 | GH期待値でVERIFIED | 0。Rhino/GHから採取した版付きoracle fixtureとの比較は未実施 |
 | GH2公式index | 取得時1419件。build 9.3.26329.6001 / export 2026-11-25T15:23:50Z。詳細未調査はUNKNOWN |
 

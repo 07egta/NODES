@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "observed_at": "2026-11-27T00:27:20Z",
+  "observed_at": "2026-11-27T00:32:29Z",
   "repository": "07egta/NODES",
   "pull_request_url": "https://github.com/07egta/NODES/pull/16",
   "latest_source_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
@@ -391,7 +391,7 @@
       }
     },
     {
-      "observed_at": "2026-11-27T00:27:20Z",
+      "observed_at": "2026-11-27T00:32:29Z",
       "repository": "07egta/NODES",
       "pull_request": {
         "number": 16,
@@ -422,8 +422,9 @@
         "path": ".github/workflows/windows.yml",
         "event": "pull_request",
         "run_attempt": 1,
-        "status": "in_progress",
-        "conclusion": null
+        "status": "completed",
+        "conclusion": "success",
+        "updated_at": "2026-11-27T00:30:11Z"
       },
       "jobs": [
         {
@@ -585,10 +586,10 @@
           "id": 140236846326,
           "name": "windows",
           "url": "https://github.com/07egta/NODES/actions/runs/45916077764/job/140236846326",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "started_at": "2026-11-27T00:24:04Z",
-          "completed_at": null,
+          "completed_at": "2026-11-27T00:30:10Z",
           "steps": [
             {
               "name": "Install Rust",
@@ -616,41 +617,130 @@
             },
             {
               "name": "Test all targets",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "number": 6,
               "started_at": "2026-11-27T00:24:55Z",
-              "completed_at": null
+              "completed_at": "2026-11-27T00:27:44Z"
             },
             {
               "name": "Build Windows desktop and console applications",
-              "status": "pending",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "number": 7,
-              "started_at": null,
-              "completed_at": null
+              "started_at": "2026-11-27T00:27:44Z",
+              "completed_at": "2026-11-27T00:30:02Z"
             },
             {
               "name": "Prepare development artifact",
-              "status": "pending",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "number": 8,
-              "started_at": null,
-              "completed_at": null
+              "started_at": "2026-11-27T00:30:02Z",
+              "completed_at": "2026-11-27T00:30:03Z"
             },
             {
               "name": "Upload Windows development artifact",
-              "status": "pending",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "number": 9,
-              "started_at": null,
-              "completed_at": null
+              "started_at": "2026-11-27T00:30:03Z",
+              "completed_at": "2026-11-27T00:30:06Z"
             }
           ],
-          "tests": null
+          "tests": {
+            "passed": 521,
+            "failed": 0,
+            "ignored": 3,
+            "measured": 0,
+            "filtered": 0,
+            "targets": 48,
+            "nonempty_targets": 44
+          },
+          "duration_seconds": 366,
+          "compiler": [
+            "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+            "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+          ],
+          "cargo_finished": [
+            "Finished `test` profile [optimized + debuginfo] target(s) in 2m 46s",
+            "Finished `release` profile [optimized] target(s) in 2m 17s"
+          ],
+          "checkout_commit_from_logs": "9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+          "rust_cache": "hit; explicitly recorded by the cache restore step"
         }
       ],
       "artifacts": [
+        {
+          "id": 15163120765,
+          "name": "NODES-windows-x64-9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+          "url": "https://github.com/07egta/NODES/actions/runs/45916077764/artifacts/15163120765",
+          "size_in_bytes": 14623248,
+          "digest": "sha256:3637290463926c93d2652b335ab252ce7c475ca8d58a4f9e4412db368d9dce92",
+          "expires_at": "2026-12-11T00:30:03Z",
+          "source_head": "25f981b794e3e0f037cd664915ce144347b49f40",
+          "local_archive_sha256": "3637290463926c93d2652b335ab252ce7c475ca8d58a4f9e4412db368d9dce92",
+          "github_digest_matches": true,
+          "build_info": "NODES development build\r\nCommit: 9e2507813f7ed929c74a3ed3beaea9a69fbf049c\r\nTarget: x86_64-pc-windows-msvc\r\nCompiler: rustc 1.100.0 (0ef1bc386 2026-11-09)\r\nBuild: cargo build --release --locked --bins\r\nTests: cargo test --all-targets --locked (Windows and Linux)\r\nThis CI artifact has not been validated by GUI or 3D-print hardware testing.\r\nLicense audit scope and unresolved items: docs/DEPENDENCIES.md\r\n",
+          "binaries": {
+            "Morphlet.exe": {
+              "bytes": 18556416,
+              "sha256": "140915ee7fc0bd7dd514066488bd5a6ccd52e3a21dd15ec7997d063519d4eb83",
+              "executed": false,
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows GUI",
+              "direct_import_dlls": [
+                "ADVAPI32.dll",
+                "GDI32.dll",
+                "KERNEL32.dll",
+                "OPENGL32.dll",
+                "USER32.dll",
+                "VCRUNTIME140.dll",
+                "api-ms-win-core-synch-l1-2-0.dll",
+                "api-ms-win-crt-heap-l1-1-0.dll",
+                "api-ms-win-crt-locale-l1-1-0.dll",
+                "api-ms-win-crt-math-l1-1-0.dll",
+                "api-ms-win-crt-runtime-l1-1-0.dll",
+                "api-ms-win-crt-stdio-l1-1-0.dll",
+                "api-ms-win-crt-string-l1-1-0.dll",
+                "bcryptprimitives.dll",
+                "dwmapi.dll",
+                "gdi32.dll",
+                "imm32.dll",
+                "kernel32.dll",
+                "ntdll.dll",
+                "ole32.dll",
+                "shell32.dll",
+                "shlwapi.dll",
+                "user32.dll",
+                "uxtheme.dll"
+              ]
+            },
+            "nodes-cli.exe": {
+              "bytes": 5894656,
+              "sha256": "5230e4ae208a447f4f5f7952472d546e52ef83e0e09d32e80cf198185b541fe5",
+              "executed": false,
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows Console",
+              "direct_import_dlls": [
+                "KERNEL32.dll",
+                "VCRUNTIME140.dll",
+                "api-ms-win-core-synch-l1-2-0.dll",
+                "api-ms-win-crt-heap-l1-1-0.dll",
+                "api-ms-win-crt-locale-l1-1-0.dll",
+                "api-ms-win-crt-math-l1-1-0.dll",
+                "api-ms-win-crt-runtime-l1-1-0.dll",
+                "api-ms-win-crt-stdio-l1-1-0.dll",
+                "api-ms-win-crt-string-l1-1-0.dll",
+                "bcryptprimitives.dll",
+                "ntdll.dll"
+              ]
+            }
+          },
+          "archive_paths_checked": true,
+          "content_file_count": 500,
+          "binaries_executed": false
+        },
         {
           "id": 15162711183,
           "name": "NODES-linux-x64-9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
@@ -682,9 +772,10 @@
         }
       ],
       "limitations": [
-        "This is the follow-up UI checkpoint. Results from 0aa286a are not results for this source.",
-        "Linux CI and its downloaded artifact are verified. Windows is running Test all targets; its final counts and artifact are not yet verified.",
-        "Downloaded binaries were not executed by this audit. Native GUI validation is separate."
+        "Validation applies to source 25f981b and its identical PR merge tree. Subsequent pending-preview changes require a separate record.",
+        "The three opt-in benchmarks were ignored by this CI invocation.",
+        "Both downloaded development artifacts were inspected and hashed, but neither executable was run by this audit. Native GUI and physical printing validation are separate.",
+        "The Windows packages depend on VCRUNTIME140.dll and do not bundle it; first launch on a fresh Windows 11 system remains unverified."
       ],
       "evidence_urls": [
         "https://api.github.com/repos/07egta/NODES/git/commits/25f981b794e3e0f037cd664915ce144347b49f40",
@@ -696,7 +787,32 @@
         "canvas::perf::benchmark_canvas_pan",
         "benchmark_sparse_slider_edit",
         "audit_stress"
-      ]
+      ],
+      "platform_test_difference": {
+        "unix_only_tests": [
+          "cli_workflows::fifo_projects_return_json_errors_without_waiting_for_a_writer",
+          "part_io_regressions::fifo_parts_are_rejected_without_waiting_for_a_writer"
+        ],
+        "note": "Two Unix-only FIFO tests are excluded on Windows; compare the observed platform totals with this scope."
+      },
+      "deployment_checks": {
+        "windows_runtime": {
+          "artifact_id": 15163120765,
+          "inspection": "GNU objdump -p on both hash-verified executables; neither executable was run",
+          "binaries_with_vcruntime140_import": [
+            "Morphlet.exe",
+            "nodes-cli.exe"
+          ],
+          "bundled_dlls": [],
+          "fresh_windows11_startup_verified": false,
+          "transitive_or_dynamically_loaded_dll_audit": false,
+          "user_guide": "docs/WINDOWS_RUNTIME.md",
+          "primary_sources": [
+            "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist",
+            "https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute"
+          ]
+        }
+      }
     }
   ],
   "earlier_runs": [
@@ -769,14 +885,17 @@
     }
   ],
   "resume": {
-    "run_id": 45916077764,
+    "status": "completed_for_latest_record",
     "source_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
-    "action": "Fetch completed job logs and artifacts for the follow-up source; preserve the completed 0aa286a record and do not transfer its results to a different source.",
-    "local_log_parser": "/tmp/nodes-ci-parse.py"
+    "run_id": 45916077764,
+    "next_action": "For the next published source, add a separate record with its head and merge tree, job logs and independently verified artifacts; preserve both completed records.",
+    "local_log_parser": "/tmp/nodes-ci-parse.py",
+    "local_artifact_inspector": "/tmp/nodes-ci-inspect-artifact.py"
   },
   "limitations": [
     "Each record is scoped to its exact source and PR merge tree.",
     "Cancelled older runs are not test failures.",
     "A development artifact built with the release profile is not a stable product release or a guarantee of print success."
-  ]
+  ],
+  "latest_successful_ci_source_sha": "25f981b794e3e0f037cd664915ce144347b49f40"
 }

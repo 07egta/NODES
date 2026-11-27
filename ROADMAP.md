@@ -6,14 +6,14 @@
 
 Rust / egui の独立デスクトップ基盤へ、既存の core・Data Tree・数学・生成デザイン・メッシュ・UI・GHX/API・精密曲線・精密曲面ブランチを統合した。298種類をノード選択欄に登録し、Cluster は定義から作成する。登録数を完成率やGrasshopper互換率として扱わない。
 
-現在の作業は [PR #16](https://github.com/07egta/NODES/pull/16)、`feat/nodes-omega-geometry`。`0aa286a` のLinux520件・Windows518件と両release配布が成功し、UIを追加した `25f981b` はローカル523件・0 failed・3 ignored、fmt/strict Clippy/releaseが成功した。実GUIでキャンバス直接入力と符号付きゼロ、Undo/Redo/保存、頂点接触の診断、2部品STL出力を確認。正確なsource/CI/artifact/未完了事項は [OMEGA_CI_RESULTS.json](docs/development/OMEGA_CI_RESULTS.json)、[OMEGA_NATIVE_GUI.json](docs/development/OMEGA_NATIVE_GUI.json)、[STATUS](docs/development/STATUS.md) に記録する。
+現在の作業は [PR #16](https://github.com/07egta/NODES/pull/16)、`feat/nodes-omega-geometry`。`0aa286a` のLinux520件・Windows518件と両release配布が成功し、UIを追加した `25f981b` はローカル/Linux CI523件・Windows CI521件、各0 failed・3 ignored、両releaseが成功した。実GUIでキャンバス直接入力と符号付きゼロ、Undo/Redo/保存、頂点接触の診断、2部品STL出力を確認。正確なsource/CI/artifact/未完了事項は [OMEGA_CI_RESULTS.json](docs/development/OMEGA_CI_RESULTS.json)、[OMEGA_NATIVE_GUI.json](docs/development/OMEGA_NATIVE_GUI.json)、[STATUS](docs/development/STATUS.md) に記録する。
 
 新しい問題を再調査し、複数出力の既存PR統合、消費portのエラー伝播、未知nativeノード保持、差分APIの符号付きゼロ、描画cache、配布runtime等の11項目を [OMEGA_NEXT_TASKS.md](docs/development/OMEGA_NEXT_TASKS.md) に優先順位付きで残した。別PRを名称だけで取り込まず、競合と実際のCI失敗を解消する。
 
 | 優先 | 開発項目 | 現状 | 完了条件 |
 |---|---|---|---|
 | P0 | 成果保全・統合 | PR #16へ意味のある単位で保存、旧PR・復旧ブランチを保全 | 最終SHAと実装・試験・再開手順をSTATUSに一致させる |
-| P1 | 品質ゲート | 0aaのLinux520件・Windows518件と両release成功。UI25fのローカル523件とstrict gates成功 | 次の変更も同じソースのCI・実操作を通し、証拠を保存する |
+| P1 | 品質ゲート | 0aaのLinux520件・Windows518件と両release成功。UI25fのLinux523件/Windows521件とstrict gates・両release成功 | 次の変更も同じソースのCI・実操作を通し、証拠を保存する |
 | P2 | データフロー | 型検査、循環検出、キャッシュ、キャンセル、枝照合、List/Tree実装 | 複数出力ポート、Null、一般の混合アクセス、完全な空データ規則 |
 | P3 | 精密幾何 | NURBS曲線/曲面、解析primitive、曲率、箱限定ソリッド | トリム曲面、一般B-rep位相、頑健な交差・Boolean、許容誤差の公開 |
 | P4 | 実操作品質 | 日本語検索、Light/Dark、キャンバス、プレビュー、Undo/Redo、精度を保持する数値入力をLinux実GUIで確認 | Windows/Intel Arc・高DPI・より小さい画面・大グラフ実操作（Linux 1116×758と1364px幅は確認） |
