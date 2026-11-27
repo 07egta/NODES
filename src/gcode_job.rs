@@ -1220,8 +1220,6 @@ impl GcodeJob {
             };
             match m.op {
                 Op::Layer => {
-                    t.line(&format!(";LAYER:{}", m.layer))?;
-                    t.line(&format!(";Z:{:.3}", m.to[2]))?;
                     let mut change_here = false;
                     while self
                         .color_changes
@@ -1234,6 +1232,8 @@ impl GcodeJob {
                     if change_here && pr.heated {
                         t.line(&format!("M600 ; 色替え（層 {} の前）", m.layer + 1))?;
                     }
+                    t.line(&format!(";LAYER:{}", m.layer))?;
+                    t.line(&format!(";Z:{:.3}", m.to[2]))?;
                     if pr.heated
                         && pf.fan_pct > 0.0
                         && !fan_on
