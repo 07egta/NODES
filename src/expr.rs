@@ -2,7 +2,8 @@
 //!
 //! Variables are `x`, `y`, `z` and `w`; constants are `pi` and `e`. Operators are
 //! `+ - * / % ^` (with `^` right-associative and binding tighter than unary minus).
-//! Functions: sin cos tan sqrt abs min max floor ceil round ln exp (angles in radians).
+//! Functions: trig and inverse trig, hyperbolic, roots, logarithms, rounding,
+//! min/max/clamp, hypot, exact lerp and smoothstep (angles in radians).
 //! There are no loops, no user functions and no recursion beyond the parser's fixed
 //! depth, so any input terminates quickly. Full-width characters typed through a
 //! Japanese IME are accepted and normalised first.
@@ -39,6 +40,26 @@ pub enum Func {
     Round,
     Ln,
     Exp,
+    Asin,
+    Acos,
+    Atan,
+    Atan2,
+    Sinh,
+    Cosh,
+    Tanh,
+    Hypot,
+    Cbrt,
+    Log2,
+    Log10,
+    Log,
+    Trunc,
+    Fract,
+    Sign,
+    Degrees,
+    Radians,
+    Clamp,
+    Lerp,
+    Smoothstep,
 }
 impl Func {
     fn from_name(name: &str) -> Option<Self> {
@@ -55,12 +76,33 @@ impl Func {
             "round" => Self::Round,
             "ln" => Self::Ln,
             "exp" => Self::Exp,
+            "asin" => Self::Asin,
+            "acos" => Self::Acos,
+            "atan" => Self::Atan,
+            "atan2" => Self::Atan2,
+            "sinh" => Self::Sinh,
+            "cosh" => Self::Cosh,
+            "tanh" => Self::Tanh,
+            "hypot" => Self::Hypot,
+            "cbrt" => Self::Cbrt,
+            "log2" => Self::Log2,
+            "log10" => Self::Log10,
+            "log" => Self::Log,
+            "trunc" => Self::Trunc,
+            "fract" => Self::Fract,
+            "sign" => Self::Sign,
+            "deg" => Self::Degrees,
+            "rad" => Self::Radians,
+            "clamp" => Self::Clamp,
+            "lerp" | "mix" => Self::Lerp,
+            "smoothstep" => Self::Smoothstep,
             _ => return None,
         })
     }
     fn arity(self) -> usize {
         match self {
-            Self::Min | Self::Max => 2,
+            Self::Min | Self::Max | Self::Atan2 | Self::Hypot | Self::Log => 2,
+            Self::Clamp | Self::Lerp | Self::Smoothstep => 3,
             _ => 1,
         }
     }
@@ -286,25 +328,25 @@ impl Parser {
                     let func = Func::from_name(&name)
                         .ok_or_else(|| format!("関数「{name}」は使えません。"))?;
                     self.pos += 1;
-                    let mut args = Vec::new();
-                    loop {
-                        args.push(self.additive(depth + 1)?);
-                        if matches!(self.peek(), Some(Tok::Comma)) {
+                    let arity = func.arity();
+                    let arity_error = || format!("関数「{name}」には値が {arity} 個必要です。");
+                    let mut args = Vec::with_capacity(arity);
+                    for index in 0..arity {
+                        if index != 0 {
+                            if !matches!(self.peek(), Some(Tok::Comma)) {
+                                return Err(arity_error());
+                            }
                             self.pos += 1;
-                        } else {
-                            break;
                         }
-                        if args.len() > 2 {
-                            break;
+                        if matches!(self.peek(), Some(Tok::RParen)) {
+                            return Err(arity_error());
                         }
+                        args.push(self.additive(depth + 1)?);
+                    }
+                    if matches!(self.peek(), Some(Tok::Comma)) {
+                        return Err(arity_error());
                     }
                     self.expect_close()?;
-                    if args.len() != func.arity() {
-                        return Err(format!(
-                            "関数「{name}」には値が {} 個必要です。",
-                            func.arity()
-                        ));
-                    }
                     return self.make(Expr::Call(func, args));
                 }
                 match name.as_str() {
@@ -361,14 +403,36 @@ fn finite(v: f64) -> Result<f64, String> {
     }
 }
 
+/// Cubic Hermite easing from 0 to 1, with clamped endpoints.
+/// Scale only when the finite endpoint difference would overflow.
+fn smoothstep(lo: f64, hi: f64, value: f64) -> Result<f64, String> {
+    if lo >= hi {
+        return Err("smoothstep の下限は上限より小さくしてください。".into());
+    }
+    if value <= lo {
+        return Ok(0.0);
+    }
+    if value >= hi {
+        return Ok(1.0);
+    }
+    let width = hi - lo;
+    let t = if width.is_finite() {
+        (value - lo) / width
+    } else {
+        (value * 0.5 - lo * 0.5) / (hi * 0.5 - lo * 0.5)
+    }
+    .clamp(0.0, 1.0);
+    Ok(t * t * (3.0 - 2.0 * t))
+}
+
 impl Expr {
     /// Evaluates with `vars = [x, y, z, w]`. Division by zero, a root or logarithm outside
     /// its domain, and any non-finite intermediate result are errors, never NaN.
     pub fn eval(&self, vars: [f64; 4]) -> Result<f64, String> {
         match self {
-            Self::Num(v) => Ok(*v),
-            Self::Var(i) => Ok(vars.get(*i).copied().unwrap_or(0.)),
-            Self::Neg(e) => Ok(-e.eval(vars)?),
+            Self::Num(v) => finite(*v),
+            Self::Var(i) => finite(vars.get(*i).copied().ok_or(SYNTAX)?),
+            Self::Neg(e) => finite(-e.eval(vars)?),
             Self::Bin(op, l, r) => {
                 let x = l.eval(vars)?;
                 let y = r.eval(vars)?;
@@ -401,7 +465,12 @@ impl Expr {
                 finite(v)
             }
             Self::Call(func, args) => {
+                if args.len() != func.arity() {
+                    return Err(SYNTAX.into());
+                }
                 let x = args.first().ok_or(SYNTAX)?.eval(vars)?;
+                let y = || args.get(1).ok_or(SYNTAX)?.eval(vars);
+                let z = || args.get(2).ok_or(SYNTAX)?.eval(vars);
                 let v = match func {
                     Func::Sin => x.sin(),
                     Func::Cos => x.cos(),
@@ -414,7 +483,7 @@ impl Expr {
                     }
                     Func::Abs => x.abs(),
                     Func::Min | Func::Max => {
-                        let y = args.get(1).ok_or(SYNTAX)?.eval(vars)?;
+                        let y = y()?;
                         if *func == Func::Min {
                             x.min(y)
                         } else {
@@ -431,9 +500,201 @@ impl Expr {
                         x.ln()
                     }
                     Func::Exp => x.exp(),
+                    Func::Asin | Func::Acos => {
+                        if !(-1.0..=1.0).contains(&x) {
+                            return Err("逆三角関数の入力は -1〜1 にしてください。".into());
+                        }
+                        if *func == Func::Asin {
+                            x.asin()
+                        } else {
+                            x.acos()
+                        }
+                    }
+                    Func::Atan => x.atan(),
+                    // Same signed-zero quadrant convention as Rust f64::atan2.
+                    Func::Atan2 => x.atan2(y()?),
+                    Func::Sinh => x.sinh(),
+                    Func::Cosh => x.cosh(),
+                    Func::Tanh => x.tanh(),
+                    Func::Hypot => x.hypot(y()?),
+                    Func::Cbrt => x.cbrt(),
+                    Func::Log2 | Func::Log10 | Func::Log => {
+                        if x <= 0.0 {
+                            return Err("対数の入力は正の数にしてください。".into());
+                        }
+                        match func {
+                            Func::Log2 => x.log2(),
+                            Func::Log10 => x.log10(),
+                            _ => {
+                                let base = y()?;
+                                if base <= 0.0 || base == 1.0 {
+                                    return Err("対数の底は 1 以外の正の数にしてください。".into());
+                                }
+                                x.log(base)
+                            }
+                        }
+                    }
+                    Func::Trunc => x.trunc(),
+                    Func::Fract => x.fract(),
+                    Func::Sign => {
+                        if x == 0.0 {
+                            x
+                        } else {
+                            x.signum()
+                        }
+                    }
+                    Func::Degrees => x.to_degrees(),
+                    Func::Radians => x.to_radians(),
+                    Func::Clamp => {
+                        let (lo, hi) = (y()?, z()?);
+                        if lo > hi {
+                            return Err("clamp の下限は上限以下にしてください。".into());
+                        }
+                        x.clamp(lo, hi)
+                    }
+                    Func::Lerp => crate::number_interpolation::lerp(x, y()?, z()?),
+                    Func::Smoothstep => {
+                        let (hi, value) = (y()?, z()?);
+                        smoothstep(x, hi, value)?
+                    }
                 };
                 finite(v)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evaluate(source: &str, vars: [f64; 4]) -> f64 {
+        parse(source).unwrap().eval(vars).unwrap()
+    }
+
+    #[test]
+    fn inverse_trig_and_angle_conversion() {
+        let pi = std::f64::consts::PI;
+        for (source, expected) in [
+            ("asin(1)", pi / 2.0),
+            ("acos(-1)", pi),
+            ("atan(1)", pi / 4.0),
+            ("atan2(1,-1)", 3.0 * pi / 4.0),
+            ("deg(pi)", 180.0),
+            ("rad(180)", pi),
+            ("ＤＥＧ（ｐｉ）", 180.0),
+        ] {
+            assert!((evaluate(source, [0.0; 4]) - expected).abs() < 1e-12);
+        }
+        assert_eq!(
+            evaluate("atan2(x,-1)", [-0.0, 0.0, 0.0, 0.0]).to_bits(),
+            (-pi).to_bits()
+        );
+    }
+
+    #[test]
+    fn roots_logs_rounding_and_hyperbolic_functions() {
+        for (source, expected) in [
+            ("hypot(3,4)", 5.0),
+            ("cbrt(-27)", -3.0),
+            ("log2(8)", 3.0),
+            ("log10(1000)", 3.0),
+            ("log(81,3)", 4.0),
+            ("trunc(-2.75)", -2.0),
+            ("fract(-2.75)", -0.75),
+            ("sign(-4)", -1.0),
+            ("sign(0)", 0.0),
+            ("sign(4)", 1.0),
+            ("sinh(0)", 0.0),
+            ("cosh(0)", 1.0),
+            ("tanh(0)", 0.0),
+            ("cosh(1)^2-sinh(1)^2", 1.0),
+        ] {
+            assert!((evaluate(source, [0.0; 4]) - expected).abs() < 1e-12);
+        }
+        assert_eq!(
+            evaluate("hypot(x,0)", [f64::MAX, 0.0, 0.0, 0.0]),
+            f64::MAX
+        );
+    }
+
+    #[test]
+    fn three_argument_functions_and_extreme_endpoints() {
+        for (source, expected) in [
+            ("clamp(-2,0,1)", 0.0),
+            ("clamp(0.4,0,1)", 0.4),
+            ("clamp(2,0,1)", 1.0),
+            ("clamp(9,2,2)", 2.0),
+            ("lerp(2,8,0.25)", 3.5),
+            ("mix(2,8,2)", 14.0),
+            ("smoothstep(0,1,-1)", 0.0),
+            ("smoothstep(0,1,2)", 1.0),
+            ("smoothstep(0,1,0.25)", 0.15625),
+            ("smoothstep(0,1,0.5)", 0.5),
+            ("smoothstep(0,1,0.75)", 0.84375),
+            ("clamp(lerp(0,10,0.5),0,4)", 4.0),
+        ] {
+            assert_eq!(evaluate(source, [0.0; 4]), expected, "{source}");
+        }
+        let vars = [-f64::MAX, f64::MAX, 0.5, 0.0];
+        assert_eq!(evaluate("lerp(x,y,z)", vars), 0.0);
+        assert_eq!(evaluate("smoothstep(x,y,w)", vars), 0.5);
+        assert_eq!(
+            evaluate("lerp(x,1,0)", [-0.0, 0.0, 0.0, 0.0]).to_bits(),
+            (-0.0_f64).to_bits()
+        );
+    }
+
+    #[test]
+    fn reject_wrong_arity_and_invalid_domains() {
+        for source in [
+            "sin()",
+            "min(1)",
+            "min(1,2,3)",
+            "lerp(1,2)",
+            "lerp(1,2,3,4)",
+            "lerp(1,2,3,)",
+            "smoothstep(0,1,)",
+            "clamp(1,,2)",
+        ] {
+            assert!(parse(source).is_err(), "{source}");
+        }
+        for source in [
+            "asin(2)",
+            "acos(-2)",
+            "log(10,1)",
+            "log(10,-2)",
+            "log2(0)",
+            "log10(-1)",
+            "clamp(0,2,1)",
+            "smoothstep(1,1,0)",
+            "smoothstep(2,1,0)",
+            "cosh(1000)",
+            "lerp(0,1e308,2)",
+        ] {
+            assert!(parse(source).unwrap().eval([0.0; 4]).is_err(), "{source}");
+        }
+    }
+
+    #[test]
+    fn nonfinite_leaves_and_malformed_public_ast_are_errors() {
+        for source in ["x", "-x", "min(x,1)", "max(x,1)", "x^0", "clamp(0,x,1)"] {
+            for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                assert!(
+                    parse(source)
+                        .unwrap()
+                        .eval([invalid, 0.0, 0.0, 0.0])
+                        .is_err(),
+                    "{source}"
+                );
+            }
+        }
+        assert!(Expr::Var(4).eval([0.0; 4]).is_err());
+        assert!(Expr::Num(f64::NAN).eval([0.0; 4]).is_err());
+        let malformed = Expr::Call(Func::Sin, vec![Expr::Num(1.0), Expr::Num(2.0)]);
+        assert!(malformed.eval([0.0; 4]).is_err());
+        assert_eq!(evaluate("2^3^2", [0.0; 4]), 512.0);
+        assert_eq!(evaluate("-2^2", [0.0; 4]), -4.0);
+        assert_eq!(evaluate("2^-2", [0.0; 4]), 0.25);
     }
 }
