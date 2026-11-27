@@ -2,6 +2,7 @@
 //! the saved theme choice and the shortcut cheat-sheet. No egui drawing happens here,
 //! so the ranking and persistence rules can be unit tested on their own.
 
+use crate::theme;
 use nodes::model::{DataType, NodeKind};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -258,16 +259,17 @@ pub fn snap(value: f32, grid: f32) -> f32 {
 }
 
 /// Parses the saved theme line. Unknown text gives `None`.
-pub fn parse_dark(text: &str) -> Option<bool> {
-    match text.trim() {
-        "theme=dark" => Some(true),
-        "theme=light" => Some(false),
-        _ => None,
+pub fn parse_theme(text: &str) -> Option<theme::Mode> {
+    let text = text.trim();
+    if text.starts_with("theme=") {
+        theme::Mode::parse(text)
+    } else {
+        None
     }
 }
 
-pub fn format_dark(dark: bool) -> &'static str {
-    if dark { "theme=dark" } else { "theme=light" }
+pub fn format_theme(mode: theme::Mode) -> String {
+    format!("theme={}", mode.key())
 }
 
 /// Settings file beside the autosave file (same folder rules as `recovery.morph`).
@@ -283,16 +285,17 @@ pub fn settings_path() -> Option<PathBuf> {
     }
 }
 
-/// Saved theme; dark when nothing is saved yet.
-pub fn load_dark() -> bool {
+/// Saved theme; Melt when nothing is saved yet. An older saved `theme=dark` or
+/// `theme=light` keeps working, so nobody's choice changes under them.
+pub fn load_theme() -> theme::Mode {
     // The settings file holds other lines too (node lists), so only the theme line is read.
     read_setting("theme")
-        .and_then(|value| parse_dark(&format!("theme={value}")))
-        .unwrap_or(true)
+        .and_then(|value| theme::Mode::parse(&value))
+        .unwrap_or(theme::Mode::Melt)
 }
 
-pub fn save_dark(dark: bool) -> Result<(), String> {
-    save_setting_line(format_dark(dark))
+pub fn save_theme(mode: theme::Mode) -> Result<(), String> {
+    save_setting_line(&format_theme(mode))
 }
 
 /// Value of the `key=value` line in the settings file (the text after `key=`).
@@ -543,8 +546,11 @@ mod tests {
 
     #[test]
     fn saved_theme_round_trips() {
-        assert_eq!(parse_dark(format_dark(true)), Some(true));
-        assert_eq!(parse_dark(format_dark(false)), Some(false));
-        assert_eq!(parse_dark("garbage"), None);
+        for mode in theme::Mode::ALL {
+            assert_eq!(parse_theme(&format_theme(mode)), Some(mode));
+        }
+        assert_eq!(parse_theme("theme=dark"), Some(theme::Mode::Dark));
+        assert_eq!(parse_theme("garbage"), None);
+        assert_eq!(parse_theme("theme=pink"), None);
     }
 }

@@ -174,8 +174,8 @@ pub struct NodesApp {
     palette_cursor: usize,
     /// ショートカット一覧 window (?).
     shortcuts_open: bool,
-    /// Dark theme is on (saved in the settings file).
-    dark: bool,
+    /// Selected theme (saved in the settings file).
+    theme_mode: theme::Mode,
     /// Node shelf: tabs, favourites, and the drag / Space state.
     shelf: node_shelf::Shelf,
     /// Favourites and recent nodes as last written to the settings file.
@@ -188,8 +188,8 @@ impl NodesApp {
         open_file: Option<PathBuf>,
         screenshot: Option<PathBuf>,
     ) -> Self {
-        let dark = ui_polish::load_dark();
-        theme::configure(&cc.egui_ctx, dark);
+        let theme_mode = ui_polish::load_theme();
+        theme::configure(&cc.egui_ctx, theme_mode);
         let mut project = templates::create(0);
         let mut file_path = None;
         let mut initial_error = None;
@@ -279,7 +279,7 @@ impl NodesApp {
             recent,
             palette_cursor: 0,
             shortcuts_open: false,
-            dark,
+            theme_mode,
             shelf: node_shelf::Shelf::new(favorites.clone()),
             saved_lists: (favorites, saved_recent),
         };
@@ -986,11 +986,14 @@ impl NodesApp {
         };
         self.notify(text, false);
     }
-    fn toggle_theme(&mut self, ctx: &egui::Context) {
-        self.dark = !self.dark;
-        theme::set_dark(self.dark);
+    fn set_theme(&mut self, mode: theme::Mode, ctx: &egui::Context) {
+        if self.theme_mode == mode {
+            return;
+        }
+        self.theme_mode = mode;
+        theme::set_mode(mode);
         theme::apply_style(ctx);
-        if let Err(e) = ui_polish::save_dark(self.dark) {
+        if let Err(e) = ui_polish::save_theme(mode) {
             self.notify(e, true);
         }
     }
@@ -1238,17 +1241,17 @@ impl NodesApp {
                             self.fit_preview();
                             ui.close();
                         }
-                        if ui
-                            .button(if self.dark {
-                                "ライトテーマ"
-                            } else {
-                                "ダークテーマ"
-                            })
-                            .clicked()
-                        {
-                            self.toggle_theme(ctx);
-                            ui.close();
-                        }
+                        ui.menu_button("テーマ", |ui| {
+                            for mode in theme::Mode::ALL {
+                                if ui
+                                    .selectable_label(self.theme_mode == mode, mode.label())
+                                    .clicked()
+                                {
+                                    self.set_theme(mode, ctx);
+                                    ui.close();
+                                }
+                            }
+                        });
                     });
                     ui.menu_button("作例・ヘルプ", |ui| {
                         if ui.button("作品例").clicked() {
