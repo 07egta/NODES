@@ -40,6 +40,7 @@ pub struct Change {
 #[derive(Debug, Default, Serialize)]
 pub struct Report {
     pub changed: bool,
+    pub change_count: usize,
     pub changes: Vec<Change>,
     pub evaluation_roots: Vec<NodeId>,
     pub affected_before: Vec<NodeId>,
@@ -316,6 +317,7 @@ pub fn compare(before: &Project, after: &Project, content_only: bool) -> Result<
     if content_only {
         report.changes.retain(|change| change.class == Evaluation);
     }
-    report.changed = !report.changes.is_empty();
+    report.change_count = report.changes.len();
+    report.changed = report.change_count != 0;
     Ok(report)
 }
