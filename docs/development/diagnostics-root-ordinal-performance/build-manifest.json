@@ -1,0 +1,106 @@
+{
+  "experiment": "Unchanged ordinal diagnostic modules; isolated per-variant measurement process",
+  "started_at_utc": "2026-11-26T23:58:04.433759+00:00",
+  "library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "worktree": "/workspace/scratch/74d3da15ab33/NODES-diagnostics-ordinal-paired",
+  "target_directory": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+  "target_policy": "Exclusively owned existing dependency target; cargo clean -p morphlet --release forces fresh project library and example while retaining third-party dependencies. Both diagnostic implementations then coexist in that single fresh library.",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+      "bytes": 19342,
+      "fnv1a64": "1b946498bfb0f532"
+    },
+    {
+      "label": "after",
+      "revision": "24e92ebd46bfd59cc5ba532c5c9a79df86e16379",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+      "bytes": 21010,
+      "fnv1a64": "ce9da1d576fb99ed"
+    }
+  ],
+  "harness_sha256": "70189a060158cf355295c3360ea4a4c5a8b8568778d5fcc1ceadf18c5336502f",
+  "library_shim_sha256": "7ab252fbf5bad1c96ad98b11585d03136bf0c0e0fa25e0b77c58b741ddba115a",
+  "full_lib_rs_sha256": "f9c560318c38bc2ed3c71229807a4807d6bd9b66f22b2ffdc79c7036848c4618",
+  "cargo_toml_sha256": "7981c5c016bee195cd0f909bfa42778db0302b66bf04ac4c5c7a50d7db685e5f",
+  "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+  "worktree_status": "M src/lib.rs\n?? benchmark-snapshots/\n?? examples/diagnostics_root_ordinal.rs",
+  "compiler": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cargo": "cargo 1.100.0 (3acc79c0c 2026-11-05)",
+  "build_environment": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "NODES_ORDINAL_LIBRARY_SHA": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+    "NODES_ORDINAL_BEFORE_SHA": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+    "NODES_ORDINAL_AFTER_SHA": "24e92ebd46bfd59cc5ba532c5c9a79df86e16379",
+    "NODES_ORDINAL_BEFORE_SHA256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+    "NODES_ORDINAL_AFTER_SHA256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca"
+  },
+  "rustflags": "",
+  "profile": {
+    "opt_level": 3,
+    "lto": "thin",
+    "codegen_units": 16,
+    "strip": true
+  },
+  "commands": [
+    {
+      "label": "package-clean",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clean",
+        "-p",
+        "morphlet",
+        "--release",
+        "--target-dir",
+        "/workspace/scratch/74d3da15ab33/diagnostics-bench-target"
+      ],
+      "started_at_utc": "2026-11-26T23:58:04.525110+00:00",
+      "completed_at_utc": "2026-11-26T23:58:04.603741+00:00",
+      "elapsed_seconds": 0.07865699000012683,
+      "exit_code": 0,
+      "log": "package-clean.log"
+    },
+    {
+      "label": "paired-build",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "diagnostics_root_ordinal"
+      ],
+      "started_at_utc": "2026-11-26T23:58:04.604172+00:00",
+      "completed_at_utc": "2026-11-26T23:58:38.184209+00:00",
+      "elapsed_seconds": 33.58007667699985,
+      "exit_code": 0,
+      "log": "paired-build.log"
+    }
+  ],
+  "free_disk_bytes_before": 6246789120,
+  "completed_at_utc": "2026-11-26T23:58:38.249697+00:00",
+  "binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-root-ordinal",
+  "binary_sha256": "016f40926d6529d725cc9cd6a9926f6e8a9c96124790cb7468b07c1e382cf080",
+  "binary_size_bytes": 5226832,
+  "linked_library": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target/release/build/morphlet/da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+  "linked_library_sha256": "7883b27b4f18eef0d4ecb80ccbfd2e713299831439ed41368e4cab3c91b1436d",
+  "library_mtime_ns": 1795737497012542677,
+  "free_disk_bytes_after": 6236360704,
+  "published_equivalence": {
+    "before_published_equivalent_revision": "545bcd4208cc6bf7069a75c7e4aadd6d2e915910",
+    "before_published_source_bytes_equal": true,
+    "after_published_equivalent_revision": "46417ae91af8cbe11eb45934d535278ce23df06b",
+    "after_published_source_bytes_equal": true,
+    "after_local_tree": "98b1ffc61c79fdeb7d0bbe11496a4cd3ec0833c3",
+    "after_published_tree": "98b1ffc61c79fdeb7d0bbe11496a4cd3ec0833c3"
+  }
+}

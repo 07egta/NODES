@@ -1,0 +1,743 @@
+   Compiling morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES)
+    Finished `test` profile [optimized] target(s) in 27.64s
+     Running unittests src/lib.rs (target/debug/build/morphlet/f87e7d35a64d5faf/out/morphlet-f87e7d35a64d5faf)
+
+running 99 tests
+test engine::tests::bad_division_is_local_to_its_descendants ... ok
+test engine::tests::changed_parameter_only_recomputes_descendants ... ok
+test engine::tests::concave_star_extrusion_has_expected_volume ... ok
+test engine::tests::cancelling_does_not_poison_cache ... ok
+test engine::tests::a_one_shot_cancel_signal_is_latched_and_not_cached_as_an_error ... ok
+test engine::tests::graft_broadcast_does_not_add_spurious_root_branch ... ok
+test engine::tests::graft_preserves_value_when_deeper_empty_path_collides ... ok
+test engine::tests::lists_repeat_last_item_and_empty_branches_survive ... ok
+test engine::tests::error_does_not_leave_previous_geometry_in_output ... ok
+test engine::tests::self_intersecting_profile_is_rejected ... ok
+test engine::tests::singleton_grafted_branch_is_not_duplicated_by_constants ... ok
+test engine::tests::moving_renaming_and_hiding_cards_do_not_invalidate_cache ... ok
+test gcode::tests::layer_height_above_line_width_is_rejected ... ok
+test engine::tests::separate_radius_and_height_lists_produce_a_closed_loft ... ok
+test gcode::tests::default_settings_are_valid ... ok
+test gcode::tests::resample_keeps_perimeter_and_ccw ... ok
+test engine::tests::oversized_array_is_rejected_before_allocating ... ok
+test generative::extra_tests::life_blinker_returns_after_two_steps ... ok
+test generative::extra_tests::curve_array_spacing_uses_arc_length_and_not_vertex_indices ... ok
+test engine::tests::sphere_is_closed_without_duplicate_poles ... ok
+test generative::extra_tests::delaunay_square_duplicate_and_interior_point ... ok
+test generative::extra_tests::mesh_population_reproducible_and_inside_triangle ... ok
+test generative::hull_coverage_regressions::near_collinear_interior_site_cannot_leave_a_hole_in_the_convex_hull ... ok
+test generative::tests::arbitrary_axis_rotation_preserves_distance_to_center ... ok
+test generative::tests::hull_removes_interior_duplicates_and_collinear_points ... ok
+test generative::tests::grid_and_recursive_tree_have_expected_counts ... ok
+test generative::tests::point_array_rejects_multiple_sources_and_shares_original ... ok
+test generative::tests::rejects_outside_and_excess_sites_and_cancels ... ok
+test generative::tests::two_voronoi_cells_cover_boundary_and_duplicates_are_merged ... ok
+test generative::tests::voronoi_collinear_sites_partition_rectangle ... ok
+test generative::tests::wrapping_preserves_closed_flag_and_subdivides ... ok
+test engine::tests::mesh_validation_cooperates_with_cancellation ... ok
+test generative::tests::nearest_ties_are_stable_and_attractor_distances_match ... ok
+test ghx::tests::unexpected_tree_settings_and_multiple_wires_are_not_silently_converted ... ok
+test ghx::tests::unsupported_object_preserves_wire_and_source ... ok
+test graph_api::tests::destructive_and_invalid_edits_roll_back ... ok
+test graph_api::tests::duplicate_wire_edits_are_rejected ... ok
+test graph_api::tests::build_and_evaluate_addition ... ok
+test graph_api::tests::failed_edits_are_atomic ... ok
+test graph_api::tests::legacy_and_canonical_wire_keys_cannot_duplicate_edits ... ok
+test graph_api::tests::transactional_editing_disconnect_reset_move_and_remove ... ok
+test graph_api::tests::untrusted_capabilities_and_versions_are_rejected ... ok
+test latest_channel::tests::disconnection_returns_the_submitted_snapshot ... ok
+test latest_channel::tests::superseded_snapshots_release_their_memory_immediately ... ok
+test ghx::tests::source_and_port_identity_and_scalar_evaluation ... ok
+test latest_channel::tests::thousands_of_updates_keep_only_the_latest ... ok
+test ghx::tests::invalid_numbers_dangling_wires_and_cycles ... ok
+test math_nodes::tests::linear_algebra_and_fourier ... ok
+test math_nodes::tests::mapper_and_seed ... ok
+test math_nodes::tests::orthogonal_and_rotation ... ok
+test math_nodes::tests::range_includes_both_ends_and_reverses ... ok
+test math_nodes::tests::scalar_domains_and_errors ... ok
+test math_nodes::tests::statistics_and_sets ... ok
+test mesh_fabrication::tests::closed_and_open ... ok
+test mesh_fabrication::tests::malformed_and_cancelled ... ok
+test mesh_fabrication::tests::midpoint_and_subd ... ok
+test ghx::tests::invalid_xml_and_limits ... ok
+test math_nodes::tests::frame_round_trip ... ok
+test math_nodes::tests::intersection_and_basis ... ok
+test latest_channel::tests::worker_can_consume_the_final_snapshot_before_disconnect ... ok
+test latest_channel::tests::concurrent_burst_never_delivers_out_of_order ... ok
+test mesh_fabrication::tests::reversed_and_unified ... ok
+test mesh_fabrication::tests::subd_boundary ... ok
+test mesh_fabrication::tests::vertex_bowtie ... ok
+test mesh_fabrication::tests::weld_and_nearest ... ok
+test mesh_geometry_checks::tests::crossing_and_coplanar ... ok
+test mesh_fabrication::tests::smooth_boundary_fixed ... ok
+test mesh_geometry_checks::tests::coplanar_aabbs_overlap_but_triangles_do_not ... ok
+test model::tests::duplicate_ids_and_missing_sources_are_rejected ... ok
+test model::tests::failed_wire_keeps_previous_connection ... ok
+test mesh_geometry_checks::tests::slab ... ok
+test model::tests::impossible_types_are_rejected ... ok
+test polygon_triangulation::tests::concave_area_winding_and_vertices ... ok
+test polygon_triangulation::tests::cyclic_projection_axes_and_cancellation_during_work ... ok
+test polygon_triangulation::tests::indexed_errors_limits_and_cancellation ... ok
+test polygon_triangulation::tests::invalid_nonplanar_and_crossing_rings_are_rejected ... ok
+test model::tests::metadata_and_defaults_cover_every_node ... ok
+test polygon_triangulation::tests::large_translation_and_collinear_boundary_vertex ... ok
+test print_info::tests::cube_volume_is_side_cubed ... ok
+test print_info::tests::fit_checks_each_axis ... ok
+test print_info::tests::overhang_rule_follows_the_angle_from_horizontal ... ok
+test print_info::tests::overhang_rule_matches_the_overhang_node ... ok
+test print_info::tests::pla_weight_uses_density ... ok
+test print_info::tests::size_comes_from_min_and_max ... ok
+test raster::tests::degenerate_triangles_are_ignored ... ok
+test raster::tests::uncovered_pixels_stay_transparent ... ok
+test raster::tests::nearer_triangle_wins_whatever_the_order ... ok
+test surface_kernel::tests::analytic_areas_normals_and_closest ... ok
+test surface_kernel::tests::bilinear_nonunit_knots_derivatives ... ok
+test surface_kernel::tests::invalid_input_and_cancellation ... ok
+test surface_kernel::tests::multi_span_endpoint_and_internal_knot ... ok
+test surface_kernel::tests::box_restricted_booleans_and_offset ... ok
+test surface_kernel::tests::rational_quarter_cylinder ... ok
+test surface_kernel::tests::closed_box_topology_volume_and_intersection ... ok
+test surface_kernel::tests::exact_revolved_profile_and_ruled_sections ... ok
+test surface_kernel::tests::sphere_and_torus_meshes_closed_oriented ... ok
+test engine::tests::vase_and_twisted_vase_are_watertight ... ok
+test engine::tests::nested_arrays_observe_the_remaining_budget_before_each_expansion ... ok
+test engine::tests::interrupted_evaluation_also_bounds_unvisited_cached_meshes ... ok
+
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)
+
+running 37 tests
+test app::tests::copy_paste_remaps_internal_edges_and_drops_external_links ... ok
+test app::tests::failed_paste_is_atomic ... ok
+test app::tests::file_name_is_path_safe ... ok
+test app::tests::japanese_and_english_search_find_real_nodes ... ok
+test canvas::premium_tests::wire_culling_preserves_reverse_and_crossing_curves ... ok
+test app::tests::layout_changes_do_not_trigger_geometry ... ok
+test app::numeric_editor_tests::focus_and_enter_without_editing_preserve_loaded_precision ... ok
+test app::tests::export_never_silently_drops_a_failed_output ... ok
+test canvas::premium_tests::zoom_preserves_the_world_point_under_the_pointer ... ok
+test canvas::premium_tests::fit_is_finite_for_narrow_and_large_graphs ... ok
+test data_view::tests::full_number_and_coordinate_text_preserves_finite_values_exactly ... ok
+test data_view::tests::numeric_previews_keep_extremes_nonzero_and_ordinary_values_readable ... ok
+test data_view::tests::shapes_and_badges ... ok
+test diagnostics_ui::tests::cached_node_lookup_keeps_live_names_and_rejects_reordered_indices ... ok
+test diagnostics_ui::tests::incomplete_or_cancelled_results_never_display_success ... ok
+test diagnostics_ui::tests::name_filter_uses_live_renames_without_new_diagnosis ... ok
+test data_view::tests::rows_are_capped_and_counted ... ok
+test help::tests::every_listed_kind_has_a_page_and_a_tip ... ok
+test ui_polish::tests::every_token_must_match ... ok
+test ui_polish::tests::exact_keyword_beats_typo_tolerant_match ... ok
+test ui_polish::tests::dropped_wire_prefers_nodes_that_accept_it ... ok
+test ui_polish::tests::first_compatible_input_skips_incompatible_ports ... ok
+test ui_polish::tests::katakana_and_hiragana_match_the_same_label ... ok
+test ui_polish::tests::one_line_keeps_the_first_line_only ... ok
+test ui_polish::tests::empty_query_shows_recent_nodes_first_in_recency_order ... ok
+test app::numeric_editor_tests::typed_numbers_keep_precision_and_can_exceed_the_convenience_track_range ... ok
+test ui_polish::tests::saved_theme_round_trips ... ok
+test ui_polish::tests::short_english_tokens_do_not_fuzzy_match ... ok
+test diagnostics_ui::tests::the_101st_root_is_reachable_by_page_and_exact_id_filter ... ok
+test ui_polish::tests::recent_list_has_no_duplicates_and_is_capped ... ok
+test ui_polish::tests::ranking_puts_the_best_match_first ... ok
+test ui_polish::tests::natural_japanese_and_full_width_english_find_supported_nodes ... ok
+test app::numeric_editor_tests::numeric_edits_enforce_metadata_bounds_finite_values_and_integers ... ok
+test ui_polish::tests::snapping_rounds_to_the_grid ... ok
+test ui_polish::tests::wire_search_never_suggests_an_incompatible_node ... ok
+test app::tests::unrelated_errors_do_not_block_valid_export_outputs ... ok
+test app::numeric_editor_tests::passive_numeric_widgets_preserve_every_registered_default ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/bin/nodes-cli.rs (target/debug/build/morphlet/adc619be0038b75f/out/nodes_cli-adc619be0038b75f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/access_evaluation_regressions.rs (target/debug/build/morphlet/11189c97a5e0305f/out/access_evaluation_regressions-11189c97a5e0305f)
+
+running 5 tests
+test api_rejects_duplicate_connections_through_legacy_aliases_atomically ... ok
+test an_empty_first_item_setting_still_propagates_an_empty_branch ... ok
+test no_cull_replace_or_insert_indices_preserve_the_original_list ... ok
+test single_item_shape_access_rejects_empty_and_multiple_shapes ... ok
+test no_curve_shatter_parameters_preserve_one_complete_exact_curve ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_workflows.rs (target/debug/build/morphlet/6cd86e16f03e497b/out/cli_workflows-6cd86e16f03e497b)
+
+running 11 tests
+test diagnose_success_returns_compact_measured_report_without_geometry_payloads ... ok
+test diagnose_reports_independent_causes_and_downstream_errors_without_writing ... ok
+test explicit_mesh_output_roundtrips_stl_and_excludes_intermediate_meshes ... ok
+test console_apply_supports_transactional_structural_edits ... ok
+test evaluation_previews_are_bounded_even_for_large_number_lists ... ok
+test evaluation_errors_have_node_ids_and_failed_apply_preserves_existing_destination ... ok
+test build_edit_save_reload_and_evaluate_preserve_project_metadata ... ok
+test export_rejects_missing_mixed_and_disabled_outputs_before_writing ... ok
+test blocked_capabilities_and_oversized_requests_never_replace_destination ... ok
+test console_help_catalog_and_usage_have_real_stdout_and_exit_codes ... ok
+test fifo_projects_return_json_errors_without_waiting_for_a_writer ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/core_integration.rs (target/debug/build/morphlet/9cadab6611738965/out/core_integration-9cadab6611738965)
+
+running 16 tests
+test benchmark_sparse_slider_edit ... ignored, manual release-mode performance measurement
+test cache_preserves_the_sign_of_zero_and_invalidates_after_node_removal ... ok
+test disabled_nodes_inside_nested_clusters_match_top_level_semantics ... ok
+test indexed_topology_handles_sparse_ids_repeated_parents_and_reordered_storage ... ok
+test cluster_id_exhaustion_is_an_error_and_preserves_the_target ... ok
+test nested_import_recomputes_when_missing_file_appears_and_is_removed ... ok
+test overdeep_definition_graph_is_rejected_before_exponential_expansion ... ok
+test graph_storage_order_does_not_change_sibling_evaluation_order ... ok
+test shared_definition_edits_recompute_only_dependent_instances ... ok
+test unknown_project_content_is_rejected_without_rewriting_the_original ... ok
+test registered_node_contracts_have_unique_serialized_ids_and_input_keys ... ok
+test part_save_replaces_only_with_complete_valid_data ... ok
+test all_checked_in_project_examples_round_trip_without_schema_changes ... ok
+test graphs_above_the_resource_limit_are_rejected ... ok
+test oversized_streaming_save_preserves_the_previous_project_and_removes_temp ... ok
+test sparse_slider_edit_does_not_recompute_unrelated_nodes_at_supported_scales ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/curve_geometry_tests.rs (target/debug/build/morphlet/832d6d86adaf767a/out/curve_geometry_tests-832d6d86adaf767a)
+
+running 11 tests
+test de_boor_knot_insertion_preserves_points_and_derivatives ... ok
+test graph_circle_resolution_independent_and_affine_retains_precision ... ok
+test closest_parameter_and_exact_subcurve ... ok
+test helix_length_and_tangent_are_analytic ... ok
+test interpolation_passes_through_chord_parameter_points ... ok
+test intersections_include_endpoint_skew_and_parallel_cases ... ok
+test parameter_is_not_arc_length ... ok
+test periodic_uniform_curve_has_continuous_seam ... ok
+test three_points_circle_and_arc_and_degenerate_input ... ok
+test rational_quarter_circle_has_exact_locus_and_analytic_curvature ... ok
+test tree_branches_preserved_and_examples_round_trip ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/curve_surface_integration.rs (target/debug/build/morphlet/535d1b9ddb9d62b1/out/curve_surface_integration-535d1b9ddb9d62b1)
+
+running 7 tests
+test surface_tessellation_preserves_nonuniform_polyline_corners ... ok
+test ruled_rational_surface_is_euclidean_linear_in_v ... ok
+test rational_tensor_isocurves_preserve_native_knots_and_derivatives ... ok
+test analytic_isocurve_loci_lengths_and_poles_are_explicit ... ok
+test exact_curve_surface_workflow_survives_save_and_recompute ... ok
+test editable_exact_cylinder_example_loads_and_evaluates ... ok
+test circle_extrusion_uses_exact_controls_not_preview_samples ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/data_tree_contracts.rs (target/debug/build/morphlet/4dae846f929f06f9/out/data_tree_contracts-4dae846f929f06f9)
+
+running 11 tests
+test every_list_result_respects_remaining_count_and_weight ... ok
+test direct_tree_adapters_validate_paths_and_scalar_settings ... ok
+test insertion_preserves_order_at_duplicate_positions_and_empty_input ... ok
+test mapper_repeated_variables_and_unmatched_paths_are_lossless ... ok
+test direct_integer_settings_reject_negative_fractional_and_nonfinite_values ... ok
+test matrix_flip_preserves_parent_and_reindexes_sparse_siblings ... ok
+test member_search_budgets_geometry_comparison_work ... ok
+test item_matching_rejects_overflow_before_enumeration_and_is_empty_if_any_port_empty ... ok
+test singleton_simplification_follows_documented_nodes_api_policy ... ok
+test public_tree_combinators_limit_ports_and_logical_payload_weight ... ok
+test direct_aggregation_reports_overflow_and_cancel ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/data_tree_tests.rs (target/debug/build/morphlet/1245f6acab2cfce2/out/data_tree_tests-1245f6acab2cfce2)
+
+running 10 tests
+test flat_graft_partition_and_roundtrip_preserve_order_and_empty ... ok
+test hierarchical_simplify_trim_mapper_and_merge ... ok
+test matrix_flip_and_missing_slot ... ok
+test graph_math_and_geometry_share_matching ... ok
+test mixed_depth_graft_collisions_do_not_lose_items ... ok
+test ordinal_branches_repeat_last_not_union ... ok
+test shortest_longest_cross_and_empty ... ok
+test path_mapper_cache_key_tracks_rule_edits_and_port_transforms ... ok
+test cross_budget_before_iteration_and_10000_items ... ok
+test graph_large_repeat_partition_save_load_and_undo_redo ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/diagnostics_interleaved.rs (target/debug/build/morphlet/3a39147672863866/out/diagnostics_interleaved-3a39147672863866)
+
+running 1 test
+test interleaved_ids_keep_exact_counts_and_the_smallest_affected_nodes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/diagnostics_oracle.rs (target/debug/build/morphlet/ef2ec0137f41ed36/out/diagnostics_oracle-ef2ec0137f41ed36)
+
+running 1 test
+test diagnostic_cause_sets_match_independent_breadth_first_reachability ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/diagnostics_root_ordinals.rs (target/debug/build/morphlet/0755b5aba9b11131/out/diagnostics_root_ordinals-0755b5aba9b11131)
+
+running 2 tests
+test local_failure_after_disabled_and_successful_nodes_is_a_new_root ... ok
+test high_id_roots_keep_all_shared_descendants_and_sorted_public_ids ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/diagnostics_tests.rs (target/debug/build/morphlet/e6b8a3ae1e0b5826/out/diagnostics_tests-e6b8a3ae1e0b5826)
+
+running 11 tests
+test cached_errors_are_still_actionable_and_diagnosis_does_not_mutate_the_graph ... ok
+test cancellation_keeps_finished_results_and_marks_the_interrupted_visit ... ok
+test disabled_nodes_and_successful_empty_trees_break_failure_chains ... ok
+test inferred_dependency_roots_preserve_an_independent_downstream_error_message ... ok
+test oversized_error_text_is_utf8_safe_and_unknown_evaluation_ids_are_ignored ... ok
+test graph_validation_errors_do_not_invent_node_causality ... ok
+test roots_are_id_sorted_even_when_discovered_in_reverse_topological_order ... ok
+test timing_ranking_includes_cache_hits_and_partial_work_without_claiming_cpu_percent ... ok
+test unused_cluster_inputs_do_not_hide_an_internal_or_missing_definition_failure ... ok
+test two_root_failures_merge_without_duplicate_causes_or_affected_nodes ... ok
+test wide_root_merge_and_long_chain_bound_previews_but_keep_exact_counts ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/example_edit_workflows.rs (target/debug/build/morphlet/48151f72d6a06f71/out/example_edit_workflows-48151f72d6a06f71)
+
+running 38 tests
+test every_committed_example_has_an_explicit_parameter_edit_fixture ... ok
+test helix_sketch ... ok
+test helix_frames ... ok
+test furniture_profile ... ok
+test fractal_tree ... ok
+test line_intersection ... ok
+test honeycomb ... ok
+test multiple_parts ... ok
+test offset_preview ... ok
+test attractor_pattern ... ok
+test circle_divisions ... ok
+test nurbs_panel ... ok
+test power_mountains ... ok
+test revolved_nurbs_vase ... ok
+test ruled_surface ... ok
+test sine_tower ... ok
+test profile_loft ... ok
+test slat_chair ... ok
+test solid_box_intersection ... ok
+test exact_surface_cylinder ... ok
+test spiral_stair ... ok
+test rounded_box ... ok
+test density_wall ... ok
+test organic_sculpture ... ok
+test star_totem ... ok
+test trimmed_loft ... ok
+test surface_curvature ... ok
+test twisted_tower ... ok
+test wave_blocks ... ok
+test surface_lattice ... ok
+test wave_panel_checks ... ok
+test voronoi_lamp ... ok
+test wave_facade ... ok
+test light_ring ... ok
+test twisted_vase ... ok
+test twisted_vase_checks ... ok
+test noise_vessel ... ok
+test hollow_vessel_checks ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/fabrication_tests.rs (target/debug/build/morphlet/f82e2ad80c8b3d1b/out/fabrication_tests-f82e2ad80c8b3d1b)
+
+running 8 tests
+test audit_stress ... ignored, Opt-in 100k and 500k triangle stress benchmark; run in release mode
+test construct_from_lists_and_tree_matching ... ok
+test old_examples_still_deserialize ... ok
+test graph_rejects_open_volume ... ok
+test rounded_box_stl_obj_roundtrip ... ok
+test threemf_preserves_separate_input_objects ... ok
+test samples_evaluate_and_serialize ... ok
+test oversized_input_fails_and_subdivision_budget_is_bounded ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/gcode_tests.rs (target/debug/build/morphlet/b10138e71d486e0d/out/gcode_tests-b10138e71d486e0d)
+
+running 7 tests
+test empty_mesh_is_rejected ... ok
+test model_larger_than_bed_is_rejected ... ok
+test open_mesh_is_rejected ... ok
+test cylinder_slices_into_expected_layers ... ok
+test z_is_monotonic_in_body ... ok
+test extrusion_is_monotonic_in_body ... ok
+test all_coordinates_stay_inside_bed ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/generative_tests.rs (target/debug/build/morphlet/5adedb28aea2b416/out/generative_tests-5adedb28aea2b416)
+
+running 4 tests
+test generative_kinds_have_stable_serialized_names_and_registry_entries ... ok
+test generative_list_nodes_keep_grafted_branch_paths ... ok
+test new_nodes_have_registered_search_and_unique_input_keys ... ok
+test generative_examples_load_evaluate_and_react_to_changes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/graph_api_tree_tests.rs (target/debug/build/morphlet/2645329ba1aefa8d/out/graph_api_tree_tests-2645329ba1aefa8d)
+
+running 3 tests
+test invalid_reserved_tree_settings_are_rejected_atomically ... ok
+test legacy_port_transforms_migrate_and_conflicts_remain_explicit ... ok
+test structured_api_configures_cross_matching_and_input_grafting ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/grasshopper_coverage.rs (target/debug/build/morphlet/fd0044bd24f87a59/out/grasshopper_coverage-fd0044bd24f87a59)
+
+running 5 tests
+test invalid_inputs_and_cancelled_results_do_not_reuse_stale_values ... ok
+test independent_number_to_list_tree_and_save_contract ... ok
+test catalog_claims_are_conservative_and_mapped_nodes_exist ... ok
+test every_registered_kind_has_unique_id_and_complete_metadata ... ok
+test node_budget_is_a_rejection_not_a_false_large_graph_success ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/import_tests.rs (target/debug/build/morphlet/09e0a4ba4bf25484/out/import_tests-09e0a4ba4bf25484)
+
+running 18 tests
+test ascii_stl_counts_triangles_and_welds_the_cube ... ok
+test binary_file_whose_header_starts_with_solid_is_still_binary ... ok
+test ascii_stl_with_an_incomplete_facet_is_rejected ... ok
+test binary_stl_counts_triangles_and_welds_the_cube ... ok
+test count_over_the_triangle_limit_is_rejected_before_parsing ... ok
+test file_kind_comes_from_the_extension ... ok
+test garbage_bytes_are_rejected ... ok
+test empty_and_missing_paths_are_japanese_errors ... ok
+test import_node_keeps_its_serde_name_and_is_listed ... ok
+test huge_count_header_without_matching_size_is_rejected ... ok
+test place_scales_centres_and_puts_the_lowest_point_on_the_bed ... ok
+test place_rejects_a_zero_scale ... ok
+test obj_triangulates_polygons_and_ignores_normals_and_uvs ... ok
+test obj_accepts_negative_indices ... ok
+test obj_cube_with_unshared_corners_is_welded_closed ... ok
+test obj_index_out_of_range_or_zero_is_rejected ... ok
+test nan_and_infinite_coordinates_are_rejected ... ok
+test truncated_binary_is_rejected ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integrated_workflows.rs (target/debug/build/morphlet/53fa1c33ec2c9a18/out/integrated_workflows-53fa1c33ec2c9a18)
+
+running 8 tests
+test closest_point_mission_aliases_connect_and_disconnect_canonically ... ok
+test api_catalog_exposes_pure_integrated_nodes_with_access_and_keeps_execution_restricted ... ok
+test integer_inputs_near_an_integer_do_not_silently_truncate ... ok
+test conflicting_legacy_connections_are_rejected ... ok
+test obsolete_list_matching_option_migrates_to_the_shared_ordinal_default ... ok
+test saved_generative_closest_point_ports_migrate_without_losing_wires ... ok
+test affine_generated_curves_keep_exact_geometry_and_length ... ok
+test every_editable_example_roundtrips_evaluates_and_uses_the_cache ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/large_graph_tests.rs (target/debug/build/morphlet/59421da747600057/out/large_graph_tests-59421da747600057)
+
+running 1 test
+test ten_thousand_scalar_nodes_evaluate_cache_and_recompute_only_the_edited_suffix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/linear_algebra_regressions.rs (target/debug/build/morphlet/77be47a82bed9aaa/out/linear_algebra_regressions-77be47a82bed9aaa)
+
+running 6 tests
+test row_scale_and_pivot_swaps_preserve_known_solutions ... ok
+test singular_unstable_and_unrepresentable_systems_remain_explicit_errors ... ok
+test matrix_normalization_and_elimination_are_cooperatively_cancellable ... ok
+test large_well_conditioned_rows_do_not_overflow_during_elimination ... ok
+test scaling_neither_overflows_small_rows_nor_erases_meaningful_right_hand_sides ... ok
+test full_graph_matrix_nodes_return_finite_results_and_reuse_their_cache ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/math_nodes_tests.rs (target/debug/build/morphlet/5c395673a5ba7073/out/math_nodes_tests-5c395673a5ba7073)
+
+running 6 tests
+test gh_range_uses_step_count_and_preserves_old_range ... ok
+test branch_paths_and_broadcast_are_preserved ... ok
+test graph_error_propagation_and_seed_repeatability ... ok
+test numeric_domain_and_vector_are_composable ... ok
+test mapper_recomputes_downstream_and_round_trips_project ... ok
+test registered_specs_have_stable_unique_serde_names ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/math_precision_regressions.rs (target/debug/build/morphlet/3b507e462f557a5e/out/math_precision_regressions-3b507e462f557a5e)
+
+running 6 tests
+test population_spread_handles_opposite_extrema_without_intermediate_overflow ... ok
+test population_variance_retains_small_spread_after_large_translation ... ok
+test precision_aggregations_are_cancellable_and_keep_existing_empty_semantics ... ok
+test products_preserve_subnormal_inputs_and_outputs ... ok
+test products_recover_from_extreme_intermediate_exponents_in_any_order ... ok
+test products_report_true_range_loss_but_zero_factors_are_exact ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mesh_repair_regressions.rs (target/debug/build/morphlet/4b16ad2b2ded253c/out/mesh_repair_regressions-4b16ad2b2ded253c)
+
+running 6 tests
+test nonmanifold_edges_do_not_receive_a_watertight_success ... ok
+test repair_can_still_reverse_one_closed_inward_shell ... ok
+test repair_and_orientation_check_are_translation_invariant ... ok
+test repair_does_not_fill_a_cavity_stored_as_separate_meshes ... ok
+test repair_does_not_infer_global_orientation_from_an_open_surface ... ok
+test repair_preserves_the_inner_shell_of_a_hollow_cube ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/node_access_contracts.rs (target/debug/build/morphlet/98fcc8b6936072fe/out/node_access_contracts-98fcc8b6936072fe)
+
+running 7 tests
+test curve_and_generation_ports_describe_their_actual_adapters ... ok
+test catalog_ports_are_total_and_nonexistent_ports_are_not_invented ... ok
+test mathematical_list_ports_and_scalar_settings_are_distinguished ... ok
+test only_new_families_default_to_ordinal_matching ... ok
+test legacy_item_paths_remain_unchanged_until_matching_is_selected ... ok
+test new_list_and_item_nodes_match_disjoint_branch_paths_ordinally ... ok
+test whole_tree_and_legacy_special_routes_keep_their_contracts ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/node_timing_tests.rs (target/debug/build/morphlet/c7a1dba606be912e/out/node_timing_tests-c7a1dba606be912e)
+
+running 5 tests
+test disabled_nodes_have_uncached_bookkeeping_time ... ok
+test cached_errors_keep_their_timing_status ... ok
+test validation_and_prestart_cancellation_do_not_invent_node_times ... ok
+test interrupted_node_has_partial_time_but_no_partial_output_or_cache ... ok
+test timings_distinguish_cache_hits_and_downstream_edits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/persistence_tests.rs (target/debug/build/morphlet/523ad647c34f1ec3/out/persistence_tests-523ad647c34f1ec3)
+
+running 44 tests
+test distance_and_point_component ... ok
+test binary_stl_has_valid_triangle_count_length_and_unit_normals ... ok
+test gh_node_kinds_keep_stable_serde_names_and_have_japanese_specs ... ok
+test expression_parses_evaluates_and_rejects_garbage ... ok
+test every_template_is_valid_and_names_and_defaults_are_preserved ... ok
+test expression_node_maps_lists_and_keeps_its_text_in_files ... ok
+test gh_nodes_evaluate_to_finite_non_empty_results_with_defaults ... ok
+test divide_modulo_and_power_never_produce_nan_or_infinity ... ok
+test history_is_bounded_and_new_edits_clear_redo ... ok
+test invalid_meshes_and_degenerate_faces_are_not_silently_exported ... ok
+test list_nodes_keep_branches_separate ... ok
+test invalid_files_do_not_replace_the_current_project ... ok
+test invalid_save_leaves_last_good_file_untouched ... ok
+test mirror_handles_curves_and_rejects_numbers ... ok
+test mirror_and_non_uniform_scale_keep_solids_closed_and_outward ... ok
+test new_node_kinds_keep_stable_serde_names_and_old_names_are_unchanged ... ok
+test list_nodes_compute_expected_values ... ok
+test new_templates_use_the_new_nodes_and_old_ones_are_unchanged ... ok
+test noise_is_smooth_deterministic_and_finite_at_extremes ... ok
+test non_file_sources_are_rejected_without_replacing_destinations ... ok
+test new_nodes_evaluate_to_finite_non_empty_results ... ok
+test obj_offsets_indices_between_multiple_objects ... ok
+test cylinder_cone_and_torus_are_closed_with_correct_volume ... ok
+test old_files_without_the_new_nodes_still_load_and_evaluate ... ok
+test plane_is_an_upward_facing_open_grid ... ok
+test project_roundtrip_preserves_geometry_inputs_and_view ... ok
+test random_and_populate_are_deterministic_and_bounded ... ok
+test range_count_is_capped_by_the_input_limit ... ok
+test overhang_check_reports_flat_downward_faces ... ok
+test replacing_an_existing_save_keeps_only_the_complete_new_document ... ok
+test shell_of_a_box_has_the_exact_hollow_volume ... ok
+test hostile_settings_on_new_nodes_are_errors_not_panics ... ok
+test stl_rejects_faces_that_collapse_at_float32_precision ... ok
+test simple_number_nodes_compute_expected_values ... ok
+test topology_detects_open_inconsistent_and_nonmanifold_edges ... ok
+test sine_over_a_range_gives_a_finite_list_even_at_extreme_settings ... ok
+test topology_welds_separate_vertices_at_the_same_position ... ok
+test undo_redo_restores_parameters_wires_and_deleted_nodes ... ok
+test noise_deform_keeps_a_vase_closed ... ok
+test shipped_example_files_load_and_evaluate ... ok
+test oversized_and_cyclic_projects_are_rejected ... ok
+test new_example_works_are_closed_and_use_the_new_nodes ... ok
+test templates_evaluate_and_solid_presets_are_closed ... ok
+test graph_profile_shell_makes_a_closed_outward_printable_wall ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/polygon_import_repair.rs (target/debug/build/morphlet/93595f8362be430d/out/polygon_import_repair-93595f8362be430d)
+
+running 7 tests
+test nonplanar_holes_are_left_open_and_reported ... ok
+test concave_hole_repair_uses_existing_vertices_and_analytic_prism_volume ... ok
+test obj_rejects_a_polygon_that_collapses_during_coordinate_welding ... ok
+test nested_coplanar_boundaries_are_not_filled_as_independent_disks ... ok
+test selfcrossing_holes_are_left_open_and_reported ... ok
+test obj_concave_faces_preserve_area_winding_and_original_vertices ... ok
+test obj_rejects_crossing_nonplanar_repeated_and_invalid_faces ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/script_tests.rs (target/debug/build/morphlet/925de00d3a9cedcb/out/script_tests-925de00d3a9cedcb)
+
+running 32 tests
+test a_cluster_node_without_a_definition_is_invalid ... ok
+test ambiguous_outputs_are_refused ... ok
+test an_oversized_script_in_a_file_is_rejected ... ok
+test a_part_file_cannot_smuggle_an_oversized_script ... ok
+test bad_part_files_are_rejected_without_changing_the_work ... ok
+test an_erroring_script_marks_only_its_node ... ok
+test definition_cycles_are_refused_and_never_overflow_the_stack ... ok
+test grouping_errors_leave_the_graph_untouched ... ok
+test cluster_round_trips_through_a_morph_file_and_still_evaluates ... ok
+test editing_the_definition_invalidates_the_cache ... ok
+test grouping_keeps_the_result_and_shows_one_node ... ok
+test nesting_up_to_four_levels_works_and_five_is_refused ... ok
+test cylinder_and_merge_make_valid_meshes ... ok
+test geometry_input_g_is_available_to_scripts ... ok
+test old_files_without_the_new_fields_still_load ... ok
+test parts_with_nested_definitions_are_renumbered_on_import ... ok
+test parts_can_be_saved_and_loaded_into_another_work ... ok
+test script_node_uses_connected_lists_for_a ... ok
+test script_text_length_is_capped ... ok
+test both_examples_work_with_the_default_inputs ... ok
+test script_text_round_trips_through_a_morph_file ... ok
+test script_can_return_a_point_and_a_list ... ok
+test simple_script_produces_a_closed_outward_mesh_through_the_engine ... ok
+test scripts_inside_clusters_run ... ok
+test forbidden_features_are_errors ... ok
+test simple_script_returns_a_number_and_integers_work_in_math ... ok
+test the_cancel_callback_stops_a_script ... ok
+test bad_results_are_japanese_errors_not_panics ... ok
+test too_many_meshes_hit_the_budget ... ok
+test the_total_inner_node_cap_stops_huge_definitions ... ok
+test infinite_loops_are_stopped ... ok
+test huge_arrays_and_strings_are_rejected ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/stl_export_tests.rs (target/debug/build/morphlet/4b752c2006e35386/out/stl_export_tests-4b752c2006e35386)
+
+running 13 tests
+test crc32_matches_the_standard_check_value ... ok
+test gather_counts_non_mesh_values_as_skipped ... ok
+test file_names_and_split_numbering ... ok
+test ascii_stl_parses_back_to_the_same_triangles ... ok
+test check_flags_oversize_and_tiny_models ... ok
+test binary_stl_has_correct_header_count_and_size ... ok
+test options_reject_bad_scale ... ok
+test slicer_is_started_directly_without_a_shell ... ok
+test repair_fixes_a_flipped_face ... ok
+test split_bodies_counts_disconnected_parts ... ok
+test threemf_zip_has_valid_local_headers_and_mm_units ... ok
+test repair_fills_a_missing_triangle_hole ... ok
+test scale_and_bed_placement_are_applied_in_order ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/surface_curvature_study.rs (target/debug/build/morphlet/74b64885e5b6398b/out/surface_curvature_study-74b64885e5b6398b)
+
+running 1 test
+test torus_study_has_nine_curvature_branches_and_roundtrips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/surface_curvature_tests.rs (target/debug/build/morphlet/34a1df251e7e8880/out/surface_curvature_tests-34a1df251e7e8880)
+
+running 9 tests
+test bilinear_saddle_has_nonzero_mixed_derivative ... ok
+test invalid_singular_discontinuous_and_cancelled_evaluations_are_errors ... ok
+test normal_reversal_preserves_gaussian_and_reverses_mean ... ok
+test plane_sphere_cylinder_and_frustum_match_analytic_curvatures ... ok
+test nurbs_polynomial_jet_and_curvature_match_paraboloid ... ok
+test rational_derivatives_and_curvature_are_weight_scale_invariant ... ok
+test simple_cubic_interior_knot_is_c2_and_allowed ... ok
+test torus_outer_inner_and_parabolic_rings_match_analytic_solution ... ok
+test curvature_nodes_roundtrip_recompute_and_propagate_errors ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/surface_kernel_tests.rs (target/debug/build/morphlet/4a2ffcb5c6b2b135/out/surface_kernel_tests-4a2ffcb5c6b2b135)
+
+running 5 tests
+test box_graph_extracts_topology_and_exports_only_explicit_mesh ... ok
+test precise_geometry_graph_recomputes_and_keeps_typed_values ... ok
+test tree_matching_and_safe_unsupported_operations ... ok
+test all_precise_nodes_have_stable_specs_and_evaluate_on_examples ... ok
+test saved_examples_roundtrip_and_evaluate_after_edits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/surface_knot_roundoff.rs (target/debug/build/morphlet/9a3c16a2103b58c9/out/surface_knot_roundoff-9a3c16a2103b58c9)
+
+running 3 tests
+test normalized_uv_one_ulp_from_non_c2_knot_is_rejected_in_both_axes ... ok
+test nearby_distinct_simple_cubic_knots_keep_their_true_multiplicity ... ok
+test clear_spans_and_exact_endpoints_remain_available ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ux_tests.rs (target/debug/build/morphlet/e0e275ba1c528580/out/ux_tests-e0e275ba1c528580)
+
+running 5 tests
+test groups_and_notes_are_capped_and_pruned ... ok
+test an_off_node_outputs_an_empty_tree_and_comes_back_when_turned_on ... ok
+test an_off_flag_is_saved_and_loaded ... ok
+test groups_and_notes_round_trip_through_a_file ... ok
+test old_files_load_with_defaults_and_new_fields_are_not_written_when_unused ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vector_angle_regressions.rs (target/debug/build/morphlet/d2d771f03f92c7d0/out/vector_angle_regressions-d2d771f03f92c7d0)
+
+running 4 tests
+test zero_invalid_and_cancelled_angle_inputs_still_fail ... ok
+test near_parallel_integer_vectors_retain_their_nonzero_angle ... ok
+test independent_scaling_and_subnormal_directions_preserve_angles ... ok
+test native_angle_nodes_preserve_grafted_paths_broadcasting_and_cache ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vector_precision_regressions.rs (target/debug/build/morphlet/e91f9acb74b74720/out/vector_precision_regressions-e91f9acb74b74720)
+
+running 6 tests
+test compensated_zero_results_preserve_existing_ieee_zero_signs ... ok
+test dot_product_keeps_small_terms_and_recovers_product_rounding_residuals ... ok
+test cross_product_keeps_the_exact_small_determinant_and_orientation ... ok
+test finite_bounds_and_cancellation_remain_in_force ... ok
+test representable_subnormal_products_survive_without_claiming_underflow_immunity ... ok
+test real_vector_nodes_preserve_grafted_paths_and_single_branch_broadcasting ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/coverage_inventory.rs (target/debug/build/morphlet/aaae172e012f799d/out/coverage_inventory-aaae172e012f799d)
+
+running 4 tests
+test tests::revision_is_explicit_and_invalid_arguments_are_rejected ... ok
+test tests::generated_inventory_has_unique_ids_and_no_implicit_verification ... ok
+test tests::custom_input_requirements_are_not_guessed_from_missing_defaults ... ok
+test tests::registration_signature_is_stable_and_records_numeric_defaults ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests examples/coverage_perf.rs (target/debug/build/morphlet/91418997d5a9a15c/out/coverage_perf-91418997d5a9a15c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/diagnostics_perf.rs (target/debug/build/morphlet/6d7135c58ada8b4e/out/diagnostics_perf-6d7135c58ada8b4e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

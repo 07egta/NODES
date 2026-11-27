@@ -1,5 +1,6 @@
 //! Offline console entry point. Keep the Windows console subsystem default:
 //! the separate Morphlet GUI binary intentionally uses the Windows GUI subsystem.
+use morphlet::diagnostics::{self, DiagnosticReport};
 use morphlet::engine::Evaluation;
 use morphlet::graph_api::{self, Request};
 use morphlet::model::{NodeKind, Tree, Value};
@@ -23,6 +24,7 @@ Usage:
   nodes-cli catalog
   nodes-cli validate PROJECT.morph
   nodes-cli evaluate PROJECT.morph
+  nodes-cli diagnose PROJECT.morph
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
@@ -31,6 +33,8 @@ Usage:
 Commands return one JSON document on stdout, including operational errors.
 Exit codes: 0 success, 1 project/evaluation/I/O failure, 2 invalid command usage.
 validate checks structure and the restricted capability policy without evaluation.
+diagnose evaluates once and reports root failure candidates and measured node costs.
+Evaluation failures also include error.diagnostics; exit code remains 1.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
 export-stl requires explicit, enabled, nonempty Output nodes containing only Mesh.
@@ -43,6 +47,7 @@ struct CliError {
     code: &'static str,
     message: String,
     nodes: Vec<Json>,
+    diagnostics: Option<Box<DiagnosticReport>>,
 }
 
 fn problem(code: &'static str, message: impl AsRef<str>) -> CliError {
@@ -50,6 +55,7 @@ fn problem(code: &'static str, message: impl AsRef<str>) -> CliError {
         code,
         message: message.as_ref().chars().take(MAX_ERROR_CHARS).collect(),
         nodes: Vec::new(),
+        diagnostics: None,
     }
 }
 
@@ -125,6 +131,7 @@ fn checked_evaluate(project: &Project) -> Result<Evaluation, CliError> {
                 errors.len()
             ),
             nodes: errors,
+            diagnostics: Some(Box::new(diagnostics::diagnose(&project.graph, &result))),
         });
     }
     Ok(result)
@@ -327,7 +334,7 @@ fn export_stl(project_path: &Path, destination: &Path) -> Result<Json, CliError>
 fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
-        "validate" | "evaluate" => 1,
+        "validate" | "evaluate" | "diagnose" => 1,
         "build" | "export-stl" => 2,
         "apply" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
@@ -350,6 +357,14 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             Ok(
                 json!({"project": project_summary(&project), "evaluation": evaluation_summary(&project, &evaluation)}),
             )
+        }
+        "diagnose" => {
+            let project = load_project(Path::new(&arguments[0]))?;
+            let evaluation = checked_evaluate(&project)?;
+            Ok(json!({
+                "project": project_summary(&project),
+                "diagnostics": diagnostics::diagnose(&project.graph, &evaluation)
+            }))
         }
         "build" => {
             let request = read_request(Path::new(&arguments[0]))?;
@@ -396,14 +411,15 @@ fn main() -> ExitCode {
             } else {
                 ExitCode::FAILURE
             };
-            (
-                json!({
-                    "cli_version": CLI_VERSION, "api_version": graph_api::API_VERSION,
-                    "command": command, "ok": false,
-                    "error": {"code": error.code, "message": error.message, "nodes": error.nodes}
-                }),
-                status,
-            )
+            let mut response = json!({
+                "cli_version": CLI_VERSION, "api_version": graph_api::API_VERSION,
+                "command": command, "ok": false,
+                "error": {"code": error.code, "message": error.message, "nodes": error.nodes}
+            });
+            if let Some(diagnostics) = error.diagnostics {
+                response["error"]["diagnostics"] = json!(diagnostics);
+            }
+            (response, status)
         }
     };
     let mut stdout = io::stdout().lock();

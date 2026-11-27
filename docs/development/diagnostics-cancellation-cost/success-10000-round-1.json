@@ -1,0 +1,227 @@
+{
+  "api_paths": {
+    "after_atomic": "after::diagnose_cancellable(Graph, Evaluation, || latest.load(Relaxed) != request_revision), with an unchanged runtime Arc<AtomicU64> token",
+    "after_wrapper": "after::diagnose(Graph, Evaluation), the library's literal-false wrapper",
+    "before": "before::diagnose(Graph, Evaluation)"
+  },
+  "architecture": "x86_64",
+  "arguments": [
+    "--case",
+    "success-10000",
+    "--repetitions",
+    "5"
+  ],
+  "cases": [
+    {
+      "core_roots": 0,
+      "expected_blocked": 0,
+      "expected_roots": 0,
+      "fixture_build_and_validate_ms": 16.205886999999997,
+      "implementations": {
+        "after_atomic": {
+          "first_report_call_ms": 21.786102000000003,
+          "first_report_serialization_ms": 10.191255,
+          "repeated": {
+            "max_ms": 8.567637,
+            "median_ms": 7.749414,
+            "min_ms": 6.705629,
+            "samples_ms": [
+              8.567637,
+              8.353252,
+              7.749414,
+              7.717737,
+              6.705629
+            ]
+          }
+        },
+        "after_wrapper": {
+          "first_report_call_ms": 10.35222,
+          "first_report_serialization_ms": 5.051217,
+          "repeated": {
+            "max_ms": 10.183443,
+            "median_ms": 9.543681,
+            "min_ms": 8.395605,
+            "samples_ms": [
+              10.183443,
+              9.942729000000002,
+              9.543681,
+              8.395605,
+              8.742945
+            ]
+          }
+        },
+        "before": {
+          "first_report_call_ms": 10.031829,
+          "first_report_serialization_ms": 2.804283,
+          "repeated": {
+            "max_ms": 10.588547,
+            "median_ms": 8.334825,
+            "min_ms": 6.893624999999999,
+            "samples_ms": [
+              8.334825,
+              10.588547,
+              9.111367,
+              6.893624999999999,
+              7.431748
+            ]
+          }
+        }
+      },
+      "name": "success-10000",
+      "nodes": 10000,
+      "oracle": {
+        "all_calls_equal_complete_serialized_report": true,
+        "checked_fields": "All node/root/blocked counts; all sorted capped relationship IDs and exact counts; all truncation flags; real error messages; complete timing coverage; successful chain value",
+        "full_report_json_bytes": 1471787,
+        "independently_verified_implementations": [
+          "after_atomic",
+          "after_wrapper",
+          "before"
+        ],
+        "maximum_affected_count": 0,
+        "maximum_upstream_root_count": 0,
+        "method": "Analytic prefix intervals or balanced-tree root intervals plus explicit ID permutation; no diagnostic traversal reused",
+        "truncated_affected_records": 0,
+        "truncated_upstream_records": 0
+      },
+      "real_evaluation_reported_ms": 31.230389000000002,
+      "real_evaluation_wall_ms": 36.888867999999995,
+      "rounds": [
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 10.031829,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 10.35222,
+              "implementation": "after_wrapper"
+            },
+            {
+              "diagnostics_ms": 21.786102000000003,
+              "implementation": "after_atomic"
+            }
+          ],
+          "phase": "first_report",
+          "round": 0
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 10.183443,
+              "implementation": "after_wrapper"
+            },
+            {
+              "diagnostics_ms": 8.567637,
+              "implementation": "after_atomic"
+            },
+            {
+              "diagnostics_ms": 8.334825,
+              "implementation": "before"
+            }
+          ],
+          "phase": "repeated",
+          "round": 1
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 8.353252,
+              "implementation": "after_atomic"
+            },
+            {
+              "diagnostics_ms": 10.588547,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 9.942729000000002,
+              "implementation": "after_wrapper"
+            }
+          ],
+          "phase": "repeated",
+          "round": 2
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 9.111367,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 9.543681,
+              "implementation": "after_wrapper"
+            },
+            {
+              "diagnostics_ms": 7.749414,
+              "implementation": "after_atomic"
+            }
+          ],
+          "phase": "repeated",
+          "round": 3
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 8.395605,
+              "implementation": "after_wrapper"
+            },
+            {
+              "diagnostics_ms": 7.717737,
+              "implementation": "after_atomic"
+            },
+            {
+              "diagnostics_ms": 6.893624999999999,
+              "implementation": "before"
+            }
+          ],
+          "phase": "repeated",
+          "round": 4
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 6.705629,
+              "implementation": "after_atomic"
+            },
+            {
+              "diagnostics_ms": 7.431748,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 8.742945,
+              "implementation": "after_wrapper"
+            }
+          ],
+          "phase": "repeated",
+          "round": 5
+        }
+      ],
+      "status": "MEASURED"
+    }
+  ],
+  "debug_assertions": false,
+  "measurement_scope": "One real evaluation per case; all three API paths diagnose the same immutable graph/result. One initial report call/path is recorded/excluded; repeated order rotates each round and reverses exactly in the second process. Timers exclude fixture/oracle construction, evaluation, JSON serialization, checks and destruction. Atomic token setup is outside timers. Repeated diagnosis is not cached node evaluation. OS/allocator state is not reset; no zero-overhead, CAD evaluation or UI claim is inferred.",
+  "os": "linux",
+  "provenance": {
+    "after_diagnostics_sha256": "865324a95c61991e84c6797ab15573935d17245cb95c6da7575343adb9c65a33",
+    "after_embedded_snapshot_bytes": 26623,
+    "after_embedded_snapshot_fnv1a64": "8602a796fe6070b0",
+    "after_report_type": "morphlet::cost_after::DiagnosticReport",
+    "after_revision": "3e3bb46185628e479888053fe4e4ff606047c244",
+    "before_diagnostics_sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+    "before_embedded_snapshot_bytes": 21010,
+    "before_embedded_snapshot_fnv1a64": "ce9da1d576fb99ed",
+    "before_report_type": "morphlet::cost_before::DiagnosticReport",
+    "before_revision": "f858186b6d8907ca1184054a25ff127d71564b15",
+    "distinct_linked_wrapper_function_addresses": true,
+    "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3"
+  },
+  "repeated_rounds": 5,
+  "reverse_order": false,
+  "runtime_callback_setup": "Arc allocation and one black_box of its AtomicU64 reference occur outside timing; callback contains only Relaxed load and revision comparison, without a counter, Arc clone, or black_box. No thread changes the token during diagnosis.",
+  "status": "MEASURED",
+  "total_workload_ms": 638.413947,
+  "unix_time_seconds": 1795739405,
+  "workload": "Ordinary-path cost of cooperative diagnostic cancellation instrumentation",
+  "workload_schema_version": 1
+}

@@ -3,6 +3,7 @@ use crate::stl_export_ui::{self, StlExportUi, StlSources, UiRequest};
 use crate::{
     canvas::GraphCanvas,
     data_view,
+    diagnostics_ui::DiagnosticsWindow,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
     node_icons,
@@ -14,6 +15,7 @@ use crate::{
 use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
 use morphlet::{
     annotations, cluster,
+    diagnostics::{self, DiagnosticReport},
     engine::{Evaluation, Evaluator},
     gcode,
     latest_channel::{self, LatestReceiver, LatestSender},
@@ -36,6 +38,7 @@ struct ComputeRequest {
 struct ComputeResult {
     revision: u64,
     evaluation: Evaluation,
+    diagnostics: DiagnosticReport,
 }
 struct Worker {
     sender: LatestSender<ComputeRequest>,
@@ -58,10 +61,24 @@ impl Worker {
                     revision.load(Ordering::Relaxed) != request.revision
                 });
                 if !result.cancelled && revision.load(Ordering::Relaxed) == request.revision {
+                    // Derive diagnostics once from the matching graph snapshot, away
+                    // from the UI thread. Stop obsolete analysis so a newer edit can
+                    // reach the evaluator without waiting for the whole report.
+                    let Some(diagnostics) =
+                        diagnostics::diagnose_cancellable(&request.graph, &result, || {
+                            revision.load(Ordering::Relaxed) != request.revision
+                        })
+                    else {
+                        continue;
+                    };
+                    if revision.load(Ordering::Relaxed) != request.revision {
+                        continue;
+                    }
                     if results
                         .send(ComputeResult {
                             revision: request.revision,
                             evaluation: result,
+                            diagnostics,
                         })
                         .is_err()
                     {
@@ -80,7 +97,7 @@ impl Worker {
 }
 impl Drop for Worker {
     fn drop(&mut self) {
-        // Cooperatively cancel the active evaluation when the UI is destroyed.
+        // Cooperatively cancel active evaluation/diagnosis when the UI is destroyed.
         self.latest.fetch_add(1, Ordering::Relaxed);
     }
 }
@@ -100,6 +117,8 @@ pub struct MorphletApp {
     viewport: Viewport,
     worker: Worker,
     evaluation: Option<Evaluation>,
+    diagnostics: Option<DiagnosticReport>,
+    diagnostics_window: DiagnosticsWindow,
     revision: u64,
     result_revision: u64,
     pending_compute: bool,
@@ -211,6 +230,8 @@ impl MorphletApp {
             viewport: Viewport::default(),
             worker: Worker::new(cc.egui_ctx.clone()),
             evaluation: None,
+            diagnostics: None,
+            diagnostics_window: DiagnosticsWindow::default(),
             revision: 0,
             result_revision: u64::MAX,
             pending_compute: true,
@@ -280,6 +301,7 @@ impl MorphletApp {
             if result.revision == self.revision {
                 self.result_revision = result.revision;
                 self.evaluation = Some(result.evaluation);
+                self.diagnostics = Some(result.diagnostics);
             }
         }
         if self.pending_compute && self.last_submit.elapsed() >= Duration::from_millis(35) {
@@ -428,6 +450,7 @@ impl MorphletApp {
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
             self.evaluation = None;
+            self.diagnostics = None;
             self.queue_compute();
             self.preview_mode = 0;
             if let Some(n) = self.project.graph.nodes.first() {
@@ -1178,6 +1201,10 @@ impl MorphletApp {
                     ui.menu_button("表示", |ui| {
                         ui.checkbox(&mut self.show_library, "ノードライブラリ");
                         ui.checkbox(&mut self.show_workspace, "3D と設定");
+                        if ui.button("診断と処理時間").clicked() {
+                            self.diagnostics_window.open = true;
+                            ui.close();
+                        }
                         if ui.button("選択にズーム  Shift+F").clicked() {
                             self.canvas.fit_selection_requested = true;
                             ui.close();
@@ -1421,6 +1448,13 @@ impl MorphletApp {
                         }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui
+                            .small_button("診断")
+                            .on_hover_text("上流のエラー原因候補と、時間のかかったノードを確認")
+                            .clicked()
+                        {
+                            self.diagnostics_window.open = true;
+                        }
                         if ui.available_width() > 260. {
                             ui.label(theme::small("mm / °"));
                             ui.separator();
@@ -2343,7 +2377,7 @@ impl MorphletApp {
                     }
                 }
                 ui.label(theme::small(format!(
-                    "数値は小数 4 桁、最大 {} 行まで表示します。",
+                    "数値は省略表示です。詳しい値はホバー・右クリックで確認できます。最大 {} 行。",
                     data_view::MAX_ROWS
                 )));
             });
@@ -2412,6 +2446,22 @@ impl eframe::App for MorphletApp {
             self.add_node(kind, None);
         }
         self.values_window(ctx);
+        // Edits earlier in this frame queue their revision below. Do not allow
+        // navigation using a prior result during that brief interval either.
+        let stale = self.stale()
+            || (self.diagnostics_window.open
+                && !same_calculation(&before.graph, &self.project.graph));
+        if let Some(id) = self.diagnostics_window.show(
+            ctx,
+            self.diagnostics.as_ref(),
+            &self.project.graph,
+            stale,
+            self.revision,
+        ) {
+            self.canvas.select_only(id);
+            self.canvas.fit_selection_requested = true;
+            self.show_workspace = true;
+        }
         self.confirm_dialog(ctx);
         self.recovery_dialog(ctx);
         // Dropped files run before the change check below, so a node they add is

@@ -1277,6 +1277,69 @@ use crate::engine::{cross, dot, sub};
 fn norm(v: [f64; 3]) -> f64 {
     v[0].hypot(v[1]).hypot(v[2])
 }
+// Public vector nodes use coordinates bounded by 1e9; the angle helper rescales
+// internal directions below 2^257. Both keep these products and residual sums
+// finite. Recover low product bits before compensated summation so large
+// cancelling terms do not erase a representable small dot/determinant.
+// Ordinary floating-point underflow remains; this is not exact arithmetic.
+fn compensated_dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    let products = [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
+    let result = stable_sum(&[
+        products[0],
+        products[1],
+        products[2],
+        a[0].mul_add(b[0], -products[0]),
+        a[1].mul_add(b[1], -products[1]),
+        a[2].mul_add(b[2], -products[2]),
+    ]);
+    preserve_zero_sign(result, products[0] + products[1] + products[2])
+}
+fn difference_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    let (p, q) = (a * b, c * d);
+    let result = stable_sum(&[p, -q, a.mul_add(b, -p), -c.mul_add(d, -q)]);
+    preserve_zero_sign(result, p - q)
+}
+fn compensated_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        difference_of_products(a[1], b[2], a[2], b[1]),
+        difference_of_products(a[2], b[0], a[0], b[2]),
+        difference_of_products(a[0], b[1], a[1], b[0]),
+    ]
+}
+fn preserve_zero_sign(result: f64, original: f64) -> f64 {
+    if result == 0.0 && original == 0.0 {
+        original
+    } else {
+        result
+    }
+}
+fn angle_cross_norm(v: [f64; 3]) -> f64 {
+    // angle_direction bounds the cross product well below overflow. Normalize
+    // its largest component before squaring; the square sum is then in [1, 3].
+    // Unlike platform hypot, this also keeps a one-component norm exact.
+    let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
+    if m == 0.0 {
+        return 0.0;
+    }
+    let [x, y, z] = v.map(|component| component / m);
+    m * (x * x + y * y + z * z).sqrt()
+}
+fn angle_direction(v: [f64; 3]) -> Result<[f64; 3], String> {
+    let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
+    if m == 0.0 || !m.is_finite() {
+        return Err("ゼロまたは無効なベクトルです。".into());
+    }
+    // Inputs have passed xyz's 1e9 bound. Lifting by 2^512 makes even the least
+    // subnormal component normal without overflowing the largest component.
+    // The second exact power-of-two scale puts the largest in [2^256, 2^257).
+    // Retaining this headroom prevents rounding away tiny direction differences
+    // while products, compensated sums and cross-product norms remain finite.
+    const LIFT: f64 = f64::from_bits((1023_u64 + 512) << 52);
+    let lifted_max = m * LIFT;
+    let exponent = ((lifted_max.to_bits() >> 52) & 0x7ff) as i32 - 1023;
+    let adjust = f64::from_bits(((1023 + 256 - exponent) as u64) << 52);
+    Ok(v.map(|x| (x * LIFT) * adjust))
+}
 fn unit(v: [f64; 3]) -> Result<[f64; 3], String> {
     // Scaling first prevents a reciprocal overflow for subnormal inputs.
     let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
@@ -1556,6 +1619,10 @@ fn matrix_shape(data: &[f64], rows: usize, cols: usize) -> Result<(), String> {
 }
 /// Scaled partial-pivot Gauss-Jordan elimination on an augmented system.
 /// Returns the right block in row-major order. Rejects numerically tiny pivots.
+/// Large rows are normalized before elimination to avoid overflowing subtraction
+/// in otherwise well-conditioned systems. Small rows are not scaled up: doing so
+/// can overflow a right-hand side whose final solution is still representable.
+/// This is finite-precision arithmetic, not universal overflow immunity.
 fn eliminate(
     a: &[f64],
     rhs: &[f64],
@@ -1567,18 +1634,38 @@ fn eliminate(
     matrix_shape(rhs, size, cols)?;
     let w = size + cols;
     let mut aug = vec![0.0; size * w];
-    let mut scales = vec![0.0_f64; size];
+    let mut scales = vec![0.0; size];
     for i in 0..size {
         cancelled(stop)?;
-        for j in 0..size {
-            let v = a[i * size + j];
-            aug[i * w + j] = v;
-            scales[i] = scales[i].max(v.abs());
-        }
-        if scales[i] == 0.0 {
+        let scale = a[i * size..(i + 1) * size]
+            .iter()
+            .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+        if scale == 0.0 {
             return Err("行列が特異です。".into());
         }
-        aug[i * w + size..(i + 1) * w].copy_from_slice(&rhs[i * cols..(i + 1) * cols]);
+        let proposed = scale.max(1.0);
+        // A nonzero subnormal quotient can still lose significant precision,
+        // e.g. 1e-15 / 1e308 rounding to 1e-323. Keep the original row when a
+        // division/multiplication round-trip loses meaningful relative precision.
+        // This local range check is not a condition estimate for the whole solve.
+        let safe_to_normalize = a[i * size..(i + 1) * size]
+            .iter()
+            .chain(&rhs[i * cols..(i + 1) * cols])
+            .all(|value| {
+                if *value == 0.0 {
+                    return true;
+                }
+                let restored = (*value / proposed) * proposed;
+                restored.is_finite() && ((restored - *value) / *value).abs() <= 16.0 * f64::EPSILON
+            });
+        let normalizer = if safe_to_normalize { proposed } else { 1.0 };
+        scales[i] = scale / normalizer;
+        for j in 0..size {
+            aug[i * w + j] = a[i * size + j] / normalizer;
+        }
+        for j in 0..cols {
+            aug[i * w + size + j] = rhs[i * cols + j] / normalizer;
+        }
     }
     for k in 0..size {
         cancelled(stop)?;
@@ -1588,6 +1675,8 @@ fn eliminate(
                 pivot = i;
             }
         }
+        // Use actual post-normalization scales, retaining the relative threshold
+        // for small rows without comparing large rows against obsolete maxima.
         if aug[pivot * w + k].abs() / scales[pivot] <= 1e-12 {
             return Err("行列が特異、または数値的に不安定です。".into());
         }
@@ -1981,11 +2070,23 @@ pub fn run_item(
         VectorLength => norm(v()?),
         Unitize => return point(unit(v()?)?),
         ReverseVector => return point(scale(v()?, -1.0)),
-        DotProduct => dot(v()?, w()?),
-        CrossProduct => return point(cross(v()?, w()?)),
+        DotProduct => compensated_dot(v()?, w()?),
+        CrossProduct => return point(compensated_cross(v()?, w()?)),
         VectorAngle => {
-            let (u, v) = (unit(v()?)?, unit(w()?)?);
-            norm(cross(u, v)).atan2(dot(u, v))
+            let (u, v) = (angle_direction(v()?)?, angle_direction(w()?)?);
+            let sine = angle_cross_norm(compensated_cross(u, v));
+            let cosine = compensated_dot(u, v);
+            if cosine > 0.0 {
+                let ratio = sine / cosine;
+                // For t <= 2^-27, 0 <= t - atan(t) <= t^3/3: the relative
+                // correction is at most 2^-54/3. Direct division preserves tiny
+                // angles that platform atan2 may round to zero. This remains an
+                // approximation, not universal correctly rounded angle arithmetic.
+                if ratio <= f64::from_bits((1023_u64 - 27) << 52) {
+                    return scalar(ratio);
+                }
+            }
+            sine.atan2(cosine)
         }
         VectorAddition => return point(plus(v()?, w()?)),
         VectorSubtraction => return point(sub(v()?, w()?)),

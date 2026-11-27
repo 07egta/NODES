@@ -1,0 +1,98 @@
+{
+  "experiment": "Paired unchanged diagnostic modules in one library/binary",
+  "started_at_utc": "2026-11-26T23:52:42.820195+00:00",
+  "library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "worktree": "/workspace/scratch/74d3da15ab33/NODES-diagnostics-heap-paired",
+  "target_directory": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+  "target_policy": "Exclusively owned existing dependency target; cargo clean -p morphlet --release forces fresh project library and example while retaining third-party dependencies. Both diagnostic implementations then coexist in that single fresh library.",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "bytes": 17955,
+      "fnv1a64": "01a2f1cd3e358ce8"
+    },
+    {
+      "label": "after",
+      "revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+      "bytes": 19342,
+      "fnv1a64": "1b946498bfb0f532"
+    }
+  ],
+  "harness_sha256": "5822aec16a60c7e59ca7400e50614780c22f5efc3ab63e5100220ff23aec5646",
+  "library_shim_sha256": "949f11e3a7c54214dbd25833f08ac852eb54f84d3cbfbd5f4db93720d0f99436",
+  "full_lib_rs_sha256": "c5c94edf9c54cb0e91ca434a4eb37f2f7dca29d5c38adfdeee2b7c88fb5ca328",
+  "cargo_toml_sha256": "7981c5c016bee195cd0f909bfa42778db0302b66bf04ac4c5c7a50d7db685e5f",
+  "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+  "worktree_status": "M src/lib.rs\n?? benchmark-snapshots/\n?? examples/diagnostics_heap_perf.rs",
+  "compiler": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cargo": "cargo 1.100.0 (3acc79c0c 2026-11-05)",
+  "build_environment": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "NODES_HEAP_LIBRARY_SHA": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+    "NODES_HEAP_BEFORE_SHA": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+    "NODES_HEAP_AFTER_SHA": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+    "NODES_HEAP_BEFORE_SHA256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+    "NODES_HEAP_AFTER_SHA256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898"
+  },
+  "rustflags": "",
+  "profile": {
+    "opt_level": 3,
+    "lto": "thin",
+    "codegen_units": 16,
+    "strip": true
+  },
+  "commands": [
+    {
+      "label": "package-clean",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clean",
+        "-p",
+        "morphlet",
+        "--release",
+        "--target-dir",
+        "/workspace/scratch/74d3da15ab33/diagnostics-bench-target"
+      ],
+      "started_at_utc": "2026-11-26T23:52:42.918704+00:00",
+      "completed_at_utc": "2026-11-26T23:52:43.079100+00:00",
+      "elapsed_seconds": 0.16042106800068723,
+      "exit_code": 0,
+      "log": "package-clean.log"
+    },
+    {
+      "label": "paired-build",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "diagnostics_heap_perf"
+      ],
+      "started_at_utc": "2026-11-26T23:52:43.079525+00:00",
+      "completed_at_utc": "2026-11-26T23:53:21.192225+00:00",
+      "elapsed_seconds": 38.112742127000274,
+      "exit_code": 0,
+      "log": "paired-build.log"
+    }
+  ],
+  "free_disk_bytes_before": 6589083648,
+  "completed_at_utc": "2026-11-26T23:53:21.312257+00:00",
+  "binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-heap-paired",
+  "binary_sha256": "c9501562d64f0b72c50bc8ba132c13055f271f420575c1bc9e69306f1ee8d92e",
+  "binary_size_bytes": 5290544,
+  "linked_library": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target/release/build/morphlet/da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+  "linked_library_sha256": "79b2c9a622c4d6f0369ccfe544f9cb57021c5c0d6cc477c794eaa9f3e378e904",
+  "library_mtime_ns": 1795737176786856694,
+  "free_disk_bytes_after": 6575509504
+}

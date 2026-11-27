@@ -1,0 +1,22 @@
+{
+  "status": "MEASURED_SOURCE_SNAPSHOTS_VERIFIED",
+  "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "f858186b6d8907ca1184054a25ff127d71564b15",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+      "bytes": 21010
+    },
+    {
+      "label": "after",
+      "revision": "3e3bb46185628e479888053fe4e4ff606047c244",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "865324a95c61991e84c6797ab15573935d17245cb95c6da7575343adb9c65a33",
+      "bytes": 26623
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rmeta",
+    "modified_at_utc": "2026-11-26T23:32:44.936898+00:00",
+    "bytes": 3837233
+  },
+  {
+    "path": "da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+    "modified_at_utc": "2026-11-26T23:32:54.182581+00:00",
+    "bytes": 15672184
+  },
+  {
+    "path": "da594b737a3efa5a/fingerprint/lib-morphlet.json",
+    "modified_at_utc": "2026-11-26T23:32:54.210581+00:00",
+    "bytes": 704
+  },
+  {
+    "path": "73bc86e8aff63ba6/fingerprint/example-diagnostics_perf.json",
+    "modified_at_utc": "2026-11-26T23:33:36.633747+00:00",
+    "bytes": 777
+  }
+]

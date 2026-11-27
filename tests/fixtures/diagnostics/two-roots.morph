@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "name": "診断デモ：2つの原因を修正",
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 1.0,
+  "graph": {
+    "next_id": 6,
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "divide",
+        "name": "半径の計算",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "a": 12,
+          "b": 0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 1,
+        "kind": "divide",
+        "name": "高さの計算",
+        "position": [
+          20,
+          220
+        ],
+        "params": {
+          "a": 20,
+          "b": 0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 2,
+        "kind": "add",
+        "name": "寸法を合計",
+        "position": [
+          270,
+          120
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 3,
+        "kind": "multiply",
+        "name": "仕上げ係数",
+        "position": [
+          520,
+          120
+        ],
+        "params": {
+          "b": 2
+        },
+        "inputs": {
+          "a": 2
+        },
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 4,
+        "kind": "number",
+        "name": "別系統の正常値",
+        "position": [
+          20,
+          440
+        ],
+        "params": {
+          "value": 10
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 5,
+        "kind": "divide",
+        "name": "無効にした試作",
+        "position": [
+          270,
+          440
+        ],
+        "params": {
+          "b": 0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": true
+      }
+    ]
+  }
+}

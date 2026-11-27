@@ -3,6 +3,7 @@ pub mod cluster;
 pub mod compatibility;
 pub mod data_tree;
 pub mod data_tree_nodes;
+pub mod diagnostics;
 pub mod engine;
 pub mod expr;
 pub mod gcode;

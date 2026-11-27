@@ -2,6 +2,7 @@
 mod app;
 mod canvas;
 mod data_view;
+mod diagnostics_ui;
 mod file_picker;
 mod gcode_ui;
 mod help;

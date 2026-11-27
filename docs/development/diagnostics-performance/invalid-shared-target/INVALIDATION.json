@@ -1,0 +1,8 @@
+{
+  "valid_for_before_after_comparison": false,
+  "recorded_at_utc": "2026-11-26T23:40:25.902757+00:00",
+  "reason": "The shared-target after executable linked the baseline diagnostic library. Both binaries omit message_truncated despite the after source adding that serialized field. Distinct executable hashes and source SHA strings identify only the separately rebuilt harness, not the linked library. Raw files preserved unchanged. All analytic invariants passed, but no after-version timing claim may use these files.",
+  "before_binary_expected_marker": false,
+  "after_binary_observed_marker": false,
+  "after_binary_expected_marker": true
+}
