@@ -1,0 +1,37 @@
+# Vendored from SolidCraft (MIT OR Apache-2.0, https://github.com/tangency-labs/solidcraft) via the
+# owner's melt3D fork. Changes are logged in docs/SOLIDCRAFT_CHANGES.md.
+[package]
+name = "solidcraft-kernel"
+description = "SolidCraft B-rep kernel (solids, booleans, fillets, tessellation, STEP) on vendored truck, vendored into NODES"
+version = "0.26.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.88"
+publish = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+neg_cmp_op_on_partial_ord = "allow"
+
+[dependencies]
+solidcraft-geom = { path = "../sc-geom" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+log = "0.4"
+truck-modeling = "0.6"
+truck-shapeops = { version = "0.4", default-features = false }
+truck-meshalgo = { version = "0.4", default-features = false, features = ["tessellation", "analyzers"] }
+truck-stepio = { version = "0.3", default-features = false }
+truck-topology = "0.6"
+spade = { version = "2.15", default-features = false, features = ["std"] }
+web-time = "1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.12"
