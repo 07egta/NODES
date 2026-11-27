@@ -266,12 +266,13 @@ pub fn tip(kind: NodeKind) -> &'static str {
         .unwrap_or(FALLBACK_TIP)
 }
 
-const CATEGORY_ORDER: [&str; 8] = [
+const CATEGORY_ORDER: [&str; 9] = [
     "立体",
     "精密曲面",
     "曲線",
     "変形",
     "配列",
+    "物理",
     "数値",
     "データ",
     "出力",
