@@ -89,7 +89,25 @@ releaseは93.308秒、実release CLIの3fixtureは期待する構造・終了コ
 
 旧aa690のWindows失敗は [run45917517285](https://github.com/07egta/NODES/actions/runs/45917517285)。
 修正ca6147の [run45919617590](https://github.com/07egta/NODES/actions/runs/45919617590) は
-10:00 JST時点では進行中。ローカルLinux成功をWindows成功とは扱わない。
+**10:14 JSTに両job・run全体のsuccessを確認**。Linux487/0/2、Windows486/0/2で、
+両OSのreleaseビルド・artifact uploadまで成功した。Windowsでも元の極小角度検査と
+追加の境界検査が通過。1件差はUnix専用FIFOテストである。CIは一時的なPRマージ
+d3128a29f45f142873ca0ba8a0d2d72d1161d924 を検証するが、tree55903180が
+ca6147と同一であることをGitHub側でも照合した。
+
+両OSのZIPを実ダウンロードしてGitHub digestと照合し、BUILD-INFOと実行ファイルの
+形式・指紋も検査。配布Linux CLIで3例を実行して結果と入力不変を確認した。
+Windows実行ファイルのGUIや起動を試したものではない。詳細は
+[CI・配布物の記録](portable-angle-ci/README.md)を参照。
+この合格はPR18単独のソースに対するもので、統合候補のWindows合格には外挿しない。
+
+## 最終の参照確認 — 10:15 JST
+
+GitHubから再取得し、mainは79f32745923adfa9e3de05ef4683b6e3b5f4948f、
+PR16は固定した46ab578、PR18は修正ca6147のままであることを確認した。
+両PRはDraft・未マージ。保留したRust作品比較ブランチもfa56fb1bのままである。
+142件／164件の検証対象ソースハッシュを最後に再照合した。
+この後の証拠保存は文書だけで、検証済みの実装を変更しない。
 
 ## 再開時に残る確認
 

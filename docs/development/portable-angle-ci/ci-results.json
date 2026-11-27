@@ -10,7 +10,7 @@
   "identical_trees_verified": true,
   "run_id": 45919617590,
   "run_url": "https://github.com/07egta/NODES/actions/runs/45919617590",
-  "observed_at_jst": "2026-11-27T10:10:19+09:00",
+  "observed_at_jst": "2026-11-27T10:14:14+09:00",
   "linux": {
     "job_id": 140246959469,
     "conclusion": "success",
@@ -171,15 +171,149 @@
   },
   "windows": {
     "job_id": 140248896250,
-    "status": "in_progress",
-    "conclusion": null,
-    "completed_claimed": false,
-    "test_step": {
-      "status": "completed",
-      "conclusion": "success",
-      "started_at_utc": "2026-11-27T01:02:38Z",
-      "completed_at_utc": "2026-11-27T01:09:16Z"
+    "status": "completed",
+    "conclusion": "success",
+    "completed_claimed": true,
+    "test_results": {
+      "suites": 44,
+      "passed": 486,
+      "failed": 0,
+      "ignored": 2
     },
-    "current_step": "Build Windows desktop and console applications"
-  }
+    "log_source": "https://github.com/07egta/NODES/actions/runs/45919617590/job/140248896250",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-11-27T01:02:16Z",
+        "completed_at": "2026-11-27T01:02:17Z"
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-11-27T01:02:17Z",
+        "completed_at": "2026-11-27T01:02:24Z"
+      },
+      {
+        "name": "Install Rust",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-11-27T01:02:24Z",
+        "completed_at": "2026-11-27T01:02:36Z"
+      },
+      {
+        "name": "Restore Rust cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-11-27T01:02:36Z",
+        "completed_at": "2026-11-27T01:02:36Z"
+      },
+      {
+        "name": "Record compiler",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-11-27T01:02:36Z",
+        "completed_at": "2026-11-27T01:02:38Z"
+      },
+      {
+        "name": "Test all targets",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-11-27T01:02:38Z",
+        "completed_at": "2026-11-27T01:09:16Z"
+      },
+      {
+        "name": "Build Windows desktop and console applications",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-11-27T01:09:16Z",
+        "completed_at": "2026-11-27T01:13:26Z"
+      },
+      {
+        "name": "Prepare development artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-11-27T01:13:26Z",
+        "completed_at": "2026-11-27T01:13:27Z"
+      },
+      {
+        "name": "Upload Windows development artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-11-27T01:13:27Z",
+        "completed_at": "2026-11-27T01:13:30Z"
+      },
+      {
+        "name": "Post Restore Rust cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-11-27T01:13:30Z",
+        "completed_at": "2026-11-27T01:13:40Z"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-11-27T01:13:40Z",
+        "completed_at": "2026-11-27T01:13:41Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-11-27T01:13:41Z",
+        "completed_at": "2026-11-27T01:13:41Z"
+      }
+    ]
+  },
+  "run": {
+    "id": 45919617590,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+    "event": "pull_request",
+    "updated_at": "2026-11-27T01:13:44Z"
+  },
+  "platform_test_difference": {
+    "only_linux": [
+      "fifo_projects_return_json_errors_without_waiting_for_a_writer"
+    ],
+    "only_windows": [],
+    "reason": "The FIFO project test is #[cfg(unix)] in tests/cli_workflows.rs; all other passing test names agree."
+  },
+  "artifacts": [
+    {
+      "id": 15164386802,
+      "name": "NODES-linux-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924",
+      "size_in_bytes": 14008773,
+      "digest": "sha256:8c8d0c2ef4f1f3df941be2db38c8728a77300acfab0106de2c014559f0ec1573",
+      "created_at": "2026-11-27T01:02:10Z",
+      "expires_at": "2026-12-11T01:02:09Z",
+      "head_sha": "ca6147a0b639b9429900313147d4e288972373e5"
+    },
+    {
+      "id": 15163853732,
+      "name": "NODES-windows-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924",
+      "size_in_bytes": 14477693,
+      "digest": "sha256:dfba130058f790df4920dd6b5106a76dbe1acda9fd568b8c903668344a361dfe",
+      "created_at": "2026-11-27T01:13:30Z",
+      "expires_at": "2026-12-11T01:13:27Z",
+      "head_sha": "ca6147a0b639b9429900313147d4e288972373e5"
+    }
+  ],
+  "ci_warning": "Pinned checkout/cache/upload actions target deprecated Node.js20 and GitHub forced Node.js24; the run succeeded. Plan a separately verified maintenance update, retaining immutable action SHAs."
 }

@@ -1,0 +1,57 @@
+2026-11-27T01:02:34.8810934Z   1.100.0-x86_64-pc-windows-msvc installed - rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T01:02:35.0105948Z   1.100.0-x86_64-pc-windows-msvc unchanged - rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T01:02:36.4011571Z rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T01:02:37.4367005Z rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T01:02:38.3860027Z ##[group]Run cargo test --all-targets --locked
+2026-11-27T01:09:13.3336212Z [1m[92m    Finished[0m `test` profile [optimized] target(s) in 6m 34s
+2026-11-27T01:09:13.5303384Z test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+2026-11-27T01:09:13.5845255Z test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+2026-11-27T01:09:13.5941562Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:13.6053281Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:13.8064364Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+2026-11-27T01:09:14.2129804Z test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.40s
+2026-11-27T01:09:14.2629654Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+2026-11-27T01:09:14.2827205Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:14.2933806Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:14.3176894Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+2026-11-27T01:09:14.3900597Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+2026-11-27T01:09:14.4220851Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+2026-11-27T01:09:14.4441500Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:14.4670275Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:14.4888283Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:14.8154214Z test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+2026-11-27T01:09:14.9638407Z test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.14s
+2026-11-27T01:09:14.9990911Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+2026-11-27T01:09:15.0144757Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:15.0251432Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.3158582Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+2026-11-27T01:09:15.3282543Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.4104773Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+2026-11-27T01:09:15.6461282Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+2026-11-27T01:09:15.6598016Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.6708084Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.6799060Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.6891189Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.6992718Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.7096509Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.8194499Z test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+2026-11-27T01:09:15.8301600Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:15.9837838Z test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+2026-11-27T01:09:16.0016927Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:16.0119122Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.0284881Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:16.0766519Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+2026-11-27T01:09:16.0856814Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.1023549Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:09:16.1114694Z test independent_scaling_and_subnormal_directions_preserve_angles ... ok
+2026-11-27T01:09:16.1115651Z test tiny_axis_angles_preserve_bits_across_the_normal_boundary ... ok
+2026-11-27T01:09:16.1121141Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.1223475Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.1810565Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-11-27T01:09:16.1900410Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.1978275Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:09:16.3104177Z ##[group]Run cargo build --release --locked --bins
+2026-11-27T01:13:26.1936605Z [1m[92m    Finished[0m `release` profile [optimized] target(s) in 4m 09s
+2026-11-27T01:13:30.2417722Z Artifact NODES-windows-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924.zip successfully finalized. Artifact ID 15163853732
+2026-11-27T01:13:30.2419113Z Artifact NODES-windows-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924 has been successfully uploaded! Final size is 14477693 bytes. Artifact ID is 15163853732
+2026-11-27T01:13:41.8147256Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

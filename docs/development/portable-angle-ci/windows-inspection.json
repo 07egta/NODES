@@ -1,0 +1,65 @@
+{
+  "artifact_id": 15163853732,
+  "artifact_zip_sha256": "dfba130058f790df4920dd6b5106a76dbe1acda9fd568b8c903668344a361dfe",
+  "github_digest_verified": true,
+  "size_bytes": 14477693,
+  "member_count": 765,
+  "head_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+  "build_commit": "d3128a29f45f142873ca0ba8a0d2d72d1161d924",
+  "tested_tree": "55903180e8609378657c00095833c295b9e4caf9",
+  "build_info": "NODES development build\r\nCommit: d3128a29f45f142873ca0ba8a0d2d72d1161d924\r\nTarget: x86_64-pc-windows-msvc\r\nCompiler: rustc 1.100.0 (0ef1bc386 2026-11-09)\r\nBuild: cargo build --release --locked --bins\r\nTests: cargo test --all-targets --locked (Windows and Linux)\r\nThis CI artifact has not been validated by GUI or 3D-print hardware testing.\r\nLicense audit scope and unresolved items: docs/DEPENDENCIES.md\r\n",
+  "binaries": {
+    "Morphlet.exe": {
+      "size_bytes": 18707456,
+      "sha256": "64244d7b3c19d3485e36edd3cca7ec1e955fdd23e8163aa2b373382f39b755ef",
+      "format": "PE32+",
+      "machine": "0x8664",
+      "imports": [
+        "kernel32.dll",
+        "shlwapi.dll",
+        "user32.dll",
+        "gdi32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "shell32.dll",
+        "bcryptprimitives.dll",
+        "OPENGL32.dll",
+        "KERNEL32.dll",
+        "USER32.dll",
+        "GDI32.dll",
+        "ADVAPI32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "imm32.dll",
+        "dwmapi.dll",
+        "uxtheme.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll"
+      ]
+    },
+    "nodes-cli.exe": {
+      "size_bytes": 5996544,
+      "sha256": "05b39a897ded5f1d5df698bc289151b66ccfe46d6f9391567d805b47471a9282",
+      "format": "PE32+",
+      "machine": "0x8664",
+      "imports": [
+        "bcryptprimitives.dll",
+        "KERNEL32.dll",
+        "ntdll.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll"
+      ]
+    }
+  },
+  "runtime_execution_performed": false
+}

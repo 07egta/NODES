@@ -4,7 +4,8 @@
 > PR18単独ca6147は487/0/2、更新した統合候補は572/0/4でLinux全体検証済み。
 > 以下の3e3bb46・486件は履歴であり、最新の原ログと対象SHAは上記リンクを優先する。
 > 修正後CI・配布artifactの照合は [portable-angle-ci/README.md](portable-angle-ci/README.md)。
-> CIの合否は同フォルダの観測時刻とjob状態で確認する。統合候補のWindows成功とは区別する。
+> ca6147はLinux487/0/2・Windows486/0/2、両release/artifactまでCI成功。
+> 統合候補のWindows成功とは区別する。履歴の途中経過より最終記録を優先する。
 
 > 追加のWindows CI確認で極小角度の回帰1件が失敗した。修正と根拠は
 > [Windows角度の移植性記録](WINDOWS_ANGLE_PORTABILITY.md)を優先して読む。
