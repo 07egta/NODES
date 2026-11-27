@@ -314,6 +314,40 @@ fn matches(kind: NodeKind, query: &str) -> bool {
     q.split_whitespace().all(|w| hay.contains(w))
 }
 
+/// A short worked example built from the spec: which inputs to wire, which numbers to set,
+/// and what comes out.
+pub fn example(kind: NodeKind) -> String {
+    let spec = kind.spec();
+    let mut wired: Vec<&str> = Vec::new();
+    let mut set: Vec<String> = Vec::new();
+    for input in spec.inputs {
+        match input.default {
+            Some(d) => {
+                if set.len() < 4 {
+                    set.push(format!("{} = {}", input.label, trim_number(d)));
+                }
+            }
+            None => wired.push(input.label),
+        }
+    }
+    let mut text = String::new();
+    if wired.is_empty() && set.is_empty() {
+        text.push_str("入力なしで、そのまま使えます。");
+    } else {
+        if !wired.is_empty() {
+            text.push_str(&format!("線でつなぐ: {}。", wired.join("・")));
+        }
+        if !set.is_empty() {
+            if !text.is_empty() {
+                text.push(' ');
+            }
+            text.push_str(&format!("初期値の例: {}。", set.join("、")));
+        }
+    }
+    text.push_str(&format!(" 出力: {}。", type_hint(spec.output)));
+    text
+}
+
 /// The help page of one node kind, built from its spec.
 pub fn node_page(ui: &mut egui::Ui, kind: NodeKind) {
     let spec = kind.spec();
@@ -343,7 +377,7 @@ pub fn node_page(ui: &mut egui::Ui, kind: NodeKind) {
                     ui.label(
                         RichText::new(type_hint(input.kind))
                             .size(11.)
-                            .color(theme::TEAL),
+                            .color(theme::teal()),
                     );
                     match input.default {
                         Some(d) => {
@@ -356,15 +390,15 @@ pub fn node_page(ui: &mut egui::Ui, kind: NodeKind) {
                                     if input.integer { "（整数）" } else { "" }
                                 ))
                                 .size(11.)
-                                .color(theme::MUTED),
+                                .color(theme::muted()),
                             );
                         }
                         None => {
-                            ui.label(RichText::new("—").size(11.).color(theme::MUTED));
+                            ui.label(RichText::new("—").size(11.).color(theme::muted()));
                             ui.label(
                                 RichText::new("線でつなぐ（必須）")
                                     .size(11.)
-                                    .color(theme::ERROR),
+                                    .color(theme::error()),
                             );
                         }
                     }
@@ -378,11 +412,14 @@ pub fn node_page(ui: &mut egui::Ui, kind: NodeKind) {
     ui.add_space(8.);
     ui.horizontal(|ui| {
         ui.label(RichText::new("出力").strong());
-        ui.label(RichText::new(type_hint(spec.output)).color(theme::TEAL));
+        ui.label(RichText::new(type_hint(spec.output)).color(theme::teal()));
     });
+    ui.add_space(4.);
+    ui.label(RichText::new("入出力の例").strong());
+    ui.label(theme::small(example(kind)));
     ui.add_space(8.);
     egui::Frame::new()
-        .fill(theme::TEAL_PALE)
+        .fill(theme::card_bg())
         .corner_radius(8)
         .inner_margin(10)
         .show(ui, |ui| {
@@ -410,7 +447,7 @@ fn shapes_page(ui: &mut egui::Ui) {
         ),
     ] {
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(head).size(11.).color(theme::TEAL));
+            ui.label(RichText::new(head).size(11.).color(theme::teal()));
             ui.label(RichText::new(body).size(11.));
         });
     }
@@ -546,5 +583,12 @@ mod tests {
         assert_eq!(trim_number(2.5), "2.5");
         assert_eq!(trim_number(64.), "64");
         assert!(matches(NodeKind::Twist, "twist"));
+    }
+    #[test]
+    fn every_kind_has_a_short_example() {
+        for kind in NodeKind::all() {
+            let text = example(*kind);
+            assert!(text.contains("出力"), "{kind:?}");
+        }
     }
 }

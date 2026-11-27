@@ -381,6 +381,50 @@ impl GraphCanvas {
         }
     }
 
+    /// Align the selected cards by `edge` (0 = left/top, 1 = centre, 2 = right/bottom) on `axis`
+    /// (0 = horizontal, 1 = vertical), using each card's real size.
+    pub fn align_selected_edge(&self, p: &mut Project, axis: usize, edge: u8) {
+        if axis > 1 || edge > 2 || self.selected.len() < 2 {
+            return;
+        }
+        let size_of = |n: &Node| if axis == 0 { WIDTH } else { height(n) };
+        let cards: Vec<(NodeId, f32)> = p
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| self.selected.contains(&n.id))
+            .map(|n| (n.id, size_of(n)))
+            .collect();
+        if cards.len() < 2 {
+            return;
+        }
+        let at = |p: &Project, id: NodeId| p.graph.node(id).map_or(0., |n| n.position[axis]);
+        let target = match edge {
+            0 => cards
+                .iter()
+                .map(|c| at(p, c.0))
+                .fold(f32::INFINITY, f32::min),
+            2 => cards
+                .iter()
+                .map(|c| at(p, c.0) + c.1)
+                .fold(f32::NEG_INFINITY, f32::max),
+            _ => cards.iter().map(|c| at(p, c.0) + c.1 / 2.).sum::<f32>() / cards.len() as f32,
+        };
+        if !target.is_finite() {
+            return;
+        }
+        for (id, size) in cards {
+            let shift = match edge {
+                0 => 0.,
+                2 => size,
+                _ => size / 2.,
+            };
+            if let Some(node) = p.graph.node_mut(id) {
+                node.position[axis] = (target - shift).clamp(-1e6, 1e6);
+            }
+        }
+    }
+
     /// Equalize the gaps between selected card bounds, rather than their centers.
     pub fn distribute_selected(&self, p: &mut Project, axis: usize) {
         if axis > 1 {
