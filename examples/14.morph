@@ -115,7 +115,6 @@
         "params": {
           "amplitude": 1.2,
           "mode": 0.0,
-          "phase": 0.0,
           "twist": 4.0,
           "wavelength": 18.0,
           "z_wavelength": 40.0
