@@ -2246,7 +2246,7 @@ impl MorphletApp {
                     }
                 }
                 ui.label(theme::small(format!(
-                    "数値は小数 4 桁、最大 {} 行まで表示します。",
+                    "数値は省略表示です。詳しい値はホバー・右クリックで確認できます。最大 {} 行。",
                     data_view::MAX_ROWS
                 )));
             });

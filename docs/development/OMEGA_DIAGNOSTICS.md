@@ -1,5 +1,9 @@
 # OMEGA: graph diagnostics and recovery checkpoints
 
+For the latest tested source, verification results, integration constraints and
+remaining work, start with the [2026-11-27 handoff](OMEGA_HANDOFF_20261127.md).
+The checkpoint entries below retain their historical pending/completed states.
+
 ## Scope and ownership — 2026-11-27 JST
 
 Branch: `feat/omega-graph-diagnostics-20261127`.
@@ -423,3 +427,41 @@ The successful numeric fixture
 contains the tiny-angle graph, the least positive subnormal, signed zero and a
 large number. It supports the next native GUI check and is separate from the
 intentional two-root failure fixture.
+
+## Functional checkpoint 8: whole-tree verification and actual clipboard QA
+
+Checkpoint `147148edb7d1fe70a0cb9096b9fec4578e020ab6` passed formatting, all-target
+check, strict all-target Clippy and all-target tests: **481 passed, 0 failed,
+2 ignored across 43 suites**. The two ignored cases are existing opt-in
+performance/stress measurements; they were not silently counted as executed.
+Both debug binaries and both release binaries built. The release build took
+182.234 seconds with the recorded local dependency cache/profile; this is not a
+startup or clean-build performance comparison. All 17 existing developer utility
+self-tests also passed.
+
+The second native GUI workflow verified scientific output for the nearly parallel
+angle, a full-precision hover, actual right-click copy and OS paste into a blank
+Mousepad document, the smallest positive subnormal and negative zero. The pasted
+value was exactly `5.00000001e-19`. See [GUI steps](DIAGNOSTICS_GUI_CHECK.md).
+This exposed an outdated four-decimal footer; the follow-up changes only that
+explanation and the diagnosis timing-percentage explanation in application source.
+All-target Clippy passed again for those wording changes. Numerical behavior,
+evaluation, storage and the 481-test implementation remain unchanged.
+
+A separate old input-slider layout issue remains: a full decimal rendering of
+the least subnormal can widen the inspector. The compact output viewer is correct.
+Record this fixture for the signed-zero input-editor work in PR #16 rather than
+overwriting that developer's implementation. The latest inspected #16 head
+`0aa286a93a8b61f23ce691b1d15a025780ec1fc8` also adds interpolation, beyond its
+earlier Summation/Mean changes. Neither its matrix/vector/angle sections nor
+`data_view.rs` overlap our changes. Combined-branch integration is still untested.
+
+Independent final review identified the next substantive work: cancellation
+inside diagnosis, early public-API size checks and aggregate long-message memory
+budgets. Current worker revision checks prevent stale publication, but do not
+stop an obsolete diagnosis before the next queued evaluation. The measured
+memory improvements do not establish a global bound for arbitrary error text.
+
+The final [handoff](OMEGA_HANDOFF_20261127.md) records the single-contract
+integration sequence for PR #20, preserves the separate tested project-diff WIP
+at `fa56fb1`, and distinguishes actual CI/source results from pending runs.

@@ -60,3 +60,40 @@ fixture and these exact steps make the check reproducible after that session end
   or a performance guarantee.
 - Geometry preview, printability and fabrication remain separate verification
   tasks. This fixture contains only numeric values.
+
+## Precise numeric values and actual clipboard transfer
+
+Executed a second native check on 2026-11-27 JST with the debug desktop binary
+built from `147148edb7d1fe70a0cb9096b9fec4578e020ab6`.
+The saved [`numeric-details.morph`](../../tests/fixtures/diagnostics/numeric-details.morph)
+passed real CLI safe validation and evaluation: all six nodes succeeded.
+
+1. Launched that file, selected **ほぼ平行な角度**, opened **値を見る** and
+   **別ウィンドウで開く**. The output displayed **5.0000e-19**, rather than zero.
+2. Hovered the output and observed the detailed value **5.00000001e-19**.
+3. Right-clicked it, selected **詳しい値をコピー**, launched a blank Mousepad
+   document and used the operating system's Paste shortcut. Both the screenshot
+   and accessibility text contained exactly **5.00000001e-19**. No string was
+   typed into the destination to simulate this transfer.
+4. Selected **最小の正数**. The viewer displayed **4.9407e-324**, preserving a
+   nonzero preview of the least positive subnormal.
+5. Selected **符号を持つゼロ**. The viewer displayed **-0.0000**.
+6. Closed the temporary unsaved clipboard test document and stopped only this
+   owned test application. The concurrent developer's other NODES window remained.
+
+This verifies an actual Linux scalar clipboard path. Coordinate copying, keyboard
+parameter editing, large-number GUI display and Windows clipboard behavior were
+not checked in this second workflow; formatting tests cover finite scalar/XYZ
+round trips and range endpoints separately.
+
+Two additional observations were retained instead of treating screenshots as an
+unqualified UI pass:
+
+- The viewer footer still described all values as four decimal places. The
+  follow-up changes that text to describe abbreviated previews and the detail
+  affordances. No numerical behavior changes with this wording correction.
+- The existing parameter slider's full decimal text for the least subnormal
+  widened the inspector and narrowed the canvas. The new result viewer itself
+  remained compact. Parameter editing is owned by concurrent PR #16; reproduce
+  this case there when integrating its signed-zero editor. This branch does not
+  claim to have fixed that separate input layout issue.
