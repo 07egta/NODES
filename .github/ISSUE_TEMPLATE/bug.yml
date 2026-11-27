@@ -1,0 +1,85 @@
+name: バグ報告 / Bug report
+description: 動かない・おかしな結果になった場合の報告 / Report a crash, wrong result or broken behaviour
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。再現手順が分かるほど修正が早くなります。
+        Thanks for reporting. Clear steps make the fix faster.
+        **非公開の.morphファイル・個人情報・認証情報は貼り付けないでください。** / Do not attach private .morph files, personal data or credentials.
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要 / Summary
+      description: 何が起きたかを1〜2文で / What happened, in 1-2 sentences
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順 / Steps to reproduce
+      description: 操作を番号付きで / Numbered steps
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作 / Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作 / Actual behaviour
+      description: エラーメッセージや画面の様子 / Error messages or what the screen shows
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - Linux
+        - その他 / Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: バージョン・コミット / Version or commit
+      description: CIアーティファクトのコミットID（BUILD-INFO.txt）など / e.g. commit id from BUILD-INFO.txt in a CI artifact
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 関係する領域 / Area
+      multiple: true
+      options:
+        - ノード / Node
+        - UI / UI
+        - G-code / G-code
+        - STL / STL
+        - 保存・読込 / Save and load
+        - その他 / Other
+  - type: textarea
+    id: extra
+    attributes:
+      label: 補足・画像 / Notes and screenshots
+      description: 再現用の最小限の.morphは可能なら公開可能な内容だけ添付してください / If you attach a minimal .morph, only attach one that is safe to publish
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認 / Checks
+      options:
+        - label: 最新の開発ブランチで再現することを確認した / I checked that it reproduces on the latest development branch
+          required: true
+        - label: 同じ内容の既存Issueがないことを確認した / I searched existing issues for duplicates
+          required: true
