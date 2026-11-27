@@ -496,6 +496,10 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    // Sampled shape interpolation and panelization (append-only IDs).
+    ShapeMorph,
+    InsetCell,
+    MeshFacePanels,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -849,6 +853,9 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::ShapeMorph,
+            Self::InsetCell,
+            Self::MeshFacePanels,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
