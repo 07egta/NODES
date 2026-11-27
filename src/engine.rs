@@ -484,6 +484,10 @@ pub(crate) fn evaluate_node(
             cancel,
         );
     }
+    // Gコード nodes work on whole trees of G-code jobs (see `gcode_nodes.rs`).
+    if crate::gcode_nodes::is_kind(node.kind) {
+        return checked_tree(crate::gcode_nodes::run(node, &inputs, cancel)?, cancel);
+    }
     // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
     if node.kind == NodeKind::ImportMesh {
         let scale = first_number(inputs.first().ok_or("倍率の入力がありません。")?)?;
@@ -1278,7 +1282,7 @@ pub(crate) fn map_shape(
             Ok(Value::Mesh(Arc::new(mesh)))
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
-        Value::Surface(_) | Value::Solid(_) => {
+        Value::Surface(_) | Value::Solid(_) | Value::Gcode(_) => {
             Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into())
         }
     }

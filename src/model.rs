@@ -22,6 +22,8 @@ pub enum DataType {
     Surface,
     Solid,
     DisplayGeometry,
+    /// A G-code job (printer, settings, toolpaths). See `gcode_job.rs`.
+    Gcode,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
@@ -35,6 +37,7 @@ impl DataType {
             Self::Surface => "数学曲面",
             Self::Solid => "B-rep 立体",
             Self::DisplayGeometry => "表示形状",
+            Self::Gcode => "Gコード",
         }
     }
     pub fn accepts(self, source: Self) -> bool {
@@ -471,6 +474,28 @@ pub enum NodeKind {
     GridArray3d,
     Gyroid,
     RevolvePoints,
+    // G-code nodes (see `gcode_nodes.rs`); appended, serde names are snake_case.
+    GcodePrinter,
+    GcodeSlice,
+    GcodeContour,
+    GcodeSpiral,
+    GcodeSort,
+    GcodeSplit,
+    GcodeExtrusion,
+    GcodeSpeed,
+    GcodeTemp,
+    GcodeRetract,
+    GcodeZHop,
+    GcodeNonplanar,
+    GcodeTexture,
+    GcodeClay,
+    GcodeStart,
+    GcodeEnd,
+    GcodeJoin,
+    GcodeWrite,
+    GcodePreview,
+    GcodeEstimate,
+    GcodeSafety,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -803,6 +828,27 @@ impl NodeKind {
             Self::GridArray3d,
             Self::Gyroid,
             Self::RevolvePoints,
+            Self::GcodePrinter,
+            Self::GcodeSlice,
+            Self::GcodeContour,
+            Self::GcodeSpiral,
+            Self::GcodeSort,
+            Self::GcodeSplit,
+            Self::GcodeExtrusion,
+            Self::GcodeSpeed,
+            Self::GcodeTemp,
+            Self::GcodeRetract,
+            Self::GcodeZHop,
+            Self::GcodeNonplanar,
+            Self::GcodeTexture,
+            Self::GcodeClay,
+            Self::GcodeStart,
+            Self::GcodeEnd,
+            Self::GcodeJoin,
+            Self::GcodeWrite,
+            Self::GcodePreview,
+            Self::GcodeEstimate,
+            Self::GcodeSafety,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1417,6 +1463,7 @@ impl NodeKind {
             other if crate::surface_nodes::KINDS.contains(&other) => {
                 crate::surface_nodes::spec(other)
             }
+            other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1706,6 +1753,7 @@ pub enum Value {
     Mesh(Arc<Mesh>),
     Surface(Arc<crate::surface_kernel::SurfaceValue>),
     Solid(Arc<crate::surface_kernel::ClosedSolid>),
+    Gcode(Arc<crate::gcode_job::GcodeJob>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
@@ -1716,6 +1764,7 @@ impl Value {
             Self::Mesh(_) => DataType::Mesh,
             Self::Surface(_) => DataType::Surface,
             Self::Solid(_) => DataType::Solid,
+            Self::Gcode(_) => DataType::Gcode,
         }
     }
     pub fn weight(&self) -> usize {
@@ -1732,6 +1781,7 @@ impl Value {
                 .saturating_add(m.triangles.len().saturating_mul(3)),
             Self::Surface(s) => s.weight(),
             Self::Solid(s) => s.weight(),
+            Self::Gcode(j) => j.weight(),
         }
     }
     pub fn number(&self) -> Result<f64, String> {

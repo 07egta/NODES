@@ -210,7 +210,7 @@ fn every_new_node_is_finite_and_non_empty() {
                         "{kind:?}"
                     );
                 }
-                Value::Surface(_) | Value::Solid(_) => {}
+                Value::Surface(_) | Value::Solid(_) | Value::Gcode(_) => {}
             }
         }
     }

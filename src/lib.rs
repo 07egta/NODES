@@ -7,6 +7,8 @@ pub mod diagnostics;
 pub mod engine;
 pub mod expr;
 pub mod gcode;
+pub mod gcode_job;
+pub mod gcode_nodes;
 pub mod generative;
 pub mod gh_nodes;
 pub mod ghx;

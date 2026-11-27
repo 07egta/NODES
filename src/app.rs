@@ -143,6 +143,8 @@ pub struct NodesApp {
     help_open: bool,
     /// Advanced: G-code (vase mode) from the その他の書き出し menu.
     gcode: GcodeDialog,
+    /// The Gコード書き出し node whose file the picker is choosing.
+    gcode_node: Option<NodeId>,
     stl_export: StlExportUi,
     toast: Option<(String, bool, Instant)>,
     confirm_action: Option<PendingAction>,
@@ -258,6 +260,7 @@ impl NodesApp {
             template_open: false,
             help_open: false,
             gcode: GcodeDialog::default(),
+            gcode_node: None,
             stl_export: StlExportUi::new(),
             toast: None,
             confirm_action: None,
@@ -330,6 +333,19 @@ impl NodesApp {
         }
         if self.stale() {
             ctx.request_repaint_after(Duration::from_millis(40));
+        }
+    }
+    /// The G-code job a node produced, once the evaluation is up to date.
+    fn gcode_node_job(&self, id: NodeId) -> Result<Arc<nodes::gcode_job::GcodeJob>, String> {
+        if self.stale() {
+            return Err("形状を更新中です。更新が終わってから書き出してください。".into());
+        }
+        let e = self.evaluation.as_ref().ok_or("計算が完了していません。")?;
+        match e.outputs.get(&id) {
+            Some(Ok(tree)) => nodes::gcode_nodes::first_job(tree)
+                .ok_or_else(|| "Gコードがありません。上流のノードを確認してください。".to_string()),
+            Some(Err(error)) => Err(error.clone()),
+            None => Err("このノードの結果がまだありません。".into()),
         }
     }
     fn result_trees(&self) -> Result<Vec<Tree>, String> {
@@ -564,6 +580,24 @@ impl NodesApp {
                     FileTask::ImportMesh => {
                         let target = self.import_target.take();
                         self.set_import_file(&path, target, None);
+                    }
+                    FileTask::ExportGcode if self.gcode_node.is_some() => {
+                        let id = self.gcode_node.take();
+                        let result = id
+                            .ok_or_else(|| "書き出すノードが選ばれていません。".to_string())
+                            .and_then(|id| self.gcode_node_job(id))
+                            .and_then(|job| nodes::gcode_nodes::write_job(&path, &job));
+                        match result {
+                            Ok(s) => self.notify(
+                                format!(
+                                    "G-code を書き出しました（約 {:.0} 分・{:.1} m）",
+                                    s.seconds / 60.0,
+                                    s.filament_mm / 1000.0
+                                ),
+                                false,
+                            ),
+                            Err(e) => self.notify(e, true),
+                        }
                     }
                     FileTask::ExportGcode => {
                         let settings = self.gcode.settings().clone();
@@ -1892,6 +1926,20 @@ impl NodesApp {
         }
         if node.kind == NodeKind::ImportMesh {
             self.import_panel(ui, id, &node.script);
+        }
+        if nodes::gcode_nodes::uses_script(node.kind) {
+            crate::gcode_ui::script_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::GcodeWrite {
+            let job = self.gcode_node_job(id).ok();
+            if crate::gcode_ui::write_panel(ui, job.as_deref()) {
+                self.gcode_node = Some(id);
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::ExportGcode,
+                    self.start_directory(),
+                    format!("{}.gcode", safe_name(&self.project.name)),
+                ));
+            }
         }
         if node.kind == NodeKind::Cluster
             && let Some(action) = crate::script_ui::cluster_panel(ui, &mut self.project.graph, id)
