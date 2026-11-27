@@ -364,7 +364,8 @@ fn register_api(engine: &mut Engine) {
     engine.register_get("z", |p: &mut SPoint| p.0[2]);
 
     // Math. Arguments may be integers or floats (Rhai itself is strict about that).
-    let unary: [(&str, fn(f64) -> f64); 15] = [
+    type UnaryMathFn = fn(f64) -> f64;
+    let unary: [(&str, UnaryMathFn); 15] = [
         ("sin", f64::sin),
         ("cos", f64::cos),
         ("tan", f64::tan),
@@ -386,7 +387,8 @@ fn register_api(engine: &mut Engine) {
             finite(f(num(&x)?))
         });
     }
-    let binary: [(&str, fn(f64, f64) -> f64); 4] = [
+    type BinaryMathFn = fn(f64, f64) -> f64;
+    let binary: [(&str, BinaryMathFn); 4] = [
         ("atan2", f64::atan2),
         ("pow", f64::powf),
         ("min", f64::min),

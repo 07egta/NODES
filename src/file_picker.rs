@@ -27,7 +27,10 @@ pub enum FileTask {
 impl FileTask {
     /// Tasks that pick an existing file (the others name a file to write).
     fn picks_existing(self) -> bool {
-        matches!(self, Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer)
+        matches!(
+            self,
+            Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer
+        )
     }
     fn title(self) -> &'static str {
         match self {
@@ -84,7 +87,11 @@ impl FileTask {
             Self::Save => "保存",
             Self::LoadPart | Self::ImportMesh => "読み込む",
             Self::PickSlicer => "選ぶ",
-            Self::ExportStl | Self::ExportObj | Self::ExportGcode | Self::ExportThreeMf | Self::SavePart => "書き出す",
+            Self::ExportStl
+            | Self::ExportObj
+            | Self::ExportGcode
+            | Self::ExportThreeMf
+            | Self::SavePart => "書き出す",
         }
     }
 }
@@ -490,9 +497,12 @@ impl FilePicker {
             return None;
         }
         let extension = self.task.extension();
-        if !has_extension(&path, extension) {
+        if !self.task.accepts(&path) {
             if self.task.picks_existing() && path.extension().is_some() {
-                self.error = Some(format!("開けるファイルは .{extension} です。"));
+                self.error = Some(format!(
+                    "開けるファイルは {} です。",
+                    self.task.filter_hint()
+                ));
                 return None;
             }
             path.set_extension(extension);
@@ -636,4 +646,108 @@ fn read_directory(path: &Path, task: FileTask) -> Result<(Vec<Entry>, bool), Str
             .then_with(|| a.sort_key.cmp(&b.sort_key))
     });
     Ok((entries, truncated))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_PICKER_TEST: AtomicU64 = AtomicU64::new(0);
+
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new() -> Self {
+            let n = NEXT_PICKER_TEST.fetch_add(1, Ordering::Relaxed);
+            let path =
+                std::env::temp_dir().join(format!("nodes-picker-{}-{n}", std::process::id()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+
+        fn file(&self, name: &str) -> PathBuf {
+            let path = self.0.join(name);
+            fs::write(&path, "").unwrap();
+            path
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn import_obj_can_be_chosen_from_listing_and_typed_full_path() {
+        let scratch = Scratch::new();
+        let obj = scratch.file("模型.OBJ");
+        let mut picker = FilePicker::new(FileTask::ImportMesh, scratch.0.clone(), String::new());
+        let listed = picker.entries.iter().find(|row| row.path == obj).unwrap();
+        picker.select(listed.path.clone());
+        assert!(
+            matches!(picker.choose(), Some(PickerEvent::Chosen(p)) if p == obj),
+            "listed OBJ rejected: {:?}",
+            picker.error
+        );
+        let mut typed = FilePicker::new(
+            FileTask::ImportMesh,
+            scratch.0.clone(),
+            obj.to_str().unwrap().into(),
+        );
+        assert!(
+            matches!(typed.choose(), Some(PickerEvent::Chosen(p)) if p == obj),
+            "typed OBJ rejected: {:?}",
+            typed.error
+        );
+    }
+
+    #[test]
+    fn import_keeps_explicit_stl_and_prefers_stl_when_no_extension_is_entered() {
+        let scratch = Scratch::new();
+        let stl = scratch.file("大文字.STL");
+        let lowercase_stl = scratch.file("同じ名前.stl");
+        let _obj = scratch.file("同じ名前.obj");
+        let mut picker =
+            FilePicker::new(FileTask::ImportMesh, scratch.0.clone(), "大文字.STL".into());
+        assert!(matches!(picker.choose(), Some(PickerEvent::Chosen(p)) if p == stl));
+        picker.filename = "同じ名前".into();
+        assert!(matches!(picker.choose(), Some(PickerEvent::Chosen(p)) if p == lowercase_stl));
+    }
+
+    #[test]
+    fn import_rejects_unsupported_extension_and_does_not_rewrite_it() {
+        let scratch = Scratch::new();
+        let _invalid = scratch.file("模型.ply");
+        let _stl = scratch.file("模型.stl");
+        let mut picker =
+            FilePicker::new(FileTask::ImportMesh, scratch.0.clone(), "模型.ply".into());
+        assert!(picker.choose().is_none());
+        let error = picker.error.as_deref().unwrap();
+        assert!(error.contains(".stl") && error.contains(".obj"), "{error}");
+    }
+
+    #[test]
+    fn single_format_tasks_keep_their_extension() {
+        let scratch = Scratch::new();
+        let stl_export = scratch.0.join("書き出し.stl");
+        let obj_export = scratch.0.join("書き出し.obj");
+        let mut stl = FilePicker::new(
+            FileTask::ExportStl,
+            scratch.0.clone(),
+            "書き出し.OBJ".into(),
+        );
+        let mut obj = FilePicker::new(
+            FileTask::ExportObj,
+            scratch.0.clone(),
+            "書き出し.STL".into(),
+        );
+        assert!(matches!(stl.choose(), Some(PickerEvent::Chosen(p)) if p == stl_export));
+        assert!(matches!(obj.choose(), Some(PickerEvent::Chosen(p)) if p == obj_export));
+        let _invalid = scratch.file("模型.OBJ");
+        let mut open = FilePicker::new(FileTask::Open, scratch.0.clone(), "模型.OBJ".into());
+        assert!(open.choose().is_none());
+        assert!(open.error.as_deref().unwrap().contains(".morph"));
+    }
 }

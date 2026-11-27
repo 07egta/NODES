@@ -1356,7 +1356,9 @@ fn loft_branch_error(sections: &Tree, path: &[u32]) -> String {
     let mut nonempty = sections.branches.values().filter(|items| !items.is_empty());
     let first = nonempty.next();
     let singletons = if first.is_some_and(|items| items.len() == 1) {
-        nonempty.try_fold(1usize, |count, items| (items.len() == 1).then_some(count + 1))
+        nonempty.try_fold(1usize, |count, items| {
+            (items.len() == 1).then_some(count + 1)
+        })
     } else {
         None
     };

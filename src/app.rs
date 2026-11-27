@@ -604,7 +604,10 @@ impl MorphletApp {
                     self.notify(format!("「{}」を追加しました", kind.spec().label), false);
                 } else {
                     self.notify(
-                        format!("「{}」を追加しましたが、線をつなげる入力がありません", kind.spec().label),
+                        format!(
+                            "「{}」を追加しましたが、線をつなげる入力がありません",
+                            kind.spec().label
+                        ),
                         true,
                     );
                 }
@@ -1494,7 +1497,9 @@ impl MorphletApp {
                                     self.canvas.auto_arrange(&mut self.project);
                                 }
                                 ui.toggle_value(&mut self.canvas.snap, "格子")
-                                    .on_hover_text("格子に吸着: ノードを離すと格子点に揃います · Ctrl+Shift+G");
+                                    .on_hover_text(
+                                        "格子に吸着: ノードを離すと格子点に揃います · Ctrl+Shift+G",
+                                    );
                                 if ui.small_button("全体").clicked() {
                                     self.canvas.fit_requested = true;
                                 }
@@ -1591,8 +1596,8 @@ impl MorphletApp {
         self.palette_cursor = self.palette_cursor.min(last);
         // IME Enter belongs to the input method while composing; only a plain Enter adds.
         let composing = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Ime(_))));
-        let enter = !composing
-            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+        let enter =
+            !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
         if enter {
             add = matches.get(self.palette_cursor).copied();
         }
@@ -1627,10 +1632,8 @@ impl MorphletApp {
                     .show(ui, |ui| {
                         for (index, kind) in matches.iter().enumerate() {
                             let spec = kind.spec();
-                            let (rect, response) = ui.allocate_exact_size(
-                                egui::vec2(430., 40.),
-                                Sense::click(),
-                            );
+                            let (rect, response) =
+                                ui.allocate_exact_size(egui::vec2(430., 40.), Sense::click());
                             let active = index == cursor;
                             if active || response.hovered() {
                                 ui.painter().rect_filled(
@@ -1701,7 +1704,9 @@ impl MorphletApp {
             .default_width(520.)
             .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
-                ui.label(theme::small("? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。"));
+                ui.label(theme::small(
+                    "? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。",
+                ));
                 ui.add_space(8.);
                 egui::Grid::new("shortcut_grid")
                     .num_columns(2)

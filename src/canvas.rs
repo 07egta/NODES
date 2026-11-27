@@ -603,7 +603,11 @@ impl GraphCanvas {
                     Align2::LEFT_CENTER,
                     spec.label,
                     FontId::proportional(11. * p.zoom),
-                    if linked { theme::teal() } else { theme::muted() },
+                    if linked {
+                        theme::teal()
+                    } else {
+                        theme::muted()
+                    },
                 );
                 if p.zoom > 0.62
                     && let Some(default) = spec.default
