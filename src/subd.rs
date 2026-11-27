@@ -40,9 +40,6 @@ pub struct Cage {
 fn add(a: P3, b: P3) -> P3 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
-fn sub(a: P3, b: P3) -> P3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
 fn scale(a: P3, s: f64) -> P3 {
     [a[0] * s, a[1] * s, a[2] * s]
 }
