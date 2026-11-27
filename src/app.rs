@@ -145,6 +145,9 @@ pub struct NodesApp {
     gcode: GcodeDialog,
     /// The Gコード書き出し node whose file the picker is choosing.
     gcode_node: Option<NodeId>,
+    cage_edit: crate::cage_edit::CageEdit,
+    /// STEP export node and graph revision captured when its picker opens.
+    step_export: Option<(NodeId, u64)>,
     stl_export: StlExportUi,
     toast: Option<(String, bool, Instant)>,
     confirm_action: Option<PendingAction>,
@@ -166,7 +169,7 @@ pub struct NodesApp {
     help_window: HelpWindow,
     /// 値を見る window for the selected node.
     values_open: bool,
-    /// ファイル読み込み node that the next picked mesh file is loaded into.
+    /// File import node waiting for the picker.
     import_target: Option<NodeId>,
     /// Node whose output wire was dropped on empty canvas; the search connects to it.
     wire_source: Option<NodeId>,
@@ -261,6 +264,8 @@ impl NodesApp {
             help_open: false,
             gcode: GcodeDialog::default(),
             gcode_node: None,
+            cage_edit: Default::default(),
+            step_export: None,
             stl_export: StlExportUi::new(),
             toast: None,
             confirm_action: None,
@@ -539,6 +544,7 @@ impl NodesApp {
                 PickerEvent::Cancelled => {
                     self.after_save = None;
                     self.import_target = None;
+                    self.step_export = None;
                 }
                 PickerEvent::Chosen(path) => match task {
                     FileTask::Open => self.request(PendingAction::Open(path), ctx),
@@ -577,9 +583,27 @@ impl NodesApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
-                    FileTask::ImportMesh => {
+                    FileTask::ImportMesh | FileTask::ImportStep => {
                         let target = self.import_target.take();
-                        self.set_import_file(&path, target, None);
+                        let kind = if task == FileTask::ImportStep {
+                            NodeKind::ExactStepImport
+                        } else {
+                            NodeKind::ImportMesh
+                        };
+                        self.set_import_file(&path, kind, target, None);
+                    }
+                    FileTask::ExportStep => {
+                        let result = self
+                            .step_export
+                            .take()
+                            .ok_or_else(|| "書き出すノードが選ばれていません。".to_string())
+                            .and_then(|(id, revision)| self.save_step(&path, id, revision));
+                        match result {
+                            Ok(bytes) => {
+                                self.notify(format!("STEP を保存しました（{bytes} バイト）"), false)
+                            }
+                            Err(e) => self.notify(e, true),
+                        }
                     }
                     FileTask::ExportGcode if self.gcode_node.is_some() => {
                         let id = self.gcode_node.take();
@@ -629,9 +653,31 @@ impl NodesApp {
             }
         }
     }
-    /// Points an ファイル読み込み node at a mesh file. Without a valid target, a new node is
+    fn save_step(&self, path: &Path, id: NodeId, revision: u64) -> Result<usize, String> {
+        if self.stale()
+            || self.revision != revision
+            || !same_calculation(&self.edits.previous.graph, &self.project.graph)
+        {
+            return Err("形状が更新されました。計算が終わってから保存し直してください。".into());
+        }
+        let evaluation = self.evaluation.as_ref().ok_or("計算が完了していません。")?;
+        let node = self
+            .project
+            .graph
+            .node(id)
+            .ok_or("STEP 書き出しノードが見つかりません。")?;
+        nodes::nurbs_nodes::write_step(path, node, evaluation)
+    }
+
+    /// Points an import node at its file. Without a valid target, a new node is
     /// added at `at` (or the canvas centre).
-    fn set_import_file(&mut self, path: &Path, target: Option<NodeId>, at: Option<[f32; 2]>) {
+    fn set_import_file(
+        &mut self,
+        path: &Path,
+        kind: NodeKind,
+        target: Option<NodeId>,
+        at: Option<[f32; 2]>,
+    ) {
         let Some(text) = path.to_str().map(str::to_owned) else {
             self.notify(
                 "ファイル名を文字として読めませんでした。英数字の名前に変えてから選び直してください。",
@@ -646,17 +692,13 @@ impl NodesApp {
             );
             return;
         }
-        let valid_target = target.filter(|id| {
-            self.project
-                .graph
-                .node(*id)
-                .is_some_and(|n| n.kind == NodeKind::ImportMesh)
-        });
+        let valid_target =
+            target.filter(|id| self.project.graph.node(*id).is_some_and(|n| n.kind == kind));
         let id = match valid_target {
             Some(id) => id,
             None => {
                 let at = at.unwrap_or_else(|| self.canvas.center_for_add(&self.project));
-                match self.project.graph.add(NodeKind::ImportMesh, at) {
+                match self.project.graph.add(kind, at) {
                     Ok(id) => {
                         self.canvas.select_only(id);
                         id
@@ -671,7 +713,10 @@ impl NodesApp {
         if let Some(node) = self.project.graph.node_mut(id) {
             node.script = text;
         }
-        self.notify("「ファイル読み込み」にファイルを設定しました", false);
+        self.notify(
+            format!("「{}」にファイルを設定しました", kind.spec().label),
+            false,
+        );
     }
 
     fn add_node(&mut self, kind: NodeKind, position: Option<[f32; 2]>) {
@@ -1696,8 +1741,19 @@ impl NodesApp {
                 });
             });
     }
-    /// File line and the picker button for an ファイル読み込み node.
-    fn import_panel(&mut self, ui: &mut egui::Ui, id: NodeId, file: &str) {
+    fn import_panel(&mut self, ui: &mut egui::Ui, node: &Node) {
+        let (task, hint) = if node.kind == NodeKind::ExactStepImport {
+            (
+                FileTask::ImportStep,
+                ".step または .stp ファイルを選んでください",
+            )
+        } else {
+            (
+                FileTask::ImportMesh,
+                "STL または OBJ を選びます。ウィンドウへのドラッグでも読み込めます",
+            )
+        };
+        let file = node.script.as_str();
         ui.add_space(6.);
         ui.label(RichText::new("ファイル").strong());
         let shown = if file.is_empty() {
@@ -1708,22 +1764,10 @@ impl NodesApp {
                 .map_or_else(|| file.to_string(), |n| n.to_string_lossy().into_owned())
         };
         ui.label(theme::small(shown))
-            .on_hover_text(if file.is_empty() {
-                "STL または OBJ を選んでください"
-            } else {
-                file
-            });
-        if ui
-            .button("ファイルを選ぶ")
-            .on_hover_text("STL または OBJ を選びます。ウィンドウへのドラッグでも読み込めます")
-            .clicked()
-        {
-            self.import_target = Some(id);
-            self.file_picker = Some(FilePicker::new(
-                FileTask::ImportMesh,
-                self.start_directory(),
-                String::new(),
-            ));
+            .on_hover_text(if file.is_empty() { hint } else { file });
+        if ui.button("ファイルを選ぶ").on_hover_text(hint).clicked() {
+            self.import_target = Some(node.id);
+            self.file_picker = Some(FilePicker::new(task, self.start_directory(), String::new()));
         }
     }
 
@@ -1924,8 +1968,32 @@ impl NodesApp {
         {
             crate::math_mapper_ui::show(ui, n);
         }
-        if node.kind == NodeKind::ImportMesh {
-            self.import_panel(ui, id, &node.script);
+        if matches!(node.kind, NodeKind::ImportMesh | NodeKind::ExactStepImport) {
+            self.import_panel(ui, &node);
+        }
+        if node.kind == NodeKind::SubdCageEdit {
+            self.cage_edit
+                .panel(ui, &mut self.project.graph, id, self.evaluation.as_ref());
+        }
+        if node.kind == NodeKind::ExactStepExport {
+            let ready = !node.off
+                && !self.stale()
+                && self
+                    .evaluation
+                    .as_ref()
+                    .and_then(|e| e.outputs.get(&id))
+                    .is_some_and(Result::is_ok);
+            if ui
+                .add_enabled(ready, egui::Button::new("STEP を保存"))
+                .clicked()
+            {
+                self.step_export = Some((id, self.revision));
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::ExportStep,
+                    self.start_directory(),
+                    format!("{}.step", safe_name(&self.project.name)),
+                ));
+            }
         }
         if nodes::gcode_nodes::uses_script(node.kind) {
             crate::gcode_ui::script_editor(ui, &mut self.project.graph, id);
@@ -2059,6 +2127,9 @@ impl NodesApp {
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                    self.viewport.cage_overlay = self
+                        .cage_edit
+                        .overlay(&self.project.graph, self.evaluation.as_ref());
                     let picked = if let Some(items) = &items {
                         let picked = self.viewport.show(ui, items);
                         self.preview_revision = Some(self.result_revision);
@@ -2066,6 +2137,14 @@ impl NodesApp {
                     } else {
                         self.viewport.show_previous(ui)
                     };
+                    let events = std::mem::take(&mut self.viewport.cage_events);
+                    if !events.is_empty() {
+                        self.cage_edit.handle(
+                            events,
+                            &mut self.project.graph,
+                            self.evaluation.as_ref(),
+                        );
+                    }
                     // Undo can reuse a previous shape's node ID for a different
                     // node. Only a completed current preview may select nodes;
                     // camera controls remain live while showing previous geometry.
@@ -2737,7 +2816,7 @@ impl eframe::App for NodesApp {
                     let at = ctx
                         .input(|i| i.pointer.latest_pos())
                         .and_then(|p| self.canvas.world_at(&self.project, p));
-                    self.set_import_file(&path, None, at);
+                    self.set_import_file(&path, NodeKind::ImportMesh, None, at);
                 } else {
                     self.request(PendingAction::Open(path), ctx);
                 }

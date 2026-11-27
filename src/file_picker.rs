@@ -19,11 +19,13 @@ pub enum FileTask {
     ExportObj,
     ExportGcode,
     ExportThreeMf,
+    ExportStep,
     PickSlicer,
     SavePart,
     LoadPart,
     /// Mesh file for the ファイル読み込み node: STL or OBJ.
     ImportMesh,
+    ImportStep,
 }
 
 impl FileTask {
@@ -31,7 +33,7 @@ impl FileTask {
     fn picks_existing(self) -> bool {
         matches!(
             self,
-            Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer
+            Self::Open | Self::LoadPart | Self::ImportMesh | Self::ImportStep | Self::PickSlicer
         )
     }
     fn title(self) -> &'static str {
@@ -42,10 +44,12 @@ impl FileTask {
             Self::ExportObj => "OBJ に書き出す",
             Self::ExportGcode => "G-code に書き出す",
             Self::ExportThreeMf => "3MF に書き出す",
+            Self::ExportStep => "STEP を保存",
             Self::PickSlicer => "スライサーを選ぶ",
             Self::SavePart => "部品を書き出す",
             Self::LoadPart => "部品を読み込む",
             Self::ImportMesh => "ファイルを読み込む",
+            Self::ImportStep => "STEP を読み込む",
         }
     }
 
@@ -56,6 +60,7 @@ impl FileTask {
             Self::ExportObj => "obj",
             Self::ExportGcode => "gcode",
             Self::ExportThreeMf => "3mf",
+            Self::ExportStep | Self::ImportStep => "step",
             Self::PickSlicer => "exe",
             Self::SavePart | Self::LoadPart => "morphpart",
         }
@@ -65,6 +70,9 @@ impl FileTask {
     fn accepts(self, path: &Path) -> bool {
         match self {
             Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
+            Self::ExportStep | Self::ImportStep => {
+                has_extension(path, "step") || has_extension(path, "stp")
+            }
             other => has_extension(path, other.extension()),
         }
     }
@@ -77,6 +85,7 @@ impl FileTask {
             Self::ExportObj => ".obj",
             Self::SavePart | Self::LoadPart => ".morphpart",
             Self::ImportMesh => ".stl / .obj",
+            Self::ExportStep | Self::ImportStep => ".step / .stp",
             Self::ExportGcode => ".gcode",
             Self::ExportThreeMf => ".3mf",
             Self::PickSlicer => ".exe",
@@ -87,12 +96,13 @@ impl FileTask {
         match self {
             Self::Open => "開く",
             Self::Save => "保存",
-            Self::LoadPart | Self::ImportMesh => "読み込む",
+            Self::LoadPart | Self::ImportMesh | Self::ImportStep => "読み込む",
             Self::PickSlicer => "選ぶ",
             Self::ExportStl
             | Self::ExportObj
             | Self::ExportGcode
             | Self::ExportThreeMf
+            | Self::ExportStep
             | Self::SavePart => "書き出す",
         }
     }
@@ -505,9 +515,12 @@ impl FilePicker {
             return None;
         }
         let extension = self.task.extension();
-        if !has_extension(&path, extension) {
+        if !self.task.accepts(&path) {
             if self.task.picks_existing() && path.extension().is_some() {
-                self.error = Some(format!("開けるファイルは .{extension} です。"));
+                self.error = Some(format!(
+                    "開けるファイルは {} です。",
+                    self.task.filter_hint()
+                ));
                 return None;
             }
             path.set_extension(extension);
@@ -742,6 +755,33 @@ mod directory_listing_tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn step_picker_accepts_both_extensions_and_prompts_for_overwrite() {
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("nodes-picker-{}-{id}", std::process::id()));
+        fs::create_dir(&path).unwrap();
+        let directory = TempDirectory(path);
+        let existing = directory.0.join("part.STP");
+        fs::File::create(&existing).unwrap();
+
+        let mut picker =
+            FilePicker::new(FileTask::ImportStep, directory.0.clone(), "part.STP".into());
+        assert!(matches!(picker.choose(), Some(PickerEvent::Chosen(path)) if path == existing));
+
+        let mut picker =
+            FilePicker::new(FileTask::ExportStep, directory.0.clone(), "part.STP".into());
+        assert!(picker.choose().is_none());
+        assert_eq!(picker.overwrite, Some(existing));
+
+        let mut picker = FilePicker::new(FileTask::ExportStep, directory.0.clone(), "new".into());
+        assert!(
+            matches!(picker.choose(), Some(PickerEvent::Chosen(path)) if path == directory.0.join("new.step"))
+        );
     }
 
     #[test]
