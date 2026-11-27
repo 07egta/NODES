@@ -105,6 +105,7 @@ pub fn permitted(kind: NodeKind) -> bool {
             | MeshConstruct
             | MeshSelfContact
             | MeshThicknessSample
+            | MeshBedFit
             | MeshCompact
             | MeshNonManifold
     ) || crate::math_nodes::spec(kind).is_some()
