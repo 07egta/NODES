@@ -145,6 +145,8 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Mesh(_) => "mesh",
         Value::Surface(_) => "surface",
         Value::Solid(_) => "solid",
+        Value::Brep(_) => "brep",
+        Value::Cage(_) => "cage",
     }
 }
 
@@ -161,6 +163,13 @@ fn preview(value: &Value) -> Json {
         }),
         Value::Surface(_) => json!({"kind": "surface"}),
         Value::Solid(_) => json!({"kind": "solid"}),
+        Value::Brep(b) => json!({
+            "kind": "brep", "faces": b.face_count(), "closed": b.is_closed(),
+            "triangle_count": b.preview().triangles.len()
+        }),
+        Value::Cage(c) => json!({
+            "kind": "cage", "control_points": c.vertices().len(), "faces": c.faces().len()
+        }),
     }
 }
 

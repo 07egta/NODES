@@ -70,6 +70,26 @@ pub const TEMPLATES: &[Template] = &[
         description: "網目状のジャイロイドを箱の中に作ります。単位の大きさと壁の太さで、すき間の大きさを調整。",
         tag: "格子・網目",
     },
+    Template {
+        name: "角の丸い箱（厳密フィレット）",
+        description: "B-rep の直方体のすべての稜線を丸めます。半径を変えると、角の丸みが正確に変わります。",
+        tag: "NURBS / B-rep",
+    },
+    Template {
+        name: "2 本の円柱のブーリアン",
+        description: "厳密な円柱から別の円柱を削り取ります。位置を動かして、穴の位置を調整できます。",
+        tag: "NURBS / B-rep",
+    },
+    Template {
+        name: "ロフトの花器（厳密立体・STEP 向け）",
+        description: "高さと大きさの違う円を滑らかにつなぎ、底と口をふさいだ B-rep 立体にします。STEP 書き出しノードで CAD に渡せます。",
+        tag: "NURBS / B-rep",
+    },
+    Template {
+        name: "T-spline の有機的な花器",
+        description: "円柱ケージの膨らみを変えると、なめらかな NURBS の器になります。",
+        tag: "T-spline / SubD",
+    },
 ];
 
 fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
@@ -463,6 +483,103 @@ fn build(index: usize) -> Result<Project, String> {
             let info = add(&mut graph, NodeKind::MeshInfo, [262.0, 310.0], &[])?;
             graph.connect(smooth, info, "geometry")?;
             finish(&mut graph, smooth, [504.0, 30.0])?;
+        }
+        12 => {
+            let solid = add(
+                &mut graph,
+                NodeKind::ExactBox,
+                [20.0, 30.0],
+                &[("width", 60.0), ("depth", 40.0), ("height", 30.0)],
+            )?;
+            let round = add(
+                &mut graph,
+                NodeKind::ExactFillet,
+                [290.0, 30.0],
+                &[("radius", 5.0), ("edge", -1.0)],
+            )?;
+            graph.connect(solid, round, "brep")?;
+            finish(&mut graph, round, [290.0, 300.0])?;
+        }
+        13 => {
+            let body = add(
+                &mut graph,
+                NodeKind::ExactCylinder,
+                [20.0, 30.0],
+                &[("radius", 25.0), ("height", 40.0)],
+            )?;
+            let tool = add(
+                &mut graph,
+                NodeKind::ExactCylinder,
+                [20.0, 300.0],
+                &[("radius", 10.0), ("height", 60.0)],
+            )?;
+            let moved = add(
+                &mut graph,
+                NodeKind::ExactMove,
+                [290.0, 300.0],
+                &[("x", 12.0), ("z", -10.0)],
+            )?;
+            graph.connect(tool, moved, "brep")?;
+            let cut = add(&mut graph, NodeKind::ExactDifference, [290.0, 30.0], &[])?;
+            graph.connect(body, cut, "brep")?;
+            graph.connect(moved, cut, "other")?;
+            finish(&mut graph, cut, [560.0, 30.0])?;
+        }
+        14 => {
+            let radii = add(
+                &mut graph,
+                NodeKind::Series,
+                [20.0, 30.0],
+                &[("start", 18.0), ("step", 10.0), ("count", 3.0)],
+            )?;
+            rename(&mut graph, radii, "断面の半径");
+            let heights = add(
+                &mut graph,
+                NodeKind::Series,
+                [20.0, 310.0],
+                &[("start", 0.0), ("step", 45.0), ("count", 3.0)],
+            )?;
+            rename(&mut graph, heights, "断面の高さ");
+            let circles = add(
+                &mut graph,
+                NodeKind::Circle,
+                [262.0, 30.0],
+                &[("segments", 64.0)],
+            )?;
+            graph.connect(radii, circles, "radius")?;
+            let moved = add(&mut graph, NodeKind::Move, [504.0, 30.0], &[])?;
+            graph.connect(circles, moved, "geometry")?;
+            graph.connect(heights, moved, "z")?;
+            let loft = add(
+                &mut graph,
+                NodeKind::ExactLoft,
+                [262.0, 310.0],
+                &[("smooth", 1.0)],
+            )?;
+            graph.connect(moved, loft, "curves")?;
+            finish(&mut graph, loft, [504.0, 340.0])?;
+        }
+        15 => {
+            let cage = add(
+                &mut graph,
+                NodeKind::SubdCylinderCage,
+                [20.0, 30.0],
+                &[
+                    ("radius", 26.0),
+                    ("height", 90.0),
+                    ("segments", 8.0),
+                    ("rings", 6.0),
+                    ("bulge", 0.35),
+                ],
+            )?;
+            let solid = add(
+                &mut graph,
+                NodeKind::SubdToBrep,
+                [290.0, 30.0],
+                &[("cap", 1.0)],
+            )?;
+            graph.connect(cage, solid, "cage")?;
+            finish(&mut graph, solid, [290.0, 300.0])?;
         }
         _ => {
             let base = add(

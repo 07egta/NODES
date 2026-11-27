@@ -484,6 +484,10 @@ pub(crate) fn evaluate_node(
             cancel,
         );
     }
+    // STEP 読み込み・書き出し: the path is in `script` (see `nurbs_nodes::run_file`).
+    if crate::nurbs_nodes::uses_file(node.kind) {
+        return checked_tree(crate::nurbs_nodes::run_file(node, &inputs, cancel)?, cancel);
+    }
     // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
     if node.kind == NodeKind::ImportMesh {
         let scale = first_number(inputs.first().ok_or("倍率の入力がありません。")?)?;
@@ -608,6 +612,8 @@ pub(crate) fn evaluate_node(
                 crate::generative::run_list(node.kind, &lists, cancel)?
             } else if node.kind == NodeKind::MeshConstruct {
                 crate::mesh_fabrication::run_list(&lists, cancel)?
+            } else if crate::nurbs_nodes::is_list_kind(node.kind) {
+                crate::nurbs_nodes::run_list(node.kind, &lists, cancel)?
             } else if crate::nodes_shape::is_list_kind(node.kind) {
                 crate::nodes_shape::run_list(node.kind, &lists, cancel)?
             } else if curve_list {
@@ -807,6 +813,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
     use NodeKind::*;
     match kind {
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
+        k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
@@ -1278,9 +1285,10 @@ pub(crate) fn map_shape(
             Ok(Value::Mesh(Arc::new(mesh)))
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
-        Value::Surface(_) | Value::Solid(_) => {
-            Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into())
-        }
+        Value::Surface(_) | Value::Solid(_) | Value::Brep(_) | Value::Cage(_) => Err(
+            "精密曲面・B-rep・ケージは専用ノードで変換するか、明示的にメッシュ化してください。"
+                .into(),
+        ),
     }
 }
 pub(crate) fn map_affine_shape(

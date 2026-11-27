@@ -288,6 +288,8 @@ fn type_hint(kind: DataType) -> &'static str {
         DataType::Surface => "数学曲面（メッシュとは別）",
         DataType::Solid => "閉じたB-rep立体",
         DataType::DisplayGeometry => "表示可能な形状（出力）",
+        DataType::Brep => "厳密な B-rep（NURBS 面の立体・面）",
+        DataType::Cage => "SubD / T-spline の制御ケージ",
     }
 }
 

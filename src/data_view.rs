@@ -120,6 +120,25 @@ pub fn value_text(value: &Value) -> String {
             m.triangles.len()
         ),
         Value::Surface(s) => format!("数学曲面 · {} · UV 0–1", s.geometry().name()),
+        Value::Brep(b) => format!(
+            "厳密 B-rep · {} 面 / {} 稜線 · {}",
+            b.face_count(),
+            b.edge_count(),
+            match b.volume() {
+                Some(v) => format!("閉じた立体 · 体積 {}", compact_number(v)),
+                None => "開いた面".to_string(),
+            }
+        ),
+        Value::Cage(c) => format!(
+            "SubD ケージ · {} 点 / {} 面{}",
+            c.vertices().len(),
+            c.faces().len(),
+            if c.grid().is_some() {
+                " · 格子（NURBS 変換可）"
+            } else {
+                ""
+            }
+        ),
         Value::Solid(s) => format!(
             "閉じた B-rep · {} 面 / {} 稜線 · 体積 {}",
             s.brep().shell().faces().len(),

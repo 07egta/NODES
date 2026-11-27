@@ -808,7 +808,7 @@ fn value_points(v: &Value) -> Result<&[[f64; 3]], String> {
         Value::Curve(c) => Ok(c.points.as_slice()),
         Value::Mesh(m) => Ok(m.vertices.as_slice()),
         Value::Number(_) => Err("形状を接続してください。".into()),
-        Value::Surface(_) | Value::Solid(_) => {
+        Value::Surface(_) | Value::Solid(_) | Value::Brep(_) | Value::Cage(_) => {
             Err("曲面・ソリッドはメッシュに変換してから接続してください。".into())
         }
     }
