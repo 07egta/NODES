@@ -2158,6 +2158,9 @@ impl NodesApp {
                 if outcome.view_values {
                     self.values_open = true;
                 }
+                if outcome.open_templates {
+                    self.template_open = true;
+                }
                 if let Some(kind) = outcome.help {
                     self.help_window.open_for(kind);
                 }

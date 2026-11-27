@@ -183,6 +183,8 @@ pub struct CanvasOutcome {
     pub add_note_at: Option<[f32; 2]>,
     /// A wire was dropped on empty canvas: the source node and the world position.
     pub drop_wire: Option<(NodeId, [f32; 2])>,
+    /// 「サンプルを開く」 on the empty canvas.
+    pub open_templates: bool,
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
@@ -1113,16 +1115,49 @@ impl GraphCanvas {
         }
         if p.graph.nodes.is_empty() {
             painter.text(
-                rect.center() - egui::vec2(0., 25.),
+                rect.center() - egui::vec2(0., 62.),
                 Align2::CENTER_CENTER,
                 "ここから、形をつくろう。",
                 FontId::proportional(24.),
                 theme::ink(),
             );
+            let area = Rect::from_center_size(rect.center(), egui::vec2(360., 40.));
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(area)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                |ui| {
+                    ui.add_space(((area.width() - 304.) / 2.).max(0.));
+                    if melt::tool_button(
+                        ui,
+                        melt::Tool::Plus,
+                        "ノードを追加",
+                        "検索してノードを置く  Tab / Ctrl+K",
+                        true,
+                        true,
+                    )
+                    .clicked()
+                    {
+                        out.add_at = Some(to_world(rect.center(), rect, p.pan, p.zoom));
+                    }
+                    if melt::tool_button(
+                        ui,
+                        melt::Tool::Open,
+                        "サンプルを開く",
+                        "作品例から始める",
+                        false,
+                        true,
+                    )
+                    .clicked()
+                    {
+                        out.open_templates = true;
+                    }
+                },
+            );
             painter.text(
-                rect.center() + egui::vec2(0., 15.),
+                rect.center() + egui::vec2(0., 44.),
                 Align2::CENTER_CENTER,
-                "左のライブラリから追加、またはダブルクリックで検索",
+                "Tab・ダブルクリック・? でノードを検索（例: 円 / circle / twist）",
                 FontId::proportional(12.),
                 theme::muted(),
             );
