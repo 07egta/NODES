@@ -2,9 +2,10 @@
 //! `subd`, `nurbs_nodes`).
 use nodes::curve_geometry::CurveGeometry;
 use nodes::kernel_bridge::{self as kb, Bool, BrepValue};
-use nodes::model::{Curve, Mesh};
+use nodes::model::{Curve, Mesh, Tree, Value};
 use nodes::subd::Cage;
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 fn go() -> bool {
     false
@@ -93,6 +94,26 @@ fn loft_of_three_sections_is_watertight() {
 }
 
 #[test]
+fn one_rail_sweep_requires_a_path_that_leaves_the_profile_plane() {
+    let profile = circle([0., 0., 0.], 5.);
+    let planar_rail = circle([20., 0., 0.], 15.);
+    assert!(
+        kb::sweep1(&profile, &planar_rail, &go)
+            .unwrap_err()
+            .contains("立体を作れません")
+    );
+
+    let rising_rail = Curve {
+        points: vec![[0., 0., 0.], [0., 0., 20.]],
+        closed: false,
+        geometry: None,
+    };
+    let swept = kb::sweep1(&profile, &rising_rail, &go).unwrap();
+    assert!(swept.is_closed());
+    assert!(rel(swept.volume().unwrap(), 500. * PI) < 1e-3);
+}
+
+#[test]
 fn crossing_cylinders_boolean_is_watertight_with_exact_volume() {
     let r = 10.;
     let z = kb::cylinder([0., 0., -30.], [0., 0., 1.], r, 60., &go).unwrap();
@@ -110,6 +131,18 @@ fn crossing_cylinders_boolean_is_watertight_with_exact_volume() {
     let expected = 2. * PI * r * r * 60. - 16. * r * r * r / 3.;
     let v = union.volume().unwrap();
     assert!(rel(v, expected) < 1e-3, "union volume {v} vs {expected}");
+    for solid in [both, union] {
+        // The repaired preview passes the same topology checks as the STL exporter,
+        // while the underlying geometry still uses cylindrical faces.
+        let body = solid.body();
+        assert!((0..body.face_count()).any(|face| matches!(
+            solidcraft_kernel::face_surface(body, face),
+            Some(solidcraft_kernel::FaceSurface::Cylinder { .. })
+        )));
+        let tree = Tree::single(Value::Brep(Arc::new(solid)));
+        let report = nodes::persistence::mesh_stats(&[tree]).unwrap();
+        assert!(report.is_closed(), "{report:?}");
+    }
 }
 
 #[test]

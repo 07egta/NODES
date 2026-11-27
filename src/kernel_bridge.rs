@@ -35,6 +35,8 @@ pub mod tol {
     pub const CHORD_FRACTION: f64 = 1e-3;
     pub const CHORD_MIN: f64 = 0.005;
     pub const CHORD_MAX: f64 = 0.25;
+    /// Maximum volume difference accepted for a faceted Boolean preview.
+    pub const BOOLEAN_PREVIEW_VOLUME_ERROR: f64 = 0.01;
     /// Chord tolerance for a body of the given size (bounding-box diagonal, mm).
     pub fn chord(size: f64) -> f64 {
         if size.is_finite() && size > 0. {
@@ -59,6 +61,7 @@ pub mod limits {
     pub const MAX_PIECES: usize = 4096;
     pub const MAX_FACES: usize = 20_000;
     pub const MAX_TRIANGLES: usize = 600_000;
+    pub const MAX_FACETED_BOOLEAN_TRIANGLES: usize = 8_192;
     pub const MAX_STEP_BYTES: usize = 64 * 1024 * 1024;
     pub const MAX_COORDINATE: f64 = 1e6;
     pub const MAX_SAMPLES: usize = 20_000;
@@ -140,7 +143,8 @@ impl BrepValue {
     pub fn body(&self) -> &Body {
         &self.body
     }
-    /// Welded triangle mesh at the display/STL tolerance ([`tol::chord`]).
+    /// Welded triangle mesh for display and STL. A Boolean may use a separately
+    /// faceted preview while retaining the original B-rep.
     pub fn preview(&self) -> &Arc<Mesh> {
         &self.preview
     }
@@ -165,7 +169,7 @@ impl BrepValue {
         if !self.closed {
             return None;
         }
-        match sk::guard("体積", || sk::measure(&self.body)) {
+        match sk::guard("体積", || sk::measure_mass(&self.body)) {
             Ok(m) if m.volume.is_finite() => Some(m.volume.abs()),
             _ => Some(mesh_volume(&self.preview).abs()),
         }
@@ -233,8 +237,13 @@ pub fn boundary_edges(m: &Mesh) -> Vec<(u32, u32)> {
 /// Kernel tessellation at [`tol::chord`], welded so shared edges become shared vertices.
 pub fn display_mesh(body: &Body, stop: Stop) -> R<Mesh> {
     let size = body.size();
-    let chord = tol::chord(size);
-    let raw = kernel("メッシュ化", stop, || body.tessellate(chord))?;
+    let raw = kernel("メッシュ化", stop, || {
+        body.tessellate(tol::chord(size))
+    })?;
+    weld_tessellation(&raw, size, stop)
+}
+
+fn weld_tessellation(raw: &solidcraft_geom::Mesh, size: f64, stop: Stop) -> R<Mesh> {
     if raw.triangles.len() > limits::MAX_TRIANGLES {
         return Err(format!(
             "メッシュが大きすぎます（{} 三角形）。形を小さくするか、面の数を減らしてください。",
@@ -1032,6 +1041,17 @@ pub fn sweep1(profile_curve: &Curve, rail: &Curve, stop: Stop) -> R<BrepValue> {
         _ => return Err("レール曲線が短すぎます。".into()),
     };
     let (plane, lp) = profile(profile_curve, Some(tangent), stop)?;
+    // Parallel transport along a planar rail keeps a parallel profile in its
+    // original plane, so there is no volume to sweep.
+    let start = path[0];
+    let normal = plane.normal();
+    if path
+        .iter()
+        .skip(1)
+        .all(|point| normal.dot(v3(sub(*point, start))).abs() <= tol::ABS)
+    {
+        return Err("断面とレールが平行な平面にあり、立体を作れません。レールが断面を抜ける向きに変えてください。".into());
+    }
     let region = Region2 {
         outer: lp,
         holes: Vec::new(),
@@ -1113,11 +1133,70 @@ pub fn boolean(a: &BrepValue, b: &BrepValue, op: Bool, stop: Stop) -> R<BrepValu
         ));
     }
     match kernel(what, stop, || sk::boolean(a.body(), b.body(), kop))? {
-        Some(body) => brep(body, stop),
+        Some(body) => {
+            let mut result = brep(body, stop)?;
+            if !result.is_closed() {
+                // The kernel may produce a valid B-rep whose trimmed faces leave gaps in
+                // the mesh, for example at the tangencies of two equal crossing cylinders.
+                // Keep the original body for STEP, measurement and subsequent operations.
+                let preview = faceted_boolean_preview(a.body(), b.body(), result.body(), kop, stop);
+                stopped(stop)?;
+                if let Ok(preview) = preview {
+                    result.preview = Arc::new(preview);
+                    result.closed = true;
+                }
+            }
+            Ok(result)
+        }
         None => Err(format!(
             "{what}: 結果が空です。2 つの立体が重なっているか確認してください。"
         )),
     }
+}
+
+fn faceted_boolean_preview(
+    a: &Body,
+    b: &Body,
+    result: &Body,
+    op: sk::BoolOp,
+    stop: Stop,
+) -> R<Mesh> {
+    let chord = tol::chord(result.size());
+    let a = a.keeping_meshes();
+    let (target, tool) = kernel("ブーリアンの表示メッシュ", stop, || {
+        Ok((a.tessellate(chord)?, b.tessellate(chord)?))
+    })?;
+    if target.triangles.len().saturating_add(tool.triangles.len())
+        > limits::MAX_FACETED_BOOLEAN_TRIANGLES
+    {
+        return Err("ブーリアンの表示メッシュが大きすぎます。".into());
+    }
+    for (body, mesh) in [(&a, &target), (b, &tool)] {
+        if !is_watertight(&weld_tessellation(mesh, body.size(), stop)?) {
+            return Err("入力の表示メッシュが閉じていません。".into());
+        }
+    }
+    let faceted = kernel("ブーリアンの表示メッシュ", stop, || {
+        sk::faceted_boolean(&a, &tool, op, chord)
+    })?
+    .ok_or("ブーリアンの表示メッシュが空です。")?;
+    let raw = kernel("メッシュ化", stop, || faceted.tessellate(chord))?;
+    let bounds = raw.bounds();
+    let mesh = weld_tessellation(&raw, result.size(), stop)?;
+    let volume = crate::mesh_fabrication::signed_volume(&mesh, stop)?;
+    let exact = kernel("体積", stop, || sk::measure_mass(result))?;
+    if !exact.volume.is_finite()
+        || volume <= 0.0
+        || (volume - exact.volume).abs() > exact.volume * tol::BOOLEAN_PREVIEW_VOLUME_ERROR
+        || bounds
+            .min
+            .dist(exact.bbox.min)
+            .max(bounds.max.dist(exact.bbox.max))
+            > chord * 4.0
+    {
+        return Err("表示メッシュがブーリアンの形状と一致しません。".into());
+    }
+    Ok(mesh)
 }
 
 /// Edge pick points: every edge, or the listed edge numbers.
