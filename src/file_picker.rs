@@ -759,7 +759,7 @@ mod directory_listing_tests {
         fs::File::create(directory.0.join("project.MORPH")).unwrap();
         fs::create_dir(directory.0.join("subdirectory")).unwrap();
 
-        let (entries, truncated) = read_directory(&directory.0, "morph").unwrap();
+        let (entries, truncated) = read_directory(&directory.0, FileTask::Open).unwrap();
         assert!(!truncated);
         assert_eq!(entries.len(), 2);
         assert!(entries[0].is_dir);

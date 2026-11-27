@@ -2490,7 +2490,7 @@ impl eframe::App for NodesApp {
         // navigation using a prior result during that brief interval either.
         let stale = self.stale()
             || (self.diagnostics_window.open
-                && !same_calculation(&before.graph, &self.project.graph));
+                && !same_calculation(&self.edits.previous.graph, &self.project.graph));
         if let Some(id) = self.diagnostics_window.show(
             ctx,
             self.diagnostics.as_ref(),
