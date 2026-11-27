@@ -1,0 +1,555 @@
+{
+  "experiment_schema_version": 1,
+  "started_at_utc": "2026-11-26T23:46:26.891963+00:00",
+  "build_manifest": "build-manifest.json",
+  "linked_library_schema_probes": "linked-library-probes.json",
+  "linked_library_provenance_verified": true,
+  "measurement_scope": "Public graph diagnostics only. Reuses real evaluated graph snapshots; no geometry/UI speed claim.",
+  "ordering": "Ascending cases before/after, then descending cases after/before; five repeated samples per process. Optimized-only full matrix last.",
+  "resources_before": {
+    "load_average": [
+      1.99755859375,
+      2.88720703125,
+      3.05126953125
+    ],
+    "free_disk_bytes": 6631784448,
+    "memory": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6466112 kB"
+    }
+  },
+  "runs": [
+    {
+      "label": "before",
+      "case": "prefix-512",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:26.892674+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "before-prefix-512-round-1.json",
+      "stderr_log": "before-prefix-512-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.99755859375,
+          2.88720703125,
+          3.05126953125
+        ],
+        "free_disk_bytes": 6631780352,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6466112 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.2670512049999161,
+      "process_cpu_user_seconds": 0.259061,
+      "process_cpu_system_seconds": 0.007108,
+      "process_peak_rss_kib": 13568,
+      "completed_at_utc": "2026-11-26T23:46:27.159874+00:00",
+      "stdout_sha256": "8df203181177e560ea0a2aa76903ad74087be0e786da69d0cbb743728507de04",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-512",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:27.160990+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "after-prefix-512-round-1.json",
+      "stderr_log": "after-prefix-512-round-1.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.99755859375,
+          2.88720703125,
+          3.05126953125
+        ],
+        "free_disk_bytes": 6631604224,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6429804 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.022100019000390603,
+      "process_cpu_user_seconds": 0.021682999999999997,
+      "process_cpu_system_seconds": 0.0,
+      "process_peak_rss_kib": 13576,
+      "completed_at_utc": "2026-11-26T23:46:27.183340+00:00",
+      "stdout_sha256": "81c6ebb46feaba7044378c1abd71b34530f5fc19a5e159882e070d6152abc624",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-1024",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:27.184415+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "before-prefix-1024-round-1.json",
+      "stderr_log": "before-prefix-1024-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.99755859375,
+          2.88720703125,
+          3.05126953125
+        ],
+        "free_disk_bytes": 6631600128,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6429764 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.3538569250004002,
+      "process_cpu_user_seconds": 1.338753,
+      "process_cpu_system_seconds": 0.012478,
+      "process_peak_rss_kib": 14856,
+      "completed_at_utc": "2026-11-26T23:46:28.538542+00:00",
+      "stdout_sha256": "57ae9dc02b24001e7a65ff3fd6976a5b2b5f4e7a2c488b7d1be64e7bb8794903",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-1024",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:28.539542+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "after-prefix-1024-round-1.json",
+      "stderr_log": "after-prefix-1024-round-1.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.99755859375,
+          2.88720703125,
+          3.05126953125
+        ],
+        "free_disk_bytes": 6631759872,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6477592 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.06357621799998014,
+      "process_cpu_user_seconds": 0.053901,
+      "process_cpu_system_seconds": 0.009339,
+      "process_peak_rss_kib": 13576,
+      "completed_at_utc": "2026-11-26T23:46:28.603287+00:00",
+      "stdout_sha256": "1d4ebc08f8427b36af1c8bcecfc1030d62aaf04176d40e0bfeb080074713322d",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-2048",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:28.604256+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "before-prefix-2048-round-1.json",
+      "stderr_log": "before-prefix-2048-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.99755859375,
+          2.88720703125,
+          3.05126953125
+        ],
+        "free_disk_bytes": 6631755776,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6473840 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 6.230863220999709,
+      "process_cpu_user_seconds": 6.14646,
+      "process_cpu_system_seconds": 0.044628999999999995,
+      "process_peak_rss_kib": 27460,
+      "completed_at_utc": "2026-11-26T23:46:34.835620+00:00",
+      "stdout_sha256": "dede6893d8b2d06161fbf767dce21360882bbb919afa365d6a30dfb4f9d1e1c6",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-2048",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:34.839283+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "after-prefix-2048-round-1.json",
+      "stderr_log": "after-prefix-2048-round-1.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.84375,
+          2.82421875,
+          3.02880859375
+        ],
+        "free_disk_bytes": 6631751680,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6537812 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.15487173600013193,
+      "process_cpu_user_seconds": 0.146067,
+      "process_cpu_system_seconds": 0.007832,
+      "process_peak_rss_kib": 24096,
+      "completed_at_utc": "2026-11-26T23:46:34.995075+00:00",
+      "stdout_sha256": "56f41fdb8d05cba098fc6a686628425dcaf53b4361479dcdeea3dc6e0a8e2530",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-2048",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:34.996177+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "after-prefix-2048-round-2.json",
+      "stderr_log": "after-prefix-2048-round-2.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.84375,
+          2.82421875,
+          3.02880859375
+        ],
+        "free_disk_bytes": 6631743488,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6516352 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.15788211200015212,
+      "process_cpu_user_seconds": 0.132973,
+      "process_cpu_system_seconds": 0.024131999999999997,
+      "process_peak_rss_kib": 24044,
+      "completed_at_utc": "2026-11-26T23:46:35.154247+00:00",
+      "stdout_sha256": "e6a6f4f48a7ab94dbb81eee15d2cc4ed22bb442aef37d78ae696bb41e3124ffb",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-2048",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:35.155358+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "before-prefix-2048-round-2.json",
+      "stderr_log": "before-prefix-2048-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.84375,
+          2.82421875,
+          3.02880859375
+        ],
+        "free_disk_bytes": 6631739392,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6498672 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 6.280684350999763,
+      "process_cpu_user_seconds": 6.122395,
+      "process_cpu_system_seconds": 0.106698,
+      "process_peak_rss_kib": 27156,
+      "completed_at_utc": "2026-11-26T23:46:41.436394+00:00",
+      "stdout_sha256": "091e8f14b182d13bf4baa87a379096476a2f0f35a84f62ce25b35122daa1fe85",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-1024",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:41.439897+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "after-prefix-1024-round-2.json",
+      "stderr_log": "after-prefix-1024-round-2.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.8564453125,
+          2.81005859375,
+          3.02294921875
+        ],
+        "free_disk_bytes": 6631723008,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6543796 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.05765970799984643,
+      "process_cpu_user_seconds": 0.040827999999999996,
+      "process_cpu_system_seconds": 0.016066999999999998,
+      "process_peak_rss_kib": 13704,
+      "completed_at_utc": "2026-11-26T23:46:41.498096+00:00",
+      "stdout_sha256": "f29179da0409df448e941e9be4d4f2eda4f5440843f82860149d239765ce8890",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-1024",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:41.499627+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "before-prefix-1024-round-2.json",
+      "stderr_log": "before-prefix-1024-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.8564453125,
+          2.81005859375,
+          3.02294921875
+        ],
+        "free_disk_bytes": 6631718912,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6540784 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.2156458640001802,
+      "process_cpu_user_seconds": 1.214669,
+      "process_cpu_system_seconds": 0.0,
+      "process_peak_rss_kib": 14588,
+      "completed_at_utc": "2026-11-26T23:46:42.715521+00:00",
+      "stdout_sha256": "f8bac47cbe7c7dfe5e697fc7273b1d8ff2d7be781dbda163566a6f92e17cc764",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-512",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:42.716921+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "after-prefix-512-round-2.json",
+      "stderr_log": "after-prefix-512-round-2.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.8564453125,
+          2.81005859375,
+          3.02294921875
+        ],
+        "free_disk_bytes": 6631714816,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6540804 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.02224036600000545,
+      "process_cpu_user_seconds": 0.021828999999999998,
+      "process_cpu_system_seconds": 0.0,
+      "process_peak_rss_kib": 13704,
+      "completed_at_utc": "2026-11-26T23:46:42.739351+00:00",
+      "stdout_sha256": "472c0e9c215e9ee99820026fc5639547f2e81e5f61e0608fb21d363743be13e3",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-512",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:46:42.740757+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "before-prefix-512-round-2.json",
+      "stderr_log": "before-prefix-512-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.8564453125,
+          2.81005859375,
+          3.02294921875
+        ],
+        "free_disk_bytes": 6631706624,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6540564 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.36558168699957605,
+      "process_cpu_user_seconds": 0.361867,
+      "process_cpu_system_seconds": 0.0,
+      "process_peak_rss_kib": 13704,
+      "completed_at_utc": "2026-11-26T23:46:43.106969+00:00",
+      "stdout_sha256": "621aadb84e4433c1be1611f795930ad615f04514d10007a8a159087f78207890",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": null,
+      "round": 1,
+      "mode": "--full",
+      "started_at_utc": "2026-11-26T23:46:43.118199+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after-isolated",
+        "--full",
+        "--repetitions",
+        "5"
+      ],
+      "stdout_json": "after-full-matrix-round-1.json",
+      "stderr_log": "after-full-matrix-round-1.stderr.log",
+      "binary_sha256": "41b26664468a273c4619559c8c0137379f2b63b62d63850a12ab1b236ee0a296",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.8564453125,
+          2.81005859375,
+          3.02294921875
+        ],
+        "free_disk_bytes": 6631702528,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6545312 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 3.37937026399959,
+      "process_cpu_user_seconds": 3.024618,
+      "process_cpu_system_seconds": 0.336983,
+      "process_peak_rss_kib": 107472,
+      "completed_at_utc": "2026-11-26T23:46:46.498648+00:00",
+      "stdout_sha256": "a9a3ef8521ecb15708ee92e3b2fa1d93d476eddb92b5e30375b47c27c19f4937",
+      "validated": true
+    }
+  ],
+  "completed_at_utc": "2026-11-26T23:46:46.500098+00:00",
+  "resources_after": {
+    "load_average": [
+      1.78759765625,
+      2.77978515625,
+      3.01171875
+    ],
+    "free_disk_bytes": 6631686144,
+    "memory": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6532468 kB"
+    }
+  },
+  "all_runs_passed": true
+}

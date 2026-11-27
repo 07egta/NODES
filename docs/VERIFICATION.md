@@ -1,4 +1,6 @@
-# Morphlet 0.1.0 — 検証記録
+# NODES 0.1.0 — 検証記録
+
+> **未検証の追加（`evolve/more-nodes`）：** 以下の記録は配布版0.1.0（28ノード・6作品）についてです。その後に追加した14ノード、作品例07・08、`examples/07.morph`・`08.morph`、追加テストは、コンパイルも`cargo test`も実行していません。ビルドとテストが通るまで、動作を確認済みとして扱わないでください。
 
 ## NODES 公開時の Windows 確認
 
@@ -6,7 +8,7 @@
 
 同梱ソースの `cargo test --all-targets --locked` は Windows 上で42件成功しました。Windowsでの日本語IMEとマウスを使った保存・書き出しの通し操作は今後の確認項目です。
 
-## Morphlet 0.1.0 配布元の検証記録
+## NODES 0.1.0 配布元の検証記録
 
 確認日: 2026-11-26。結果はこの配布物の実装についての記録です。
 
@@ -52,7 +54,7 @@ Windows向けにコンパイルしたことと、Windows実機で操作を確認
 
 ## 作品例の生成・書き出し
 
-`Morphlet --export-demos examples` で、同じエンジンから6作品を生成しました。メッシュの5作品はSTL出力に成功しています。
+`NODES --export-demos examples` で、同じエンジンから6作品を生成しました。メッシュの5作品はSTL出力に成功しています。
 
 | 作品 | 三角形 | 開いた辺 | 出力 |
 |---|---:|---:|---|
@@ -70,12 +72,25 @@ Windows向けにコンパイルしたことと、Windows実機で操作を確認
 生成コマンドの中心部分は次のとおりです。Windows上でMSVCを使う通常のビルド手順はREADMEに記載しています。
 
 ```sh
-RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --locked --target x86_64-pc-windows-gnullvm --bin Morphlet
+RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --locked --target x86_64-pc-windows-gnullvm --bin NODES
 ```
 
 LLVM MinGWの対応リンカーを指定してクロスコンパイルしています。PEヘッダーはx86-64 / PE32+ / Windows GUIです。DLLインポートを確認し、WindowsのシステムDLL以外の追加ランタイムDLLへの依存は見つかっていません。RhinoやGrasshopperのランタイムへの依存もありません。コード署名は付けていません。
 
 これらはWindows実機での起動や、特定PCのGPUドライバーとの相性を保証する確認ではありません。FPS、起動秒数、大規模グラフの性能保証は計測・公表していません。
+
+## 評価の速度（perf-bugsブランチ、実測）
+
+`cargo test --test robustness_tests bench -- --ignored --nocapture`で測定。環境はLinux・2コア・devプロファイル（opt-level 1、依存は2）で、Windows実機のreleaseではない。値は5回の最小。変更前は並列評価導入前のコード。
+
+| 対象 | 変更前 | 変更後 |
+|---|---|---|
+| 作品例01〜10（3〜9ノード） | 0.01〜12 ms（09が約12 ms） | ほぼ同じ（9ノード以下で並列なし。ノイズの範囲） |
+| 独立した32個の球（分割160×160上限内） | 9.2 ms | 3.2〜5.8 ms（1スレッド12.5 ms、2コア） |
+
+作品例は小さく、並列化の効果は出ない。広いグラフで効く。計測はノイズが大きい（共有環境）。Windows実機のFPSや起動時間は計測していない。リリースの`lto = "fat"`・`codegen-units = 1`の速度とCI時間は未計測。
+
+3Dプレビューは形状とカメラのハッシュが変わらない限り再投影しない既存の構成で、アイドル時の再描画は計算中・トースト・自動回転・保存待ちだけが要求する（コードの確認のみで、CPU使用率は計測していない）。
 
 ## 残る実装上の制約
 

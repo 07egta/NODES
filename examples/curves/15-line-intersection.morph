@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "name": "交点から配置点",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "point",
+        "name": "A",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "x": -30,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "point",
+        "name": "B",
+        "position": [
+          285,
+          40
+        ],
+        "params": {
+          "x": 30,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "point",
+        "name": "C",
+        "position": [
+          550,
+          40
+        ],
+        "params": {
+          "x": -20,
+          "y": -25,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "point",
+        "name": "D",
+        "position": [
+          815,
+          40
+        ],
+        "params": {
+          "x": -20,
+          "y": 25,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "curve_line",
+        "name": "水平線",
+        "position": [
+          20,
+          225
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 5,
+        "kind": "curve_line",
+        "name": "垂直線",
+        "position": [
+          285,
+          225
+        ],
+        "params": {},
+        "inputs": {
+          "a": 2,
+          "b": 3
+        },
+        "preview": true
+      },
+      {
+        "id": 6,
+        "kind": "curve_line_line",
+        "name": "交点",
+        "position": [
+          550,
+          225
+        ],
+        "params": {
+          "tolerance": 0.000001
+        },
+        "inputs": {
+          "a": 4,
+          "b": 5
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 7
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

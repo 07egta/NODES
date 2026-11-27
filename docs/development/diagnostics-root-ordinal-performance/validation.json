@@ -1,0 +1,27 @@
+{
+  "checked_at_utc": "2026-11-27T00:01:53.472248+00:00",
+  "source_equivalence_checks": [
+    {
+      "label": "before",
+      "local": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+      "published": "545bcd4208cc6bf7069a75c7e4aadd6d2e915910",
+      "bytes_equal": true
+    },
+    {
+      "label": "after",
+      "local": "24e92ebd46bfd59cc5ba532c5c9a79df86e16379",
+      "published": "46417ae91af8cbe11eb45934d535278ce23df06b",
+      "bytes_equal": true
+    }
+  ],
+  "harness_and_shim_hashes_match_build": true,
+  "separate_full_report_verification_processes": 2,
+  "measurement_processes": 40,
+  "one_variant_and_one_diagnosis_per_measurement_process": true,
+  "no_full_report_serialization_in_measurement": true,
+  "all_exit_codes_zero": true,
+  "all_oracles_passed": true,
+  "latency_and_rss_medians_independently_recomputed": true,
+  "relative_report_links_checked": true,
+  "whole_process_rss_scope_explicit": true
+}

@@ -1,0 +1,40 @@
+{
+  "recovery_status": "GENERATOR_RECOVERED_INVENTORY_REGENERATION_REQUIRED",
+  "source_url": "https://www.rhino3d.com/docs/grasshopper2/specs/",
+  "rhino_gh2_version": "9.3.26329.6001",
+  "exported_at_utc": "2026-11-25T15:23:50Z",
+  "rhino_source_commit": "a309d5c6769c79fcca9573bda292e006d0e1fd69",
+  "grasshopper2_source_commit": "063e8ec1cd871615ecb58a50d1ea8c9834c3f3a6",
+  "source_html_sha256": "3238d5c37f5932e3ed75fc51157c034fc3b33e22aaec707438f68fcb66d5ba50",
+  "source_html_bytes": 135582,
+  "observed_inventory_count": 1419,
+  "observed_subcategory_count": 66,
+  "observed_in_depth_article_count": 69,
+  "observed_category_counts": {
+    "Curve": 212,
+    "Data": 156,
+    "Display": 94,
+    "Intersect": 83,
+    "Maths": 184,
+    "Mesh": 130,
+    "Params": 104,
+    "Surface": 157,
+    "Text": 38,
+    "Transform": 89,
+    "Vector": 172
+  },
+  "observed_generated_json_bytes": 937266,
+  "inventory_original_local_commit": "6f77c9f",
+  "validation_before_environment_loss": [
+    "Python parser self-test: 3 tests passed",
+    "Offline regeneration and --check matched",
+    "Public HTTP --check with --expect-count 1419 --expect-version 9.3.26329.6001 matched"
+  ],
+  "validation_after_environment_loss": "NOT_RUN",
+  "regenerate_command": "python scripts/update_gh2_inventory.py --expect-count 1419 --expect-version 9.3.26329.6001",
+  "notes": [
+    "This provenance record is not the full inventory and does not claim any component is implemented or verified.",
+    "The full generated JSON was in the lost executor and is not recreated from guessed entries.",
+    "Recovered generator content matches the prior authoring payload; rerun its tests before treating the recovered snapshot as validated."
+  ]
+}

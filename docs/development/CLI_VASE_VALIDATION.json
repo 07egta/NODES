@@ -1,0 +1,711 @@
+{
+  "schema_version": 1,
+  "fixture": "vase -> twist -> Output 2, radius 32 -> 36",
+  "started_utc": "2026-11-26T15:53:52.660325+00:00",
+  "ok": true,
+  "printability_verified": false,
+  "provenance": {
+    "cli_path": "/workspace/scratch/a294e49d5e0f/nodes-validation/2f94df4/nodes-cli",
+    "cli_sha256": "752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434",
+    "request_path": "/workspace/scratch/a294e49d5e0f/NODES-recovered/examples/interop/ai-vase.json",
+    "request_sha256": "05f22a977eb307028d505a31a00cbcab06becd9d26dba81135ed25ff685633e7",
+    "validator_sha256": "59acd26f0b585dcf0cbb875a9d408c500ab8ea06f1718f2526fcf4dcb2932b8f",
+    "source_revision": "2f94df459533774f83593835ba1e22d4924a3c42",
+    "source_context": "GitHub Actions run 45852634502, artifact 15134610988; PR merge 19717e70917718af1374e387720b29b619c1c1ed; tree equality and artifact SHA-256 verified independently",
+    "source_attribution": "caller_provided_not_independently_verified"
+  },
+  "environment": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "system": "Linux",
+    "release": "6.18.57",
+    "machine": "x86_64",
+    "python_version": "3.12.14",
+    "execution_context": "Local real CLI subprocesses; no GUI or printer hardware test"
+  },
+  "expected": {
+    "nodes": 3,
+    "output_node_id": 2,
+    "mesh_count": 1,
+    "vertices": 5906,
+    "triangles": 11808,
+    "height_mm": 104.0,
+    "stl_bytes": 590484,
+    "bounds_absolute_tolerance_mm": 1e-05,
+    "volume_relative_tolerance": 1e-05,
+    "volume_absolute_tolerance_mm3": 0.001
+  },
+  "limitations": [
+    "STL coordinates are f32; CLI geometry and volume use the source mesh.",
+    "The independent check covers finite data, nonzero faces, bounds and determinant volume.",
+    "Topology, self-intersection, wall thickness and printability are not independently certified.",
+    "Metadata preservation is checked for every field of this actual build-produced project."
+  ],
+  "commands": [
+    {
+      "command": "build",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/NODES-recovered/examples/interop/ai-vase.json",
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.0066433480001251155,
+      "exit_code": 0,
+      "stdout_bytes": 1111,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "build",
+        "ok": true,
+        "result": {
+          "destination": "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph",
+          "evaluation": {
+            "cached": 0,
+            "cancelled": false,
+            "computed": 3,
+            "elapsed_ms": 2.637979,
+            "nodes": [
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 1.5998430000000001,
+                "kind": "vase",
+                "node_id": 0
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.983907,
+                "kind": "twist",
+                "node_id": 1
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.050173999999999996,
+                "kind": "output",
+                "node_id": 2
+              }
+            ],
+            "preview_limit_per_node": 8
+          },
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "validate",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.0015795029999026156,
+      "exit_code": 0,
+      "stdout_bytes": 170,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "validate",
+        "ok": true,
+        "result": {
+          "evaluation_performed": false,
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "evaluate",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.002563959999861254,
+      "exit_code": 0,
+      "stdout_bytes": 1000,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "evaluate",
+        "ok": true,
+        "result": {
+          "evaluation": {
+            "cached": 0,
+            "cancelled": false,
+            "computed": 3,
+            "elapsed_ms": 0.760819,
+            "nodes": [
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.430383,
+                "kind": "vase",
+                "node_id": 0
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.28123299999999996,
+                "kind": "twist",
+                "node_id": 1
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.047059,
+                "kind": "output",
+                "node_id": 2
+              }
+            ],
+            "preview_limit_per_node": 8
+          },
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "export-stl",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph",
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.stl"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.010853729000245949,
+      "exit_code": 0,
+      "stdout_bytes": 658,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "export-stl",
+        "ok": true,
+        "result": {
+          "bounds": [
+            [
+              -39.68259324268832,
+              -40.13559362304196,
+              0.0
+            ],
+            [
+              39.78088569610176,
+              39.13328151015398,
+              104.0
+            ]
+          ],
+          "degenerate_triangles": 0,
+          "destination": "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.stl",
+          "format": "binary_stl",
+          "inconsistent_edges": 0,
+          "mesh_count": 1,
+          "non_manifold_edges": 0,
+          "open_edges": 0,
+          "output_node_ids": [
+            2
+          ],
+          "printability_verified": false,
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          },
+          "signed_volume_mm3": 52430.4175536775,
+          "skipped_values": 0,
+          "topologically_closed": true,
+          "triangles": 11808,
+          "units": "millimeters",
+          "vertices": 5906
+        }
+      }
+    },
+    {
+      "command": "apply",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-32.morph",
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/radius-36-request.json",
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.005121550999774627,
+      "exit_code": 0,
+      "stdout_bytes": 1118,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "apply",
+        "ok": true,
+        "result": {
+          "destination": "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.morph",
+          "evaluation": {
+            "cached": 0,
+            "cancelled": false,
+            "computed": 3,
+            "elapsed_ms": 0.857751,
+            "nodes": [
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.457813,
+                "kind": "vase",
+                "node_id": 0
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.3462,
+                "kind": "twist",
+                "node_id": 1
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.050004,
+                "kind": "output",
+                "node_id": 2
+              }
+            ],
+            "preview_limit_per_node": 8
+          },
+          "node_ids": {
+            "0": 0,
+            "1": 1,
+            "2": 2
+          },
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "validate",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.0015361790001406916,
+      "exit_code": 0,
+      "stdout_bytes": 170,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "validate",
+        "ok": true,
+        "result": {
+          "evaluation_performed": false,
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "evaluate",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.morph"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.0022094379996815405,
+      "exit_code": 0,
+      "stdout_bytes": 988,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "evaluate",
+        "ok": true,
+        "result": {
+          "evaluation": {
+            "cached": 0,
+            "cancelled": false,
+            "computed": 3,
+            "elapsed_ms": 0.831783,
+            "nodes": [
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.39434,
+                "kind": "vase",
+                "node_id": 0
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.363936,
+                "kind": "twist",
+                "node_id": 1
+              },
+              {
+                "data": {
+                  "branch_count": 1,
+                  "empty_branches": 0,
+                  "item_count": 1,
+                  "kinds": {
+                    "mesh": 1
+                  },
+                  "preview": [
+                    {
+                      "kind": "mesh",
+                      "triangle_count": 11808,
+                      "vertex_count": 5906
+                    }
+                  ],
+                  "preview_truncated": false
+                },
+                "disabled": false,
+                "elapsed_ms": 0.071375,
+                "kind": "output",
+                "node_id": 2
+              }
+            ],
+            "preview_limit_per_node": 8
+          },
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          }
+        }
+      }
+    },
+    {
+      "command": "export-stl",
+      "arguments": [
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.morph",
+        "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.stl"
+      ],
+      "timeout_seconds": 30,
+      "passed": true,
+      "elapsed_seconds": 0.0126056740000422,
+      "exit_code": 0,
+      "stdout_bytes": 661,
+      "stderr_tail": "",
+      "response": {
+        "api_version": 1,
+        "cli_version": 1,
+        "command": "export-stl",
+        "ok": true,
+        "result": {
+          "bounds": [
+            [
+              -44.642917398024366,
+              -45.15254282592222,
+              0.0
+            ],
+            [
+              44.753496408114486,
+              44.02494169892323,
+              104.0
+            ]
+          ],
+          "degenerate_triangles": 0,
+          "destination": "/workspace/scratch/a294e49d5e0f/nodes-validation/cli-vase-current/vase-radius-36.stl",
+          "format": "binary_stl",
+          "inconsistent_edges": 0,
+          "mesh_count": 1,
+          "non_manifold_edges": 0,
+          "open_edges": 0,
+          "output_node_ids": [
+            2
+          ],
+          "printability_verified": false,
+          "project": {
+            "name": "API graph",
+            "node_count": 3,
+            "schema_version": 1
+          },
+          "signed_volume_mm3": 59967.82314285221,
+          "skipped_values": 0,
+          "topologically_closed": true,
+          "triangles": 11808,
+          "units": "millimeters",
+          "vertices": 5906
+        }
+      }
+    }
+  ],
+  "baseline": {
+    "file": "vase-radius-32.stl",
+    "sha256": "b5209ca39d2627182216b8fc8e01cb8c45674ab0676d95a5ec1da8b50a9e4070",
+    "bytes": 590484,
+    "header_ascii": "Morphlet binary STL | units: millimeters | mesh geometry",
+    "triangle_count": 11808,
+    "unique_exported_vertex_positions": 5906,
+    "bounds_mm": [
+      [
+        -39.682594299316406,
+        -40.13559341430664,
+        0.0
+      ],
+      [
+        39.7808837890625,
+        39.13328170776367,
+        104.0
+      ]
+    ],
+    "height_mm": 104.0,
+    "half_width_x_mm": 39.73173904418945,
+    "half_width_y_mm": 39.634437561035156,
+    "minimum_triangle_area_mm2": 2.2207415298401463,
+    "all_coordinates_and_normals_finite": true,
+    "all_triangle_areas_nonzero": true,
+    "signed_volume_mm3": 52430.418305523504,
+    "cli_signed_volume_mm3": 52430.4175536775,
+    "volume_absolute_difference_mm3": 0.0007518460042774677,
+    "volume_relative_tolerance": 1e-05,
+    "volume_absolute_tolerance_mm3": 0.001,
+    "volume_comparison_passed": true,
+    "topology_diagnostics_from_cli": {
+      "open_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_edges": 0,
+      "degenerate_triangles": 0,
+      "topologically_closed": true
+    },
+    "independent_topology_verification_performed": false,
+    "printability_verified": false,
+    "saved_radius_mm": 32.0,
+    "project_sha256": "f9ed03d7c4317629c5a05dcf9725f93fe8829c48d30f55e7a37f75adc44ee3da"
+  },
+  "edited": {
+    "file": "vase-radius-36.stl",
+    "sha256": "baf16ce8a9abcdc620b340e7a4118e83d610d3cd6add77c5927e6d501cce168b",
+    "bytes": 590484,
+    "header_ascii": "Morphlet binary STL | units: millimeters | mesh geometry",
+    "triangle_count": 11808,
+    "unique_exported_vertex_positions": 5906,
+    "bounds_mm": [
+      [
+        -44.64291763305664,
+        -45.15254211425781,
+        0.0
+      ],
+      [
+        44.75349807739258,
+        44.024940490722656,
+        104.0
+      ]
+    ],
+    "height_mm": 104.0,
+    "half_width_x_mm": 44.69820785522461,
+    "half_width_y_mm": 44.588741302490234,
+    "minimum_triangle_area_mm2": 2.5396657359210764,
+    "all_coordinates_and_normals_finite": true,
+    "all_triangle_areas_nonzero": true,
+    "signed_volume_mm3": 59967.823772166026,
+    "cli_signed_volume_mm3": 59967.82314285221,
+    "volume_absolute_difference_mm3": 0.0006293138139881194,
+    "volume_relative_tolerance": 1e-05,
+    "volume_absolute_tolerance_mm3": 0.001,
+    "volume_comparison_passed": true,
+    "topology_diagnostics_from_cli": {
+      "open_edges": 0,
+      "non_manifold_edges": 0,
+      "inconsistent_edges": 0,
+      "degenerate_triangles": 0,
+      "topologically_closed": true
+    },
+    "independent_topology_verification_performed": false,
+    "printability_verified": false,
+    "saved_radius_mm": 36.0,
+    "project_sha256": "ac05094f64e61abd56a6280ab53042091a8f099c3cbbd6f04e293b6e9cf697ba"
+  },
+  "saved_radius_change_verified": [
+    32.0,
+    36.0
+  ],
+  "all_other_saved_project_fields_preserved": true,
+  "source_project_bytes_preserved": true,
+  "geometry_changed_after_edit": true,
+  "finished_utc": "2026-11-26T15:53:52.846635+00:00"
+}

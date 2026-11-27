@@ -1,0 +1,54 @@
+# Core integration: node authoring and verification
+
+Base: `evolve/all` at `df77c542473a5c637f3353dec48e367dd67db027`. The initial integration preserved schema v1, node IDs, port keys and dependencies. Subsequent changes raised the graph node limit to 16,384 after adding deterministic traversal, cache pressure accounting and a 10,000-node regression. Geometry/item budgets remain separate; see [ARCHITECTURE.md](ARCHITECTURE.md) and [TEST_RESULTS.md](../TEST_RESULTS.md).
+
+## Node authoring contract
+
+- Implement standard nodes, shared types, evaluation, geometry, persistence and UI integration in Rust. The [language policy](LANGUAGE_POLICY.md) permits small supporting-language exceptions, including existing developer tooling and bounded user scripts; it does not move core node implementations into scripts or foreign runtimes.
+- Add a stable snake_case serialized NodeKind ID in `src/model.rs`; do not rename an existing ID or port key. Add it to `NodeKind::all()` (Cluster is intentionally not in the picker).
+- Define metadata in the owning category module: Japanese display label, category, description, Japanese/English search keywords, typed inputs, defaults/ranges/steps, and output type. Reuse InputSpec constructors.
+- For a normal item-wise node, dispatch its kernel through the existing evaluator, with cancellation and checked size. Whole-list or whole-tree operations belong in their respective modules, not a second independent tree implementation.
+- Use `Value` and `Tree` from model. Do not introduce a new implicit coercion or silently discard a branch. Handle empty input, type mismatch, non-finite values, excessive allocations and cancellation.
+- Provide deterministic unit tests and an integration test exercising Graph -> Evaluator. Include save/load compatibility for a new serialized ID and a regression for its failure cases.
+- Keep UI display independent from evaluation. Presentation-only edits should not invalidate computation. Include any non-port semantic state in the cache key, including external resource metadata.
+- Do not add dependencies without updating and reviewing the lockfile, license notices and the Windows dependency audit. MIT/Apache-2.0 project policy remains unchanged.
+
+## Integration boundaries
+
+Graph and node metadata: model; evaluation and cache: engine; category nodes: gh_nodes (and future separate category modules); cluster definitions and execution: cluster; sandbox scripts: script; file I/O: persistence/import/stl_export/gcode; UI: app/canvas/viewport. Preserve current entry points so parallel agents can add category modules without changing the schema.
+
+The validated topological traversal now supplies references to nodes directly, rather than repeatedly looking up IDs with a linear scan. The public ID order and its validation rules remain intact. Nested cluster execution shares the traversal and honors disabled nodes. A nested import's cache key includes external file metadata, like a top-level import; this is evaluated when a new evaluation is requested, not a new file watcher. Metadata checks cannot detect an edit that preserves both size and modification time.
+
+## Reproducible checks
+
+```powershell
+cargo test --all-targets --locked
+cargo build --release --locked --bin NODES
+cargo test --release --locked --test core_integration benchmark_sparse_slider_edit -- --ignored --nocapture
+```
+
+Record CPU, RAM, OS, Rust version, commit SHA and power mode. Compare five release-mode samples per graph size on the same machine. The benchmark excludes graph construction, runs cold/warm/sparse-edit evaluations, and prints computed/cached counts and elapsed milliseconds. The current graph limit is 16,384 nodes. `tests/large_graph_tests.rs` exercises a 10,000-node chain, warm cache reuse and a middle edit that recomputes exactly 5,000 downstream nodes. Above-limit tests use `MAX_NODES + 1`. Historical 2,048-node/rejected-10,000 results apply only to the earlier checkpoint; current measurements and their build/hardware scope belong in `TEST_RESULTS.md`. Start-up, UI frame time, idle CPU, memory, GPU and real geometry workloads need separate Windows measurements.
+
+## Remaining coordinated work
+
+Multi-output port IDs and migration (retain the v1 reader); opaque unknown node payloads with explicit disabled behavior; cooperative parallel node execution; versioned plugin API; richer runtime typed registries; Windows-specific UI/geometry resource measurements. The bounded latest-only worker queue and category module dispatch are implemented. These require coordinated schema/UI work and compatibility tests, not an unreviewed merge into the current graph model.
+
+## Second hardening pass
+
+Cluster instance keys now share per-root dependency token arrays. Each reachable definition is compared against its full serialized signature once per evaluation and receives a new revision only on change; tokens are not collision-prone hashes. This avoids storing the entire definition closure in every instance's cache entry. The evaluator still serializes active definitions once per evaluation and does not provide a file watcher. Definition validation memoizes depths and stops before descending past the configured maximum. Part import checks ID allocation before mutation; part export validates the generated payload and uses the same atomic, flushed writer as projects.
+
+Regression tests cover shared nested definitions, graph replacement with reused IDs, pathological definition fanout/depth, ID exhaustion and preservation of an existing part on failed saves.
+
+## Third hardening pass: bounded worker mailbox
+
+The GUI and worker now exchange snapshots through a dependency-free latest-only mailbox rather than unbounded channels. Each direction retains at most one undelivered snapshot; superseded snapshots are released outside the lock. The worker skips stale requests before starting and still checks the revision during evaluation and before publishing; the UI retains its final revision check. Dropping the worker requests cooperative cancellation. This is a single-worker scheduling change, not parallel node execution.
+
+Mailbox unit tests exercise 10,000 updates, release of superseded payloads, final delivery on producer close, monotonic concurrent delivery and consumer disconnect. UI responsiveness and shutdown behavior still require Windows execution.
+
+## Fourth hardening pass: loss-resistant project I/O
+
+Project v1 decoding rejects unknown top-level fields rather than silently dropping them, and checks the schema version before interpreting the graph. Unknown node IDs still fail closed: the current editor cannot edit or round-trip such nodes; the source bytes remain untouched. Future opaque-node support needs a coordinated UI and model migration. Project writes stream through an 8 MiB limiter into the existing atomic writer; oversized serialization cannot overwrite a previous valid file and the temporary file is removed on failure. Autosave failures are surfaced in the GUI instead of silently ignored. Tests cover unknown metadata/node types, future versions, oversized valid in-memory projects, and round-tripping all bundled examples. Recovery-file ownership across simultaneous application instances remains an open issue.
+
+## Fifth hardening pass: predictable evaluation and cache pressure
+
+Cached logical weights are now computed only when results are produced. The eviction index preserves the existing oldest-revision policy while replacing repeated full cache scans with ordered removals. Deleted graph nodes are removed from both indexes through the same routine; cancellation tests assert the index and weight invariants. Topological traversal orders sibling nodes by stable IDs so the serialized vector order cannot alter the evaluation/resource-admission order. Numeric cache keys compare IEEE-754 bit patterns, including signed zero. Regression tests cover sibling ordering, signed zero and node removal/reuse. These are algorithmic improvements; elapsed-time and RAM gains remain unmeasured.

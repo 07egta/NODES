@@ -1,0 +1,15 @@
+{
+  "source_sha": "aa6906574ba3a89919d80a8a778d71ac65cc3724",
+  "run_id": 45917517285,
+  "job_id": 140241516635,
+  "run_url": "https://github.com/07egta/NODES/actions/runs/45917517285",
+  "job_conclusion": "failure",
+  "step": "Test all targets",
+  "test": "independent_scaling_and_subnormal_directions_preserve_angles",
+  "location": "tests/vector_angle_regressions.rs:79",
+  "expected_bits": 1,
+  "actual_bits": 0,
+  "excerpt": "windows-ci-failure-excerpt.log",
+  "excerpt_format": "Relevant failure section from actual GitHub Actions job log, line endings normalized to LF. Full job log not archived here.",
+  "failure_stage": "The final node output was observed. Individual hypot/atan2 intermediate values were not measured on Windows."
+}

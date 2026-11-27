@@ -1,0 +1,14 @@
+{
+  "checked_at_utc": "2026-11-26T23:55:52.693563+00:00",
+  "snapshot_checks": [
+    "before source byte-exact to frozen git revision",
+    "after source byte-exact to frozen git revision"
+  ],
+  "harness_and_shim_hashes_match_build": true,
+  "measured_processes": 12,
+  "diagnosis_calls": 144,
+  "all_exit_codes_zero": true,
+  "all_oracles_and_full_report_equality_passed": true,
+  "pooled_medians_independently_recomputed": true,
+  "source_reports_and_relative_links_checked": true
+}

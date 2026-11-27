@@ -1,17 +1,19 @@
-# Morphlet 第三者ライセンスと著作権表示
+# NODES 第三者ライセンスと著作権表示
 
 確認日: 2026-11-26  
-対象: Windows x64 (`x86_64-pc-windows-gnullvm`) / Morphlet 0.1.0
+対象: Windows x64 (`x86_64-pc-windows-gnullvm`) / NODES 0.1.0
 
-## Morphlet 本体
+この文書の 114 件の監査と MinGW runtime 記録は、その時点の Windows gnullvm 配布物を対象とする。現在の Cargo.lock 全体、Windows MSVC CI、実行環境中断後の回収範囲は [DEPENDENCIES.md](DEPENDENCIES.md) を参照する。Rhai 関連 7 件の本文は記録済み公式コミットから回収し、旧監査とは分けて保存した。
 
-Morphlet は、このプロジェクトのために新しく記述した独立した実装です。Arclet CAD の方針・既存構造を参考にしていますが、Arclet CAD / SolidCraft のソースコードをこの配布物へコピーしていません。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
+## NODES 本体
 
-Morphlet 本体のソースコードは **MIT または Apache-2.0** から選択できます。本文は [LICENSE-MIT](../LICENSE-MIT) と [LICENSE-APACHE](../LICENSE-APACHE) です。本体のライセンスは、下記の第三者コードやフォントの著作権・ライセンスを変更しません。
+NODES は、このプロジェクトのために新しく記述した独立した実装です。Arclet CAD の方針・既存構造を参考にしていますが、Arclet CAD / SolidCraft のソースコードをこの配布物へコピーしていません。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
+
+NODES 本体のソースコードは **MIT または Apache-2.0** から選択できます。本文は [LICENSE-MIT](../LICENSE-MIT) と [LICENSE-APACHE](../LICENSE-APACHE) です。本体のライセンスは、下記の第三者コードやフォントの著作権・ライセンスを変更しません。
 
 ## 確認対象と結果
 
-現在の `Cargo.lock` と有効な機能設定を使い、`cargo tree` でこのターゲットに有効な通常依存・ビルド依存を抽出し、`cargo metadata` でバージョン・ソース・ライセンスを突き合わせました。開発専用・非選択の optional 依存は除外しています。metadata の resolve グラフには追加の optional 依存も含まれたため、単純な全件集計を採用していません。
+この監査時点の `Cargo.lock`（SHA-256: `96331253910df5b9537f9b79393a0378a58ea68373df42653f1c6138ae4bd5d5`）と有効な機能設定を使い、`cargo tree` でこのターゲットに有効な通常依存・ビルド依存を抽出し、`cargo metadata` でバージョン・ソース・ライセンスを突き合わせました。開発専用・非選択の optional 依存は除外しています。metadata の resolve グラフには追加の optional 依存も含まれたため、単純な全件集計を採用していません。
 
 ```sh
 cargo tree --locked --offline --target x86_64-pc-windows-gnullvm --edges normal,build --prefix none
@@ -28,11 +30,22 @@ cargo metadata --locked --offline --format-version 1 --filter-platform x86_64-pc
 
 Cargo の情報形式: [公式 cargo metadata ドキュメント](https://doc.rust-lang.org/cargo/commands/cargo-metadata.html)。依存のバージョンや機能設定を変えた場合は、この一覧を再生成してください。
 
+## 追加済み依存の本文回収
+
+次の7件は上記114件の確認後に追加された既存依存です（理由は [実装構成](ARCHITECTURE.md) の第10章）。2026-11-26 に本文を補完した後、実行環境が失われました。記録済み VCS commit の公式 repository から本文・manifest を再取得し、出典と保存本文の SHA-256 を [追加監査データ](../licenses/additional-dependency-audit.json) と各 package の SOURCE.txt に保存しました。失われた archive 全体との再照合、対象 OS の dependency graph と最終バイナリの再監査は行っていません。
+
+| パッケージ | ライセンス宣言 |
+|---|---|
+| rhai 1.27.0 / rhai_codegen 3.3.0 | MIT OR Apache-2.0 |
+| thin-vec 0.2.21 / const-random 0.1.20 / const-random-macro 0.1.18 | MIT OR Apache-2.0 |
+| tiny-keccak 2.0.2 | CC0-1.0 |
+| smartstring 1.0.1 | **MPL-2.0+**（ファイル単位の弱いコピーレフト。配布に含めるなら本文とソース入手先の表示が必要） |
+
 ## フォント
 
-### Morphlet JP
+### NODES JP
 
-`assets/MorphletJP.ttf` は Google Fonts が配布する Noto Sans JP の可変フォントをウェイト 400 に固定し、内部名称を Morphlet JP へ変更したものです。元フォントの著作権表示は **Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'** です。フォント自体は **SIL Open Font License 1.1** のまま配布します。
+`assets/MorphletJP.ttf` は Google Fonts が配布する Noto Sans JP の可変フォントをウェイト 400 に固定し、内部名称を NODES JP へ変更したものです。元フォントの著作権表示は **Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'** です。フォント自体は **SIL Open Font License 1.1** のまま配布します。
 
 本文: [Noto-Sans-JP-OFL.txt](../licenses/fonts/Noto-Sans-JP-OFL.txt)。アプリ側の同じ表示: [FONT-LICENSE.txt](../assets/FONT-LICENSE.txt)。[Google Fonts の Noto Sans JP 公式ライセンス](https://github.com/google/fonts/blob/main/ofl/notosansjp/OFL.txt)。フォント名の変更は本ソフト向けの変更を示すものであり、Adobe や Noto プロジェクトによる推奨を意味しません。
 

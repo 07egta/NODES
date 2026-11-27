@@ -1,0 +1,73 @@
+# 曲率判定の再実装 — CI 未検証
+
+更新日: 2026-11-26 UTC。作業ブランチ: `recovery/mesh-review`。
+基点: メッシュ回収コミット `03ba0b5123476df0ebf6f8dcf635d483ce0f11d1`。
+
+## 回復と再実装の区別
+
+ローカルコミット `997183b` の完全なソースとサンプルは環境停止により取得不能。
+この変更は公開済み `6349577` のコードを読み直して作成した**新規実装**であり、
+失われたコミットのバイト単位の回復とは主張しない。実行環境がなく、
+この変更に対する Cargo・Rust コンパイル・GUI の検証は未実施。CI 待ち。
+
+## 原因と変更
+
+`NurbsSurface::derivatives2` は正規化 UV をネイティブ節点座標へ変換する。
+旧 `require_second_order_continuity` は評価値と節点の完全一致だけで多重度を調べた。
+しかし IEEE 754 二進倍精度では `10 * 0.07` は `0.7000000000000001` になり、
+記録された `0.7` と 1 ULP 異なるため、C2 未満の内部節点の拒否をすり抜けた。
+
+新しい検査は各**内部節点の正確に等しい値の連続群**を走査する。
+群の多重度 m と次数 p が `p - m < 2` のとき、評価値が節点から
+`8 * f64::EPSILON * max(abs(domain_start), abs(domain_end), 1)` 以内ならエラーにする。
+これは変換時の丸めに対する保守的な近傍であり、幾何的な曲率公差ではない。
+
+近接していても異なる節点を同じ群として数えない。
+特に 1 ULP 離れた 2 個の単純な三次節点は、それぞれ C2 であり、
+「近傍に 2 個ある」ことを理由に C1 と扱わない。
+正確な定義域端点では、従来の片側微分を維持する。
+非常に小さいネイティブ定義域や大きな節点オフセットでは保守的に広く拒否することがある。
+
+## 回帰テストと次の手順
+
+`tests/surface_knot_roundoff.rs` に次を追加した。
+
+1. `10 * 0.07` と `0.7` のビット差が 1 であること、および U/V 両方向の C2 未満節点の拒否。
+2. 節点から離れた正則点・正確な端点での評価とキャンセル。
+3. 1 ULP 離れた単純な三次節点の多重度を混同しないこと。
+
+JavaScript の二進倍精度演算で 1 ULP の入力差を確認しただけであり、
+それを Rust のテスト成功として数えない。
+
+```sh
+cargo test --locked --test surface_knot_roundoff --test surface_curvature_tests
+cargo test --all-targets --locked
+```
+
+## 新規作成した編集用サンプル
+
+`examples/surface-curvature-study.morph` は失われたファイルの推測復元ではなく、
+保存済みの node specs と 37 例 fixture の契約に基づく新しい作例。
+`node 0` は `torus_surface`、大半径 35・小半径 8。
+`node 1` の数列 `0, 0.125, ..., 1` を `node 2` の Graft で 9 枝に分け、
+評価点・ガウス曲率・平均曲率・主曲率・法線へ同じ V を接続する。
+
+固定 ID は 3=評価点、4=K、5=H、6=主曲率、7=法線、
+8=9 枝の法線表示、9=精密トーラス表示。
+37 例 fixture の `node 0 minor: 8→10` 編集と `node 5 Number` の結果変化に対応する。
+元の値へ戻すと同じグラフから再評価できる構成。これは構成上の期待であり、
+今回の実行確認はまだ行えていない。
+
+`tests/surface_curvature_study.rs` は 9 枝、トーラスの独立した解析曲率式、
+保存・再読込、温キャッシュ、半径変更による再計算を検査する。
+端点 V=0 と V=1 は同じ周期位置を異なる枝として含む。
+曲率の符号は `n=Su×Sv/|Su×Sv|` に従う。
+
+```sh
+cargo test --locked --test surface_curvature_study --test surface_knot_roundoff --test surface_curvature_tests
+cargo test --all-targets --locked
+```
+
+サンプルおよび追加テストも **Cargo 未検証・CI 待ち**。
+GUI、実機印刷、Grasshopper 互換性は検証していない。
+

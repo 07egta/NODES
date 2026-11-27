@@ -1,0 +1,28 @@
+[
+  {
+    "label": "before",
+    "probe_source_sha256": "21d7fa2309672acab8c4c55430fef59467288460abb415ed2b1dcbb8f108db27",
+    "morphlet_rlib_sha256": "40bdf1228a1eef25785d5d95f4c25ac6f46e869937975901ad3288e795148e21",
+    "morphlet_rlib_path": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target/release/build/morphlet/da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+    "compile_exit_code": 0,
+    "compile_seconds": 7.417278362000161,
+    "run_exit_code": 0,
+    "raw_json": "before-linked-schema-probe.json",
+    "binary_sha256": "033c208fb9c1613942febd73651e3918fb9ddaf84d2e47d24bd88613a22eb0d6",
+    "message_truncated_present": false,
+    "message_truncated_value": null
+  },
+  {
+    "label": "after",
+    "probe_source_sha256": "21d7fa2309672acab8c4c55430fef59467288460abb415ed2b1dcbb8f108db27",
+    "morphlet_rlib_sha256": "87b142c0f05906d9827970655903d2ab6256be5565746ca62ac3dfa980b91ec2",
+    "morphlet_rlib_path": "/workspace/scratch/74d3da15ab33/diagnostics-after-isolated-target/release/build/morphlet/da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+    "compile_exit_code": 0,
+    "compile_seconds": 7.998408603999906,
+    "run_exit_code": 0,
+    "raw_json": "after-linked-schema-probe.json",
+    "binary_sha256": "5a7bbcd72d410364b0c496922c43b7ec14b1f7a26754d14c45f6c7344b430f99",
+    "message_truncated_present": true,
+    "message_truncated_value": false
+  }
+]

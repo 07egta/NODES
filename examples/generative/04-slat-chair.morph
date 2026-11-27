@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "name": "スラット椅子の構成スタディ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "座板",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 6,
+          "depth": 45,
+          "height": 3
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "grid_array",
+        "name": "座板を並べる",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "nx": 7,
+          "ny": 1,
+          "dx": 7,
+          "dy": 0
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "move",
+        "name": "座面高さ",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "x": -21,
+          "z": 43
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "box",
+        "name": "背板",
+        "position": [
+          20,
+          420
+        ],
+        "params": {
+          "width": 6,
+          "depth": 3,
+          "height": 42
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "grid_array",
+        "name": "背板を並べる",
+        "position": [
+          280,
+          420
+        ],
+        "params": {
+          "nx": 7,
+          "ny": 1,
+          "dx": 7,
+          "dy": 0
+        },
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "move",
+        "name": "背の位置",
+        "position": [
+          540,
+          420
+        ],
+        "params": {
+          "x": -21,
+          "y": 21,
+          "z": 43
+        },
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "box",
+        "name": "脚",
+        "position": [
+          20,
+          810
+        ],
+        "params": {
+          "width": 4,
+          "depth": 4,
+          "height": 43
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "grid_array",
+        "name": "四脚",
+        "position": [
+          280,
+          810
+        ],
+        "params": {
+          "nx": 2,
+          "ny": 2,
+          "dx": 40,
+          "dy": 38
+        },
+        "inputs": {
+          "geometry": 6
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "move",
+        "name": "脚の位置",
+        "position": [
+          540,
+          810
+        ],
+        "params": {
+          "x": -20,
+          "y": -19
+        },
+        "inputs": {
+          "geometry": 7
+        },
+        "preview": false
+      },
+      {
+        "id": 9,
+        "kind": "concat_list",
+        "name": "座面と背面",
+        "position": [
+          800,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "a": 2,
+          "b": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 10,
+        "kind": "concat_list",
+        "name": "脚を合わせる",
+        "position": [
+          1060,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "a": 9,
+          "b": 8
+        },
+        "preview": false
+      },
+      {
+        "id": 11,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 10
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 12
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

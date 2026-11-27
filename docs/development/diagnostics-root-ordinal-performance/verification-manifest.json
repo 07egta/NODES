@@ -1,0 +1,42 @@
+{
+  "checked_at_utc": "2026-11-26T23:59:00.109248+00:00",
+  "processes": [
+    {
+      "case": "high-id-two-roots",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-root-ordinal",
+        "--mode",
+        "verify",
+        "--case",
+        "high-id-two-roots"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.3714266269998916,
+      "independent_oracles": true,
+      "full_report_byte_equality": true,
+      "source_checks": true,
+      "excluded_from_measurement": true,
+      "raw_json": "verify-high-id-two-roots.json",
+      "stderr_log": "verify-high-id-two-roots.stderr.log"
+    },
+    {
+      "case": "success-10000",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-root-ordinal",
+        "--mode",
+        "verify",
+        "--case",
+        "success-10000"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13203017500018177,
+      "independent_oracles": true,
+      "full_report_byte_equality": true,
+      "source_checks": true,
+      "excluded_from_measurement": true,
+      "raw_json": "verify-success-10000.json",
+      "stderr_log": "verify-success-10000.stderr.log"
+    }
+  ],
+  "all_passed": true
+}

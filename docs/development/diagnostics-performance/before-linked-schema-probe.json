@@ -1,0 +1,54 @@
+{
+  "blocked_nodes": [],
+  "causality": "dependency_inference",
+  "disabled_nodes": [],
+  "graph_error": null,
+  "hotspots": [
+    {
+      "cached": false,
+      "completed": true,
+      "elapsed_ms": 0.05453,
+      "node": {
+        "id": 0,
+        "kind": "divide",
+        "name": "割り算"
+      },
+      "share_percent": 100.0
+    }
+  ],
+  "root_failures": [
+    {
+      "affected_count": 0,
+      "affected_nodes": [],
+      "affected_nodes_truncated": false,
+      "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+      "node": {
+        "id": 0,
+        "kind": "divide",
+        "name": "割り算"
+      },
+      "upstream_root_count": 0,
+      "upstream_roots": [],
+      "upstream_roots_truncated": false
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "blocked_count": 0,
+    "cached_count": 0,
+    "cancelled": false,
+    "complete": true,
+    "completed_count": 1,
+    "computed_count": 1,
+    "connection_count": 0,
+    "disabled_count": 0,
+    "elapsed_ms": 0.085065,
+    "failed_count": 1,
+    "measured_node_ms": 0.05453,
+    "node_count": 1,
+    "root_failure_count": 1,
+    "successful_count": 0,
+    "unevaluated_count": 0
+  },
+  "unevaluated_nodes": []
+}

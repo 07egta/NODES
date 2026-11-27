@@ -1,0 +1,56 @@
+{
+  "api_version": 1,
+  "edits": [
+    {
+      "op": "add",
+      "alias": "a",
+      "kind": "number",
+      "position": [
+        80,
+        80
+      ]
+    },
+    {
+      "op": "add",
+      "alias": "b",
+      "kind": "number",
+      "position": [
+        80,
+        220
+      ]
+    },
+    {
+      "op": "add",
+      "alias": "sum",
+      "kind": "add",
+      "position": [
+        350,
+        150
+      ]
+    },
+    {
+      "op": "set",
+      "node": "a",
+      "input": "value",
+      "value": 7
+    },
+    {
+      "op": "set",
+      "node": "b",
+      "input": "value",
+      "value": 5
+    },
+    {
+      "op": "connect",
+      "from": "a",
+      "to": "sum",
+      "input": "a"
+    },
+    {
+      "op": "connect",
+      "from": "b",
+      "to": "sum",
+      "input": "b"
+    }
+  ]
+}

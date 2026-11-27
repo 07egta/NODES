@@ -1,5 +1,6 @@
 [package]
-name = "morphlet"
+name = "nodes"
+default-run = "NODES"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
@@ -10,13 +11,18 @@ description = "An independent Japanese-first desktop node geometry studio"
 eframe = { version = "=0.33.3", default-features = false, features = ["default_fonts", "glow", "x11"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
+# Already present in Cargo.lock via desktop dependencies; no proprietary GH SDK.
+xml-rs = "=0.8.29"
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Sandboxed user scripts (スクリプトノード). Exact pin; see docs/ARCHITECTURE.md section 10.
+# No "sync" (the engine lives on one helper thread) and no "unchecked" (limits must stay on).
+rhai = { version = "=1.27.0", default-features = false, features = ["std", "no_module", "no_time", "no_custom_syntax"] }
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = "fat"
 strip = true
-codegen-units = 16
+codegen-units = 1
 
 [profile.dev]
 opt-level = 1
@@ -25,6 +31,6 @@ opt-level = 1
 opt-level = 2
 
 [[bin]]
-name = "Morphlet"
+name = "NODES"
 path = "src/main.rs"
 

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "ハニカムパネル",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "hex_panels",
+        "name": "六角セル",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 9,
+          "ny": 7,
+          "size": 9,
+          "fill": 0.86
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "厚み",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "height": 4,
+          "layers": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

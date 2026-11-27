@@ -1,0 +1,112 @@
+{
+  "source_sha": "3e3bb46185628e479888053fe4e4ff606047c244",
+  "source_tree": "8f5f93cf0c4b64ac2059b698b7e4f88de12fc75c",
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.491,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 6.135,
+      "log": "check.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 5.517,
+      "log": "clippy.log"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 41.491,
+      "log": "tests.log",
+      "results": {
+        "suites": 44,
+        "passed": 486,
+        "failed": 0,
+        "ignored": 2
+      }
+    },
+    {
+      "name": "debug-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.114,
+      "log": "debug-bins.log"
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 91.066,
+      "log": "release-bins.log"
+    }
+  ],
+  "local_profile": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "scope": "Local Linux full-source verification after cooperative diagnostic cancellation and the fixed search layout. Ignored cases are not counted as run.",
+  "binaries": {
+    "Morphlet": {
+      "size_bytes": 19393360,
+      "sha256": "542433d3e6d6543edb2af84164b8d6bcc88be72789fba85df845d0a275af1fb3"
+    },
+    "nodes-cli": {
+      "size_bytes": 5588368,
+      "sha256": "a8c2d08e8ee9e43af4044171061a156f3531f06ecad79d0c0a8cd477104a9132"
+    }
+  }
+}

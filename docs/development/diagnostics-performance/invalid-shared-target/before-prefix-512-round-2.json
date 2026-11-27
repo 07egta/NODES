@@ -1,0 +1,103 @@
+{
+  "architecture": "x86_64",
+  "arguments": [
+    "--quick",
+    "--repetitions",
+    "5",
+    "--case",
+    "prefix-512"
+  ],
+  "cases": [
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 1023,
+      "expected_root_failures": 512,
+      "name": "prefix-512",
+      "nodes": 1023,
+      "report": {
+        "affected_count_max": 511,
+        "affected_count_min": 1,
+        "blocked_records": 511,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 1
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 2
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 64,
+        "root_records": 512,
+        "serialized_json_bytes": 949510,
+        "summary": {
+          "blocked_count": 511,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 1023,
+          "computed_count": 1023,
+          "connection_count": 1022,
+          "disabled_count": 0,
+          "elapsed_ms": 2.3027249999999997,
+          "failed_count": 1023,
+          "measured_node_ms": 1.8926590000000008,
+          "node_count": 1023,
+          "root_failure_count": 512,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 256,
+        "truncated_upstream_records": 448,
+        "upstream_root_count_max": 512
+      },
+      "shape": "independent Divide-by-zero roots, incremental Add joins adding one root per step",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 40.637842,
+        "diagnostics_warm_max": 42.914921,
+        "diagnostics_warm_median": 41.30948,
+        "diagnostics_warm_min": 39.885556,
+        "diagnostics_warm_samples": [
+          39.885556,
+          42.914921,
+          41.30948,
+          40.394164,
+          42.245326
+        ],
+        "evaluation_reported": 2.3027249999999997,
+        "evaluation_wall": 2.437144,
+        "fixture_build_and_validate": 1.7140199999999999,
+        "report_json_serialization": 1.34655
+      }
+    }
+  ],
+  "compiler_version": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "debug_assertions": false,
+  "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+  "limits": {
+    "max_nodes": 16384,
+    "max_reported_affected": 256,
+    "max_reported_roots": 64
+  },
+  "measurement_scope": "Each graph is evaluated once. First and repeated diagnose calls use that same immutable real result. Diagnostic timers include report construction but exclude graph construction, evaluation, checks, serialization and destruction. Warm refers to repeated diagnostics only, not cached node evaluation. OS/allocator caches are not reset; first-call is not a cold process measurement.",
+  "mode": "quick",
+  "os": "linux",
+  "package_version": "0.1.0",
+  "pointer_bits": 64,
+  "source_revision_compile_time": "78eac24ac730ff3a9d882df55a991923e25ad7c2",
+  "source_revision_runtime": "78eac24ac730ff3a9d882df55a991923e25ad7c2",
+  "source_worktree_state": "untracked identical benchmark harness only",
+  "status": "MEASURED",
+  "total_workload_ms": 256.057356,
+  "unix_time_seconds": 1795736117,
+  "warm_repetitions": 5,
+  "workload": "NODES read-only graph diagnostics",
+  "workload_schema_version": 1
+}

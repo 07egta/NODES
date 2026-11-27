@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-11-27T00:36:39.139919+00:00",
+  "scope": "NODES pending viewport cache; local headless UI measurements, not complete native application frame rate",
+  "baseline_revision": "25f981b794e3e0f037cd664915ce144347b49f40",
+  "final_saved_revision": null,
+  "metadata_before": {
+    "stage": "before",
+    "git_head": "25f981b794e3e0f037cd664915ce144347b49f40",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "kernel": "6.18.57",
+    "profile": "test: opt-level=1; dependencies opt-level=2; debug=0; incremental=0; debug_assertions enabled",
+    "source_sha256": {
+      "src/app.rs": "0951739dd42a691a564e6164138c9a237711224b976cd416636ce96e271ac295",
+      "src/viewport.rs": "c8f500c1aa510053bf628857d0ba9e3823c74c57114228b1e1f51297cda84162",
+      "src/viewport_cache_tests.rs": "215c06e04f70987257870bc8a474463aa68b3789f660aaa04e9536b6cba6f73c"
+    },
+    "flags": "--locked --bin Morphlet benchmark_pending_preview -- --ignored --nocapture --test-threads=1",
+    "time_scope": "headless egui right_panel and software viewport; excludes graph evaluation, mailbox delivery, GPU/native window and platform event loop"
+  },
+  "metadata_after_measured": {
+    "stage": "after",
+    "git_head": "25f981b794e3e0f037cd664915ce144347b49f40",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "kernel": "6.18.57",
+    "profile": "test: opt-level=1; dependencies opt-level=2; debug=0; incremental=0; debug_assertions enabled",
+    "source_sha256": {
+      "src/app.rs": "b14e07fb5cfad2ef507c9300cdbc36fa937f4ac0485154519fb132c8bf763322",
+      "src/viewport.rs": "bb13e791b4d397053fd9d241bf4d57ca949fbcdf34b59c7bf267520e80492597",
+      "src/viewport_cache_tests.rs": "03c8622529ca3c8c5cbc228b0205b0ee82e9adfc723a273e4825b0ce357a52ae"
+    },
+    "flags": "--locked --bin Morphlet benchmark_pending_preview -- --ignored --nocapture --test-threads=1",
+    "time_scope": "headless egui right_panel and software viewport; excludes graph evaluation, mailbox delivery, GPU/native window and platform event loop",
+    "recorded_utc": "2026-11-27T00:31:41.808610+00:00"
+  },
+  "final_source_sha256": {
+    "src/app.rs": "b21bce3de1ee8fc842ffeb65fd8efdd9d8140cc9041d63c2497359a97956cbe1",
+    "src/viewport.rs": "bb13e791b4d397053fd9d241bf4d57ca949fbcdf34b59c7bf267520e80492597",
+    "src/viewport_cache_tests.rs": "83678fbac039bda24e41984f98f79dde05d603fdaa395bc0eca8403a9d79958d"
+  },
+  "cpu_affinity": [
+    0
+  ],
+  "process_runs_per_stage": 1,
+  "samples_per_mesh_per_stage": 7,
+  "ordering": "Before small, before large; product fix plus independent review; after small, after large. Same CPU affinity, compiler and profile. Shared host, not a dedicated benchmark machine.",
+  "before": [
+    {
+      "accurate_depth": true,
+      "completed_median_ms": 3.018779,
+      "completed_ms": [
+        3.261266,
+        3.018779,
+        2.967765,
+        3.104415,
+        3.015014,
+        2.941716,
+        3.1018310000000002
+      ],
+      "cycles": 7,
+      "mesh_arc_identity_verified": true,
+      "mode": "completed_outputs",
+      "pending_median_ms": 0.425536,
+      "pending_ms": [
+        0.47855400000000003,
+        0.472425,
+        0.402862,
+        0.425536,
+        0.389362,
+        0.45566,
+        0.370034
+      ],
+      "retained_pending_scene": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "scenario": "sphere_midpoint_subdivision_and_unconnected_number",
+      "screen_points": [
+        1000,
+        800
+      ],
+      "segments": 24,
+      "timed": "egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery",
+      "triangles": 2112,
+      "vertices": 1058,
+      "work_after": {
+        "completed_diagnostics": 8,
+        "diagnostic_attempts": 15,
+        "scene_builds": 15
+      },
+      "work_before": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      }
+    },
+    {
+      "accurate_depth": true,
+      "completed_median_ms": 191.568295,
+      "completed_ms": [
+        506.62174000000005,
+        200.604448,
+        191.568295,
+        182.573603,
+        169.16431300000002,
+        194.70610399999998,
+        164.39048300000002
+      ],
+      "cycles": 7,
+      "mesh_arc_identity_verified": true,
+      "mode": "completed_outputs",
+      "pending_median_ms": 1.506245,
+      "pending_ms": [
+        1.6069529999999999,
+        1.506245,
+        1.546705,
+        1.548286,
+        1.480206,
+        1.355764,
+        1.327052
+      ],
+      "retained_pending_scene": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "scenario": "sphere_midpoint_subdivision_and_unconnected_number",
+      "screen_points": [
+        1000,
+        800
+      ],
+      "segments": 192,
+      "timed": "egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery",
+      "triangles": 145920,
+      "vertices": 72962,
+      "work_after": {
+        "completed_diagnostics": 8,
+        "diagnostic_attempts": 15,
+        "scene_builds": 15
+      },
+      "work_before": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      }
+    }
+  ],
+  "after": [
+    {
+      "accurate_depth": true,
+      "completed_median_ms": 0.042783,
+      "completed_ms": [
+        0.053538999999999996,
+        0.112014,
+        0.041481,
+        0.042783,
+        0.039879000000000005,
+        0.051986,
+        0.040720000000000006
+      ],
+      "cycles": 7,
+      "mesh_arc_identity_verified": true,
+      "mode": "completed_outputs",
+      "pending_median_ms": 0.046779,
+      "pending_ms": [
+        0.275956,
+        0.046779,
+        0.04795,
+        0.043893999999999996,
+        0.043273,
+        0.12930999999999998,
+        0.045587
+      ],
+      "retained_pending_scene": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "scenario": "sphere_midpoint_subdivision_and_unconnected_number",
+      "screen_points": [
+        1000,
+        800
+      ],
+      "segments": 24,
+      "timed": "egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery",
+      "triangles": 2112,
+      "vertices": 1058,
+      "work_after": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      },
+      "work_before": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      }
+    },
+    {
+      "accurate_depth": true,
+      "completed_median_ms": 0.049934,
+      "completed_ms": [
+        0.316605,
+        0.049563,
+        0.052898,
+        0.107518,
+        0.049743,
+        0.049934,
+        0.046588000000000004
+      ],
+      "cycles": 7,
+      "mesh_arc_identity_verified": true,
+      "mode": "completed_outputs",
+      "pending_median_ms": 0.057935,
+      "pending_ms": [
+        0.174506,
+        0.058956,
+        0.045947,
+        0.044947,
+        0.057935,
+        0.08156,
+        0.044434999999999995
+      ],
+      "retained_pending_scene": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "scenario": "sphere_midpoint_subdivision_and_unconnected_number",
+      "screen_points": [
+        1000,
+        800
+      ],
+      "segments": 192,
+      "timed": "egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery",
+      "triangles": 145920,
+      "vertices": 72962,
+      "work_after": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      },
+      "work_before": {
+        "completed_diagnostics": 1,
+        "diagnostic_attempts": 1,
+        "scene_builds": 1
+      }
+    }
+  ],
+  "interpretation": [
+    "Before and after independently verify identical Arc<Mesh> for each unconnected Number edit and exactly one recomputed graph node.",
+    "Before clears the visible mesh during every pending frame and repeats full diagnostics on completion; after retains every pending mesh and performs no post-warm-up geometry/diagnostic rebuild.",
+    "Times include egui Context::run, actual right_panel and software viewport. They exclude graph evaluation, worker/mailbox delivery, OS event loop, GPU upload/presentation, and whole application update.",
+    "The initial full scene/diagnostic/projection build is excluded in both stages. This measures cache reuse, not faster topology algorithms or faster rendering of new geometry.",
+    "The harness result text names Viewport::show generically; after pending frames use show_previous and the shared show_snapshot implementation.",
+    "Baseline source files were restored from the saved revision plus test instrumentation and checked byte-for-byte against SHA256 recorded before measurements.",
+    "After the recorded timing run, app pick adoption was restricted to a completed current preview to prevent Undo-related NodeId reuse selecting a new node from a stale shape. Geometry/diagnostic code and the benchmark function are unchanged; no timing rerun was performed. Final source hashes and focused results are separate from the measured source hashes."
+  ],
+  "regressions": {
+    "before": {
+      "pass": 1,
+      "fail": 2,
+      "ignored": 1
+    },
+    "after_measured": {
+      "pass": 3,
+      "fail": 0,
+      "ignored": 1
+    },
+    "pending_pick_before_guard": {
+      "pass": 0,
+      "fail": 1,
+      "ignored": 0
+    },
+    "final": {
+      "pass": 4,
+      "fail": 0,
+      "ignored": 1
+    },
+    "additional_guards": [
+      "pending fit; no repeated clear after hidden completion",
+      "1x1 drawable area accepts a completed empty snapshot before marking its revision",
+      "completed current picking remains enabled; actual History Undo plus same-ID replacement cannot be selected from previous geometry while pending"
+    ]
+  },
+  "reproduction": {
+    "command": "PATH=/home/agent/.cargo/bin:$PATH CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 taskset -c 0 cargo test --locked --bin Morphlet benchmark_pending_preview -- --ignored --nocapture --test-threads=1",
+    "baseline_setup": "Use an isolated checkout of baseline_revision, apply baseline_instrumentation_patch with git apply, verify metadata_before.source_sha256, then run command.",
+    "after_setup": "Use the final source and the same benchmark command. For exact historical timing attribution use metadata_after_measured.source_sha256; the later selection-only guard was not remeasured.",
+    "baseline_instrumentation_patch": "--- a/src/app.rs\n+++ b/src/app.rs\n@@ -2694,6 +2694,10 @@\n mod numeric_editor_tests;\n \n #[cfg(test)]\n+#[path = \"viewport_cache_tests.rs\"]\n+mod viewport_cache_tests;\n+\n+#[cfg(test)]\n mod tests {\n     use super::*;\n     #[test]\n--- a/src/viewport.rs\n+++ b/src/viewport.rs\n@@ -72,6 +72,8 @@\n     first_fit: bool,\n     fit_requested: bool,\n     texture: Option<egui::TextureHandle>,\n+    #[cfg(test)]\n+    cache_work: CacheWork,\n }\n \n impl Default for Viewport {\n@@ -99,8 +101,28 @@\n             first_fit: true,\n             fit_requested: false,\n             texture: None,\n-        }\n-    }\n+            #[cfg(test)]\n+            cache_work: CacheWork::default(),\n+        }\n+    }\n+}\n+\n+#[cfg(test)]\n+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]\n+pub(crate) struct CacheWork {\n+    pub scene_builds: usize,\n+    pub diagnostic_attempts: usize,\n+    pub completed_diagnostics: usize,\n+}\n+\n+#[cfg(test)]\n+#[derive(Debug)]\n+pub(crate) struct CacheState {\n+    pub work: CacheWork,\n+    pub triangles: usize,\n+    pub selected_triangles: usize,\n+    pub has_bounds: bool,\n+    pub camera: [f64; 6],\n }\n \n #[derive(Clone, Copy)]\n@@ -296,6 +318,24 @@\n }\n \n impl Viewport {\n+    #[cfg(test)]\n+    pub(crate) fn test_cache_state(&self) -> CacheState {\n+        CacheState {\n+            work: self.cache_work,\n+            triangles: self.scene.triangles.len(),\n+            selected_triangles: self.scene.triangles.iter().filter(|t| t.selected).count(),\n+            has_bounds: self.scene.bounds.is_some(),\n+            camera: [\n+                self.yaw,\n+                self.pitch,\n+                self.span,\n+                self.target[0],\n+                self.target[1],\n+                self.target[2],\n+            ],\n+        }\n+    }\n+\n     /// Fill the remaining UI area and return the picked geometry's source node.\n     pub fn show(&mut self, ui: &mut egui::Ui, items: &[PreviewItem]) -> Option<u64> {\n         let rect = ui.available_rect_before_wrap();\n@@ -851,6 +891,10 @@\n             return;\n         }\n \n+        #[cfg(test)]\n+        {\n+            self.cache_work.scene_builds += 1;\n+        }\n         let mut scene = Scene::default();\n         let mut value_count = 0;\n         'items: for item in items {\n@@ -901,6 +945,11 @@\n         }\n         let trees: Vec<Tree> = items.iter().map(|item| item.tree.clone()).collect();\n         scene.report = persistence::mesh_stats(&trees).ok();\n+        #[cfg(test)]\n+        {\n+            self.cache_work.diagnostic_attempts += 1;\n+            self.cache_work.completed_diagnostics += usize::from(scene.report.is_some());\n+        }\n         self.scene = scene;\n         self.geometry_hash = Some(hash);\n         self.selection_hash = Some(selection_hash);\n--- /dev/null\n+++ b/src/viewport_cache_tests.rs\n@@ -0,0 +1,294 @@\n+//! Render the actual application panel and viewport across evaluation revisions.\n+use super::*;\n+use morphlet::model::{Mesh, Value};\n+\n+struct PreviewTest {\n+    context: egui::Context,\n+    app: MorphletApp,\n+    evaluator: Evaluator,\n+    results: LatestSender<ComputeResult>,\n+    _requests: LatestReceiver<ComputeRequest>,\n+    number: NodeId,\n+    subdivide: NodeId,\n+    output: NodeId,\n+}\n+\n+impl PreviewTest {\n+    fn new(segments: usize) -> Self {\n+        let mut graph = Graph::default();\n+        let sphere = graph.add(NodeKind::Sphere, [0., 0.]).unwrap();\n+        graph\n+            .node_mut(sphere)\n+            .unwrap()\n+            .params\n+            .insert(\"segments\".into(), segments as f64);\n+        graph\n+            .node_mut(sphere)\n+            .unwrap()\n+            .params\n+            .insert(\"rings\".into(), (segments / 2) as f64);\n+        let subdivide = graph.add(NodeKind::MeshSubdivide, [280., 0.]).unwrap();\n+        graph.connect(sphere, subdivide, \"mesh\").unwrap();\n+        let output = graph.add(NodeKind::Output, [560., 0.]).unwrap();\n+        graph.connect(subdivide, output, \"geometry\").unwrap();\n+        let number = graph.add(NodeKind::Number, [0., 250.]).unwrap();\n+        let mut evaluator = Evaluator::default();\n+        let evaluation = evaluator.evaluate(&graph, &|| false);\n+        assert!(evaluation.outputs.values().all(Result::is_ok));\n+\n+        let context = egui::Context::default();\n+        let cc = eframe::CreationContext::_new_kittest(context.clone());\n+        // A screenshot argument only suppresses recovery-file loading. We call\n+        // right_panel, never App::update, so no screenshots or autosaves run.\n+        let mut app = MorphletApp::new(&cc, None, Some(PathBuf::from(\"unused-preview-test.png\")));\n+        let (sender, requests) = latest_channel::channel();\n+        let (results, receiver) = latest_channel::channel();\n+        // Feed actual completion mailboxes deterministically, without sleeps or\n+        // a competing evaluator thread during the viewport measurements.\n+        app.worker = Worker {\n+            sender,\n+            receiver,\n+            latest: Arc::new(AtomicU64::new(0)),\n+        };\n+        app.project = Project::new(\"preview cache\", graph);\n+        app.evaluation = Some(evaluation);\n+        app.revision = 0;\n+        app.result_revision = 0;\n+        app.pending_compute = false;\n+        app.canvas.selected.clear();\n+        app.preview_mode = 0;\n+        let result = Self {\n+            context,\n+            app,\n+            evaluator,\n+            results,\n+            _requests: requests,\n+            number,\n+            subdivide,\n+            output,\n+        };\n+        // Sphere has 2*S*(R-1) triangles; midpoint subdivision makes four per face.\n+        assert_eq!(\n+            result.mesh().triangles.len(),\n+            8 * segments * (segments / 2 - 1)\n+        );\n+        result\n+    }\n+\n+    fn mesh(&self) -> Arc<Mesh> {\n+        mesh_from(self.app.evaluation.as_ref().unwrap(), self.output)\n+    }\n+\n+    fn frame(&mut self, events: Vec<egui::Event>) -> egui::FullOutput {\n+        self.context.run(\n+            egui::RawInput {\n+                screen_rect: Some(egui::Rect::from_min_size(\n+                    egui::Pos2::ZERO,\n+                    egui::vec2(1000., 800.),\n+                )),\n+                events,\n+                ..Default::default()\n+            },\n+            |context| self.app.right_panel(context),\n+        )\n+    }\n+\n+    fn begin_unrelated_edit(&mut self) {\n+        *self\n+            .app\n+            .project\n+            .graph\n+            .node_mut(self.number)\n+            .unwrap()\n+            .params\n+            .get_mut(\"value\")\n+            .unwrap() += 1.;\n+        self.app.queue_compute();\n+        // The request has been accepted by a worker, but no result has arrived.\n+        self.app.pending_compute = false;\n+        assert!(self.app.stale());\n+    }\n+\n+    fn evaluate(&mut self) -> Evaluation {\n+        self.evaluator.evaluate(&self.app.project.graph, &|| false)\n+    }\n+\n+    fn complete(&mut self, evaluation: Evaluation) {\n+        self.results\n+            .send(ComputeResult {\n+                revision: self.app.revision,\n+                evaluation,\n+            })\n+            .unwrap_or_else(|_| panic!(\"completion mailbox closed\"));\n+        self.app.compute_tick(&self.context);\n+        assert!(!self.app.stale());\n+    }\n+}\n+\n+fn mesh_from(evaluation: &Evaluation, node: NodeId) -> Arc<Mesh> {\n+    let tree = evaluation.outputs[&node].as_ref().unwrap();\n+    let Some(Value::Mesh(mesh)) = tree.branches.values().flatten().next() else {\n+        panic!(\"expected a mesh output\");\n+    };\n+    Arc::clone(mesh)\n+}\n+\n+#[test]\n+fn pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics() {\n+    let mut test = PreviewTest::new(24);\n+    test.frame(vec![]);\n+    let before = test.app.viewport.test_cache_state();\n+    let original = test.mesh();\n+    assert!(before.has_bounds && before.triangles > 2_000);\n+    assert_eq!(before.work.completed_diagnostics, 1);\n+\n+    test.begin_unrelated_edit();\n+    let completed = test.evaluate();\n+    assert_eq!(completed.computed, 1);\n+    assert!(Arc::ptr_eq(&original, &mesh_from(&completed, test.output)));\n+    assert!(\n+        test.app.result_trees().is_err(),\n+        \"pending data must not become exportable\"\n+    );\n+    let pending_output = test.frame(vec![]);\n+    let pending = test.app.viewport.test_cache_state();\n+    assert_eq!(\n+        pending.triangles, before.triangles,\n+        \"pending is not a completed empty result\"\n+    );\n+    assert_eq!(pending.work, before.work);\n+    assert!(pending_output.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text.contains(\"前回\"))));\n+    test.complete(completed);\n+    test.frame(vec![]);\n+    assert_eq!(test.app.viewport.test_cache_state().work, before.work);\n+    assert!(Arc::ptr_eq(&original, &test.mesh()));\n+    assert!(test.app.result_trees().is_ok());\n+}\n+\n+#[test]\n+fn completed_empty_and_error_clear_previous_geometry_even_after_hidden_completion() {\n+    for error in [false, true] {\n+        for hidden in [false, true] {\n+            let mut test = PreviewTest::new(16);\n+            test.frame(vec![]);\n+            if error {\n+                test.app.project.graph.disconnect(test.subdivide, \"mesh\");\n+            } else {\n+                test.app.project.graph.node_mut(test.output).unwrap().off = true;\n+            }\n+            test.begin_unrelated_edit();\n+            let completed = test.evaluate();\n+            if error {\n+                assert!(completed.outputs[&test.output].is_err());\n+            } else {\n+                assert_eq!(\n+                    completed.outputs[&test.output]\n+                        .as_ref()\n+                        .unwrap()\n+                        .item_count(),\n+                    0\n+                );\n+            }\n+            test.complete(completed);\n+            if hidden {\n+                // No frame was drawn for this completed empty/error evaluation.\n+                // Reshowing while the next edit is pending must not resurrect it.\n+                test.begin_unrelated_edit();\n+            }\n+            test.frame(vec![]);\n+            let scene = test.app.viewport.test_cache_state();\n+            assert_eq!(scene.triangles, 0, \"error={error}, hidden={hidden}\");\n+            assert!(!scene.has_bounds);\n+        }\n+    }\n+}\n+\n+#[test]\n+fn pending_camera_controls_work_and_stale_worker_results_are_not_published() {\n+    let mut test = PreviewTest::new(16);\n+    test.frame(vec![]);\n+    let before = test.app.viewport.test_cache_state();\n+    let original = test.mesh();\n+    test.begin_unrelated_edit();\n+    test.results\n+        .send(ComputeResult {\n+            revision: test.app.revision.wrapping_sub(1),\n+            evaluation: Evaluation::default(),\n+        })\n+        .unwrap_or_else(|_| panic!(\"completion mailbox closed\"));\n+    test.app.compute_tick(&test.context);\n+    assert!(test.app.stale());\n+    assert!(Arc::ptr_eq(&original, &test.mesh()));\n+    test.frame(vec![\n+        egui::Event::PointerMoved(egui::pos2(800., 200.)),\n+        egui::Event::MouseWheel {\n+            unit: egui::MouseWheelUnit::Point,\n+            delta: egui::vec2(0., 40.),\n+            modifiers: egui::Modifiers::NONE,\n+        },\n+    ]);\n+    let pending = test.app.viewport.test_cache_state();\n+    assert_ne!(\n+        pending.camera, before.camera,\n+        \"pending must not freeze camera controls\"\n+    );\n+    assert_eq!(pending.triangles, before.triangles);\n+    assert_eq!(pending.selected_triangles, before.selected_triangles);\n+    assert_eq!(pending.work, before.work);\n+}\n+\n+/// cargo test --locked --bin Morphlet benchmark_pending_preview -- --ignored --nocapture --test-threads=1\n+#[test]\n+#[ignore = \"manual measurement of actual app/viewport pending and completion frames\"]\n+fn benchmark_pending_preview() {\n+    for segments in [24, 192] {\n+        let mut test = PreviewTest::new(segments);\n+        test.frame(vec![]);\n+        test.frame(vec![]); // Fonts, layout and the first projection are warm.\n+        let mesh = test.mesh();\n+        let before = test.app.viewport.test_cache_state().work;\n+        let mut pending_ms = Vec::new();\n+        let mut completed_ms = Vec::new();\n+        let mut retained = Vec::new();\n+        for _ in 0..7 {\n+            test.begin_unrelated_edit();\n+            let result = test.evaluate();\n+            assert_eq!(result.computed, 1);\n+            assert!(Arc::ptr_eq(&mesh, &mesh_from(&result, test.output)));\n+            let start = Instant::now();\n+            test.frame(vec![]);\n+            pending_ms.push(start.elapsed().as_secs_f64() * 1e3);\n+            retained.push(test.app.viewport.test_cache_state().triangles == mesh.triangles.len());\n+            test.complete(result);\n+            let start = Instant::now();\n+            test.frame(vec![]);\n+            completed_ms.push(start.elapsed().as_secs_f64() * 1e3);\n+        }\n+        let mut p = pending_ms.clone();\n+        let mut c = completed_ms.clone();\n+        p.sort_by(f64::total_cmp);\n+        c.sort_by(f64::total_cmp);\n+        println!(\n+            \"{}\",\n+            serde_json::json!({\n+                \"scenario\": \"sphere_midpoint_subdivision_and_unconnected_number\",\n+                \"segments\": segments,\n+                \"vertices\": mesh.vertices.len(),\n+                \"triangles\": mesh.triangles.len(),\n+                \"cycles\": 7,\n+                \"screen_points\": [1000, 800],\n+                \"mode\": \"completed_outputs\",\n+                \"accurate_depth\": test.app.viewport.accurate_depth,\n+                \"mesh_arc_identity_verified\": true,\n+                \"work_before\": before,\n+                \"work_after\": test.app.viewport.test_cache_state().work,\n+                \"retained_pending_scene\": retained,\n+                \"pending_ms\": pending_ms,\n+                \"completed_ms\": completed_ms,\n+                \"pending_median_ms\": p[3],\n+                \"completed_median_ms\": c[3],\n+                \"timed\": \"egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery\"\n+            })\n+        );\n+    }\n+}\n"
+  },
+  "logs": {
+    "before_tests": "   Compiling morphlet v0.1.0 (/workspace/scratch/a294e49d5e0f/NODES-omega)\n    Finished `test` profile [optimized] target(s) in 5.01s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 4 tests\ntest app::viewport_cache_tests::benchmark_pending_preview ... ignored, manual measurement of actual app/viewport pending and completion frames\ntest app::viewport_cache_tests::completed_empty_and_error_clear_previous_geometry_even_after_hidden_completion ... ok\ntest app::viewport_cache_tests::pending_camera_controls_work_and_stale_worker_results_are_not_published ... \nthread 'app::viewport_cache_tests::pending_camera_controls_work_and_stale_worker_results_are_not_published' (75) panicked at src/viewport_cache_tests.rs:235:5:\nassertion `left == right` failed\n  left: 0\n right: 896\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nFAILED\ntest app::viewport_cache_tests::pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics ... \nthread 'app::viewport_cache_tests::pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics' (77) panicked at src/viewport_cache_tests.rs:155:5:\nassertion `left == right` failed: pending is not a completed empty result\n  left: 0\n right: 2112\nFAILED\n\nfailures:\n\nfailures:\n    app::viewport_cache_tests::pending_camera_controls_work_and_stale_worker_results_are_not_published\n    app::viewport_cache_tests::pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics\n\ntest result: FAILED. 1 passed; 2 failed; 1 ignored; 0 measured; 45 filtered out; finished in 0.03s\n\nerror: test failed, to rerun pass `--bin Morphlet`\n",
+    "before_benchmark": "    Finished `test` profile [optimized] target(s) in 0.15s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 1 test\ntest app::viewport_cache_tests::benchmark_pending_preview ... {\"accurate_depth\":true,\"completed_median_ms\":3.018779,\"completed_ms\":[3.261266,3.018779,2.967765,3.104415,3.015014,2.941716,3.1018310000000002],\"cycles\":7,\"mesh_arc_identity_verified\":true,\"mode\":\"completed_outputs\",\"pending_median_ms\":0.425536,\"pending_ms\":[0.47855400000000003,0.472425,0.402862,0.425536,0.389362,0.45566,0.370034],\"retained_pending_scene\":[false,false,false,false,false,false,false],\"scenario\":\"sphere_midpoint_subdivision_and_unconnected_number\",\"screen_points\":[1000,800],\"segments\":24,\"timed\":\"egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery\",\"triangles\":2112,\"vertices\":1058,\"work_after\":{\"completed_diagnostics\":8,\"diagnostic_attempts\":15,\"scene_builds\":15},\"work_before\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1}}\n{\"accurate_depth\":true,\"completed_median_ms\":191.568295,\"completed_ms\":[506.62174000000005,200.604448,191.568295,182.573603,169.16431300000002,194.70610399999998,164.39048300000002],\"cycles\":7,\"mesh_arc_identity_verified\":true,\"mode\":\"completed_outputs\",\"pending_median_ms\":1.506245,\"pending_ms\":[1.6069529999999999,1.506245,1.546705,1.548286,1.480206,1.355764,1.327052],\"retained_pending_scene\":[false,false,false,false,false,false,false],\"scenario\":\"sphere_midpoint_subdivision_and_unconnected_number\",\"screen_points\":[1000,800],\"segments\":192,\"timed\":\"egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery\",\"triangles\":145920,\"vertices\":72962,\"work_after\":{\"completed_diagnostics\":8,\"diagnostic_attempts\":15,\"scene_builds\":15},\"work_before\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1}}\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 2.00s\n\n",
+    "after_tests": "   Compiling morphlet v0.1.0 (/workspace/scratch/a294e49d5e0f/NODES-omega)\n    Finished `test` profile [optimized] target(s) in 4.20s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 4 tests\ntest app::viewport_cache_tests::benchmark_pending_preview ... ignored, manual measurement of actual app/viewport pending and completion frames\ntest app::viewport_cache_tests::completed_empty_and_error_clear_previous_geometry_even_after_hidden_completion ... ok\ntest app::viewport_cache_tests::pending_camera_controls_work_and_stale_worker_results_are_not_published ... ok\ntest app::viewport_cache_tests::pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 45 filtered out; finished in 0.05s\n\n",
+    "after_benchmark": "    Finished `test` profile [optimized] target(s) in 0.10s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 1 test\ntest app::viewport_cache_tests::benchmark_pending_preview ... {\"accurate_depth\":true,\"completed_median_ms\":0.042783,\"completed_ms\":[0.053538999999999996,0.112014,0.041481,0.042783,0.039879000000000005,0.051986,0.040720000000000006],\"cycles\":7,\"mesh_arc_identity_verified\":true,\"mode\":\"completed_outputs\",\"pending_median_ms\":0.046779,\"pending_ms\":[0.275956,0.046779,0.04795,0.043893999999999996,0.043273,0.12930999999999998,0.045587],\"retained_pending_scene\":[true,true,true,true,true,true,true],\"scenario\":\"sphere_midpoint_subdivision_and_unconnected_number\",\"screen_points\":[1000,800],\"segments\":24,\"timed\":\"egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery\",\"triangles\":2112,\"vertices\":1058,\"work_after\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1},\"work_before\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1}}\n{\"accurate_depth\":true,\"completed_median_ms\":0.049934,\"completed_ms\":[0.316605,0.049563,0.052898,0.107518,0.049743,0.049934,0.046588000000000004],\"cycles\":7,\"mesh_arc_identity_verified\":true,\"mode\":\"completed_outputs\",\"pending_median_ms\":0.057935,\"pending_ms\":[0.174506,0.058956,0.045947,0.044947,0.057935,0.08156,0.044434999999999995],\"retained_pending_scene\":[true,true,true,true,true,true,true],\"scenario\":\"sphere_midpoint_subdivision_and_unconnected_number\",\"screen_points\":[1000,800],\"segments\":192,\"timed\":\"egui Context::run -> actual MorphletApp::right_panel -> Viewport::show, excluding evaluation and mailbox delivery\",\"triangles\":145920,\"vertices\":72962,\"work_after\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1},\"work_before\":{\"completed_diagnostics\":1,\"diagnostic_attempts\":1,\"scene_builds\":1}}\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.28s\n\n",
+    "pending_pick_before_guard": "   Compiling morphlet v0.1.0 (/workspace/scratch/a294e49d5e0f/NODES-omega)\n    Finished `test` profile [optimized] target(s) in 4.09s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 1 test\n\nthread 'app::viewport_cache_tests::pending_pick_cannot_select_a_reused_node_id_after_undo' (70) panicked at src/viewport_cache_tests.rs:318:5:\nthe old Sphere must not select the new Number with its reused ID\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest app::viewport_cache_tests::pending_pick_cannot_select_a_reused_node_id_after_undo ... FAILED\n\nfailures:\n\nfailures:\n    app::viewport_cache_tests::pending_pick_cannot_select_a_reused_node_id_after_undo\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.01s\n\nerror: test failed, to rerun pass `--bin Morphlet`\n",
+    "final_tests": "   Compiling morphlet v0.1.0 (/workspace/scratch/a294e49d5e0f/NODES-omega)\n    Finished `test` profile [optimized] target(s) in 5.17s\n     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)\n\nrunning 5 tests\ntest app::viewport_cache_tests::benchmark_pending_preview ... ignored, manual measurement of actual app/viewport pending and completion frames\ntest app::viewport_cache_tests::completed_empty_and_error_clear_previous_geometry_even_after_hidden_completion ... ok\ntest app::viewport_cache_tests::pending_camera_controls_work_and_stale_worker_results_are_not_published ... ok\ntest app::viewport_cache_tests::pending_pick_cannot_select_a_reused_node_id_after_undo ... ok\ntest app::viewport_cache_tests::pending_unrelated_edit_retains_the_actual_viewport_scene_and_diagnostics ... ok\n\ntest result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 45 filtered out; finished in 0.05s\n\n"
+  },
+  "theme_condition": "The actual app constructor loads the local theme preference. The theme was not captured or fixed by this harness; both runs used the same viewport feature defaults and screen size.",
+  "benchmark_function_body_sha256": "999350e5e61c76e88cacfb736d620e5690f69be3edbaa06e53a030986ee2f02d",
+  "benchmark_function_unchanged_after_selection_guard": true
+}

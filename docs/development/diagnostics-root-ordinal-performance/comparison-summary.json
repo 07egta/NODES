@@ -1,0 +1,302 @@
+{
+  "started_at_utc": "2026-11-26T23:59:31.602646+00:00",
+  "completed_at_utc": "2026-11-26T23:59:37.212468+00:00",
+  "pooling": "Median across ten fresh processes per implementation/case. Each process makes exactly one diagnosis after one real evaluation. These are first-diagnosis measurements, not repeated warmed diagnostics.",
+  "memory_scope": "wait4 maximum RSS is the entire fresh process including one variant, graph construction, real evaluation, compact metadata and typed oracle checks. It is not diagnosis-only live memory. No before/after allocator state is shared across measurement processes.",
+  "cases": [
+    {
+      "case": "high-id-two-roots",
+      "nodes": 16384,
+      "expected_roots": 2,
+      "implementations": {
+        "before": {
+          "diagnosis_samples_ms": [
+            155.04432500000001,
+            161.36154,
+            144.295368,
+            107.574488,
+            140.268388,
+            67.909973,
+            54.646168,
+            77.298543,
+            58.579079,
+            62.131361000000005
+          ],
+          "diagnosis_median_ms": 92.4365155,
+          "diagnosis_min_ms": 54.646168,
+          "diagnosis_max_ms": 161.36154,
+          "maximum_rss_samples_kib": [
+            84052,
+            84072,
+            83988,
+            84056,
+            84180,
+            84044,
+            84056,
+            84056,
+            84124,
+            84120
+          ],
+          "maximum_rss_median_kib": 84056.0,
+          "maximum_rss_min_kib": 83988,
+          "maximum_rss_max_kib": 84180,
+          "fixture_build_samples_ms": [
+            75.08188200000001,
+            61.889882,
+            25.915815,
+            16.701527000000002,
+            77.980481,
+            20.541771,
+            14.351924,
+            15.015320000000001,
+            20.37049,
+            14.777079
+          ],
+          "evaluation_samples_ms": [
+            124.617485,
+            118.84477100000001,
+            45.797331,
+            79.058065,
+            65.338541,
+            41.433397,
+            34.806248,
+            39.140739,
+            39.927425,
+            35.461561
+          ],
+          "process_wall_samples_seconds": [
+            0.3778996559994994,
+            0.3645727880002596,
+            0.24049093000030553,
+            0.22806118100015738,
+            0.3064130880002267,
+            0.1556900730001871,
+            0.1261857420004162,
+            0.1553991999999198,
+            0.14316484200026025,
+            0.14168716999938624
+          ]
+        },
+        "after": {
+          "diagnosis_samples_ms": [
+            50.945356,
+            43.678045999999995,
+            57.726411999999996,
+            52.124269,
+            46.586059,
+            46.371519,
+            37.347002999999994,
+            218.592546,
+            35.963049,
+            41.36639
+          ],
+          "diagnosis_median_ms": 46.478789,
+          "diagnosis_min_ms": 35.963049,
+          "diagnosis_max_ms": 218.592546,
+          "maximum_rss_samples_kib": [
+            52296,
+            52248,
+            52376,
+            52252,
+            52312,
+            52248,
+            52440,
+            52316,
+            52248,
+            52416
+          ],
+          "maximum_rss_median_kib": 52304.0,
+          "maximum_rss_min_kib": 52248,
+          "maximum_rss_max_kib": 52440,
+          "fixture_build_samples_ms": [
+            71.548498,
+            55.093764,
+            14.834853,
+            15.999655,
+            15.161353,
+            21.290642,
+            13.742208,
+            14.084341,
+            14.905788,
+            15.19252
+          ],
+          "evaluation_samples_ms": [
+            118.17488700000001,
+            109.069284,
+            61.436266,
+            43.875906,
+            39.764563,
+            41.545071,
+            34.661975,
+            40.796048,
+            35.844573999999994,
+            37.041869
+          ],
+          "process_wall_samples_seconds": [
+            0.26427626900022005,
+            0.23061025800052448,
+            0.16117819000010059,
+            0.1353708110000298,
+            0.12479563799934112,
+            0.13172292899980675,
+            0.10928983800022252,
+            0.31490876499992737,
+            0.10794329399959679,
+            0.11462412400032918
+          ]
+        }
+      },
+      "diagnosis_before_over_after_ratio": 1.988789241044985,
+      "diagnosis_reduction_percent": 49.71815115640096,
+      "whole_process_peak_rss_before_over_after_ratio": 1.6070663811563168,
+      "whole_process_peak_rss_reduction_percent": 37.77481678880746
+    },
+    {
+      "case": "success-10000",
+      "nodes": 10000,
+      "expected_roots": 0,
+      "implementations": {
+        "before": {
+          "diagnosis_samples_ms": [
+            9.880322,
+            10.2607,
+            13.147552999999998,
+            16.296381,
+            18.503104999999998,
+            8.788247,
+            12.458552,
+            8.977254,
+            9.227002,
+            11.762669
+          ],
+          "diagnosis_median_ms": 11.011684500000001,
+          "diagnosis_min_ms": 8.788247,
+          "diagnosis_max_ms": 18.503104999999998,
+          "maximum_rss_samples_kib": [
+            41708,
+            41764,
+            41760,
+            41708,
+            41708,
+            41708,
+            41580,
+            41708,
+            41628,
+            41708
+          ],
+          "maximum_rss_median_kib": 41708.0,
+          "maximum_rss_min_kib": 41580,
+          "maximum_rss_max_kib": 41764,
+          "fixture_build_samples_ms": [
+            8.156468,
+            8.420325,
+            15.812221000000001,
+            10.216406000000001,
+            9.195315,
+            7.974,
+            8.804160999999999,
+            8.453385,
+            8.284977000000001,
+            8.307791
+          ],
+          "evaluation_samples_ms": [
+            34.477573,
+            34.091996,
+            39.024045,
+            126.72328499999999,
+            39.327783,
+            30.726752,
+            36.036345999999995,
+            34.053341,
+            32.549980999999995,
+            33.874266999999996
+          ],
+          "process_wall_samples_seconds": [
+            0.06254766299935,
+            0.05975483400015946,
+            0.07714716200007388,
+            0.16327575299965247,
+            0.07624681699962821,
+            0.054210287999922,
+            0.06558852699981799,
+            0.05883011300011276,
+            0.057905588999346946,
+            0.06230031900031463
+          ]
+        },
+        "after": {
+          "diagnosis_samples_ms": [
+            9.80467,
+            18.781864,
+            8.200802999999999,
+            9.873622000000001,
+            8.046016,
+            8.372426,
+            10.68842,
+            8.078814,
+            8.869616,
+            8.714219
+          ],
+          "diagnosis_median_ms": 8.7919175,
+          "diagnosis_min_ms": 8.046016,
+          "diagnosis_max_ms": 18.781864,
+          "maximum_rss_samples_kib": [
+            41516,
+            41580,
+            41564,
+            41580,
+            41580,
+            41516,
+            41628,
+            41532,
+            41516,
+            41708
+          ],
+          "maximum_rss_median_kib": 41572.0,
+          "maximum_rss_min_kib": 41516,
+          "maximum_rss_max_kib": 41708,
+          "fixture_build_samples_ms": [
+            9.489196,
+            41.834064999999995,
+            7.728979000000001,
+            8.706206,
+            7.833264,
+            7.802377999999999,
+            9.553732,
+            8.340709,
+            8.024144,
+            8.106034999999999
+          ],
+          "evaluation_samples_ms": [
+            34.340963,
+            120.967236,
+            31.258271999999998,
+            34.117694,
+            30.210633,
+            36.432969,
+            37.551491999999996,
+            30.746119999999998,
+            32.043477,
+            32.071058
+          ],
+          "process_wall_samples_seconds": [
+            0.06278827699952672,
+            0.19780525299938745,
+            0.05462495900064823,
+            0.061301968000407214,
+            0.053020269000626286,
+            0.05977218299995002,
+            0.06588329499936663,
+            0.05469483999968361,
+            0.0566764819996024,
+            0.057300439999380615
+          ]
+        }
+      },
+      "diagnosis_before_over_after_ratio": 1.2524781425667382,
+      "diagnosis_reduction_percent": 20.15828731743995,
+      "whole_process_peak_rss_before_over_after_ratio": 1.0032714326950831,
+      "whole_process_peak_rss_reduction_percent": 0.3260765320801773
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "name": "べき乗の山脈",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "range",
+        "name": "1 から 5",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "count": 5.0,
+          "end": 5.0,
+          "start": 1.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "power",
+        "name": "べき乗",
+        "position": [
+          262.0,
+          30.0
+        ],
+        "params": {
+          "base": 2.0,
+          "exponent": 2.0
+        },
+        "inputs": {
+          "base": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "multiply",
+        "name": "高さ（3 倍）",
+        "position": [
+          504.0,
+          30.0
+        ],
+        "params": {
+          "a": 1.0,
+          "b": 3.0
+        },
+        "inputs": {
+          "a": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "cone",
+        "name": "円錐 / 角錐",
+        "position": [
+          262.0,
+          310.0
+        ],
+        "params": {
+          "height": 40.0,
+          "radius": 8.0,
+          "segments": 4.0
+        },
+        "inputs": {
+          "height": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "series",
+        "name": "並べる間隔",
+        "position": [
+          20.0,
+          310.0
+        ],
+        "params": {
+          "count": 5.0,
+          "start": 0.0,
+          "step": 22.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "move",
+        "name": "移動",
+        "position": [
+          504.0,
+          310.0
+        ],
+        "params": {
+          "x": 0.0,
+          "y": 20.0,
+          "z": 0.0
+        },
+        "inputs": {
+          "geometry": 3,
+          "x": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "mirror",
+        "name": "ミラー",
+        "position": [
+          746.0,
+          310.0
+        ],
+        "params": {
+          "axis": 1.0,
+          "keep": 1.0
+        },
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          746.0,
+          30.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 6
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 8
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 0.86
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "name": "複数部品・離して配置",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "箱",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "width": 20,
+          "depth": 20,
+          "height": 12
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "linear_array",
+        "name": "直線配列",
+        "position": [
+          270,
+          20
+        ],
+        "params": {
+          "count": 3,
+          "x": 32,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "merge",
+        "name": "メッシュ結合",
+        "position": [
+          510,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          750,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "mesh_audit",
+        "name": "健全性",
+        "position": [
+          510,
+          220
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "mesh_volume",
+        "name": "符号付き体積",
+        "position": [
+          750,
+          220
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 2
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 6
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

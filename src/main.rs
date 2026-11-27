@@ -1,15 +1,72 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
 mod canvas;
+mod data_view;
+mod diagnostics_ui;
 mod file_picker;
+mod gcode_ui;
+mod getting_started;
+mod help;
+mod math_mapper_ui;
+mod melt;
+mod node_icons;
+mod node_shelf;
+mod script_ui;
+mod stl_export_ui;
 mod theme;
+mod ui_polish;
 mod viewport;
 
-use morphlet::{engine::Evaluator, model::NodeKind, persistence, templates};
+use nodes::{engine::Evaluator, model::NodeKind, persistence, templates};
 use std::path::{Path, PathBuf};
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "--node-catalog") {
+        match serde_json::to_string_pretty(&nodes::graph_api::catalog()) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+    if args.first().is_some_and(|a| a == "--build-graph") {
+        let result = match (args.get(1), args.get(2), args.len()) {
+            (Some(input), Some(output), 3) => {
+                nodes::graph_api::build_file(Path::new(input), Path::new(output))
+            }
+            _ => Err("Usage: --build-graph request.json output.morph".into()),
+        };
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+    if matches!(
+        args.first().map(String::as_str),
+        Some("--inspect-ghx" | "--convert-ghx")
+    ) {
+        let result = match (args.get(1), args.get(2), args.len()) {
+            (Some(input), Some(output), 3) if args[0] == "--inspect-ghx" => {
+                nodes::ghx::inspect_file(Path::new(input), Path::new(output))
+            }
+            (Some(input), Some(output), 3) => {
+                nodes::ghx::convert_file(Path::new(input), Path::new(output))
+            }
+            _ => Err(
+                "Usage: --inspect-ghx input.ghx report.json | --convert-ghx input.ghx output.morph"
+                    .into(),
+            ),
+        };
+        if let Err(e) = result {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     if args.first().is_some_and(|a| a == "--export-demos") {
         let path = args
             .get(1)
@@ -61,7 +118,7 @@ fn main() -> eframe::Result<()> {
         .map(PathBuf::from);
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Morphlet · Geometry Studio")
+            .with_title("NODES · Geometry Studio")
             .with_inner_size([1380., 920.])
             .with_min_inner_size([1100., 720.])
             .with_icon(icon()),
@@ -71,9 +128,9 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "Morphlet",
+        "NODES",
         options,
-        Box::new(move |cc| Ok(Box::new(app::MorphletApp::new(cc, open_file, screenshot)))),
+        Box::new(move |cc| Ok(Box::new(app::NodesApp::new(cc, open_file, screenshot)))),
     )
 }
 
@@ -130,7 +187,7 @@ fn export_demos(dir: &Path) -> Result<(), String> {
             t.branches
                 .values()
                 .flatten()
-                .any(|v| matches!(v, morphlet::model::Value::Mesh(_)))
+                .any(|v| matches!(v, nodes::model::Value::Mesh(_)))
         }) {
             let r = persistence::export_stl(&dir.join(format!("{:02}.stl", index + 1)), &trees)?;
             println!(

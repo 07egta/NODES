@@ -1,43 +1,127 @@
 //! Deterministic, bounded graph evaluation and procedural mesh construction.
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
+use crate::data_tree as dt;
 use crate::model::*;
-use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
-use std::time::Instant;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
+
+/// Wall-clock time spent processing one top-level node during this evaluation.
+/// Includes input/cache preparation, evaluation or retrieval, resource checks and
+/// output insertion. Cluster internals are included; graph validation is excluded.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct NodeTiming {
+    pub elapsed_ms: f64,
+    pub cached: bool,
+}
+impl NodeTiming {
+    fn spent(spent: Duration, cached: bool) -> Self {
+        Self {
+            elapsed_ms: spent.as_secs_f64() * 1000.,
+            cached,
+        }
+    }
+    fn since(start: Instant, cached: bool) -> Self {
+        Self {
+            elapsed_ms: start.elapsed().as_secs_f64() * 1000.,
+            cached,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct Evaluation {
     pub outputs: BTreeMap<NodeId, Result<Tree, String>>,
+    /// Only visited nodes have timings. Interrupted nodes have partial timings
+    /// without cached outputs; disabled nodes have non-cached bookkeeping time.
+    pub node_timings: BTreeMap<NodeId, NodeTiming>,
     pub computed: usize,
     pub cached: usize,
     pub elapsed_ms: f64,
     pub cancelled: bool,
 }
-#[derive(Clone, PartialEq)]
 struct Key {
     kind: NodeKind,
-    params: BTreeMap<String, f64>,
-    inputs: BTreeMap<String, (NodeId, u64)>,
+    params: Vec<(String, u64)>,
+    inputs: Vec<(String, NodeId, u64)>,
+    /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
+    extra: crate::cluster::CacheExtra,
 }
+impl Key {
+    fn matches(
+        &self,
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: &crate::cluster::CacheExtra,
+    ) -> bool {
+        self.kind == node.kind
+            && &self.extra == extra
+            && self.params.iter().map(|(key, bits)| (key, *bits)).eq(node
+                .params
+                .iter()
+                .map(|(key, value)| (key, value.to_bits())))
+            && self
+                .inputs
+                .iter()
+                .map(|(key, id, rev)| (key, *id, *rev))
+                .eq(node
+                    .inputs
+                    .iter()
+                    .map(|(key, id)| (key, *id, revisions.get(id).copied().unwrap_or(0))))
+    }
+
+    fn new(
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: crate::cluster::CacheExtra,
+    ) -> Self {
+        Self {
+            kind: node.kind,
+            // Keep exact bit equality for signed-zero-sensitive numeric operations.
+            params: node
+                .params
+                .iter()
+                .map(|(key, n)| (key.clone(), n.to_bits()))
+                .collect(),
+            inputs: node
+                .inputs
+                .iter()
+                .map(|(key, id)| (key.clone(), *id, revisions.get(id).copied().unwrap_or(0)))
+                .collect(),
+            extra,
+        }
+    }
+}
+
 struct Cache {
     key: Key,
     revision: u64,
     result: Result<Tree, String>,
+    weight: usize,
 }
 #[derive(Default)]
 pub struct Evaluator {
     cache: BTreeMap<NodeId, Cache>,
+    // Match the previous oldest-revision eviction policy, with logarithmic removal.
+    cache_order: BTreeSet<(u64, NodeId)>,
     cache_weight: usize,
     revision: u64,
+    cluster_keys: crate::cluster::CacheKeys,
+    /// Thread cap override (`None`: all available cores, up to `MAX_THREADS`).
+    max_threads: Option<usize>,
 }
 impl Evaluator {
+    /// Limits the worker threads used for one graph level (1 = fully sequential).
+    pub fn set_max_threads(&mut self, threads: usize) {
+        self.max_threads = Some(threads);
+    }
     fn remove_cached(&mut self, id: NodeId) {
         if let Some(old) = self.cache.remove(&id) {
-            self.cache_weight = self
-                .cache_weight
-                .saturating_sub(old.result.as_ref().map(Tree::weight).unwrap_or(0));
+            self.cache_order.remove(&(old.revision, id));
+            self.cache_weight = self.cache_weight.saturating_sub(old.weight);
         }
     }
 
@@ -45,37 +129,37 @@ impl Evaluator {
     // retained cache memory independently of the current evaluation's output budget.
     fn store_cached(&mut self, id: NodeId, entry: Cache) {
         self.remove_cached(id);
-        let weight = entry.result.as_ref().map(Tree::weight).unwrap_or(0);
-        while self.cache_weight.saturating_add(weight) > MAX_TOTAL_WEIGHT {
-            let oldest = self
-                .cache
-                .iter()
-                .min_by_key(|(_, c)| c.revision)
-                .map(|(id, _)| *id);
-            let Some(oldest) = oldest else { return };
+        if entry.weight > MAX_TOTAL_WEIGHT {
+            return;
+        }
+        while self.cache_weight.saturating_add(entry.weight) > MAX_TOTAL_WEIGHT {
+            let Some(&(_, oldest)) = self.cache_order.first() else {
+                return;
+            };
             self.remove_cached(oldest);
         }
-        self.cache_weight = self.cache_weight.saturating_add(weight);
+        self.cache_weight = self.cache_weight.saturating_add(entry.weight);
+        self.cache_order.insert((entry.revision, id));
         self.cache.insert(id, entry);
     }
 
-    pub fn evaluate(&mut self, graph: &Graph, cancel: &dyn Fn() -> bool) -> Evaluation {
+    pub fn evaluate(&mut self, graph: &Graph, cancel: &(dyn Fn() -> bool + Sync)) -> Evaluation {
         let start = Instant::now();
         let mut out = Evaluation::default();
         // Latch cancellation: a one-shot callback must not become a cached node error.
-        let stopped = Cell::new(false);
+        let stopped = AtomicBool::new(false);
         let stop = || {
-            if !stopped.get() && cancel() {
-                stopped.set(true);
+            if !stopped.load(Ordering::Relaxed) && cancel() {
+                stopped.store(true, Ordering::Relaxed);
             }
-            stopped.get()
+            stopped.load(Ordering::Relaxed)
         };
         if stop() {
             out.cancelled = true;
             out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
             return out;
         }
-        let order = match graph.topological_order() {
+        let order = match graph.topological_nodes() {
             Ok(o) => o,
             Err(e) => {
                 for n in &graph.nodes {
@@ -86,78 +170,232 @@ impl Evaluator {
             }
         };
         let existing: BTreeSet<_> = graph.nodes.iter().map(|n| n.id).collect();
-        self.cache.retain(|id, _| existing.contains(id));
-        self.cache_weight = self.cache.values().fold(0usize, |sum, c| {
-            sum.saturating_add(c.result.as_ref().map(Tree::weight).unwrap_or(0))
-        });
+        let removed: Vec<_> = self
+            .cache
+            .keys()
+            .copied()
+            .filter(|id| !existing.contains(id))
+            .collect();
+        for id in removed {
+            self.remove_cached(id);
+        }
+        self.cluster_keys.begin(graph);
+        let threads = if graph.nodes.len() >= PARALLEL_MIN_NODES {
+            self.max_threads
+                .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
+                .clamp(1, MAX_THREADS)
+        } else {
+            1
+        };
         let mut revisions = BTreeMap::new();
         let mut retained = 0usize;
-        for id in order {
+        'levels: for level in levels(&order) {
             if stop() {
                 out.cancelled = true;
                 break;
             }
-            let Some(node) = graph.node(id) else { continue };
-            let key = Key {
-                kind: node.kind,
-                params: node.params.clone(),
-                inputs: node
-                    .inputs
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
-                    .collect(),
-            };
-            let (result, revision, is_cached) =
-                if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
-                    (c.result.clone(), c.revision, true)
+            // Phase 1 (sequential): disabled nodes, cache keys and cache hits.
+            let mut slots: Vec<Slot> = Vec::with_capacity(level.len());
+            for node in level {
+                let id = node.id;
+                let node_start = Instant::now();
+                // Disabled node: empty output, never cached; revision 0 marks "off" for children.
+                if node.off {
+                    self.remove_cached(id);
+                    revisions.insert(id, 0);
+                    out.outputs.insert(id, Ok(Tree::default()));
+                    out.node_timings
+                        .insert(id, NodeTiming::since(node_start, false));
+                    continue;
+                }
+                let extra = self.cluster_keys.key_for(graph, node);
+                let hit = self
+                    .cache
+                    .get(&id)
+                    .filter(|c| c.key.matches(node, &revisions, &extra))
+                    .map(|c| (c.result.clone(), c.revision, c.weight));
+                let key = if hit.is_some() {
+                    None
                 } else {
-                    let result = evaluate_node(node, &out.outputs, &stop);
+                    Some(Key::new(node, &revisions, extra))
+                };
+                slots.push(Slot {
+                    id,
+                    node,
+                    key,
+                    hit,
+                    fresh: None,
+                    prep: node_start.elapsed(),
+                    compute: Duration::ZERO,
+                });
+            }
+            // Phase 2: compute the misses. Nodes of one level never depend on each other, so
+            // they may run in parallel; results are slotted by index, so the outcome does
+            // not depend on scheduling.
+            let misses: Vec<usize> = (0..slots.len())
+                .filter(|&i| slots[i].hit.is_none())
+                .collect();
+            let outputs = &out.outputs;
+            if threads > 1 && misses.len() > 1 {
+                let next = AtomicUsize::new(0);
+                let results: Vec<Mutex<Option<Computed>>> =
+                    misses.iter().map(|_| Mutex::new(None)).collect();
+                std::thread::scope(|scope| {
+                    for _ in 0..threads.min(misses.len()) {
+                        scope.spawn(|| {
+                            loop {
+                                let k = next.fetch_add(1, Ordering::Relaxed);
+                                let (Some(&i), Some(cell)) = (misses.get(k), results.get(k)) else {
+                                    break;
+                                };
+                                if stop() {
+                                    break;
+                                }
+                                let began = Instant::now();
+                                let r = crate::cluster::evaluate_any(
+                                    graph,
+                                    slots[i].node,
+                                    outputs,
+                                    &stop,
+                                );
+                                let spent = began.elapsed();
+                                // A result computed while cancelling may be a cancel error.
+                                let r = if stop() { None } else { Some(r) };
+                                if let Ok(mut cell) = cell.lock() {
+                                    *cell = Some((r, spent));
+                                }
+                            }
+                        });
+                    }
+                });
+                for (k, cell) in results.into_iter().enumerate() {
+                    if let Some((r, spent)) = cell.into_inner().ok().flatten()
+                        && let Some(slot) = misses.get(k).and_then(|&i| slots.get_mut(i))
+                    {
+                        slot.fresh = r;
+                        slot.compute = spent;
+                    }
+                }
+            } else {
+                for &i in &misses {
                     if stop() {
-                        out.cancelled = true;
                         break;
                     }
-                    self.revision = self.revision.wrapping_add(1).max(1);
-                    (result, self.revision, false)
+                    let began = Instant::now();
+                    let r = crate::cluster::evaluate_any(graph, slots[i].node, outputs, &stop);
+                    slots[i].compute = began.elapsed();
+                    if !stop() {
+                        slots[i].fresh = Some(r);
+                    }
+                }
+            }
+            // Phase 3 (sequential, in level order): revisions, weight budget, cache, outputs.
+            for slot in slots {
+                let phase3 = Instant::now();
+                let id = slot.id;
+                let base = slot.prep + slot.compute;
+                let (result, revision, is_cached, weight) = match (slot.hit, slot.fresh) {
+                    (Some((r, rev, weight)), _) => (r, rev, true, weight),
+                    (None, Some(r)) => {
+                        self.revision = self.revision.wrapping_add(1).max(1);
+                        let weight = r.as_ref().map(Tree::weight).unwrap_or(0);
+                        (r, self.revision, false, weight)
+                    }
+                    (None, None) => {
+                        out.cancelled = true;
+                        out.node_timings
+                            .insert(id, NodeTiming::spent(base + phase3.elapsed(), false));
+                        break 'levels;
+                    }
                 };
-            if is_cached {
-                out.cached += 1;
-            } else {
-                out.computed += 1;
+                if is_cached {
+                    out.cached += 1;
+                } else {
+                    out.computed += 1;
+                }
+                if retained.saturating_add(weight) > MAX_TOTAL_WEIGHT {
+                    self.remove_cached(id);
+                    self.revision = self.revision.wrapping_add(1).max(1);
+                    revisions.insert(id, self.revision);
+                    out.outputs.insert(
+                        id,
+                        Err(
+                            "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
+                                .into(),
+                        ),
+                    );
+                    out.node_timings
+                        .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
+                    continue;
+                }
+                retained = retained.saturating_add(weight);
+                if !is_cached && let Some(key) = slot.key {
+                    self.store_cached(
+                        id,
+                        Cache {
+                            key,
+                            revision,
+                            result: result.clone(),
+                            weight,
+                        },
+                    );
+                }
+                revisions.insert(id, revision);
+                out.outputs.insert(id, result);
+                out.node_timings
+                    .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
             }
-            let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
-            if retained.saturating_add(weight) > MAX_TOTAL_WEIGHT {
-                self.remove_cached(id);
-                self.revision = self.revision.wrapping_add(1).max(1);
-                revisions.insert(id, self.revision);
-                out.outputs.insert(
-                    id,
-                    Err(
-                        "グラフ全体の形状が大きすぎます。配列の個数や分割数を減らしてください。"
-                            .into(),
-                    ),
-                );
-                continue;
-            }
-            retained = retained.saturating_add(weight);
-            if !is_cached {
-                self.store_cached(
-                    id,
-                    Cache {
-                        key,
-                        revision,
-                        result: result.clone(),
-                    },
-                );
-            }
-            revisions.insert(id, revision);
-            out.outputs.insert(id, result);
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
 }
 
-fn evaluate_node(
+/// Graphs with fewer nodes than this are evaluated on one thread (spawning costs more).
+const PARALLEL_MIN_NODES: usize = 8;
+const MAX_THREADS: usize = 8;
+
+/// A node computed in phase 2: the result (`None` when cancelled) and the time it took.
+type Computed = (Option<Result<Tree, String>>, Duration);
+
+struct Slot<'a> {
+    id: NodeId,
+    node: &'a Node,
+    /// Cache key, built only for nodes that are not cache hits.
+    key: Option<Key>,
+    /// Cached result, its revision and its weight.
+    hit: Option<(Result<Tree, String>, u64, usize)>,
+    fresh: Option<Result<Tree, String>>,
+    /// Time spent preparing the cache key, and computing the node.
+    prep: Duration,
+    compute: Duration,
+}
+
+/// Groups the topological order into levels: a node's level is one more than its deepest
+/// parent, so nodes of one level are independent. Order inside a level follows `order`.
+fn levels<'a>(order: &[&'a Node]) -> Vec<Vec<&'a Node>> {
+    let mut level_of: BTreeMap<NodeId, usize> = BTreeMap::new();
+    let mut out: Vec<Vec<&'a Node>> = Vec::new();
+    for &node in order {
+        let level = node
+            .inputs
+            .values()
+            .filter_map(|p| level_of.get(p))
+            .map(|l| l + 1)
+            .max()
+            .unwrap_or(0);
+        level_of.insert(node.id, level);
+        if out.len() <= level {
+            out.resize_with(level + 1, Vec::new);
+        }
+        if let Some(bucket) = out.get_mut(level) {
+            bucket.push(node);
+        }
+    }
+    out
+}
+
+pub(crate) fn evaluate_node(
     node: &Node,
     outputs: &BTreeMap<NodeId, Result<Tree, String>>,
     cancel: &dyn Fn() -> bool,
@@ -183,56 +421,62 @@ fn evaluate_node(
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
-        for value in tree.branches.values().flatten() {
-            if !spec.kind.accepts(value.kind()) {
-                return Err(format!(
-                    "「{}」には {} が必要です（現在: {}）。",
-                    spec.label,
-                    spec.kind.label(),
-                    value.kind().label()
-                ));
-            }
-            if spec.default.is_some() {
-                let n = value.number()?;
-                if n < spec.min || n > spec.max {
+        let tree = if let Some(&mode) = node.params.get(&format!("{}{}", dt::PORT_PREFIX, spec.key))
+        {
+            dt::apply_transform(&tree, dt::PortTransform::from_number(mode)?)?
+        } else {
+            tree
+        };
+        for (path, values) in &tree.branches {
+            for (index, value) in values.iter().enumerate() {
+                cancelled(cancel)?;
+                let site = || format!("{}[{}]", dt::path_text(path), index);
+                if !spec.kind.accepts(value.kind()) {
                     return Err(format!(
-                        "「{}」は {} 〜 {} の範囲にしてください。",
-                        spec.label, spec.min, spec.max
+                        "「{}」{} には {} が必要です（現在: {}）。",
+                        spec.label,
+                        site(),
+                        spec.kind.label(),
+                        value.kind().label()
                     ));
                 }
-                if spec.integer && (n - n.round()).abs() > 1e-8 {
-                    return Err(format!("「{}」は整数にしてください。", spec.label));
+                if spec.default.is_some() {
+                    let n = value.number()?;
+                    if n < spec.min || n > spec.max {
+                        return Err(format!(
+                            "「{}」{} は {} 〜 {} の範囲にしてください。",
+                            spec.label,
+                            site(),
+                            spec.min,
+                            spec.max
+                        ));
+                    }
+                    if spec.integer && n.fract() != 0.0 {
+                        return Err(format!(
+                            "「{}」{} は整数にしてください。",
+                            spec.label,
+                            site()
+                        ));
+                    }
                 }
             }
         }
         inputs.push(tree);
     }
-    if node.kind == NodeKind::Flatten {
-        let t = inputs.first().ok_or("入力がありません。")?;
+    if crate::data_tree_nodes::is_tree_kind(node.kind) {
         return checked_tree(
-            Tree {
-                branches: BTreeMap::from([(
-                    vec![0],
-                    t.branches.values().flatten().cloned().collect(),
-                )]),
-            },
+            crate::data_tree_nodes::run_tree(node, &inputs, cancel)?,
             cancel,
         );
     }
-    if node.kind == NodeKind::Graft {
-        let mut tree = Tree::default();
-        for (path, items) in &inputs.first().ok_or("入力がありません。")?.branches {
-            cancelled(cancel)?;
-            if items.is_empty() {
-                tree.branches.insert(path.clone(), Vec::new());
-            }
-            for (index, v) in items.iter().enumerate() {
-                let mut p = path.clone();
-                p.push(index as u32);
-                tree.branches.insert(p, vec![v.clone()]);
-            }
-        }
-        return checked_tree(tree, cancel);
+    if node.kind == NodeKind::Flatten || node.kind == NodeKind::Graft {
+        let t = inputs.first().ok_or("入力がありません。")?;
+        let result = if node.kind == NodeKind::Flatten {
+            dt::flatten(t)
+        } else {
+            dt::graft(t)
+        }?;
+        return checked_tree(result, cancel);
     }
     if node.kind == NodeKind::Output {
         return checked_tree(
@@ -240,6 +484,40 @@ fn evaluate_node(
             cancel,
         );
     }
+    // Gコード nodes work on whole trees of G-code jobs (see `gcode_nodes.rs`).
+    if crate::gcode_nodes::is_kind(node.kind) {
+        return checked_tree(crate::gcode_nodes::run(node, &inputs, cancel)?, cancel);
+    }
+    // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
+    if node.kind == NodeKind::ImportMesh {
+        let scale = first_number(inputs.first().ok_or("倍率の入力がありません。")?)?;
+        let center = first_number(inputs.get(1).ok_or("中心の入力がありません。")?)? != 0.;
+        let bed = first_number(inputs.get(2).ok_or("床の入力がありません。")?)? != 0.;
+        let mut mesh = crate::import::read_file(&node.script, cancel)?;
+        crate::import::place(&mut mesh, scale, center, bed)?;
+        let values = as_mesh(mesh, cancel)?;
+        return checked_tree(
+            Tree {
+                branches: BTreeMap::from([(vec![0], values)]),
+            },
+            cancel,
+        );
+    }
+    // The 式 node parses its text once; every list item then reuses the parsed formula.
+    let formula = if node.kind == NodeKind::Expression {
+        Some(crate::expr::parse(&node.script)?)
+    } else {
+        None
+    };
+    let curve_list = crate::curve_nodes::is_list_kind(node.kind);
+    let list_kind = crate::node_access::uses_list_access(node.kind);
+    let matching = node
+        .params
+        .get(dt::MATCH_PARAM)
+        .copied()
+        .map(dt::MatchMode::from_number)
+        .transpose()?;
+    let item_mode = matching.unwrap_or(dt::MatchMode::Longest);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
     let mut paths = BTreeSet::new();
@@ -254,92 +532,151 @@ fn evaluate_node(
             paths.extend(tree.branches.keys().cloned());
         }
     }
+    // Old .morph files omit MATCH_PARAM and keep the original exact-path behaviour.
+    // When a matching mode is selected, use ordinal branch matching instead.
+    let matched = if matching.is_some() || crate::node_access::uses_ordinal_matching(node.kind) {
+        dt::match_branches(&inputs)?
+    } else {
+        paths
+            .into_iter()
+            .map(|path| {
+                let lists: Vec<&[Value]> = inputs
+                    .iter()
+                    .map(|t| {
+                        t.branches
+                            .get(&path)
+                            .or_else(|| {
+                                if t.branches.len() == 1 {
+                                    t.branches.values().next()
+                                } else {
+                                    None
+                                }
+                            })
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[])
+                    })
+                    .collect();
+                dt::BranchMatch { path, lists }
+            })
+            .collect()
+    };
     let mut result = Tree::default();
     let mut total_items = 0usize;
     let mut total_weight = 0usize;
-    for path in paths {
+    for dt::BranchMatch { path, lists } in matched {
         cancelled(cancel)?;
-        let lists: Vec<&[Value]> = inputs
-            .iter()
-            .map(|t| {
-                t.branches
-                    .get(&path)
-                    .or_else(|| {
-                        if t.branches.len() == 1 {
-                            t.branches.values().next()
-                        } else {
-                            None
-                        }
-                    })
-                    .map(Vec::as_slice)
-                    .unwrap_or(&[])
-            })
-            .collect();
-        result.branches.entry(path.clone()).or_default();
-        if lists.iter().any(|v| v.is_empty()) {
-            continue;
+        total_weight = total_weight.saturating_add(path.len() + 1);
+        if total_weight > MAX_TOTAL_WEIGHT / 2 || result.branches.len() >= MAX_ITEMS {
+            return Err("データツリーの枝数または容量が上限を超えました。".into());
         }
-        let values = if node.kind == NodeKind::Merge {
-            vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
-        } else if node.kind == NodeKind::Loft {
-            let cap = lists
-                .get(1)
-                .and_then(|v| v.first())
-                .ok_or("端面の設定がありません。")?
-                .number()?
-                != 0.;
-            vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
-        } else {
-            let count = lists.iter().map(|v| v.len()).max().unwrap_or(0);
-            let mut values = Vec::new();
-            for index in 0..count {
-                cancelled(cancel)?;
-                let args: Vec<&Value> = lists
-                    .iter()
-                    .filter_map(|v| v.get(index.min(v.len().saturating_sub(1))))
-                    .collect();
-                preflight_run(
+        result.branches.entry(path.clone()).or_default();
+        let values = (|| -> Result<Vec<Value>, String> {
+            // Empty lists are data, including non-leading lists such as cut parameters
+            // or edit indices. Only a missing FirstItem scalar setting suppresses a
+            // list adapter. SingleItem adapters must validate their exact cardinality.
+            let skip = if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
+                lists.iter().any(|v| v.is_empty())
+            } else if list_kind {
+                lists.iter().enumerate().any(|(index, values)| {
+                    values.is_empty()
+                        && crate::node_access::for_input(node.kind, index)
+                            == Some(crate::node_access::InputAccess::FirstItem)
+                })
+            } else {
+                lists.iter().any(|v| v.is_empty())
+            };
+            if skip {
+                return Ok(Vec::new());
+            }
+            let values = if node.kind == NodeKind::Merge {
+                vec![Value::Mesh(Arc::new(merge_meshes(lists[0], cancel)?))]
+            } else if node.kind == NodeKind::Loft {
+                let cap = lists
+                    .get(1)
+                    .and_then(|v| v.first())
+                    .ok_or("端面の設定がありません。")?
+                    .number()?
+                    != 0.;
+                vec![Value::Mesh(Arc::new(loft(lists[0], cap, cancel)?))]
+            } else if crate::data_tree_nodes::is_list_kind(node.kind) {
+                crate::data_tree_nodes::run_list(
                     node.kind,
-                    &args,
+                    &lists,
+                    MAX_ITEMS.saturating_sub(total_items),
                     (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
-                    MAX_ITEMS.saturating_sub(total_items.saturating_add(values.len())),
-                )?;
-                let made = run(node.kind, &args, cancel)?;
-                if values.len().saturating_add(made.len()) > MAX_ITEMS {
-                    return Err(
-                        "生成データが多すぎます。数列や配列の個数を減らしてください。".into(),
-                    );
-                }
-                for value in &made {
-                    total_weight = total_weight.saturating_add(value.weight());
-                }
-                if total_weight > MAX_TOTAL_WEIGHT / 2 {
-                    return Err(
+                    cancel,
+                )?
+            } else if crate::math_nodes::is_list_kind(node.kind) {
+                crate::math_nodes::run_list(node.kind, &lists, cancel)?
+            } else if crate::generative::is_list(node.kind) {
+                crate::generative::run_list(node.kind, &lists, cancel)?
+            } else if node.kind == NodeKind::MeshConstruct {
+                crate::mesh_fabrication::run_list(&lists, cancel)?
+            } else if crate::nodes_shape::is_list_kind(node.kind) {
+                crate::nodes_shape::run_list(node.kind, &lists, cancel)?
+            } else if curve_list {
+                crate::curve_nodes::run_list(node.kind, &lists, cancel)?
+            } else if list_kind {
+                crate::gh_nodes::run_list(node.kind, &lists, cancel)?
+            } else {
+                let matches =
+                    dt::ItemMatches::new(&lists, item_mode, MAX_ITEMS.saturating_sub(total_items))?;
+                let mut values = Vec::new();
+                for args in matches {
+                    cancelled(cancel)?;
+                    preflight_run(
+                        node.kind,
+                        &args,
+                        (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
+                        MAX_ITEMS.saturating_sub(total_items.saturating_add(values.len())),
+                    )?;
+                    let made = match &formula {
+                        Some(f) => vec![Value::Number(f.eval([
+                            num(&args, 0)?,
+                            num(&args, 1)?,
+                            num(&args, 2)?,
+                            num(&args, 3)?,
+                        ])?)],
+                        None => run(node.kind, &args, cancel)?,
+                    };
+                    if values.len().saturating_add(made.len()) > MAX_ITEMS {
+                        return Err(
+                            "生成データが多すぎます。数列や配列の個数を減らしてください。".into(),
+                        );
+                    }
+                    for value in &made {
+                        total_weight = total_weight.saturating_add(value.weight());
+                    }
+                    if total_weight > MAX_TOTAL_WEIGHT / 2 {
+                        return Err(
                         "1 つのノードの形状が大きすぎます。分割数や配列の個数を減らしてください。"
                             .into(),
                     );
+                    }
+                    values.extend(made);
                 }
-                values.extend(made);
+                values
+            };
+            if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) || list_kind {
+                for value in &values {
+                    total_weight = total_weight.saturating_add(value.weight());
+                }
+                if total_weight > MAX_TOTAL_WEIGHT / 2 {
+                    return Err("生成形状が大きすぎます。断面や分割数を減らしてください。".into());
+                }
             }
-            values
-        };
-        if matches!(node.kind, NodeKind::Merge | NodeKind::Loft) {
-            for value in &values {
-                total_weight = total_weight.saturating_add(value.weight());
+            total_items = total_items.saturating_add(values.len());
+            if total_items > MAX_ITEMS {
+                return Err("生成データの個数が上限を超えました。".into());
             }
-            if total_weight > MAX_TOTAL_WEIGHT / 2 {
-                return Err("生成形状が大きすぎます。断面や分割数を減らしてください。".into());
-            }
-        }
-        total_items = total_items.saturating_add(values.len());
-        if total_items > MAX_ITEMS {
-            return Err("生成データの個数が上限を超えました。".into());
-        }
+            Ok(values)
+        })()
+        .map_err(|e| format!("枝 {}: {e}", dt::path_text(&path)))?;
         result.branches.insert(path, values);
     }
     checked_tree(result, cancel)
 }
-fn checked_tree(tree: Tree, cancel: &dyn Fn() -> bool) -> Result<Tree, String> {
+pub(crate) fn checked_tree(tree: Tree, cancel: &dyn Fn() -> bool) -> Result<Tree, String> {
     if tree.branches.len() > MAX_ITEMS || tree.branches.keys().any(|p| p.len() > 32) {
         return Err(
             "データツリーが大きすぎるか深すぎます。フラット化で階層を整理してください。".into(),
@@ -378,13 +715,44 @@ fn preflight_run(
             let count = num(args, 1)? as usize;
             (shape(args)?.weight().saturating_mul(count), count)
         }
-        NodeKind::Move | NodeKind::Rotate | NodeKind::Scale | NodeKind::Twist | NodeKind::Wave => {
-            (shape(args)?.weight(), 1)
-        }
-        NodeKind::Series => {
+        NodeKind::Move
+        | NodeKind::Rotate
+        | NodeKind::Scale
+        | NodeKind::ScaleXyz
+        | NodeKind::Twist
+        | NodeKind::Wave => (shape(args)?.weight(), 1),
+        // A mirror that keeps the original can double the shape.
+        NodeKind::Mirror => (shape(args)?.weight().saturating_mul(2), 1),
+        NodeKind::Series | NodeKind::Range => {
             let count = num(args, 2)? as usize;
             (count, count)
         }
+        NodeKind::GhRange => {
+            let count = (num(args, 2)? as usize).saturating_add(1);
+            (count, count)
+        }
+        NodeKind::ConstructDomain => (2, 2),
+        NodeKind::RandomNormal => {
+            let count = num(args, 0)? as usize;
+            (count, count)
+        }
+        NodeKind::Random | NodeKind::Populate => {
+            let count = num(args, 0)? as usize;
+            (count, count)
+        }
+        NodeKind::NoiseDeform
+        | NodeKind::MeshFlip
+        | NodeKind::MeshSmooth
+        | NodeKind::MeshOnBed
+        | NodeKind::MeshUnify => (shape(args)?.weight(), 1),
+        NodeKind::CurveDivide => {
+            let count = num(args, 1)? as usize + 1;
+            (count, count)
+        }
+        // Outer and inner copies plus the stitched rim.
+        NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
+        k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
+        k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
     };
     if weight > remaining_weight || items > remaining_items {
@@ -392,17 +760,25 @@ fn preflight_run(
     }
     Ok(())
 }
-fn cancelled(stop: &dyn Fn() -> bool) -> Result<(), String> {
+fn first_number(tree: &Tree) -> Result<f64, String> {
+    tree.branches
+        .values()
+        .flatten()
+        .next()
+        .ok_or("数値を入力してください。")?
+        .number()
+}
+pub(crate) fn cancelled(stop: &dyn Fn() -> bool) -> Result<(), String> {
     if stop() {
         Err("計算を停止しました。".into())
     } else {
         Ok(())
     }
 }
-fn num(a: &[&Value], i: usize) -> Result<f64, String> {
+pub(crate) fn num(a: &[&Value], i: usize) -> Result<f64, String> {
     a.get(i).ok_or("数値の入力がありません。")?.number()
 }
-fn shape<'a>(a: &[&'a Value]) -> Result<&'a Value, String> {
+pub(crate) fn shape<'a>(a: &[&'a Value]) -> Result<&'a Value, String> {
     a.first()
         .copied()
         .ok_or_else(|| "形状を接続してください。".into())
@@ -413,7 +789,7 @@ fn curve(a: &[&Value]) -> Result<Arc<Curve>, String> {
         _ => Err("曲線を接続してください。".into()),
     }
 }
-fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
+pub(crate) fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     validate_mesh(&mesh, cancel)?;
     Ok(vec![Value::Mesh(Arc::new(mesh))])
 }
@@ -421,12 +797,20 @@ fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
-    Ok(vec![Value::Curve(Arc::new(Curve { points, closed }))])
+    let geometry = crate::curve_geometry::CurveGeometry::nurbs(
+        crate::curve_geometry::NurbsCurve::polyline(points.clone(), closed)?,
+    );
+    Ok(vec![Value::Curve(Arc::new(Curve {
+        points,
+        closed,
+        geometry: Some(geometry),
+    }))])
 }
 
 fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     use NodeKind::*;
     match kind {
+        k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
@@ -444,6 +828,71 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             }
             Ok(vec![Value::Number(v)])
         }
+        Subtract | Power | Min | Max | Modulo => {
+            let x = num(a, 0)?;
+            let y = num(a, 1)?;
+            let v = match kind {
+                Subtract => x - y,
+                Min => x.min(y),
+                Max => x.max(y),
+                Modulo => {
+                    if y == 0. {
+                        return Err(
+                            "ゼロでの剰余は計算できません。B を 0 以外にしてください。".into()
+                        );
+                    }
+                    x.rem_euclid(y)
+                }
+                _ => {
+                    if x == 0. && y < 0. {
+                        return Err(
+                            "0 を負の指数でべき乗できません。底か指数を変えてください。".into()
+                        );
+                    }
+                    if x < 0. && (y - y.round()).abs() > 1e-9 {
+                        return Err("負の数は整数の指数でだけ累乗できます。".into());
+                    }
+                    x.powf(y)
+                }
+            };
+            if !v.is_finite() {
+                return Err("計算結果が大きすぎます。".into());
+            }
+            Ok(vec![Value::Number(v)])
+        }
+        Abs => Ok(vec![Value::Number(num(a, 0)?.abs())]),
+        Sine => {
+            let x = num(a, 0)?;
+            let amp = num(a, 1)?;
+            let frequency = num(a, 2)?;
+            let phase = num(a, 3)?.to_radians();
+            let v = amp * (TAU * frequency * x + phase).sin();
+            if !v.is_finite() {
+                return Err("計算結果が大きすぎます。".into());
+            }
+            Ok(vec![Value::Number(v)])
+        }
+        Range => {
+            let start = num(a, 0)?;
+            let end = num(a, 1)?;
+            let count = num(a, 2)? as usize;
+            if count == 0 {
+                return Ok(Vec::new());
+            }
+            if count == 1 {
+                return Ok(vec![Value::Number(start)]);
+            }
+            let span = end - start;
+            Ok((0..count)
+                .map(|i| {
+                    if i + 1 == count {
+                        Value::Number(end)
+                    } else {
+                        Value::Number(start + span * i as f64 / (count - 1) as f64)
+                    }
+                })
+                .collect())
+        }
         Series => {
             let start = num(a, 0)?;
             let step = num(a, 1)?;
@@ -453,7 +902,24 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 .collect())
         }
         Point => Ok(vec![Value::Point([num(a, 0)?, num(a, 1)?, num(a, 2)?])]),
-        Circle | Polygon => {
+        Circle => {
+            let r = num(a, 0)?;
+            let n = num(a, 1)? as usize;
+            let geom = crate::curve_geometry::CurveGeometry::circle([0.; 3], [0., 0., 1.], r)?;
+            // Keep the legacy angular sampling and vertex count for existing lofts/exports.
+            let points = (0..n)
+                .map(|i| {
+                    let t = TAU * i as f64 / n as f64;
+                    [r * t.cos(), r * t.sin(), 0.]
+                })
+                .collect();
+            Ok(vec![Value::Curve(Arc::new(Curve {
+                points,
+                closed: true,
+                geometry: Some(geom),
+            }))])
+        }
+        Polygon => {
             let r = num(a, 0)?;
             let n = num(a, 1)? as usize;
             as_curve(
@@ -497,16 +963,26 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             let h = num(a, 1)?;
             let turns = num(a, 2)?;
             let n = num(a, 3)? as usize;
-            as_curve(
-                (0..=n)
-                    .map(|i| {
-                        let t = i as f64 / n as f64;
-                        let ang = t * turns * TAU;
-                        [r * ang.cos(), r * ang.sin(), t * h]
-                    })
-                    .collect(),
-                false,
-            )
+            let geometry = crate::curve_geometry::CurveGeometry::helix(
+                [0.; 3],
+                [r, 0., 0.],
+                [0., r, 0.],
+                [0., 0., h],
+                turns,
+                0.,
+            )?;
+            let points = (0..=n)
+                .map(|i| {
+                    let t = i as f64 / n as f64;
+                    let ang = t * turns * TAU;
+                    [r * ang.cos(), r * ang.sin(), t * h]
+                })
+                .collect();
+            Ok(vec![Value::Curve(Arc::new(Curve {
+                points,
+                closed: false,
+                geometry: Some(geometry),
+            }))])
         }
         Extrude => as_mesh(
             extrude(curve(a)?.as_ref(), num(a, 1)?, num(a, 2)? as usize, cancel)?,
@@ -534,9 +1010,31 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             cancel,
         ),
         Box => as_mesh(box_mesh(num(a, 0)?, num(a, 1)?, num(a, 2)?), cancel),
+        Cylinder => as_mesh(
+            cylinder(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
+        Cone => as_mesh(
+            cone(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
+        Torus => as_mesh(
+            torus(
+                num(a, 0)?,
+                num(a, 1)?,
+                num(a, 2)? as usize,
+                num(a, 3)? as usize,
+                cancel,
+            )?,
+            cancel,
+        ),
+        Plane => as_mesh(
+            plane(num(a, 0)?, num(a, 1)?, num(a, 2)? as usize, cancel)?,
+            cancel,
+        ),
         Move => {
             let d = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| [p[0] + d[0], p[1] + d[1], p[2] + d[2]],
                 cancel,
@@ -545,7 +1043,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         Rotate => {
             let rad = num(a, 1)?.to_radians();
             let axis = num(a, 2)? as usize;
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| rotate(p, rad, axis),
                 cancel,
@@ -553,12 +1051,21 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Scale => {
             let factor = num(a, 1)?;
-            Ok(vec![map_shape(
+            Ok(vec![map_affine_shape(
                 shape(a)?,
                 |p| [p[0] * factor, p[1] * factor, p[2] * factor],
                 cancel,
             )?])
         }
+        ScaleXyz => {
+            let f = [num(a, 1)?, num(a, 2)?, num(a, 3)?];
+            Ok(vec![map_affine_shape(
+                shape(a)?,
+                |p| [p[0] * f[0], p[1] * f[1], p[2] * f[2]],
+                cancel,
+            )?])
+        }
+        Mirror => mirror(shape(a)?, num(a, 1)? as usize, num(a, 2)? != 0., cancel),
         Twist => {
             let value = shape(a)?;
             let (lo, hi) = z_bounds(value)?;
@@ -609,7 +1116,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                         num(a, 3)? * index as f64,
                         num(a, 4)? * index as f64,
                     ];
-                    values.push(map_shape(
+                    values.push(map_affine_shape(
                         source,
                         |p| [p[0] + d[0], p[1] + d[1], p[2] + d[2]],
                         cancel,
@@ -622,35 +1129,95 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                         count.saturating_sub(1).max(1)
                     };
                     let rad = total.to_radians() * index as f64 / divisor as f64;
-                    values.push(map_shape(source, |p| rotate(p, rad, 2), cancel)?);
+                    values.push(map_affine_shape(source, |p| rotate(p, rad, 2), cancel)?);
                 }
             }
             Ok(values)
         }
-        Loft | Merge | Flatten | Graft | Output => Err("このノードはリスト評価が必要です。".into()),
+        RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d
+        | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray
+        | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d
+        | PopulateMesh | CurveArray | NoiseField | LifeGrid => {
+            crate::generative::run_item(kind, a, cancel)
+        }
+        Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
+        | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
+        ArcCurve | Polyline | SmoothCurve | OffsetCurve | PointOnCurve | DivideCurve | Pipe
+        | Sweep | SmoothMesh | Subdivide | WeldMesh | UnifyNormals | MeshInfo | TaperScale
+        | Bend | GridArray3d | Gyroid | RevolvePoints => {
+            crate::nodes_shape::run_item(kind, a, cancel)
+        }
+        PlaneSurface
+        | NurbsPanel
+        | BilinearSurface
+        | CylinderSurface
+        | FrustumSurface
+        | SphereSurface
+        | TorusSurface
+        | EvaluateSurface
+        | SurfaceDirection
+        | SurfaceNormalLine
+        | SurfaceArea
+        | SurfaceClosestPoint
+        | SurfaceIsoCurve
+        | DivideSurface
+        | SurfaceMesh
+        | BrepBox
+        | BrepVolume
+        | BrepArea
+        | BrepIntersection
+        | BrepMove
+        | BrepFaces
+        | BrepEdges
+        | BrepVertices
+        | BrepMesh
+        | NurbsVase
+        | RuledSurface
+        | SurfaceExtrude
+        | BrepUnion
+        | BrepDifference
+        | BrepOffset
+        | SurfaceGaussianCurvature
+        | SurfaceMeanCurvature
+        | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
+        MeshArea | MeshVolume | MeshCenter | MeshDimensions | MeshMass | MeshAudit
+        | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
+        | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
+        | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
+        | MeshCompact | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
+        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem
+        | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList
+        | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree
+        | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper
+        | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex
+        | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems
+        | InsertItems | MemberIndex | RandomReduce | Jitter => {
+            Err("このノードはリスト評価が必要です。".into())
+        }
+        other => crate::math_nodes::run_item(other, a, cancel),
     }
 }
 
-fn finite_point(p: [f64; 3]) -> bool {
+pub(crate) fn finite_point(p: [f64; 3]) -> bool {
     p.into_iter().all(|v| v.is_finite() && v.abs() <= 1e9)
 }
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
         a[0] * b[1] - a[1] * b[0],
     ]
 }
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+pub(crate) fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
-fn length(a: [f64; 3]) -> f64 {
+pub(crate) fn length(a: [f64; 3]) -> f64 {
     dot(a, a).sqrt()
 }
-fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
+pub(crate) fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
     if m.vertices.len() > MAX_VERTICES || m.triangles.len() > MAX_TRIANGLES {
         return Err("メッシュが上限を超えています。分割数を減らしてください。".into());
     }
@@ -673,7 +1240,7 @@ fn validate_mesh(m: &Mesh, cancel: &dyn Fn() -> bool) -> Result<(), String> {
     }
     Ok(())
 }
-fn map_shape(
+pub(crate) fn map_shape(
     v: &Value,
     f: impl Fn([f64; 3]) -> [f64; 3],
     cancel: &dyn Fn() -> bool,
@@ -703,6 +1270,8 @@ fn map_shape(
         Value::Curve(c) => Ok(Value::Curve(Arc::new(Curve {
             points: map(&c.points)?,
             closed: c.closed,
+            // Generic map may be nonlinear (twist, wave, noise). Never retain stale precision.
+            geometry: None,
         }))),
         Value::Mesh(m) => {
             let mesh = Mesh {
@@ -713,7 +1282,23 @@ fn map_shape(
             Ok(Value::Mesh(Arc::new(mesh)))
         }
         Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
+        Value::Surface(_) | Value::Solid(_) | Value::Gcode(_) => {
+            Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into())
+        }
     }
+}
+pub(crate) fn map_affine_shape(
+    v: &Value,
+    f: impl Fn([f64; 3]) -> [f64; 3],
+    cancel: &dyn Fn() -> bool,
+) -> Result<Value, String> {
+    let mut mapped = map_shape(v, &f, cancel)?;
+    if let (Value::Curve(before), Value::Curve(after)) = (v, &mut mapped)
+        && let Some(g) = &before.geometry
+    {
+        Arc::make_mut(after).geometry = Some(g.affine(&f)?);
+    }
+    Ok(mapped)
 }
 fn rotate(p: [f64; 3], r: f64, axis: usize) -> [f64; 3] {
     let (s, c) = r.sin_cos();
@@ -739,11 +1324,202 @@ fn z_bounds(v: &Value) -> Result<(f64, f64), String> {
             (a.min(p[2]), b.max(p[2]))
         }))
 }
-fn checked_size(vertices: usize, triangles: usize) -> Result<(), String> {
+pub(crate) fn checked_size(vertices: usize, triangles: usize) -> Result<(), String> {
     if vertices > MAX_VERTICES || triangles > MAX_TRIANGLES {
         Err("形状が大きすぎます。分割数を減らしてください。".into())
     } else {
         Ok(())
+    }
+}
+fn cylinder(
+    radius: f64,
+    height: f64,
+    segments: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 {
+        return Err("周の分割は 3 以上にしてください。".into());
+    }
+    checked_size(
+        segments.saturating_mul(2).saturating_add(2),
+        segments.saturating_mul(4),
+    )?;
+    let mut m = Mesh::default();
+    for z in [0., height] {
+        cancelled(cancel)?;
+        for j in 0..segments {
+            let angle = TAU * j as f64 / segments as f64;
+            m.vertices
+                .push([radius * angle.cos(), radius * angle.sin(), z]);
+        }
+    }
+    let bottom = (segments * 2) as u32;
+    m.vertices.push([0., 0., 0.]);
+    let top = bottom + 1;
+    m.vertices.push([0., 0., height]);
+    for j in 0..segments {
+        let a = j as u32;
+        let b = ((j + 1) % segments) as u32;
+        let c = a + segments as u32;
+        let d = b + segments as u32;
+        m.triangles.extend([[a, b, c], [b, d, c]]);
+        m.triangles.push([bottom, b, a]);
+        m.triangles.push([top, c, d]);
+    }
+    Ok(m)
+}
+fn cone(
+    radius: f64,
+    height: f64,
+    segments: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 {
+        return Err("周の分割は 3 以上にしてください。".into());
+    }
+    checked_size(segments.saturating_add(2), segments.saturating_mul(2))?;
+    cancelled(cancel)?;
+    let mut m = Mesh::default();
+    for j in 0..segments {
+        let angle = TAU * j as f64 / segments as f64;
+        m.vertices
+            .push([radius * angle.cos(), radius * angle.sin(), 0.]);
+    }
+    let apex = segments as u32;
+    m.vertices.push([0., 0., height]);
+    let center = apex + 1;
+    m.vertices.push([0., 0., 0.]);
+    for j in 0..segments {
+        let a = j as u32;
+        let b = ((j + 1) % segments) as u32;
+        m.triangles.push([a, b, apex]);
+        m.triangles.push([center, b, a]);
+    }
+    Ok(m)
+}
+fn torus(
+    major: f64,
+    minor: f64,
+    segments: usize,
+    tube: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if segments < 3 || tube < 3 {
+        return Err("分割数は 3 以上にしてください。".into());
+    }
+    if minor >= major {
+        return Err("副半径は主半径より小さくしてください。".into());
+    }
+    let count = segments.saturating_mul(tube);
+    checked_size(count, count.saturating_mul(2))?;
+    let mut m = Mesh::default();
+    for i in 0..segments {
+        cancelled(cancel)?;
+        let u = TAU * i as f64 / segments as f64;
+        for j in 0..tube {
+            let v = TAU * j as f64 / tube as f64;
+            let ring = major + minor * v.cos();
+            m.vertices
+                .push([ring * u.cos(), ring * u.sin(), minor * v.sin()]);
+        }
+    }
+    let index = |i: usize, j: usize| ((i % segments) * tube + (j % tube)) as u32;
+    for i in 0..segments {
+        for j in 0..tube {
+            let a = index(i, j);
+            let b = index(i + 1, j);
+            let c = index(i, j + 1);
+            let d = index(i + 1, j + 1);
+            m.triangles.extend([[a, b, c], [b, d, c]]);
+        }
+    }
+    Ok(m)
+}
+fn plane(
+    width: f64,
+    depth: f64,
+    divisions: usize,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Mesh, String> {
+    if divisions < 1 {
+        return Err("分割数は 1 以上にしてください。".into());
+    }
+    let side = divisions.saturating_add(1);
+    checked_size(
+        side.saturating_mul(side),
+        divisions.saturating_mul(divisions).saturating_mul(2),
+    )?;
+    let mut m = Mesh::default();
+    for iy in 0..side {
+        cancelled(cancel)?;
+        for ix in 0..side {
+            m.vertices.push([
+                -width / 2. + width * ix as f64 / divisions as f64,
+                -depth / 2. + depth * iy as f64 / divisions as f64,
+                0.,
+            ]);
+        }
+    }
+    for iy in 0..divisions {
+        for ix in 0..divisions {
+            let a = (iy * side + ix) as u32;
+            let b = a + 1;
+            let c = a + side as u32;
+            let d = c + 1;
+            m.triangles.extend([[a, b, c], [b, d, c]]);
+        }
+    }
+    Ok(m)
+}
+fn reflect(p: [f64; 3], axis: usize) -> [f64; 3] {
+    let mut q = p;
+    let k = axis.min(2);
+    q[k] = -q[k];
+    q
+}
+// A reflection reverses the triangle winding, so the mirrored copy swaps two indices to
+// keep outward normals. With `keep`, a mesh becomes one merged mesh (the two halves are
+// not welded); points and curves return the original and the mirrored copy.
+fn mirror(
+    source: &Value,
+    axis: usize,
+    keep: bool,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Vec<Value>, String> {
+    match source {
+        Value::Mesh(m) => {
+            let mut mesh = Mesh::default();
+            if keep {
+                checked_size(
+                    m.vertices.len().saturating_mul(2),
+                    m.triangles.len().saturating_mul(2),
+                )?;
+                mesh.vertices.extend(&m.vertices);
+                mesh.triangles.extend(&m.triangles);
+            }
+            let offset = mesh.vertices.len() as u32;
+            for (i, p) in m.vertices.iter().enumerate() {
+                if i % 256 == 0 {
+                    cancelled(cancel)?;
+                }
+                mesh.vertices.push(reflect(*p, axis));
+            }
+            mesh.triangles.extend(
+                m.triangles
+                    .iter()
+                    .map(|t| [t[0] + offset, t[2] + offset, t[1] + offset]),
+            );
+            as_mesh(mesh, cancel)
+        }
+        Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
+        other => {
+            let mirrored = map_affine_shape(other, |p| reflect(p, axis), cancel)?;
+            if keep {
+                Ok(vec![other.clone(), mirrored])
+            } else {
+                Ok(vec![mirrored])
+            }
+        }
     }
 }
 fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
@@ -1065,7 +1841,7 @@ fn revolve(
     validate_mesh(&m, cancel)?;
     Ok(m)
 }
-fn orient_outward(m: &mut Mesh) {
+pub(crate) fn orient_outward(m: &mut Mesh) {
     let volume = m
         .triangles
         .iter()
@@ -1254,6 +2030,7 @@ fn segments_intersect(a: [f64; 2], b: [f64; 2], c: [f64; 2], d: [f64; 2], eps: f
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
     fn add(g: &mut Graph, k: NodeKind) -> NodeId {
         g.add(k, [0., 0.]).unwrap()
     }
@@ -1297,6 +2074,7 @@ mod tests {
             add(&mut graph, NodeKind::Vase);
         }
         let mut engine = Evaluator::default();
+        engine.set_max_threads(1); // call counts below must be deterministic
         assert!(
             engine
                 .evaluate(&graph, &|| false)
@@ -1312,22 +2090,35 @@ mod tests {
         // before its sixteen old cached meshes are visited or replaced.
         let mut prefix = graph.clone();
         prefix.nodes.truncate(8);
-        let calls = Cell::new(0usize);
-        let prefix_result = Evaluator::default().evaluate(&prefix, &|| {
-            calls.set(calls.get() + 1);
+        let calls = AtomicUsize::new(0);
+        let mut prefix_engine = Evaluator::default();
+        prefix_engine.set_max_threads(1);
+        let prefix_result = prefix_engine.evaluate(&prefix, &|| {
+            calls.fetch_add(1, Ordering::SeqCst);
             false
         });
         assert!(prefix_result.outputs.values().all(Result::is_ok));
-        let allowed = calls.get();
+        let allowed = calls.load(Ordering::SeqCst);
         drop(prefix_result);
-        calls.set(0);
+        calls.store(0, Ordering::SeqCst);
         let result = engine.evaluate(&graph, &|| {
-            calls.set(calls.get() + 1);
-            calls.get() > allowed
+            calls.fetch_add(1, Ordering::SeqCst) + 1 > allowed / 2
         });
         assert!(result.cancelled);
-        assert_eq!(result.computed, 8);
+        assert!(
+            result.computed > 0 && result.computed < 24,
+            "{}",
+            result.computed
+        );
         assert!(engine.cache_weight <= MAX_TOTAL_WEIGHT);
+        assert_eq!(engine.cache_order.len(), engine.cache.len());
+        for (id, cached) in &engine.cache {
+            assert!(engine.cache_order.contains(&(cached.revision, *id)));
+            assert_eq!(
+                cached.weight,
+                cached.result.as_ref().map(Tree::weight).unwrap_or(0)
+            );
+        }
         assert_eq!(
             engine.cache_weight,
             engine
@@ -1384,11 +2175,8 @@ mod tests {
         let mut graph = Graph::default();
         let id = add(&mut graph, NodeKind::Vase);
         let mut engine = Evaluator::default();
-        let calls = Cell::new(0usize);
-        let result = engine.evaluate(&graph, &|| {
-            calls.set(calls.get() + 1);
-            calls.get() == 10
-        });
+        let calls = AtomicUsize::new(0);
+        let result = engine.evaluate(&graph, &|| calls.fetch_add(1, Ordering::SeqCst) + 1 == 10);
         assert!(result.cancelled);
         assert!(result.outputs.is_empty());
         assert!(engine.cache.is_empty());
@@ -1515,6 +2303,31 @@ mod tests {
         assert!(!t.branches.contains_key(&vec![0]));
     }
     #[test]
+    fn graft_preserves_value_when_deeper_empty_path_collides() {
+        // Construct a valid mixed-depth tree at the evaluator boundary; do not
+        // depend on a particular graph's path-matching rules to create it.
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let graft = graph.add(NodeKind::Graft, [0., 0.]).unwrap();
+        graph.connect(source, graft, "geometry").unwrap();
+        let input = Tree {
+            branches: BTreeMap::from([
+                (vec![0], vec![Value::Number(42.), Value::Number(17.)]),
+                (vec![0, 0], vec![]),
+                (vec![3], vec![]),
+                (vec![4, 2], vec![Value::Number(8.)]),
+            ]),
+        };
+        let outputs = BTreeMap::from([(source, Ok(input.clone()))]);
+        let result = evaluate_node(graph.node(graft).unwrap(), &outputs, &|| false).unwrap();
+        assert_eq!(result.item_count(), input.item_count());
+        assert_eq!(result.branches[&vec![0, 0]], vec![Value::Number(42.)]);
+        assert_eq!(result.branches[&vec![0, 1]], vec![Value::Number(17.)]);
+        assert_eq!(result.branches[&vec![3]], Vec::<Value>::new());
+        assert_eq!(result.branches[&vec![4, 2, 0]], vec![Value::Number(8.)]);
+    }
+
+    #[test]
     fn singleton_grafted_branch_is_not_duplicated_by_constants() {
         let mut g = Graph::default();
         let n = add(&mut g, NodeKind::Number);
@@ -1580,6 +2393,7 @@ mod tests {
         let c = Curve {
             points: vec![[0., 0., 0.], [10., 10., 0.], [0., 10., 0.], [10., 0., 0.]],
             closed: true,
+            geometry: None,
         };
         assert!(extrude(&c, 10., 1, &|| false).is_err());
     }
