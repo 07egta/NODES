@@ -206,6 +206,21 @@ pub enum Edit {
         input: String,
         value: f64,
     },
+    Disconnect {
+        to: String,
+        input: String,
+    },
+    Reset {
+        node: String,
+        input: String,
+    },
+    Move {
+        node: String,
+        position: [f32; 2],
+    },
+    Remove {
+        node: String,
+    },
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -270,7 +285,8 @@ pub fn build(request: &Request) -> Result<Project, String> {
 
 /// Transactional: caller's graph is unchanged if any operation fails.
 /// Existing nodes can be addressed by their decimal native ID; new aliases must
-/// be unique and contain ASCII letters, digits, '_' or '-'.
+/// be unique within the request and contain ASCII letters, digits, '_' or '-'.
+/// Returned aliases refer only to nodes still present after the transaction.
 pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, NodeId>, String> {
     if request.api_version != API_VERSION || request.edits.len() > MAX_EDITS {
         return Err("unsupported API version or too many edits".into());
@@ -282,6 +298,7 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
         .iter()
         .map(|n| (n.id.to_string(), n.id))
         .collect();
+    let mut allocated: BTreeSet<_> = names.keys().cloned().collect();
     let mut touched = BTreeSet::new();
     for edit in &request.edits {
         match edit {
@@ -296,7 +313,7 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                     || !alias
                         .bytes()
                         .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
-                    || names.contains_key(alias)
+                    || allocated.contains(alias)
                     || !permitted(*kind)
                 {
                     return Err("invalid, duplicate or unsupported node alias/kind".into());
@@ -305,6 +322,7 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                     return Err("too many nodes".into());
                 }
                 let id = candidate.add(*kind, *position)?;
+                allocated.insert(alias.clone());
                 names.insert(alias.clone(), id);
             }
             Edit::Connect { from, to, input } => {
@@ -326,6 +344,54 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                 let n = candidate.node_mut(id).ok_or("missing node")?;
                 validate_numeric(n.kind, input, *value)?;
                 n.params.insert(input.clone(), *value);
+            }
+            Edit::Disconnect { to, input } => {
+                let id = *names.get(to).ok_or("unknown target alias")?;
+                let n = candidate.node(id).ok_or("missing target node")?;
+                let key = n.kind.canonical_input_key(input);
+                if !n.inputs.contains_key(key) {
+                    return Err("input is not connected".into());
+                }
+                if !touched.insert((id, key.to_owned())) {
+                    return Err("duplicate input connection edit".into());
+                }
+                candidate.disconnect(id, key);
+            }
+            Edit::Reset { node, input } => {
+                let id = *names.get(node).ok_or("unknown parameter alias")?;
+                let n = candidate.node_mut(id).ok_or("missing node")?;
+                let key = n.kind.canonical_input_key(input);
+                let default = n
+                    .kind
+                    .spec()
+                    .inputs
+                    .iter()
+                    .find(|p| p.key == key)
+                    .and_then(|p| p.default)
+                    .ok_or("input has no numeric default")?;
+                n.params.insert(key.to_owned(), default);
+            }
+            Edit::Move { node, position } => {
+                let id = *names.get(node).ok_or("unknown node alias")?;
+                if !position
+                    .iter()
+                    .all(|v| v.is_finite() && v.abs() <= 1_000_000.)
+                {
+                    return Err("node position is outside the canvas range".into());
+                }
+                candidate.node_mut(id).ok_or("missing node")?.position = *position;
+            }
+            Edit::Remove { node } => {
+                let id = *names.get(node).ok_or("unknown node alias")?;
+                // Graph::remove cleans dependent wires. Keep unrelated annotations
+                // unchanged, including pre-existing empty groups.
+                candidate.remove(id);
+                candidate.groups.retain_mut(|group| {
+                    let was_member = group.nodes.contains(&id);
+                    group.nodes.retain(|&member| member != id);
+                    !was_member || !group.nodes.is_empty()
+                });
+                names.retain(|_, value| *value != id);
             }
         }
     }
@@ -424,6 +490,102 @@ mod tests {
         }
         assert!(parse_request(br#"{"api_version":2,"edits":[]}"#).is_err());
         assert!(parse_request(&vec![b' '; MAX_REQUEST_BYTES + 1]).is_err());
+    }
+
+    #[test]
+    fn transactional_editing_disconnect_reset_move_and_remove() {
+        let mut graph = build(&parse_request(SAMPLE).unwrap()).unwrap().graph;
+        crate::annotations::add_group(&mut graph, &[0, 1], "sources").unwrap();
+        crate::annotations::add_group(&mut graph, &[1], "second").unwrap();
+        let original_next_id = graph.next_id;
+        let default = NodeKind::Number
+            .spec()
+            .inputs
+            .iter()
+            .find(|p| p.key == "value")
+            .unwrap()
+            .default
+            .unwrap();
+        let request = parse_request(
+            br#"{"api_version":1,"edits":[
+            {"op":"disconnect","to":"2","input":"a"},
+            {"op":"reset","node":"0","input":"value"},
+            {"op":"move","node":"0","position":[125,-50]},
+            {"op":"remove","node":"1"}
+        ]}"#,
+        )
+        .unwrap();
+        let aliases = apply(&mut graph, &request).unwrap();
+        assert_eq!(
+            aliases.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["0", "2"]
+        );
+        assert_eq!(graph.node(0).unwrap().params["value"], default);
+        assert_eq!(graph.node(0).unwrap().position, [125., -50.]);
+        assert!(graph.node(1).is_none());
+        assert!(graph.node(2).unwrap().inputs.is_empty());
+        assert_eq!(graph.next_id, original_next_id);
+        assert_eq!(graph.groups.len(), 1);
+        assert_eq!(graph.groups[0].nodes, vec![0]);
+        assert!(validate_safe(&graph).is_ok());
+    }
+
+    #[test]
+    fn destructive_and_invalid_edits_roll_back() {
+        let mut graph = build(&parse_request(SAMPLE).unwrap()).unwrap().graph;
+        let before = graph.clone();
+        for bytes in [
+            r#"{"api_version":1,"edits":[{"op":"remove","node":"0"},{"op":"move","node":"0","position":[0,0]}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"remove","node":"1"},{"op":"disconnect","to":"2","input":"b"}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"reset","node":"0","input":"no_such_port"}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"move","node":"0","position":[1000001,0]}]}"#,
+            r#"{"api_version":1,"edits":[{"op":"add","alias":"new","kind":"number","position":[0,0]},{"op":"remove","node":"new"},{"op":"add","alias":"new","kind":"number","position":[0,0]}]}"#,
+        ] {
+            assert!(apply(&mut graph, &parse_request(bytes.as_bytes()).unwrap()).is_err());
+            assert_eq!(graph, before);
+        }
+    }
+
+    #[test]
+    fn duplicate_wire_edits_are_rejected() {
+        let mut graph = build(&parse_request(SAMPLE).unwrap()).unwrap().graph;
+        let before = graph.clone();
+        let request = parse_request(
+            br#"{"api_version":1,"edits":[
+            {"op":"disconnect","to":"2","input":"a"},
+            {"op":"connect","from":"1","to":"2","input":"a"}
+        ]}"#,
+        )
+        .unwrap();
+        assert!(apply(&mut graph, &request).is_err());
+        assert_eq!(graph, before);
+    }
+
+    #[test]
+    fn legacy_and_canonical_wire_keys_cannot_duplicate_edits() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Point, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Point, [100., 0.]).unwrap();
+        let target = graph.add(NodeKind::ClosestPoint, [200., 0.]).unwrap();
+        assert!(permitted(NodeKind::ClosestPoint));
+        graph.connect(a, target, "points").unwrap();
+        let before = graph.clone();
+        let request = Request {
+            api_version: API_VERSION,
+            edits: vec![
+                Edit::Disconnect {
+                    to: target.to_string(),
+                    input: "points".into(),
+                },
+                Edit::Connect {
+                    from: b.to_string(),
+                    to: target.to_string(),
+                    input: "candidates".into(),
+                },
+            ],
+        };
+        assert!(apply(&mut graph, &request).is_err());
+        assert_eq!(graph, before);
     }
 
     #[test]

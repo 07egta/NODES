@@ -206,6 +206,64 @@ fn build_edit_save_reload_and_evaluate_preserve_project_metadata() {
 }
 
 #[test]
+fn console_apply_supports_transactional_structural_edits() {
+    let temporary = TemporaryDirectory::new();
+    let source = temporary.path("original.morph");
+    let edited = temporary.path("edited.morph");
+    let request = temporary.path("edit.json");
+    let mut project = graph_api::build(
+        &graph_api::parse_request(include_bytes!("../examples/interop/ai-add.json")).unwrap(),
+    )
+    .unwrap();
+    project.name = "構造編集".into();
+    morphlet::annotations::add_group(&mut project.graph, &[0, 1], "inputs").unwrap();
+    persistence::save(&source, &project).unwrap();
+    let source_bytes = fs::read(&source).unwrap();
+
+    fs::write(
+        &request,
+        serde_json::to_vec(&json!({
+            "api_version": 1,
+            "edits": [
+                {"op":"disconnect","to":"2","input":"a"},
+                {"op":"remove","node":"1"},
+                {"op":"set","node":"2","input":"b","value":17},
+                {"op":"reset","node":"2","input":"b"},
+                {"op":"move","node":"0","position":[123,-50]}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let result = successful("apply", &[&source, &request, &edited]);
+    assert_eq!(node(&result, 2)["data"]["preview"][0]["value"], 10.0);
+    assert_eq!(result["node_ids"], json!({"0":0,"2":2}));
+    let reloaded = persistence::load(&edited).unwrap();
+    assert_eq!(reloaded.name, project.name);
+    assert_eq!(reloaded.graph.nodes.len(), 2);
+    assert_eq!(reloaded.graph.next_id, project.graph.next_id);
+    assert_eq!(reloaded.graph.groups[0].nodes, vec![0]);
+    assert_eq!(reloaded.graph.node(0).unwrap().position, [123., -50.]);
+    assert!(reloaded.graph.node(2).unwrap().inputs.is_empty());
+    assert_eq!(fs::read(&source).unwrap(), source_bytes);
+
+    let edited_bytes = fs::read(&edited).unwrap();
+    fs::write(
+        &request,
+        br#"{"api_version":1,"edits":[
+            {"op":"remove","node":"0"},
+            {"op":"move","node":"0","position":[0,0]}
+        ]}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        failed("apply", &[&edited, &request, &edited])["code"],
+        "apply_failed"
+    );
+    assert_eq!(fs::read(&edited).unwrap(), edited_bytes);
+}
+
+#[test]
 fn evaluation_errors_have_node_ids_and_failed_apply_preserves_existing_destination() {
     let temporary = TemporaryDirectory::new();
     let path = temporary.path("divide.morph");

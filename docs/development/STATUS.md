@@ -125,3 +125,8 @@ The GUI binary is Morphlet; the console binary is nodes-cli. Cargo's default run
 ## Save transport in the restored environment
 
 The fresh checkout can clone/fetch public GitHub source, but its direct git push failed with 'could not read Username for https://github.com'. No credentials were requested, exposed or committed. The authenticated GitHub connector is used to create an identical tree, preserve all reviewed parent commits and advance the development ref with an expected-SHA lease. Verify the remote tree against the local tree before treating this checkpoint as saved.
+
+
+## Parallel API-edit checkpoint
+
+Draft PR [#12](https://github.com/07egta/NODES/pull/12), branch `develop/nodes-ultimate-api-edits`, is based on integration snapshot `c52e850ed01a82461557fab9182778092151db2d`. It adds disconnect/reset/move/remove transactions and API/console regression tests. See [API_EDITS.md](API_EDITS.md) for the branch-specific handoff and CI gates. The upstream verification numbers above do not cover these pending edits; do not merge until CI succeeds. No main push or dependency change.

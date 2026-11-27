@@ -57,3 +57,16 @@ Use declarative node packs first, backed by existing .morphpart definitions; ver
 ## Verification
 
 Added Rust tests for synthetic scalar conversion and evaluation, unsupported IDs, retained ordered wires, dangling references, cycles, corrupt/oversized XML, XXE/DTD, deep nesting, NaN, non-default tree settings, multi-source refusal, API arithmetic, forbidden capability and version rejection, bounds, and atomic rollback. This authoring environment has no Rust toolchain or direct git/network access; these tests have **not** been executed locally. Run cargo fmt, cargo test --locked, and Windows integration checks before merge. Real GHX import/evaluation equivalence must be tested with Rhino-generated fixtures. Do not treat this draft as production-ready.
+
+
+## Transactional editing extension (draft)
+
+API v1 now also accepts:
+- `disconnect`: `to`, `input` (requires an existing connection).
+- `reset`: `node`, `input` (restores the declared numeric default, preserves the connection).
+- `move`: `node`, `position` (finite coordinates in the native canvas range).
+- `remove`: `node` (removes incident wires and group membership; node IDs are never reused).
+
+Only one explicit wire edit per canonical target port is accepted per request. Use connect directly to replace a connection; disconnect and reconnect the same port in separate transactions. A deleted alias cannot be reused within the same request. Existing numeric IDs identify existing nodes; returned aliases include only surviving nodes. Any failure rolls back all graph and annotation changes. The Rust apply API and existing console command `nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph` both support editing existing graphs. The console checks evaluation before the atomic save and preserves project metadata. No script, file import or plugin capability is granted.
+
+Added regression tests for edit success, rollback, alias lifetime, bounds and canonical wire identity, plus a real console process roundtrip test. Pending Rust/CI verification for this branch.
