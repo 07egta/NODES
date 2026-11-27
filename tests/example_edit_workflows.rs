@@ -79,6 +79,7 @@ example_cases! {
     (fractal_tree, "generative/08-fractal-tree.morph", 0, "length", 42.0, 1, Curve, false),
     (density_wall, "generative/09-density-wall.morph", 7, "height", 7.0, 10, Mesh, false),
     (surface_lattice, "generative/10-surface-lattice.morph", 1, "radius", 38.0, 2, Curve, false),
+    (smooth_vase_radius, "math/smooth-vase-radius.morph", 3, "x", 0.9, 2, Mesh, false),
     (hollow_vessel_checks, "mesh-fabrication/hollow-vessel-check.morph", 2, "height", 132.0, 7, Mesh, false),
     (multiple_parts, "mesh-fabrication/multi-part-check.morph", 0, "width", 24.0, 3, Mesh, true),
     (rounded_box, "mesh-fabrication/rounded-box.morph", 0, "width", 60.0, 3, Mesh, true),
