@@ -770,6 +770,28 @@ impl GraphCanvas {
                     ui.close();
                 }
             });
+            if let Some(message) = error {
+                let badge = melt::error_badge(&painter, nr, p.zoom);
+                let id = n.id;
+                ui.interact(badge, Id::new(("error_badge", id)), Sense::hover())
+                    .on_hover_ui(|ui| {
+                        let failed = |x: NodeId| {
+                            evaluation
+                                .and_then(|e| e.outputs.get(&x))
+                                .is_some_and(|r| r.is_err())
+                        };
+                        let root = melt::root_cause(&p.graph, &failed, id);
+                        let root_message = evaluation
+                            .and_then(|e| e.outputs.get(&root))
+                            .and_then(|r| r.as_ref().err())
+                            .map_or(message.as_str(), String::as_str);
+                        let name = p.graph.node(root).map_or("?", |m| m.name.as_str());
+                        ui.label(ui_polish::one_line(
+                            &format!("原因: 「{name}」{root_message}"),
+                            80,
+                        ));
+                    });
+            }
             if overview {
                 // At overview zoom, keep card silhouettes, selection and wires, not
                 // illegible labels/sliders. Zoom in or Shift+F to edit.

@@ -1,7 +1,7 @@
 //! Melt 3D style widgets and small painters shared by the canvas and the panels.
 use crate::theme;
 use eframe::egui::{self, Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind};
-use nodes::model::DataType;
+use nodes::model::{DataType, Graph, NodeId};
 
 /// Port outline per data type, so the type is readable without colour alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,8 +80,51 @@ pub fn wire_width(selected: bool) -> f32 {
     if selected { 3.2 } else { 1.8 }
 }
 
+/// Follows failed inputs upstream until a node whose own inputs are all fine: the root cause.
+/// Bounded, so a malformed graph cannot loop.
+pub fn root_cause(graph: &Graph, is_failed: &dyn Fn(NodeId) -> bool, start: NodeId) -> NodeId {
+    let mut current = start;
+    for _ in 0..256 {
+        let Some(node) = graph.node(current) else {
+            return current;
+        };
+        match node.inputs.values().copied().find(|id| is_failed(*id)) {
+            Some(next) if next != current => current = next,
+            _ => return current,
+        }
+    }
+    current
+}
+
+/// Red dot at the top-right corner of a card.
+pub fn error_badge(painter: &Painter, card: Rect, zoom: f32) -> Rect {
+    let center = card.right_top() + egui::vec2(-3.0, 3.0) * zoom;
+    let r = (5.5 * zoom).max(3.5);
+    painter.circle_filled(center, r + 1.5, theme::canvas_bg());
+    painter.circle_filled(center, r, theme::error());
+    Rect::from_center_size(center, egui::vec2(r * 2.0 + 6.0, r * 2.0 + 6.0))
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use nodes::model::NodeKind;
+
+    #[test]
+    fn root_cause_walks_to_the_first_failed_node() {
+        let mut graph = Graph::default();
+        let kind = NodeKind::all()[0];
+        let a = graph.add(kind, [0.0, 0.0]).expect("add");
+        let b = graph.add(kind, [10.0, 0.0]).expect("add");
+        let c = graph.add(kind, [20.0, 0.0]).expect("add");
+        graph.nodes[1].inputs.insert("x".into(), a);
+        graph.nodes[2].inputs.insert("x".into(), b);
+        let failed = |id: NodeId| id == a || id == b || id == c;
+        assert_eq!(root_cause(&graph, &failed, c), a);
+        let only_c = |id: NodeId| id == c;
+        assert_eq!(root_cause(&graph, &only_c, c), c);
+    }
+
     use super::*;
 
     #[test]
