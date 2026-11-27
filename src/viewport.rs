@@ -669,17 +669,22 @@ impl Viewport {
                 ),
                 ink,
             ),
-            (
-                format!(
-                    "体積  {:.2} cm³  ・  重さ（PLA 中実の目安）約 {:.1} g",
-                    volume_cm3, weight
-                ),
-                ink,
-            ),
+            if report.is_closed() {
+                (
+                    format!(
+                        "体積  {:.2} cm³  ・  重さ（PLA 中実の目安）約 {:.1} g",
+                        volume_cm3, weight
+                    ),
+                    ink,
+                )
+            } else {
+                ("体積・重量は未判定（閉じた多様体が必要です）".into(), warn)
+            },
             (
                 format!("三角形 {} 枚  ・  {}", report.triangles, mesh_state(report)),
                 ink,
             ),
+            ("自己交差・殻の内外・肉厚は未検査".into(), muted),
         ];
         if let Some(plan) = self.bed_plan() {
             let [w, d, h] = plan.volume;
@@ -1552,13 +1557,24 @@ fn raster_scale(rect: Rect, pixels_per_point: f32) -> f32 {
 
 fn mesh_state(report: &ExportReport) -> String {
     if report.is_closed() {
-        "閉じたメッシュ".to_owned()
+        return "閉じた多様体".to_owned();
+    }
+    let problems: Vec<_> = [
+        ("境界", report.open_edges, "辺"),
+        ("非多様体", report.non_manifold_edges, "辺"),
+        ("向きの不整合", report.inconsistent_edges, "辺"),
+        ("非多様体", report.non_manifold_vertices, "頂点"),
+        ("重複", report.duplicate_faces, "面"),
+        ("退化", report.degenerate_triangles, "面"),
+    ]
+    .into_iter()
+    .filter(|(_, count, _)| *count > 0)
+    .map(|(label, count, unit)| format!("{label} {count} {unit}"))
+    .collect();
+    if problems.is_empty() {
+        "面なし".to_owned()
     } else {
-        format!(
-            "開いた箇所あり（境界の辺 {} ・ 不正な辺 {}）",
-            report.open_edges,
-            report.non_manifold_edges + report.inconsistent_edges
-        )
+        format!("要確認（{}）", problems.join("・"))
     }
 }
 

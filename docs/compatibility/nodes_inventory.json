@@ -16942,7 +16942,7 @@
       "branch_matching": "ordinal",
       "category": "精密曲面",
       "compatibility": "NOT_INFERRED",
-      "description": "解析曲面は公式、NURBSは中点積分による近似値です。",
+      "description": "解析曲面は公式、NURBSはノット区間ごとの適応 Gauss 積分による近似値です。",
       "evaluation_status": "NOT_INFERRED",
       "inputs": [
         {
@@ -16969,7 +16969,7 @@
           "index": 1,
           "integer": true,
           "key": "steps",
-          "label": "積分分割",
+          "label": "積分精度",
           "max": 128.0,
           "min": 4.0,
           "required_connection": false,
@@ -16992,7 +16992,7 @@
       ],
       "registration": "picker",
       "search_keywords": "surface area integrate 面積",
-      "spec_fingerprint": "fnv1a64:8e974c9085a16f08"
+      "spec_fingerprint": "fnv1a64:53fd57a8d117e554"
     },
     {
       "branch_matching": "ordinal",
@@ -18494,7 +18494,7 @@
   "picker_count": 298,
   "registered_count": 299,
   "schema_version": 2,
-  "source_revision": "b26d246341d359a6284a7b1036d1369a02e59a72",
+  "source_revision": null,
   "source_revision_provenance": "caller_supplied; does not assert a clean worktree",
   "verification_note": "Registry enumeration cannot establish any verified-node count.",
   "verified_count": null

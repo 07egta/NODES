@@ -1,7 +1,7 @@
 //! Serializable, renderer-independent graph model. Geometry is evaluated separately.
 use crate::cluster::ClusterDef;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub type NodeId = u64;
@@ -1566,13 +1566,19 @@ impl Graph {
         if self.nodes.len() > MAX_NODES {
             return Err(format!("ノード数が上限 {MAX_NODES} を超えています。"));
         }
-        let mut indegree = BTreeMap::new();
-        let mut after: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
-        let ids: BTreeMap<_, _> = self.nodes.iter().map(|n| (n.id, n)).collect();
-        if ids.len() != self.nodes.len() {
+        let mut nodes: Vec<_> = self.nodes.iter().collect();
+        nodes.sort_unstable_by_key(|node| node.id);
+        if nodes.windows(2).any(|pair| pair[0].id == pair[1].id) {
             return Err("ノード ID が重複しています。".into());
         }
-        for node in &self.nodes {
+        // Dense new projects and sparse/reordered v1 files use the same compact
+        // scratch storage. Never allocate up to a serialized node ID.
+        let dense_ids = nodes
+            .last()
+            .is_some_and(|node| node.id == (nodes.len() - 1) as NodeId);
+        let mut indegree = vec![0; nodes.len()];
+        let mut children = vec![Vec::new(); nodes.len()];
+        for (index, &node) in nodes.iter().enumerate() {
             if node.id >= self.next_id {
                 return Err("次のノード ID が無効です。".into());
             }
@@ -1589,54 +1595,47 @@ impl Graph {
                     return Err(format!("「{}」のパラメータが無効です。", node.name));
                 }
             }
-            let mut parents = BTreeSet::new();
             for (key, source) in &node.inputs {
                 let spec = specs
                     .iter()
                     .find(|s| s.key == key)
                     .ok_or("不明な入力への接続があります。")?;
-                let other = ids
-                    .get(source)
-                    .ok_or("存在しないノードへの接続があります。")?;
+                let parent = if dense_ids {
+                    usize::try_from(*source).ok().filter(|&i| i < nodes.len())
+                } else {
+                    nodes.binary_search_by_key(source, |node| node.id).ok()
+                }
+                .ok_or("存在しないノードへの接続があります。")?;
+                let other = nodes[parent];
                 if !spec.kind.accepts(other.kind.spec().output) {
                     return Err(format!(
                         "「{}」の「{}」は接続の型が違います。",
                         node.name, spec.label
                     ));
                 }
-                parents.insert(*source);
-            }
-            indegree.insert(node.id, parents.len());
-            for p in parents {
-                after.entry(p).or_default().push(node.id);
+                // Count wires, so the same source feeding two ports is released twice.
+                // Visiting children by node ID also provides their stable enqueue order.
+                children[parent].push(index);
+                indegree[index] += 1;
             }
         }
-        // Stable sibling ordering makes independent output admission deterministic,
-        // even when the document stores the same nodes in a different order.
-        for children in after.values_mut() {
-            children.sort_unstable();
-        }
-        let mut queue: VecDeque<_> = indegree
-            .iter()
-            .filter(|(_, v)| **v == 0)
-            .map(|(id, _)| *id)
-            .collect();
-        let mut order = Vec::with_capacity(self.nodes.len());
-        while let Some(id) = queue.pop_front() {
-            order.push(*ids.get(&id).ok_or("ノード ID が見つかりません。")?);
-            for child in after.get(&id).into_iter().flatten() {
-                if let Some(d) = indegree.get_mut(child) {
-                    *d = d.saturating_sub(1);
-                    if *d == 0 {
-                        queue.push_back(*child);
-                    }
+
+        let mut order = Vec::with_capacity(nodes.len());
+        order.extend((0..nodes.len()).filter(|&i| indegree[i] == 0));
+        let mut cursor = 0;
+        while cursor < order.len() {
+            for &child in &children[order[cursor]] {
+                indegree[child] -= 1;
+                if indegree[child] == 0 {
+                    order.push(child);
                 }
             }
+            cursor += 1;
         }
         if order.len() != self.nodes.len() {
             return Err("この接続は循環します。途中のノードへ戻る線はつなげません。".into());
         }
-        Ok(order)
+        Ok(order.into_iter().map(|i| nodes[i]).collect())
     }
 }
 fn valid_position(p: [f32; 2]) -> bool {
@@ -1726,6 +1725,36 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sparse_reordered_nodes_with_repeated_parents_keep_stable_order() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let left = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        let right = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        let tip = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        graph.connect(a, left, "a").unwrap();
+        graph.connect(a, left, "b").unwrap();
+        graph.connect(b, right, "b").unwrap();
+        graph.connect(a, right, "a").unwrap();
+        graph.connect(left, tip, "a").unwrap();
+        graph.connect(right, tip, "b").unwrap();
+        let big_id = NodeId::MAX - 1;
+        graph.node_mut(tip).unwrap().id = big_id;
+        graph.next_id = NodeId::MAX;
+        graph.nodes.reverse();
+        assert_eq!(
+            graph.topological_order().unwrap(),
+            [a, b, left, right, big_id]
+        );
+        graph
+            .node_mut(right)
+            .unwrap()
+            .inputs
+            .insert("b".into(), big_id);
+        assert!(graph.topological_order().unwrap_err().contains("循環"));
+    }
+
     #[test]
     fn failed_wire_keeps_previous_connection() {
         let mut g = Graph::default();

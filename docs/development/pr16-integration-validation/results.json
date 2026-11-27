@@ -1,0 +1,115 @@
+{
+  "proposal_only": true,
+  "base_sha": "aa6906574ba3a89919d80a8a778d71ac65cc3724",
+  "incoming_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
+  "incoming_modeling_base_sha": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+  "candidate_tree_before_evidence": "b376f43e916accdf4dbb76829ac18c88c10cd215",
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "profile": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/target-pr16-preview",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.548,
+      "log": "fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 6.489,
+      "log": "clippy.log"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 75.175,
+      "log": "tests.log",
+      "results": {
+        "suites": 57,
+        "passed": 567,
+        "failed": 0,
+        "ignored": 3
+      }
+    },
+    {
+      "name": "debug-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.148,
+      "log": "debug-bins.log"
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 91.868,
+      "log": "release-bins.log"
+    }
+  ],
+  "check_after_fix": {
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "cargo_reported_duration_s": 1.55,
+    "raw_log_saved": false,
+    "evidence": "Observed in executor tool output before the saved fmt/Clippy/full-test run."
+  },
+  "binaries": {
+    "Morphlet": {
+      "size_bytes": 19407376,
+      "sha256": "14c521c3a1e4187f00054e416a4903c2f626ee8ddd7303850f37c19352291893"
+    },
+    "nodes-cli": {
+      "size_bytes": 5573072,
+      "sha256": "ae786fc4933236cb42b3bd8eac8d367ffda7695828ff150b33a352fc591655fe"
+    }
+  }
+}

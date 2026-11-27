@@ -146,7 +146,7 @@ pub struct MorphletApp {
     confirm_action: Option<PendingAction>,
     allow_close: bool,
     preview_mode: u8,
-    gesture_before: Option<Project>,
+    edits: EditTracker,
     last_autosave: Instant,
     recovery: Option<Project>,
     ui_scale: f32,
@@ -210,6 +210,7 @@ impl MorphletApp {
             None
         };
         let mut app = Self {
+            edits: EditTracker::new(&project),
             project,
             history: History::default(),
             canvas,
@@ -246,7 +247,6 @@ impl MorphletApp {
             confirm_action: None,
             allow_close: false,
             preview_mode: 0,
-            gesture_before: None,
             last_autosave: Instant::now(),
             recovery,
             ui_scale: 1.,
@@ -427,7 +427,6 @@ impl MorphletApp {
             self.file_path = path;
             self.dirty = false;
             self.history = History::default();
-            self.gesture_before = None;
             self.suppress_history = true;
             self.canvas.selected.clear();
             self.canvas.connecting = None;
@@ -863,7 +862,6 @@ impl MorphletApp {
     }
     fn undo(&mut self) {
         if self.history.undo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -874,7 +872,6 @@ impl MorphletApp {
     }
     fn redo(&mut self) {
         if self.history.redo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -1491,7 +1488,7 @@ impl MorphletApp {
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
                                 let value = n.params.entry(input.key.into()).or_insert(default);
-                                ui.add(parameter_slider(value, input));
+                                parameter_editor(ui, value, input);
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -1969,21 +1966,27 @@ impl MorphletApp {
             .open(&mut open)
             .collapsible(false)
             .default_width(520.)
+            .max_width((ctx.content_rect().width() - 64.0).clamp(280.0, 520.0))
             .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
                 ui.label(theme::small(
                     "? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。",
                 ));
                 ui.add_space(8.);
-                egui::Grid::new("shortcut_grid")
-                    .num_columns(2)
-                    .spacing([28., 7.])
+                egui::ScrollArea::vertical()
+                    .id_salt("keyboard_shortcuts_body")
+                    .max_height((ctx.content_rect().height() - 150.0).max(160.0))
                     .show(ui, |ui| {
-                        for (keys, what) in ui_polish::SHORTCUTS {
-                            ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
-                            ui.label(RichText::new(*what).size(12.));
-                            ui.end_row();
-                        }
+                        egui::Grid::new("shortcut_grid")
+                            .num_columns(2)
+                            .spacing([28., 7.])
+                            .show(ui, |ui| {
+                                for (keys, what) in ui_polish::SHORTCUTS {
+                                    ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
+                                    ui.label(RichText::new(*what).size(12.));
+                                    ui.end_row();
+                                }
+                            });
                     });
             });
         self.shortcuts_open = open;
@@ -2117,24 +2120,12 @@ impl MorphletApp {
         }
     }
     fn help_dialog(&mut self, ctx: &egui::Context) {
-        if !self.help_open {
-            return;
+        match crate::getting_started::show(ctx, &mut self.help_open, &mut self.ui_scale) {
+            Some(crate::getting_started::Action::Examples) => self.template_open = true,
+            Some(crate::getting_started::Action::Dictionary) => self.help_window.open_index(),
+            Some(crate::getting_started::Action::Shortcuts) => self.shortcuts_open = true,
+            None => {}
         }
-        let mut open = true;
-        egui::Window::new("Morphlet の使い方").open(&mut open).collapsible(false).default_width(570.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.heading("つなぐ。変える。形になる。");ui.add_space(10.);
-            for (title,body) in [("1  作品例を開く","まずは「ねじれの花器」。ノードを選ぶと右下に設定が出ます。"),("2  数値を動かす","スライダーを動かすか、数値を直接入力。形がすぐに変わります。"),("3  処理を追加する","左で「移動」「円形配列」などを検索。選択した形状に自動でつながります。"),("4  線をつなぐ","右の丸から左の丸へドラッグ。または出力→入力の順にクリック。入力の丸を右クリックで切断。"),("5  保存して、つくる",".morph は編集できる作品ファイル。STL はスライサー用、OBJ は3Dソフト用です。")]{
-                ui.label(RichText::new(title).strong());ui.label(body);ui.add_space(8.);
-            }
-            ui.separator();
-            egui::Grid::new("shortcuts").num_columns(2).spacing([24.,6.]).show(ui,|ui|{
-                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("F1","選択中のノードのヘルプ（ノード辞典）"),("Ctrl+E","選択ノードを無効 / 有効"),("Ctrl+G","選択ノードをグループで囲む"),("右クリック（空き）","ここにノード / メモを追加"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
-            });
-            ui.add_space(8.);if ui.button("ノード辞典を開く（全ノードの説明）").clicked(){self.help_window.open_index();}
-            ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
-            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
-        });
-        self.help_open = open;
     }
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
         let Some(action) = self.confirm_action.clone() else {
@@ -2285,11 +2276,9 @@ impl MorphletApp {
 impl eframe::App for MorphletApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.compute_tick(ctx);
-        let before = self.project.clone();
         self.suppress_history = false;
-        if ctx.input(|i| i.pointer.any_pressed()) && self.gesture_before.is_none() {
-            self.gesture_before = Some(before.clone());
-        }
+        self.edits
+            .begin(&self.project, ctx.input(|i| i.pointer.any_pressed()));
         if self.confirm_action.is_none()
             && self.recovery.is_none()
             && !self.palette_open
@@ -2324,7 +2313,7 @@ impl eframe::App for MorphletApp {
         // navigation using a prior result during that brief interval either.
         let stale = self.stale()
             || (self.diagnostics_window.open
-                && !same_calculation(&before.graph, &self.project.graph));
+                && !same_calculation(&self.edits.previous.graph, &self.project.graph));
         if let Some(id) = self.diagnostics_window.show(
             ctx,
             self.diagnostics.as_ref(),
@@ -2354,21 +2343,15 @@ impl eframe::App for MorphletApp {
             }
         }
         self.file_dialog(ctx);
-        if !self.suppress_history && document_changed(&before, &self.project) {
-            self.dirty = true;
-            if self.gesture_before.is_none() {
-                self.history.checkpoint(&before);
-            }
-            if !same_calculation(&before.graph, &self.project.graph) {
-                self.queue_compute();
-            }
-        }
-        if !ctx.input(|i| i.pointer.any_down())
-            && let Some(start) = self.gesture_before.take()
-            && !self.suppress_history
-            && document_changed(&start, &self.project)
-        {
-            self.history.checkpoint(&start);
+        let (edited, recalculate) = self.edits.finish(
+            &self.project,
+            ctx.input(|i| i.pointer.any_down()),
+            self.suppress_history,
+            &mut self.history,
+        );
+        self.dirty |= edited;
+        if recalculate {
+            self.queue_compute();
         }
         if let Some((text, error, start)) = &self.toast
             && start.elapsed() < Duration::from_secs(if *error { 9 } else { 4 })
@@ -2525,22 +2508,97 @@ fn collect_export_trees(
         .collect()
 }
 
+/// A drag gets one undo entry. Merely painting, panning or pressing a button
+/// keeps the existing graph snapshot, including when a worker requests a repaint.
+struct EditTracker {
+    previous: Project,
+    gesture: Option<EditGesture>,
+}
+
+struct EditGesture {
+    pan: [f32; 2],
+    zoom: f32,
+    before: Option<Project>,
+}
+
+impl EditTracker {
+    fn new(project: &Project) -> Self {
+        Self {
+            previous: project.clone(),
+            gesture: None,
+        }
+    }
+
+    fn begin(&mut self, project: &Project, pressed: bool) {
+        self.previous.pan = project.pan;
+        self.previous.zoom = project.zoom;
+        if pressed && self.gesture.is_none() {
+            self.gesture = Some(EditGesture {
+                pan: project.pan,
+                zoom: project.zoom,
+                before: None,
+            });
+        }
+    }
+
+    fn finish(
+        &mut self,
+        project: &Project,
+        pointer_down: bool,
+        suppress: bool,
+        history: &mut History,
+    ) -> (bool, bool) {
+        let changed = document_changed(&self.previous, project);
+        let edited = changed && !suppress;
+        let recalculate = edited && !same_calculation(&self.previous.graph, &project.graph);
+        if suppress {
+            // Open, recovery and undo/redo establish a fresh baseline.
+            self.gesture = None;
+        }
+        if changed {
+            let mut before = std::mem::replace(&mut self.previous, project.clone());
+            if edited {
+                if let Some(gesture) = &mut self.gesture {
+                    if gesture.before.is_none() {
+                        before.pan = gesture.pan;
+                        before.zoom = gesture.zoom;
+                        gesture.before = Some(before);
+                    }
+                } else {
+                    history.checkpoint_owned(before);
+                }
+            }
+        }
+        if !pointer_down
+            && let Some(before) = self.gesture.take().and_then(|g| g.before)
+            && document_changed(&before, project)
+        {
+            history.checkpoint_owned(before);
+        }
+        (edited, recalculate)
+    }
+}
+
 fn document_changed(a: &Project, b: &Project) -> bool {
-    a.name != b.name || a.graph != b.graph
+    a.name != b.name || a.graph != b.graph || !persistence::same_parameter_bits(&a.graph, &b.graph)
 }
 fn same_calculation(a: &Graph, b: &Graph) -> bool {
     a.nodes.len() == b.nodes.len()
         && a.clusters == b.clusters
+        && persistence::same_parameter_bits(a, b)
         && a.nodes.iter().zip(&b.nodes).all(|(x, y)| {
             x.id == y.id
                 && x.kind == y.kind
-                && x.params == y.params
                 && x.inputs == y.inputs
                 && x.script == y.script
                 && x.cluster == y.cluster
                 && x.off == y.off
         })
 }
+#[cfg(test)]
+#[path = "signed_zero_tests.rs"]
+mod signed_zero_tests;
+
 #[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
     ui_polish::query_score(kind, query).is_some()
@@ -2641,6 +2699,27 @@ pub(crate) fn parameter_drag_value<'a>(
         .custom_parser(parse_parameter_number)
 }
 
+/// Keep the text field bound directly to the parameter. Slider's built-in value
+/// editor copies through ordinary f64 equality, which discards a +0 -> -0 edit.
+pub(crate) fn parameter_editor(
+    ui: &mut egui::Ui,
+    value: &mut f64,
+    spec: &InputSpec,
+) -> egui::Response {
+    let before = value.to_bits();
+    let mut response = ui
+        .horizontal(|ui| {
+            let track = ui.add(parameter_slider(value, spec).show_value(false));
+            let number = ui.add(parameter_drag_value(value, spec));
+            track.union(number)
+        })
+        .inner;
+    if value.to_bits() != before {
+        response.mark_changed();
+    }
+    response
+}
+
 pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
         "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
@@ -2711,6 +2790,60 @@ mod tests {
         let before = graph.clone();
         assert!(insert_nodes(&mut graph, &[node], [0., 0.], false).is_err());
         assert_eq!(graph, before);
+    }
+
+    #[test]
+    fn repaint_and_view_gestures_reuse_the_snapshot_and_drag_keeps_one_undo() {
+        let mut project = Project::new("追跡", Graph::default());
+        let id = project.graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let initial = project.clone();
+        let mut tracker = EditTracker::new(&project);
+        let mut history = History::default();
+        let nodes = tracker.previous.graph.nodes.as_ptr();
+
+        tracker.begin(&project, true);
+        project.pan = [45., 60.];
+        for _ in 0..60 {
+            tracker.begin(&project, false);
+            assert_eq!(
+                tracker.finish(&project, true, false, &mut history),
+                (false, false)
+            );
+            assert_eq!(tracker.previous.graph.nodes.as_ptr(), nodes);
+            assert!(tracker.gesture.as_ref().unwrap().before.is_none());
+        }
+        for n in 2..=4 {
+            tracker.begin(&project, false);
+            project
+                .graph
+                .node_mut(id)
+                .unwrap()
+                .params
+                .insert("value".into(), f64::from(n));
+            assert_eq!(
+                tracker.finish(&project, n != 4, false, &mut history),
+                (true, true)
+            );
+        }
+        let edited = project.clone();
+        assert!(history.undo(&mut project));
+        assert_eq!(project, initial);
+        assert!(!history.can_undo());
+        assert_eq!(
+            tracker.finish(&project, false, true, &mut history),
+            (false, false)
+        );
+        assert!(history.redo(&mut project));
+        assert_eq!(project, edited);
+        tracker.finish(&project, false, true, &mut history);
+        tracker.begin(&project, false);
+        project.name = "更新".into();
+        assert_eq!(
+            tracker.finish(&project, false, false, &mut history),
+            (true, false)
+        );
+        assert!(history.undo(&mut project));
+        assert_eq!(project, edited);
     }
 
     #[test]

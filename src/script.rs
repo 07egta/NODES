@@ -421,7 +421,7 @@ fn register_api(engine: &mut Engine) {
         "lerp",
         |a: Dynamic, b: Dynamic, t: Dynamic| -> ScriptResult<f64> {
             let (a, b, t) = (num(&a)?, num(&b)?, num(&t)?);
-            finite(a + (b - a) * t)
+            finite(crate::math_nodes::lerp(a, b, t))
         },
     );
     // `n` evenly spaced numbers from a to b, both included (like the 「範囲」 node).
@@ -438,7 +438,7 @@ fn register_api(engine: &mut Engine) {
                 } else {
                     i as f64 / (n - 1) as f64
                 };
-                out.push(Dynamic::from(finite(a + (b - a) * t)?));
+                out.push(Dynamic::from(finite(crate::math_nodes::lerp(a, b, t))?));
             }
             Ok(out)
         },

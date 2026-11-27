@@ -60,6 +60,8 @@ jobs:
           python3 scripts/update_gh2_inventory.py --self-test
           python3 scripts/export_ci_checkpoint.py --self-test
           python3 scripts/audit_dependencies.py --self-test
+          python3 scripts/generate_sum_oracle.py --check
+          python3 scripts/generate_interpolation_oracle.py --check
       - name: Audit exact dependency declarations
         run: |
           cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/nodes-cargo-metadata.json"

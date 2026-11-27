@@ -37,9 +37,13 @@
 | `scripts/export_ci_checkpoint.py` | CI検証結果・復旧用情報の出力。補助ツールとして維持 |
 | `scripts/update_gh2_inventory.py` | 公開資料から対応調査用の一覧を生成。補助ツールとして維持 |
 | `scripts/validate_cli_vase.py` | CLIの外部実行と独立した出力検証。補助ツールとして維持 |
+| `scripts/generate_sum_oracle.py` | Python標準ライブラリの `Fraction` で合計・平均の期待値を独立生成し、開発時・CIでJSON fixtureを照合。本体の実行依存にしない |
+| `scripts/generate_interpolation_oracle.py` | Python標準ライブラリの `Fraction` で補間の期待値を独立生成し、開発時・CIでJSON fixtureを照合。本体の実行依存にしない |
 | `scripts/build-windows.ps1` | CargoによるWindowsビルドと配布準備の補助 |
 | `.github/workflows/*.yml` | CI設定と短いShell/PowerShell/Pythonコマンド |
 | `src/script.rs` とCargoの `rhai` 依存 | Rust側に組み込まれた既存のユーザースクリプト機能。実行制限と互換性を維持 |
+
+二つの `Fraction` 生成器は2026-11-27のPR16統合プレビューで一覧に追加した補助ツールです。Rust本体と計算法を共有せず、有理数から一度だけ丸めた期待値を得るために使います。同じRust実装を検証用にも再利用したり、期待値生成のためだけに多倍長演算crateを追加したりせず、チェックイン済みJSONをRustテストとの接続点とします。`--check` はファイルを書き換えず照合し、Pythonの追加パッケージやアプリ起動時の実行を必要としません。配布物へのランタイム追加はなく、CI実行時間の費用は未計測です。対象の数値契約と確認範囲は [NUMERICAL_CONTRACTS.md](development/NUMERICAL_CONTRACTS.md) に記録しています。
 
 Python/PowerShellは開発用であり、通常のアプリ利用の前提にはしない。Rhaiのスクリプト本文はユーザーのモデルに含まれる拡張で、NODES本体の標準ノードを他言語へ移す方針ではない。既存の `.morph` / `.morphpart` を言語方針だけを理由に書き換えたり、読み込めなくしたりしない。
 

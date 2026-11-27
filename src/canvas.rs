@@ -1,14 +1,15 @@
 use crate::data_view::{self, DataShape};
 use crate::theme;
 use crate::ui_polish;
+use eframe::egui::epaint::{RectShape, TessellationOptions, Tessellator};
 use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, Stroke, Vec2};
 use morphlet::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
-    model::{Node, NodeId, NodeKind},
+    model::{InputSpec, Node, NodeId, NodeKind},
     persistence::Project,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 const WIDTH: f32 = 218.0;
 const HEADER: f32 = 43.0;
@@ -39,6 +40,126 @@ pub struct GraphCanvas {
     note_focus: bool,
     /// World position of the last right-click on the empty canvas.
     menu_at: [f32; 2],
+    node_indices: NodeIndices,
+    minimap: Option<MinimapDrawing>,
+}
+
+#[derive(Default)]
+struct NodeIndices {
+    order: Vec<NodeId>,
+    by_id: HashMap<NodeId, usize>,
+}
+
+impl NodeIndices {
+    fn update(&mut self, nodes: &[Node]) {
+        // The project can be replaced or reordered by undo/import outside the canvas.
+        // Only IDs and their order matter for this index; numeric edits and pans reuse it.
+        if self.order.len() == nodes.len()
+            && self.order.iter().copied().eq(nodes.iter().map(|n| n.id))
+        {
+            return;
+        }
+        self.order.clear();
+        self.by_id.clear();
+        self.order.extend(nodes.iter().map(|node| node.id));
+        self.by_id.extend(
+            self.order
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(i, id)| (id, i)),
+        );
+    }
+
+    fn get(&self, id: NodeId) -> Option<usize> {
+        self.by_id.get(&id).copied()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct MinimapNode {
+    id: NodeId,
+    position: [f32; 2],
+    kind: NodeKind,
+}
+
+impl From<&Node> for MinimapNode {
+    fn from(node: &Node) -> Self {
+        Self {
+            id: node.id,
+            position: node.position,
+            kind: node.kind,
+        }
+    }
+}
+
+struct MinimapDrawing {
+    inner: Rect,
+    dark: bool,
+    pixels_per_point: f32,
+    options: TessellationOptions,
+    nodes: Vec<MinimapNode>,
+    selected: BTreeSet<NodeId>,
+    bounds: Rect,
+    scale: f32,
+    shape: Shape,
+}
+
+impl MinimapDrawing {
+    fn project(&self, point: Pos2) -> Pos2 {
+        self.inner.center() + (point - self.bounds.center()) * self.scale
+    }
+
+    fn new(
+        nodes: &[Node],
+        selected: &BTreeSet<NodeId>,
+        inner: Rect,
+        dark: bool,
+        pixels_per_point: f32,
+        options: TessellationOptions,
+    ) -> Option<Self> {
+        let bounds = nodes.iter().fold(Rect::NOTHING, |bounds, node| {
+            bounds.union(Rect::from_min_size(
+                node.position.into(),
+                egui::vec2(WIDTH, height(node)),
+            ))
+        });
+        if !bounds.is_positive() {
+            return None;
+        }
+        let scale = (inner.width() / bounds.width()).min(inner.height() / bounds.height());
+        let mut drawing = Self {
+            inner,
+            dark,
+            pixels_per_point,
+            options,
+            nodes: nodes.iter().map(MinimapNode::from).collect(),
+            selected: selected.clone(),
+            bounds,
+            scale,
+            shape: Shape::Noop,
+        };
+        // Cache the same rounded rectangles egui would tessellate on every pan.
+        // These shapes only use the solid white texel, with no text or circle atlas.
+        let mut tessellator = Tessellator::new(pixels_per_point, options, [1, 1], Vec::new());
+        tessellator.set_clip_rect(inner);
+        let mut mesh = egui::Mesh::default();
+        for node in nodes {
+            let start = drawing.project(node.position.into());
+            let size = egui::vec2((WIDTH * scale).max(1.), (height(node) * scale).max(1.));
+            let color = if selected.contains(&node.id) {
+                theme::teal()
+            } else {
+                theme::category_color(node.kind.spec().category).gamma_multiply(0.65)
+            };
+            tessellator.tessellate_rect(
+                &RectShape::filled(Rect::from_min_size(start, size), 1, color),
+                &mut mesh,
+            );
+        }
+        drawing.shape = Shape::mesh(mesh);
+        Some(drawing)
+    }
 }
 
 #[derive(Default)]
@@ -64,10 +185,11 @@ pub struct CanvasOutcome {
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
-fn group_rect(p: &Project, members: &[NodeId], rect: Rect) -> Option<Rect> {
+fn group_rect(p: &Project, indices: &NodeIndices, members: &[NodeId], rect: Rect) -> Option<Rect> {
     let mut bounds = Rect::NOTHING;
     for id in members {
-        if let Some(n) = p.graph.node(*id) {
+        if let Some(index) = indices.get(*id) {
+            let n = &p.graph.nodes[index];
             bounds = bounds.union(Rect::from_min_size(
                 to_screen(n.position, rect, p.pan, p.zoom),
                 egui::vec2(WIDTH, height(n)) * p.zoom,
@@ -95,6 +217,40 @@ fn note_fill() -> Color32 {
 fn height(node: &Node) -> f32 {
     HEADER + ROW * node.kind.spec().inputs.len() as f32 + 27.0
 }
+
+fn parameter_number(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    node: NodeId,
+    spec: &InputSpec,
+    value: &mut f64,
+    zoom: f32,
+) -> egui::Response {
+    let full_value = value.to_string();
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            // Auto IDs based on drawing order lose focus when cards are culled,
+            // reordered, or a connection changes which inputs have sliders.
+            .id(("canvas_parameter", node, spec.key))
+            .max_rect(rect)
+            .layout(egui::Layout::centered_and_justified(
+                egui::Direction::TopDown,
+            )),
+        |ui| {
+            // DragValue deliberately grows to fit its full precision string.
+            // Clip painting AND hit testing so it cannot cover a card's ports.
+            ui.set_clip_rect(ui.clip_rect().intersect(rect));
+            ui.spacing_mut().interact_size = rect.size();
+            ui.spacing_mut().button_padding = egui::vec2(2., 1.) * zoom;
+            ui.style_mut().override_font_id = Some(FontId::proportional(10. * zoom));
+            ui.style_mut().explanation_tooltips = false;
+            ui.add(crate::app::parameter_drag_value(value, spec))
+        },
+    )
+    .inner
+    .on_hover_text(format!("{full_value}\nクリックで直接入力 · ドラッグで調整"))
+}
+
 fn to_screen(world: [f32; 2], rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     rect.min + egui::vec2(world[0] * zoom + pan[0], world[1] * zoom + pan[1])
 }
@@ -139,7 +295,8 @@ impl GraphCanvas {
     /// Moves every selected node onto the nearest grid point (used when 吸着 is on).
     fn snap_selected(&self, p: &mut Project) {
         for id in &self.selected {
-            if let Some(m) = p.graph.node_mut(*id) {
+            if let Some(index) = self.node_indices.get(*id) {
+                let m = &mut p.graph.nodes[index];
                 m.position = [
                     ui_polish::snap(m.position[0], GRID),
                     ui_polish::snap(m.position[1], GRID),
@@ -262,6 +419,7 @@ impl GraphCanvas {
     ) -> CanvasOutcome {
         let mut out = CanvasOutcome::default();
         let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+        self.node_indices.update(&p.graph.nodes);
         self.last_rect = Some(rect);
         if self.fit_selection_requested {
             self.fit_nodes(p, rect, true);
@@ -410,14 +568,13 @@ impl GraphCanvas {
         }
         let mut to_connect = None;
         let mut to_disconnect = None;
-        // Index the endpoints once instead of searching the entire graph for each wire.
-        let sources: BTreeMap<_, _> = p.graph.nodes.iter().map(|n| (n.id, n)).collect();
         for n in &p.graph.nodes {
             for (key, from) in &n.inputs {
-                if let (Some(src), Some(index)) = (
-                    sources.get(from).copied(),
+                if let (Some(source_index), Some(index)) = (
+                    self.node_indices.get(*from),
                     n.kind.spec().inputs.iter().position(|s| s.key == key),
                 ) {
+                    let src = &p.graph.nodes[source_index];
                     let a = output_pos(src, rect, p.pan, p.zoom);
                     let b = input_pos(n, index, rect, p.pan, p.zoom);
                     if !wire_bounds(a, b).intersects(rect) {
@@ -438,26 +595,25 @@ impl GraphCanvas {
             }
         }
         // Avoid cloning invisible nodes, including potentially large script strings.
-        let nodes: Vec<_> = p
+        let cards: Vec<_> = p
             .graph
             .nodes
             .iter()
-            .filter(|n| {
-                Rect::from_min_size(
+            .enumerate()
+            .filter_map(|(index, n)| {
+                let bounds = Rect::from_min_size(
                     to_screen(n.position, rect, p.pan, p.zoom),
                     egui::vec2(WIDTH, height(n)) * p.zoom,
-                )
-                .expand(28.)
-                .intersects(rect)
+                );
+                bounds
+                    .expand(28.)
+                    .intersects(rect)
+                    .then(|| (index, n.clone(), bounds))
             })
-            .cloned()
             .collect();
-        for n in &nodes {
-            let pos = to_screen(n.position, rect, p.pan, p.zoom);
-            let nr = Rect::from_min_size(pos, egui::vec2(WIDTH, height(n)) * p.zoom);
-            if !rect.intersects(nr.expand(28.)) {
-                continue;
-            }
+        for (node_index, n, nr) in &cards {
+            let pos = nr.min;
+            let nr = *nr;
             let selected = self.selected.contains(&n.id);
             let col = theme::category_color(n.kind.spec().category);
             let overview = p.zoom < 0.38 && self.connecting.is_none();
@@ -552,7 +708,8 @@ impl GraphCanvas {
             if hr.dragged() && self.dragging == Some(n.id) && !pan_active && !over_map {
                 let d = ui.input(|i| i.pointer.delta()) / p.zoom;
                 for id in &self.selected {
-                    if let Some(m) = p.graph.node_mut(*id) {
+                    if let Some(index) = self.node_indices.get(*id) {
+                        let m = &mut p.graph.nodes[index];
                         m.position[0] = (m.position[0] + d.x).clamp(-1e6, 1e6);
                         m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
                     }
@@ -652,8 +809,8 @@ impl GraphCanvas {
                 .interact(eye, Id::new(("node_preview", n.id)), Sense::click())
                 .on_hover_text("表示対象を切替（「表示中」モード）")
                 .clicked()
-                && let Some(m) = p.graph.node_mut(n.id)
             {
+                let m = &mut p.graph.nodes[*node_index];
                 m.preview = !m.preview;
             }
             let slider_keys: Vec<&str> = n
@@ -670,7 +827,8 @@ impl GraphCanvas {
                 let linked = n.inputs.contains_key(spec.key);
                 let can = self
                     .connecting
-                    .and_then(|id| p.graph.node(id))
+                    .and_then(|id| self.node_indices.get(id))
+                    .map(|i| &p.graph.nodes[i])
                     .map(|v| v.id != n.id && spec.kind.accepts(v.kind.spec().output));
                 let port_col = if can == Some(false) {
                     theme::muted()
@@ -737,9 +895,9 @@ impl GraphCanvas {
                     && let Some(default) = spec.default
                     && slider_keys.contains(&spec.key)
                     && !linked
-                    && let Some(m) = p.graph.node_mut(n.id)
                 {
-                    // The first numeric inputs of a card are drawn as small sliders.
+                    // The first numeric inputs have a track and a direct-entry field.
+                    let m = &mut p.graph.nodes[*node_index];
                     let value = m.params.entry(spec.key.into()).or_insert(default);
                     let track = Rect::from_min_size(
                         ip + egui::vec2(88., -9.) * p.zoom,
@@ -749,22 +907,18 @@ impl GraphCanvas {
                     let slider = crate::app::parameter_slider(value, spec)
                         .show_value(false)
                         .trailing_fill(true);
-                    ui.scope(|ui| {
-                        ui.spacing_mut().slider_width = width;
-                        ui.put(track, slider)
-                    });
-                    let shown = if spec.integer {
-                        format!("{:.0}", *value)
-                    } else {
-                        format!("{:.2}", *value)
-                    };
-                    painter.text(
-                        ip + egui::vec2(153., 0.) * p.zoom,
-                        Align2::LEFT_CENTER,
-                        shown,
-                        FontId::proportional(10. * p.zoom),
-                        theme::ink(),
+                    ui.scope_builder(
+                        egui::UiBuilder::new().id(("canvas_parameter_track", n.id, spec.key)),
+                        |ui| {
+                            ui.spacing_mut().slider_width = width;
+                            ui.put(track, slider)
+                        },
                     );
+                    let number = Rect::from_min_size(
+                        ip + egui::vec2(153., -10.) * p.zoom,
+                        egui::vec2(48., 22.) * p.zoom,
+                    );
+                    parameter_number(ui, number, n.id, spec, value, p.zoom);
                 } else if p.zoom > 0.62
                     && let Some(default) = spec.default
                 {
@@ -803,9 +957,10 @@ impl GraphCanvas {
                             FontId::proportional(10. * p.zoom),
                             theme::teal(),
                         );
-                    } else if let Some(m) = p.graph.node_mut(n.id) {
+                    } else {
+                        let m = &mut p.graph.nodes[*node_index];
                         let value = m.params.entry(spec.key.into()).or_insert(default);
-                        ui.put(vr, crate::app::parameter_drag_value(value, spec));
+                        parameter_number(ui, vr, n.id, spec, value, p.zoom);
                     }
                 }
             }
@@ -895,8 +1050,9 @@ impl GraphCanvas {
             }
         }
         if let (Some(id), Some(pointer)) = (self.connecting, pointer)
-            && let Some(n) = p.graph.node(id)
+            && let Some(index) = self.node_indices.get(id)
         {
+            let n = &p.graph.nodes[index];
             bezier(
                 &painter,
                 output_pos(n, rect, p.pan, p.zoom),
@@ -969,32 +1125,50 @@ impl GraphCanvas {
     }
 
     fn draw_minimap(
-        &self,
+        &mut self,
         ui: &mut egui::Ui,
         painter: &egui::Painter,
         p: &mut Project,
         canvas: Rect,
         map: Rect,
     ) {
-        let bounds = p.graph.nodes.iter().fold(Rect::NOTHING, |b, n| {
-            b.union(Rect::from_min_size(
-                Pos2::new(n.position[0], n.position[1]),
-                egui::vec2(WIDTH, height(n)),
-            ))
-        });
-        if !bounds.is_positive() {
-            return;
-        }
         let inner = map.shrink(8.);
-        let scale = (inner.width() / bounds.width()).min(inner.height() / bounds.height());
-        let project = |w: Pos2| inner.center() + (w - bounds.center()) * scale;
+        let dark = theme::is_dark();
+        let pixels_per_point = ui.ctx().pixels_per_point();
+        let options = ui.ctx().tessellation_options(|options| *options);
+        if self.minimap.as_ref().is_none_or(|drawing| {
+            drawing.inner != inner
+                || drawing.dark != dark
+                || drawing.pixels_per_point != pixels_per_point
+                || drawing.options != options
+                || drawing.selected != self.selected
+                || drawing.nodes.len() != p.graph.nodes.len()
+                || !p
+                    .graph
+                    .nodes
+                    .iter()
+                    .map(MinimapNode::from)
+                    .eq(drawing.nodes.iter().copied())
+        }) {
+            self.minimap = MinimapDrawing::new(
+                &p.graph.nodes,
+                &self.selected,
+                inner,
+                dark,
+                pixels_per_point,
+                options,
+            );
+        }
+        let Some(drawing) = &self.minimap else {
+            return;
+        };
         let response = ui
             .interact(map, Id::new("canvas_minimap"), Sense::click_and_drag())
             .on_hover_text("ミニマップ：クリック・ドラッグで表示位置を移動");
         if (response.clicked() || response.dragged_by(egui::PointerButton::Primary))
             && let Some(pos) = response.interact_pointer_pos()
         {
-            let world = bounds.center() + (pos - inner.center()) / scale;
+            let world = drawing.bounds.center() + (pos - inner.center()) / drawing.scale;
             let pan = canvas.size() / 2. - world.to_vec2() * p.zoom;
             p.pan = [pan.x.clamp(-1e7, 1e7), pan.y.clamp(-1e7, 1e7)];
             ui.ctx().request_repaint();
@@ -1007,25 +1181,10 @@ impl GraphCanvas {
             egui::StrokeKind::Inside,
         );
         let mini = painter.with_clip_rect(inner);
-        for node in &p.graph.nodes {
-            let start = project(Pos2::new(node.position[0], node.position[1]));
-            let size = egui::vec2((WIDTH * scale).max(1.), (height(node) * scale).max(1.));
-            mini.rect_filled(
-                Rect::from_min_size(start, size),
-                1,
-                if self.selected.contains(&node.id) {
-                    theme::teal()
-                } else {
-                    theme::category_color(node.kind.spec().category).gamma_multiply(0.65)
-                },
-            );
-        }
+        mini.add(drawing.shape.clone());
         let a = to_world(canvas.min, canvas, p.pan, p.zoom);
         let b = to_world(canvas.max, canvas, p.pan, p.zoom);
-        let view = Rect::from_two_pos(
-            project(Pos2::new(a[0], a[1])),
-            project(Pos2::new(b[0], b[1])),
-        );
+        let view = Rect::from_two_pos(drawing.project(a.into()), drawing.project(b.into()));
         if view.intersects(inner) {
             mini.rect_stroke(
                 view.intersect(inner),
@@ -1052,7 +1211,7 @@ impl GraphCanvas {
             let Some(group) = p.graph.groups.get(gi).cloned() else {
                 continue;
             };
-            let Some(gr) = group_rect(p, &group.nodes, rect) else {
+            let Some(gr) = group_rect(p, &self.node_indices, &group.nodes, rect) else {
                 continue;
             };
             if !rect.intersects(gr) {
@@ -1089,13 +1248,14 @@ impl GraphCanvas {
                     .nodes
                     .iter()
                     .copied()
-                    .filter(|id| p.graph.node(*id).is_some())
+                    .filter(|id| self.node_indices.get(*id).is_some())
                     .collect();
             }
             if lr.dragged() {
                 let d = ui.input(|i| i.pointer.delta()) / p.zoom;
                 for id in &group.nodes {
-                    if let Some(m) = p.graph.node_mut(*id) {
+                    if let Some(index) = self.node_indices.get(*id) {
+                        let m = &mut p.graph.nodes[index];
                         m.position[0] = (m.position[0] + d.x).clamp(-1e6, 1e6);
                         m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
                     }
@@ -1302,6 +1462,85 @@ fn cubic(a: Pos2, b: Pos2, samples: usize) -> Vec<Pos2> {
         .collect()
 }
 
+/// Parametric interval of a line segment inside the clip rectangle.
+fn clip_segment(start: Pos2, end: Pos2, clip: Rect) -> Option<[f64; 2]> {
+    let mut enter = 0.0_f64;
+    let mut exit = 1.0_f64;
+    for (a, b, min, max) in [
+        (start.x, end.x, clip.min.x, clip.max.x),
+        (start.y, end.y, clip.min.y, clip.max.y),
+    ] {
+        let a = f64::from(a);
+        let delta = f64::from(b) - a;
+        if delta == 0.0 {
+            if a < f64::from(min) || a > f64::from(max) {
+                return None;
+            }
+            continue;
+        }
+        let t0 = (f64::from(min) - a) / delta;
+        let t1 = (f64::from(max) - a) / delta;
+        enter = enter.max(t0.min(t1));
+        exit = exit.min(t0.max(t1));
+        if enter >= exit {
+            return None;
+        }
+    }
+    Some([enter, exit])
+}
+
+fn dashed_wire_shapes(
+    points: &[Pos2],
+    clip: Rect,
+    stroke: Stroke,
+    dash: f32,
+    gap: f32,
+) -> Vec<Shape> {
+    // Clip outside the painter's rectangle so stroke ends and antialiasing are hidden.
+    let clip = clip.expand(stroke.width + 2.0);
+    if points.iter().all(|point| clip.contains(*point)) {
+        return Shape::dashed_line(points, stroke, dash, gap);
+    }
+    let dash = f64::from(dash);
+    let period = dash + f64::from(gap);
+    let mut phase = 0.0_f64;
+    let mut shapes = Vec::new();
+    for segment in points.windows(2) {
+        let start = segment[0];
+        let end = segment[1];
+        let dx = f64::from(end.x) - f64::from(start.x);
+        let dy = f64::from(end.y) - f64::from(start.y);
+        let length = (dx * dx + dy * dy).sqrt();
+        if length == 0.0 || !length.is_finite() {
+            continue;
+        }
+        if let Some([enter, exit]) = clip_segment(start, end, clip) {
+            let first = enter * length;
+            let last = exit * length;
+            // Skip every whole offscreen dash period in one operation, retaining phase
+            // along the full polyline so the pattern follows the wire when panning.
+            let mut at = first - (first + phase).rem_euclid(period);
+            let point_at = |distance| {
+                let t = distance / length;
+                egui::pos2(
+                    (f64::from(start.x) + dx * t) as f32,
+                    (f64::from(start.y) + dy * t) as f32,
+                )
+            };
+            while at < last {
+                let from = at.max(first);
+                let to = (at + dash).min(last);
+                if to > from {
+                    shapes.push(Shape::line_segment([point_at(from), point_at(to)], stroke));
+                }
+                at += period;
+            }
+        }
+        phase = (phase + length).rem_euclid(period);
+    }
+    shapes
+}
+
 /// A wire styled by the shape of the data flowing through it:
 /// one item = thin solid, list = double line, tree = dashed, empty = thin grey dots.
 fn wire(
@@ -1321,8 +1560,9 @@ fn wire(
         }
         Some(DataShape::Tree { .. }) => {
             let points = cubic(a, b, 40);
-            painter.extend(Shape::dashed_line(
+            painter.extend(dashed_wire_shapes(
                 &points,
+                painter.clip_rect(),
                 Stroke::new(w + 0.6, color),
                 8. * zoom.max(0.5),
                 5. * zoom.max(0.5),
@@ -1330,8 +1570,9 @@ fn wire(
         }
         Some(DataShape::Empty) => {
             let points = cubic(a, b, 40);
-            painter.extend(Shape::dashed_line(
+            painter.extend(dashed_wire_shapes(
                 &points,
+                painter.clip_rect(),
                 Stroke::new(1.2_f32, Color32::from_gray(175)),
                 3.,
                 4.,
@@ -1390,4 +1631,160 @@ mod premium_tests {
             assert!(cubic(a, b, 80).iter().all(|p| bounds.contains(*p)));
         }
     }
+
+    #[test]
+    fn dashed_wire_keeps_the_pattern_when_crossing_the_clip() {
+        let stroke = Stroke::new(2.0_f32, Color32::WHITE);
+        let clip = Rect::from_min_max(egui::pos2(-40., -40.), egui::pos2(220., 120.));
+        let mut path = cubic(egui::pos2(-550., -90.), egui::pos2(580., 210.), 40);
+        for _ in 0..2 {
+            let visible_inside = |shape| match shape {
+                Shape::LineSegment { points, .. } if points.iter().all(|p| clip.contains(*p)) => {
+                    Some(points)
+                }
+                _ => None,
+            };
+            let expected: Vec<_> = Shape::dashed_line(&path, stroke, 8., 5.)
+                .into_iter()
+                .filter_map(visible_inside)
+                .collect();
+            let actual: Vec<_> = dashed_wire_shapes(&path, clip, stroke, 8., 5.)
+                .into_iter()
+                .filter_map(visible_inside)
+                .collect();
+            assert!(expected.len() > 10);
+            assert_eq!(expected.len(), actual.len());
+            for ([a, b], [c, d]) in expected.into_iter().zip(actual) {
+                assert!(a.distance(c) < 0.001 && b.distance(d) < 0.001);
+            }
+            path.reverse();
+        }
+    }
+
+    #[test]
+    fn dashed_wire_shape_count_depends_on_visible_length() {
+        let stroke = Stroke::new(1.2_f32, Color32::WHITE);
+        let clip = Rect::from_min_max(Pos2::ZERO, egui::pos2(800., 600.));
+        let path = cubic(egui::pos2(-1e6, 300.), egui::pos2(1e6, 300.), 40);
+        let shapes = dashed_wire_shapes(&path, clip, stroke, 3., 4.);
+        assert!(
+            (110..120).contains(&shapes.len()),
+            "{} shapes",
+            shapes.len()
+        );
+        let offscreen = cubic(egui::pos2(-1e6, -30.), egui::pos2(1e6, -30.), 40);
+        assert!(dashed_wire_shapes(&offscreen, clip, stroke, 3., 4.).is_empty());
+    }
+
+    #[test]
+    fn canvas_node_lookup_follows_reordered_and_replaced_graphs() {
+        let mut graph = morphlet::model::Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let mut indices = NodeIndices::default();
+        indices.update(&graph.nodes);
+        assert_eq!(indices.get(b), Some(1));
+        graph.nodes.reverse();
+        indices.update(&graph.nodes);
+        assert_eq!(indices.get(b), Some(0));
+        assert_eq!(indices.get(a), Some(1));
+        graph.remove(a);
+        let c = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        indices.update(&graph.nodes);
+        assert_eq!(indices.get(a), None);
+        assert_eq!(indices.get(c), Some(1));
+    }
+
+    #[test]
+    fn canvas_slider_still_edits_its_node_and_panning_reuses_the_minimap() {
+        let ctx = egui::Context::default();
+        let mut canvas = GraphCanvas::default();
+        let mut graph = morphlet::model::Graph::default();
+        let id = graph.add(NodeKind::Number, [40., 40.]).unwrap();
+        for row in 0..11 {
+            graph
+                .add(NodeKind::Number, [1_000., row as f32 * 185.])
+                .unwrap();
+        }
+        let mut project = Project::new("test", graph);
+        project.pan = [0., 0.];
+        project.zoom = 1.;
+        let frame = |canvas: &mut GraphCanvas, project: &mut Project, events| {
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(900., 700.))),
+                events,
+                ..Default::default()
+            };
+            let _ = ctx.run(input, |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    canvas.show(ui, project, None, false);
+                });
+            });
+        };
+        let minimap_mesh = |canvas: &GraphCanvas| match &canvas.minimap.as_ref().unwrap().shape {
+            Shape::Mesh(mesh) => mesh.clone(),
+            _ => panic!("minimap should be a mesh"),
+        };
+        frame(&mut canvas, &mut project, vec![]);
+        let original = minimap_mesh(&canvas);
+        project.pan = [28., 10.];
+        frame(&mut canvas, &mut project, vec![]);
+        assert!(std::sync::Arc::ptr_eq(&original, &minimap_mesh(&canvas)));
+
+        project.graph.nodes.reverse();
+        frame(&mut canvas, &mut project, vec![]);
+        let reordered = minimap_mesh(&canvas);
+        assert!(!std::sync::Arc::ptr_eq(&original, &reordered));
+        let node = project.graph.node(id).unwrap();
+        let key = node.kind.spec().inputs[0].key;
+        let before = node.params[key];
+        let point = input_pos(
+            node,
+            0,
+            canvas.last_rect.unwrap(),
+            project.pan,
+            project.zoom,
+        ) + egui::vec2(141., 0.);
+        for pressed in [true, false] {
+            frame(
+                &mut canvas,
+                &mut project,
+                vec![
+                    egui::Event::PointerMoved(point),
+                    egui::Event::PointerButton {
+                        pos: point,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        assert_ne!(project.graph.node(id).unwrap().params[key], before);
+        assert!(
+            project
+                .graph
+                .nodes
+                .iter()
+                .filter(|node| node.id != id)
+                .all(|node| node.params[key] == before)
+        );
+        assert!(std::sync::Arc::ptr_eq(&reordered, &minimap_mesh(&canvas)));
+
+        project.graph.node_mut(id).unwrap().position[0] += 200.;
+        frame(&mut canvas, &mut project, vec![]);
+        let moved = minimap_mesh(&canvas);
+        assert!(!std::sync::Arc::ptr_eq(&reordered, &moved));
+        canvas.select_only(id);
+        frame(&mut canvas, &mut project, vec![]);
+        assert!(!std::sync::Arc::ptr_eq(&moved, &minimap_mesh(&canvas)));
+    }
 }
+
+#[cfg(test)]
+#[path = "canvas_perf.rs"]
+mod perf;
+
+#[cfg(test)]
+#[path = "canvas_numeric_tests.rs"]
+mod numeric_tests;

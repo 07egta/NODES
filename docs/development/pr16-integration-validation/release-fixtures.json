@@ -1,0 +1,74 @@
+[
+  {
+    "fixture": "tests/fixtures/diagnostics/numeric-details.morph",
+    "exit_code": 0,
+    "summary": {
+      "blocked_count": 0,
+      "cached_count": 0,
+      "cancelled": false,
+      "complete": true,
+      "completed_count": 6,
+      "computed_count": 6,
+      "connection_count": 2,
+      "disabled_count": 0,
+      "elapsed_ms": 0.092365,
+      "failed_count": 0,
+      "measured_node_ms": 0.08393300000000001,
+      "node_count": 6,
+      "root_failure_count": 0,
+      "successful_count": 6,
+      "unevaluated_count": 0
+    },
+    "sha256_before": "f92605eb7099ecff5efc882903c1ae4b501c37e5212bbd0e4817ec575611f2db",
+    "sha256_after": "f92605eb7099ecff5efc882903c1ae4b501c37e5212bbd0e4817ec575611f2db",
+    "unchanged": true
+  },
+  {
+    "fixture": "tests/fixtures/diagnostics/two-roots.morph",
+    "exit_code": 1,
+    "summary": {
+      "blocked_count": 2,
+      "cached_count": 0,
+      "cancelled": false,
+      "complete": true,
+      "completed_count": 6,
+      "computed_count": 5,
+      "connection_count": 3,
+      "disabled_count": 1,
+      "elapsed_ms": 0.020829999999999998,
+      "failed_count": 4,
+      "measured_node_ms": 0.018948,
+      "node_count": 6,
+      "root_failure_count": 2,
+      "successful_count": 1,
+      "unevaluated_count": 0
+    },
+    "sha256_before": "26399a164b47d84c6e232a6b0c0707f9a4039c327db84554026f6f8797047735",
+    "sha256_after": "26399a164b47d84c6e232a6b0c0707f9a4039c327db84554026f6f8797047735",
+    "unchanged": true
+  },
+  {
+    "fixture": "tests/fixtures/diagnostics/paging.morph",
+    "exit_code": 1,
+    "summary": {
+      "blocked_count": 0,
+      "cached_count": 0,
+      "cancelled": false,
+      "complete": true,
+      "completed_count": 102,
+      "computed_count": 101,
+      "connection_count": 0,
+      "disabled_count": 1,
+      "elapsed_ms": 0.318929,
+      "failed_count": 101,
+      "measured_node_ms": 0.30732000000000004,
+      "node_count": 102,
+      "root_failure_count": 101,
+      "successful_count": 0,
+      "unevaluated_count": 0
+    },
+    "sha256_before": "1b5a371f818366dd929bff25a0093507a0b60095bbe4df166e8326aab2dde962",
+    "sha256_after": "1b5a371f818366dd929bff25a0093507a0b60095bbe4df166e8326aab2dde962",
+    "unchanged": true
+  }
+]

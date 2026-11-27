@@ -36,14 +36,59 @@ pub struct Evaluation {
     pub elapsed_ms: f64,
     pub cancelled: bool,
 }
-#[derive(Clone, PartialEq)]
 struct Key {
     kind: NodeKind,
-    params: BTreeMap<String, u64>,
-    inputs: BTreeMap<String, (NodeId, u64)>,
+    params: Vec<(String, u64)>,
+    inputs: Vec<(String, NodeId, u64)>,
     /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
     extra: crate::cluster::CacheExtra,
 }
+impl Key {
+    fn matches(
+        &self,
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: &crate::cluster::CacheExtra,
+    ) -> bool {
+        self.kind == node.kind
+            && &self.extra == extra
+            && self.params.iter().map(|(key, bits)| (key, *bits)).eq(node
+                .params
+                .iter()
+                .map(|(key, value)| (key, value.to_bits())))
+            && self
+                .inputs
+                .iter()
+                .map(|(key, id, rev)| (key, *id, *rev))
+                .eq(node
+                    .inputs
+                    .iter()
+                    .map(|(key, id)| (key, *id, revisions[id])))
+    }
+
+    fn new(
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: crate::cluster::CacheExtra,
+    ) -> Self {
+        Self {
+            kind: node.kind,
+            // Keep exact bit equality for signed-zero-sensitive numeric operations.
+            params: node
+                .params
+                .iter()
+                .map(|(key, n)| (key.clone(), n.to_bits()))
+                .collect(),
+            inputs: node
+                .inputs
+                .iter()
+                .map(|(key, id)| (key.clone(), *id, revisions[id]))
+                .collect(),
+            extra,
+        }
+    }
+}
+
 struct Cache {
     key: Key,
     revision: u64,
@@ -140,36 +185,25 @@ impl Evaluator {
                     .insert(id, NodeTiming::since(node_start, false));
                 continue;
             }
-            let key = Key {
-                kind: node.kind,
-                // IEEE bit equality preserves signed-zero-sensitive numeric operations.
-                params: node
-                    .params
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.to_bits()))
-                    .collect(),
-                inputs: node
-                    .inputs
-                    .iter()
-                    .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
-                    .collect(),
-                extra: self.cluster_keys.key_for(graph, node),
+            let extra = self.cluster_keys.key_for(graph, node);
+            let (result, revision, is_cached, weight) = if let Some(c) = self
+                .cache
+                .get(&id)
+                .filter(|c| c.key.matches(node, &revisions, &extra))
+            {
+                (c.result.clone(), c.revision, true, c.weight)
+            } else {
+                let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
+                if stop() {
+                    out.cancelled = true;
+                    out.node_timings
+                        .insert(id, NodeTiming::since(node_start, false));
+                    break;
+                }
+                self.revision = self.revision.wrapping_add(1).max(1);
+                let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
+                (result, self.revision, false, weight)
             };
-            let (result, revision, is_cached, weight) =
-                if let Some(c) = self.cache.get(&id).filter(|c| c.key == key) {
-                    (c.result.clone(), c.revision, true, c.weight)
-                } else {
-                    let result = crate::cluster::evaluate_any(graph, node, &out.outputs, &stop);
-                    if stop() {
-                        out.cancelled = true;
-                        out.node_timings
-                            .insert(id, NodeTiming::since(node_start, false));
-                        break;
-                    }
-                    self.revision = self.revision.wrapping_add(1).max(1);
-                    let weight = result.as_ref().map(Tree::weight).unwrap_or(0);
-                    (result, self.revision, false, weight)
-                };
             if is_cached {
                 out.cached += 1;
             } else {
@@ -195,7 +229,7 @@ impl Evaluator {
                 self.store_cached(
                     id,
                     Cache {
-                        key,
+                        key: Key::new(node, &revisions, extra),
                         revision,
                         result: result.clone(),
                         weight,

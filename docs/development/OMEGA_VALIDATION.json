@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "branch": "feat/nodes-omega-geometry",
+  "base": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+  "pr": 16,
+  "updated_at_utc": "2026-11-26T23:57:49.970253+00:00",
+  "toolchain": "rustc/cargo 1.100.0, Linux x86_64",
+  "baseline": {
+    "run_id": 45907598179,
+    "linux_passed": 448,
+    "windows_passed": 447,
+    "failed": 0,
+    "ignored": 3,
+    "suites": 35,
+    "tested_merge_revision": "dde6fe137fb156f530096f25f8be2b06e592ee78",
+    "tree": "22d14b6055826b5d14316806ff699f31ec96d036",
+    "source_merge_tree_equal": true
+  },
+  "units": [
+    {
+      "name": "legacy aggregate numerical consistency",
+      "files": [
+        "src/data_tree_nodes.rs",
+        "tests/aggregate_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 5
+      },
+      "after": {
+        "passed": 6,
+        "failed": 0
+      },
+      "related_suites": {
+        "data_tree_contracts": 11,
+        "math_precision_regressions": 6
+      },
+      "command": "cargo test --locked --offline --test aggregate_numeric_regressions --test data_tree_contracts --test math_precision_regressions",
+      "review": "Independent read-only kernel_research agent; existing branch/empty/finite/count/weight/cancel contracts retained.",
+      "known_remaining": "Extreme cancellation and single-rounding mean are addressed by the later exact binary64 aggregation unit in this record."
+    },
+    {
+      "name": "curve endpoint closest point and geometric closure",
+      "files": [
+        "src/curve_geometry.rs",
+        "tests/curve_closest_regressions.rs"
+      ],
+      "before": {
+        "passed": 2,
+        "failed": 7,
+        "method": "actual rustc harness using the same std-only curve source"
+      },
+      "after": {
+        "passed": 9,
+        "failed": 0
+      },
+      "related_suites": {
+        "curve_geometry_tests": 11
+      },
+      "command": "cargo test --locked --test curve_closest_regressions --test curve_geometry_tests",
+      "review": "Root inspected endpoint retention, bounded one-sided brackets, active-interval closure and tests.",
+      "limits": "Sampled global search is not a global minimum proof; closure uses a bounded geometric tolerance estimate.",
+      "performance_probe": {
+        "method": "local rustc -O, 100 repetitions per size, one sample; closed() only, not whole application",
+        "controls_8192_old_incorrect_us": 0.46,
+        "controls_8192_initial_unbounded_fix_us": 841.0,
+        "controls_8192_final_bounded_fix_us": 2.95,
+        "probe_cap": 19
+      }
+    },
+    {
+      "name": "signed-zero numeric edits and history",
+      "files": [
+        "src/app.rs",
+        "src/persistence.rs",
+        "src/numeric_editor_tests.rs",
+        "src/signed_zero_tests.rs"
+      ],
+      "before": {
+        "passed": 0,
+        "failed": 5
+      },
+      "after": {
+        "passed": 5,
+        "failed": 0
+      },
+      "related_suites": {
+        "gui_passed": 41,
+        "gui_ignored": 1,
+        "persistence_passed": 44
+      },
+      "command": "cargo test --locked --bin Morphlet --test persistence_tests",
+      "review": "Root inspected bit comparison alongside structural equality and direct DragValue binding; preserves existing four numeric editor regressions.",
+      "independent_expected_value": "Atan2(y=+0,x=-1)=+pi; Atan2(y=-0,x=-1)=-pi. Includes undo/redo, cluster definition, JSON and actual key events.",
+      "native_gui_status": "pending combined native GUI check"
+    },
+    {
+      "name": "NURBS area and ill-conditioned planar geometry",
+      "files": [
+        "src/surface_kernel.rs",
+        "src/surface_nodes.rs",
+        "tests/surface_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 2,
+        "failed": 6,
+        "scope": "initial eight Rust regressions; three reviewer cases used independent Python/rational arithmetic before the fix"
+      },
+      "after": {
+        "passed": 11,
+        "failed": 0
+      },
+      "related_suites": {
+        "surface_kernel_tests": 5,
+        "surface_curvature_tests": 9,
+        "surface_curvature_study": 1,
+        "curve_surface_integration": 7,
+        "surface_knot_roundoff": 3
+      },
+      "related_total_passed": 36,
+      "review": "Independent kernel_research agent reproduced FMA cross-product and translated rational-derivative failures; root reviewed final diff. No blocking findings remain.",
+      "method": "Adaptive tensor GL3/5 over every nonzero native knot cell; local homogeneous origin; orthogonal planar projection; compensated difference of products.",
+      "bounds": {
+        "max_depth": 12,
+        "max_surface_evaluations": 262144,
+        "relative_convergence_indicator": "1e-3 / steps^2, steps in [4,128]"
+      },
+      "limits": "Gauss-rule difference is a convergence indicator, not a rigorous error certificate. Extreme rational boundary layers can return explicit convergence/precision errors.",
+      "metadata": "SurfaceArea description and precision label synchronized; compiled 299-record inventory regenerated without inventing a verified-node count."
+    },
+    {
+      "name": "Exact binary64 sum and single-rounding mean",
+      "files": [
+        "src/number_aggregates.rs",
+        "src/math_nodes.rs",
+        "src/lib.rs",
+        "tests/sum_rounding_regressions.rs",
+        "scripts/generate_sum_oracle.py",
+        "tests/fixtures/sum_oracle.json"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 5,
+        "scope": "initial six analytical Rust regressions on previous scaled summation"
+      },
+      "after": {
+        "passed": 9,
+        "failed": 0
+      },
+      "related_suites": {
+        "aggregate_numeric_regressions": 6,
+        "math_precision_regressions": 6
+      },
+      "independent_oracle": {
+        "method": "Python Fraction.from_float; exact rational sum/mean, one final binary64 conversion",
+        "cases": 128,
+        "orders": 2,
+        "operations": 2,
+        "bitwise_comparisons": 512,
+        "generator_check": "passed locally; included in normal Linux CI"
+      },
+      "command": "cargo test --locked --offline --test sum_rounding_regressions --test aggregate_numeric_regressions --test math_precision_regressions",
+      "review": "integration_audit independently checked carry, borrow, long division, subnormal and normal rounding, remainder/sticky logic and call sites; no blocking finding. Requested remainder/limb/Fraction cases passed.",
+      "scope": "Summation, Average, MassAddition; other statistics retain their separate algorithms.",
+      "limits": "Finite binary64 values; existing node list and evaluation budgets. Empty mean remains an empty output. No external GH oracle comparison."
+    },
+    {
+      "name": "OBJ binary64 coordinate preservation",
+      "files": [
+        "src/persistence.rs",
+        "tests/export_numeric_regressions.rs"
+      ],
+      "before": {
+        "passed": 0,
+        "failed": 2
+      },
+      "after": {
+        "passed": 2,
+        "failed": 0
+      },
+      "command": "cargo test --locked --offline --test export_numeric_regressions",
+      "review": "Root inspected writer diff and independent OBJ vertex-record parser. Tests compare every decoded coordinate bit and preserve face indices.",
+      "examples": [
+        "Valid triangle of height 4e-10 previously flattened by nine decimal places",
+        "Coordinates near 1e8 mixed with sub-nanometer offsets retain represented binary64 values"
+      ],
+      "limits": "Preserves writer text round-trip; does not establish an external OBJ consumer tolerance or physical printability."
+    },
+    {
+      "name": "NURBS local-support evaluation after measured area regression",
+      "files": [
+        "src/surface_kernel.rs",
+        "tests/surface_support_regressions.rs"
+      ],
+      "after": {
+        "passed": 5,
+        "failed": 0
+      },
+      "related_total_passed": 41,
+      "command": "cargo test --locked --offline --test surface_support_regressions --test surface_numeric_regressions --test surface_kernel_tests --test surface_curvature_tests --test surface_knot_roundoff --test surface_curvature_study --test curve_surface_integration",
+      "review": "multiport_audit independently checked endpoint/repeated-knot support, lower-degree derivative support, rational degree-one jets, degree-eight nine-control windows, anchor order, cancellation and global weight scaling; root reviewed diff and analytical test expectations.",
+      "reason": "Initial required native knot-cell coverage exposed approximately 25x cost on the 32x32-control planar benchmark due to scanning every control for every sample.",
+      "method": "Limit homogeneous evaluation and local-origin selection to the full span-degree..span window; include zero basis values whose derivatives can be nonzero.",
+      "source_sha256": "738c300bf23d09df5e93802300075b29fbdefdffaf35e82141078a96fb4835fd",
+      "performance_status": "Initial benchmark preserved; optimized performance remeasurement pending.",
+      "new_expected_values": "Independent cubic polynomial blossom, rational quotient derivatives, two Bezier spans, degree-eight Greville bilinear image and cancellation."
+    },
+    {
+      "name": "Consistent welded mesh manifold diagnostics",
+      "files": [
+        "src/mesh_fabrication.rs",
+        "src/persistence.rs",
+        "src/stl_export.rs",
+        "src/viewport.rs",
+        "src/bin/nodes-cli.rs",
+        "tests/export_topology_regressions.rs"
+      ],
+      "before": {
+        "passed": 2,
+        "failed": 5
+      },
+      "after": {
+        "passed": 7,
+        "failed": 0
+      },
+      "related_suites": {
+        "lib": 100,
+        "cli_workflows": 9,
+        "export_numeric_regressions": 2,
+        "mesh_repair_regressions": 6,
+        "persistence_tests": 44,
+        "stl_export_tests": 13
+      },
+      "related_total_passed": 181,
+      "command": "cargo test --locked --offline --lib --test export_topology_regressions --test export_numeric_regressions --test persistence_tests --test stl_export_tests --test mesh_repair_regressions --test cli_workflows --no-fail-fast",
+      "review": "Root reviewed shared indexed fan/face analysis, global quantized welding, preserved export limits and actual-process CLI regression. Final diagnostic wording shortened after tests; combined GUI compilation remains pending.",
+      "contract": "Closed means nonempty, consistently oriented manifold topology without degenerate or duplicate nondegenerate faces. Shared vertices across separate meshes are tested after 1e-6 mm quantized welding.",
+      "limits": "Self-intersections, shell nesting, wall thickness and physical printability remain unverified. This does not forbid exporting open meshes. Full 2m-face performance is not measured."
+    },
+    {
+      "name": "Bounded regular reusable-part input",
+      "files": [
+        "src/cluster.rs",
+        "tests/part_io_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 2
+      },
+      "after": {
+        "passed": 3,
+        "failed": 0
+      },
+      "related_suites": {
+        "script_tests": 32
+      },
+      "command": "cargo test --locked --offline --test part_io_regressions --test script_tests",
+      "review": "Independent integration_audit review: metadata before open prevents an ordinary FIFO from blocking; descriptor check, byte limit and transactional import remain.",
+      "reproduction": "Actual child test process blocked on FIFO and was killed/reaped at 2 seconds before the fix. After the fix it returned an error immediately and preserved graph state.",
+      "limits": "Unix FIFO test is platform-specific. This matches existing project/GHX regular-file checks, not protection against hostile path replacement races."
+    },
+    {
+      "name": "Prepare all split exports before replacing destinations",
+      "files": [
+        "src/stl_export.rs",
+        "src/stl_export_ui.rs",
+        "tests/export_batch_regressions.rs"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 4,
+        "scope": "initial five tests; four showed actual first-file sentinel replacement before later failure"
+      },
+      "after": {
+        "integration_passed": 6,
+        "partial_commit_unit_passed": 1,
+        "failed": 0
+      },
+      "related_suites": {
+        "lib": 101,
+        "gui_passed": 41,
+        "gui_ignored": 1,
+        "stl_export_tests": 13
+      },
+      "related_total_passed": 161,
+      "command": "cargo test --locked --offline --lib --bin Morphlet --test export_batch_regressions --test stl_export_tests",
+      "review": "Root inspected reservation via create_new, same-directory staging through existing serializers, cleanup on failure, no pre-delete of destinations and detailed completed-files reporting.",
+      "contract": "A preparation failure preserves every destination. Replacement failure returns successful paths/triangle count and the failed target. Existing write_bodies String-error wrapper remains; UI uses the detailed report.",
+      "limits": "A sequence of per-file atomic renames is not one atomic multi-file transaction. Split export needs staging disk space. Linux real I/O passed; Windows replacement and GUI follow-up remain pending."
+    },
+    {
+      "name": "Local B-spline basis recurrence",
+      "files": [
+        "src/surface_kernel.rs",
+        "examples/geometry_numeric_benchmark.rs",
+        "docs/development/OMEGA_GEOMETRY_PERFORMANCE.json"
+      ],
+      "after": {
+        "related_passed": 41,
+        "failed": 0,
+        "benchmark_cases_passed": 15
+      },
+      "review": "multiport_audit checked each degree-d support [span-d,span], index bounds, full-vector zero initialization, derivative support, arithmetic order and one-sided knots; root inspected diff.",
+      "source_sha256": "9a0c08d1aa1b23bef417cde9037c211265baea54c2cd285c0061ae942b07d60a",
+      "performance": {
+        "before_support_version_pooled_p50_ms": 27.093942,
+        "after_local_recurrence_pooled_p50_ms": 11.569339,
+        "input": "32x32 control planar cubic NURBS area, all native knot cells",
+        "method": "same CPU0/compiler/flags/input, four alternating processes, 22 batches per version",
+        "limits": "Kernel-only shared Linux VM measurement; smallest case slowed slightly. Original midpoint was faster but failed six of the fifteen numerical fixtures."
+      }
+    },
+    {
+      "name": "Exactly rounded affine interpolation for nodes and scripts",
+      "files": [
+        "src/number_interpolation.rs",
+        "src/math_nodes.rs",
+        "src/script.rs",
+        "src/lib.rs",
+        "tests/script_numeric_regressions.rs",
+        "tests/interpolation_oracle.rs",
+        "scripts/generate_interpolation_oracle.py",
+        "tests/fixtures/interpolation_oracle.json"
+      ],
+      "initial_script_before": {
+        "passed": 1,
+        "failed": 3,
+        "scope": "initial four Script extreme-range tests"
+      },
+      "rejected_fma_candidate": {
+        "oracle_passed": 0,
+        "oracle_failed": 2,
+        "review": "Independent Fraction/libm review found cancellation and finite/overflow boundary errors. The candidate was replaced before publication."
+      },
+      "after": {
+        "script_numeric_passed": 6,
+        "oracle_tests_passed": 2,
+        "failed": 0,
+        "six_suite_total_passed": 61
+      },
+      "independent_oracle": {
+        "method": "Python Fraction exact a+t*b-t*a; one final binary64 conversion",
+        "fixtures": 128,
+        "node_and_script_comparisons": 256,
+        "finite": 112,
+        "overflow": 16,
+        "negative_zero": 7,
+        "standalone_additional_probe_passed": 5720,
+        "standalone_scope": "implementation agent, separate temporary Rust debug-assertions harness; independent checked-in 128-case generator is the reproducible CI oracle"
+      },
+      "command": "cargo test --locked --offline --test interpolation_oracle --test script_numeric_regressions --test script_tests --test math_nodes_tests --test math_precision_regressions --test sum_rounding_regressions --no-fail-fast",
+      "review": "Independent multiport_audit and root checked product-word splitting, fixed capacity, signed terms, borrow, subnormal and normal rounding, overflow and zero contracts.",
+      "limits": "Finite binary64 affine operation is rounded once; composite Bezier/other multi-step algorithms are not thereby exact as a whole. Existing callers reject nonfinite results."
+    }
+  ],
+  "environment_events": [
+    {
+      "event": "20GB workspace filesystem exhausted during additional tests",
+      "impact": "sum-rounding baseline failed to link and a new surface regression failed to compile; neither counts as an executed test",
+      "mitigation": "Removed only this checkout target directory via cargo clean (4.1GiB), retained sources, rebuilt with CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0"
+    }
+  ],
+  "quality_gate_attempts": [
+    {
+      "gate": "fmt",
+      "result": "passed"
+    },
+    {
+      "gate": "check all targets",
+      "result": "passed",
+      "seconds": 17.2
+    },
+    {
+      "gate": "strict Clippy",
+      "result": "failed",
+      "seconds": 4.77,
+      "finding": "items_after_test_module in stl_export.rs; test module being moved to end, no test removed",
+      "recheck": "passed after moving test module to end, no tests or warning checks removed"
+    }
+  ],
+  "combined_local_gates": {
+    "source": "working tree based on b8f2f14; final code checkpoint follows this test run",
+    "rust_passed": 520,
+    "rust_failed": 0,
+    "rust_ignored": 3,
+    "targets": 48,
+    "nonempty_targets": 44,
+    "python_passed": 17,
+    "oracle_reproduction": [
+      128,
+      128
+    ],
+    "fmt_seconds": 0.532,
+    "check_seconds": 4.494,
+    "clippy_seconds": 3.955,
+    "test_gate_seconds": 22.451,
+    "test_compile_seconds": 20.78,
+    "test_body_total_seconds": 1.49,
+    "profile": "dev/test optimized profile, debug=0, incremental=0, existing cache",
+    "release": "pending",
+    "windows": "pending CI",
+    "native_gui": "pending"
+  }
+}

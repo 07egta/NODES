@@ -158,10 +158,10 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::SurfaceArea => spec!(
             "曲面積",
-            "解析曲面は公式、NURBSは中点積分による近似値です。",
+            "解析曲面は公式、NURBSはノット区間ごとの適応 Gauss 積分による近似値です。",
             "surface area integrate 面積",
             Number,
-            [S, i("steps", "積分分割", 32., 4., 128.)]
+            [S, i("steps", "積分精度", 32., 4., 128.)]
         ),
         K::SurfaceClosestPoint => spec!(
             "曲面の最近点（平面）",

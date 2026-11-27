@@ -1,0 +1,10 @@
+    Checking morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES-pr16-preview)
+error[E0425]: cannot find value `before` in this scope
+    --> src/app.rs:2316:39
+     |
+2316 |                 && !same_calculation(&before.graph, &self.project.graph));
+     |                                       ^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `morphlet` (bin "Morphlet" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

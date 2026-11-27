@@ -1,0 +1,13 @@
+{
+  "source_tree": "557394840a70a94ae9146d87192445ff7c226908",
+  "command": [
+    "/home/agent/.cargo/bin/cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit_code": 101,
+  "elapsed_s": 6.122,
+  "log": "before-check.log"
+}
