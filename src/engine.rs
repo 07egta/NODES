@@ -43,14 +43,59 @@ pub struct Evaluation {
     pub elapsed_ms: f64,
     pub cancelled: bool,
 }
-#[derive(Clone, PartialEq)]
 struct Key {
     kind: NodeKind,
-    params: BTreeMap<String, u64>,
-    inputs: BTreeMap<String, (NodeId, u64)>,
+    params: Vec<(String, u64)>,
+    inputs: Vec<(String, NodeId, u64)>,
     /// Script text or cluster-definition fingerprint (empty for ordinary nodes).
     extra: crate::cluster::CacheExtra,
 }
+impl Key {
+    fn matches(
+        &self,
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: &crate::cluster::CacheExtra,
+    ) -> bool {
+        self.kind == node.kind
+            && &self.extra == extra
+            && self.params.iter().map(|(key, bits)| (key, *bits)).eq(node
+                .params
+                .iter()
+                .map(|(key, value)| (key, value.to_bits())))
+            && self
+                .inputs
+                .iter()
+                .map(|(key, id, rev)| (key, *id, *rev))
+                .eq(node
+                    .inputs
+                    .iter()
+                    .map(|(key, id)| (key, *id, revisions.get(id).copied().unwrap_or(0))))
+    }
+
+    fn new(
+        node: &Node,
+        revisions: &BTreeMap<NodeId, u64>,
+        extra: crate::cluster::CacheExtra,
+    ) -> Self {
+        Self {
+            kind: node.kind,
+            // Keep exact bit equality for signed-zero-sensitive numeric operations.
+            params: node
+                .params
+                .iter()
+                .map(|(key, n)| (key.clone(), n.to_bits()))
+                .collect(),
+            inputs: node
+                .inputs
+                .iter()
+                .map(|(key, id)| (key.clone(), *id, revisions.get(id).copied().unwrap_or(0)))
+                .collect(),
+            extra,
+        }
+    }
+}
+
 struct Cache {
     key: Key,
     revision: u64,
@@ -163,26 +208,17 @@ impl Evaluator {
                         .insert(id, NodeTiming::since(node_start, false));
                     continue;
                 }
-                let key = Key {
-                    kind: node.kind,
-                    // IEEE bit equality preserves signed-zero-sensitive numeric operations.
-                    params: node
-                        .params
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.to_bits()))
-                        .collect(),
-                    inputs: node
-                        .inputs
-                        .iter()
-                        .map(|(k, v)| (k.clone(), (*v, *revisions.get(v).unwrap_or(&0))))
-                        .collect(),
-                    extra: self.cluster_keys.key_for(graph, node),
-                };
+                let extra = self.cluster_keys.key_for(graph, node);
                 let hit = self
                     .cache
                     .get(&id)
-                    .filter(|c| c.key == key)
+                    .filter(|c| c.key.matches(node, &revisions, &extra))
                     .map(|c| (c.result.clone(), c.revision, c.weight));
+                let key = if hit.is_some() {
+                    None
+                } else {
+                    Some(Key::new(node, &revisions, extra))
+                };
                 slots.push(Slot {
                     id,
                     node,
@@ -293,11 +329,11 @@ impl Evaluator {
                     continue;
                 }
                 retained = retained.saturating_add(weight);
-                if !is_cached {
+                if !is_cached && let Some(key) = slot.key {
                     self.store_cached(
                         id,
                         Cache {
-                            key: slot.key,
+                            key,
                             revision,
                             result: result.clone(),
                             weight,
@@ -325,7 +361,8 @@ type Computed = (Option<Result<Tree, String>>, Duration);
 struct Slot<'a> {
     id: NodeId,
     node: &'a Node,
-    key: Key,
+    /// Cache key, built only for nodes that are not cache hits.
+    key: Option<Key>,
     /// Cached result, its revision and its weight.
     hit: Option<(Result<Tree, String>, u64, usize)>,
     fresh: Option<Result<Tree, String>>,

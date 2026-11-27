@@ -148,7 +148,7 @@ pub struct MorphletApp {
     confirm_action: Option<PendingAction>,
     allow_close: bool,
     preview_mode: u8,
-    gesture_before: Option<Project>,
+    edits: EditTracker,
     last_autosave: Instant,
     recovery: Option<Project>,
     ui_scale: f32,
@@ -224,6 +224,7 @@ impl MorphletApp {
         }
         let recent = node_shelf::recent_from_saved(&saved_recent);
         let mut app = Self {
+            edits: EditTracker::new(&project),
             project,
             history: History::default(),
             canvas,
@@ -260,7 +261,6 @@ impl MorphletApp {
             confirm_action: None,
             allow_close: false,
             preview_mode: 0,
-            gesture_before: None,
             last_autosave: Instant::now(),
             recovery,
             ui_scale: 1.,
@@ -443,7 +443,6 @@ impl MorphletApp {
             self.file_path = path;
             self.dirty = false;
             self.history = History::default();
-            self.gesture_before = None;
             self.suppress_history = true;
             self.canvas.selected.clear();
             self.canvas.connecting = None;
@@ -969,7 +968,6 @@ impl MorphletApp {
     }
     fn undo(&mut self) {
         if self.history.undo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -980,7 +978,6 @@ impl MorphletApp {
     }
     fn redo(&mut self) {
         if self.history.redo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -2409,11 +2406,9 @@ impl MorphletApp {
 impl eframe::App for MorphletApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.compute_tick(ctx);
-        let before = self.project.clone();
         self.suppress_history = false;
-        if ctx.input(|i| i.pointer.any_pressed()) && self.gesture_before.is_none() {
-            self.gesture_before = Some(before.clone());
-        }
+        self.edits
+            .begin(&self.project, ctx.input(|i| i.pointer.any_pressed()));
         if self.confirm_action.is_none()
             && self.recovery.is_none()
             && !self.palette_open
@@ -2480,21 +2475,15 @@ impl eframe::App for MorphletApp {
             }
         }
         self.file_dialog(ctx);
-        if !self.suppress_history && document_changed(&before, &self.project) {
-            self.dirty = true;
-            if self.gesture_before.is_none() {
-                self.history.checkpoint(&before);
-            }
-            if !same_calculation(&before.graph, &self.project.graph) {
-                self.queue_compute();
-            }
-        }
-        if !ctx.input(|i| i.pointer.any_down())
-            && let Some(start) = self.gesture_before.take()
-            && !self.suppress_history
-            && document_changed(&start, &self.project)
-        {
-            self.history.checkpoint(&start);
+        let (edited, recalculate) = self.edits.finish(
+            &self.project,
+            ctx.input(|i| i.pointer.any_down()),
+            self.suppress_history,
+            &mut self.history,
+        );
+        self.dirty |= edited;
+        if recalculate {
+            self.queue_compute();
         }
         if let Some((text, error, start)) = &self.toast
             && start.elapsed() < Duration::from_secs(if *error { 9 } else { 4 })
@@ -2649,6 +2638,77 @@ fn collect_export_trees(
             None => Err(format!("「{}」の計算結果がまだありません。", node.name)),
         })
         .collect()
+}
+
+/// A drag gets one undo entry. Merely painting, panning or pressing a button
+/// keeps the existing graph snapshot, including when a worker requests a repaint.
+struct EditTracker {
+    previous: Project,
+    gesture: Option<EditGesture>,
+}
+
+struct EditGesture {
+    pan: [f32; 2],
+    zoom: f32,
+    before: Option<Project>,
+}
+
+impl EditTracker {
+    fn new(project: &Project) -> Self {
+        Self {
+            previous: project.clone(),
+            gesture: None,
+        }
+    }
+
+    fn begin(&mut self, project: &Project, pressed: bool) {
+        self.previous.pan = project.pan;
+        self.previous.zoom = project.zoom;
+        if pressed && self.gesture.is_none() {
+            self.gesture = Some(EditGesture {
+                pan: project.pan,
+                zoom: project.zoom,
+                before: None,
+            });
+        }
+    }
+
+    fn finish(
+        &mut self,
+        project: &Project,
+        pointer_down: bool,
+        suppress: bool,
+        history: &mut History,
+    ) -> (bool, bool) {
+        let changed = document_changed(&self.previous, project);
+        let edited = changed && !suppress;
+        let recalculate = edited && !same_calculation(&self.previous.graph, &project.graph);
+        if suppress {
+            // Open, recovery and undo/redo establish a fresh baseline.
+            self.gesture = None;
+        }
+        if changed {
+            let mut before = std::mem::replace(&mut self.previous, project.clone());
+            if edited {
+                if let Some(gesture) = &mut self.gesture {
+                    if gesture.before.is_none() {
+                        before.pan = gesture.pan;
+                        before.zoom = gesture.zoom;
+                        gesture.before = Some(before);
+                    }
+                } else {
+                    history.checkpoint_owned(before);
+                }
+            }
+        }
+        if !pointer_down
+            && let Some(before) = self.gesture.take().and_then(|g| g.before)
+            && document_changed(&before, project)
+        {
+            history.checkpoint_owned(before);
+        }
+        (edited, recalculate)
+    }
 }
 
 fn document_changed(a: &Project, b: &Project) -> bool {
@@ -2837,6 +2897,60 @@ mod tests {
         let before = graph.clone();
         assert!(insert_nodes(&mut graph, &[node], [0., 0.], false).is_err());
         assert_eq!(graph, before);
+    }
+
+    #[test]
+    fn repaint_and_view_gestures_reuse_the_snapshot_and_drag_keeps_one_undo() {
+        let mut project = Project::new("追跡", Graph::default());
+        let id = project.graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let initial = project.clone();
+        let mut tracker = EditTracker::new(&project);
+        let mut history = History::default();
+        let nodes = tracker.previous.graph.nodes.as_ptr();
+
+        tracker.begin(&project, true);
+        project.pan = [45., 60.];
+        for _ in 0..60 {
+            tracker.begin(&project, false);
+            assert_eq!(
+                tracker.finish(&project, true, false, &mut history),
+                (false, false)
+            );
+            assert_eq!(tracker.previous.graph.nodes.as_ptr(), nodes);
+            assert!(tracker.gesture.as_ref().unwrap().before.is_none());
+        }
+        for n in 2..=4 {
+            tracker.begin(&project, false);
+            project
+                .graph
+                .node_mut(id)
+                .unwrap()
+                .params
+                .insert("value".into(), f64::from(n));
+            assert_eq!(
+                tracker.finish(&project, n != 4, false, &mut history),
+                (true, true)
+            );
+        }
+        let edited = project.clone();
+        assert!(history.undo(&mut project));
+        assert_eq!(project, initial);
+        assert!(!history.can_undo());
+        assert_eq!(
+            tracker.finish(&project, false, true, &mut history),
+            (false, false)
+        );
+        assert!(history.redo(&mut project));
+        assert_eq!(project, edited);
+        tracker.finish(&project, false, true, &mut history);
+        tracker.begin(&project, false);
+        project.name = "更新".into();
+        assert_eq!(
+            tracker.finish(&project, false, false, &mut history),
+            (true, false)
+        );
+        assert!(history.undo(&mut project));
+        assert_eq!(project, edited);
     }
 
     #[test]
