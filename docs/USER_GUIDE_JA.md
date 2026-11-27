@@ -122,7 +122,21 @@ Grasshopperで花器やパターンを作るときによく使われる流れ（
 | 距離 | `distance` | 2点の距離 |
 | 点の成分 | `component` | 点の X・Y・Z のどれかを数値に |
 
-式で使えるもの: `+ - * / % ^`（`^` はべき乗で右から計算）、`sin cos tan sqrt abs min max floor ceil round ln exp`、`pi`、`e`。角度はラジアンです。0での割り算、負の数の平方根、大きすぎる結果などは日本語のエラーになります。
+式で使えるもの: `+ - * / % ^`（`^` はべき乗で右から計算）、定数 `pi`、`e`。角度はラジアンです。0での割り算、定義域外の値、非有限の計算結果などは日本語のエラーになります。
+
+| 関数 | 用途 |
+|---|---|
+| `sin(x), cos(x), tan(x), asin(x), acos(x), atan(x), atan2(y,x)` | 周期・逆三角関数・象限を考慮した角度 |
+| `sinh(x), cosh(x), tanh(x)` | 双曲線関数 |
+| `sqrt(x), cbrt(x), abs(x), hypot(x,y)` | 根・絶対値・平面上の距離 |
+| `ln(x), log2(x), log10(x), exp(x)` | 対数・指数 |
+| `log1p(x), expm1(x)` | 0付近でも精度を維持しやすい `ln(1+x)`、`exp(x)-1` |
+| `floor(x), ceil(x), round(x), min(x,y), max(x,y)` | 丸め・比較 |
+| `clamp(x,lo,hi)` | lo〜hi に制限（lo ≤ hi） |
+| `lerp(a,b,t)` | 線形補間。t=0でa、t=1でb。範囲外は外挿。 |
+| `smoothstep(x,lo,hi)` | 0〜1の滑らかな遷移（lo < hi）。引数順はNODES独自の規約。 |
+
+例: `lerp(20,45,smoothstep(x,0,1))` を花器の半径へ接続すると、x=0〜1で急な変化のない半径制御ができます。[編集可能な作例](../examples/math/smooth-vase-radius.morph)。
 
 ### 3Dプリント向け
 
