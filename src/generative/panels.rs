@@ -203,7 +203,12 @@ pub(super) fn run(
     match kind {
         NodeKind::ShapeMorph => {
             let other = args.get(1).ok_or("終了形状が必要です。")?;
-            Ok(vec![morph(value, other, fraction(num(args, 2)?, 0.)?, cancel)?])
+            Ok(vec![morph(
+                value,
+                other,
+                fraction(num(args, 2)?, 0.)?,
+                cancel,
+            )?])
         }
         NodeKind::InsetCell => Ok(vec![inset(value, fraction(num(args, 1)?, 0.01)?, cancel)?]),
         NodeKind::MeshFacePanels => {

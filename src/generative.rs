@@ -434,7 +434,9 @@ pub(crate) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), S
         GridArray | CurveArray => shape(a)?.weight().saturating_mul(n),
         NoiseField => 2,
         Rotate3d | Shear | Taper | InsetCell => shape(a)?.weight(),
-        ShapeMorph => shape(a)?.weight().max(a.get(1).ok_or("終了形状が必要です。")?.weight()),
+        ShapeMorph => shape(a)?
+            .weight()
+            .max(a.get(1).ok_or("終了形状が必要です。")?.weight()),
         MeshFacePanels => n.saturating_mul(3),
         _ => n,
     };
