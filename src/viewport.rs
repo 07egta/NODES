@@ -59,6 +59,10 @@ pub struct Viewport {
     pub overhang_limit_deg: f64,
     /// Use the z-buffer for solid surfaces (on by default).
     pub accurate_depth: bool,
+    /// Control net of the ケージ編集 node being edited (set by the app every frame).
+    pub cage_overlay: Option<crate::cage_edit::CageOverlay>,
+    /// Picks and drags on the cage since the app last took them.
+    pub cage_events: Vec<crate::cage_edit::CageEvent>,
     yaw: f64,
     pitch: f64,
     target: V3,
@@ -88,6 +92,8 @@ impl Default for Viewport {
             overhang_preview: false,
             overhang_limit_deg: 45.0,
             accurate_depth: true,
+            cage_overlay: None,
+            cage_events: Vec::new(),
             yaw: -PI / 3.0,
             pitch: 0.48,
             target: [0.0; 3],
@@ -409,6 +415,21 @@ impl Viewport {
 
         let delta = response.drag_delta();
         let shift = ui.input(|i| i.modifiers.shift);
+        let ctrl = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
+        // Cage editing: picks and Ctrl+drags go to the cage, not the camera.
+        let mut cage_used = false;
+        if let Some(overlay) = &self.cage_overlay {
+            let camera = self.camera(rect);
+            let project = move |p: V3| camera.project(p);
+            let view = crate::cage_edit::View {
+                project: &project,
+                right: camera.right,
+                up: camera.up,
+                scale: camera.scale,
+            };
+            cage_used = overlay.interact(&response, ctrl, shift, &view, &mut self.cage_events);
+        }
+        let cage_drag = self.cage_overlay.is_some() && ctrl;
         if response.dragged_by(PointerButton::Middle)
             || (shift && response.dragged_by(PointerButton::Primary))
         {
@@ -420,7 +441,7 @@ impl Viewport {
                     mul(camera.up, f64::from(delta.y) / camera.scale),
                 ),
             );
-        } else if response.dragged_by(PointerButton::Primary) {
+        } else if response.dragged_by(PointerButton::Primary) && !cage_drag {
             self.yaw -= f64::from(delta.x) * 0.008;
             self.pitch = (self.pitch + f64::from(delta.y) * 0.008).clamp(-1.54, 1.54);
         }
@@ -456,6 +477,16 @@ impl Viewport {
                 );
             }
             painter.extend(projection.over.iter().cloned());
+        }
+        if let Some(overlay) = &self.cage_overlay {
+            let project = move |p: V3| camera.project(p);
+            let view = crate::cage_edit::View {
+                project: &project,
+                right: camera.right,
+                up: camera.up,
+                scale: camera.scale,
+            };
+            overlay.paint(&painter, &view, dark);
         }
 
         // Quiet context only. Controls live in the parent panel (`controls`).
@@ -552,6 +583,9 @@ impl Viewport {
             );
         }
 
+        if cage_used {
+            return None;
+        }
         if response.clicked()
             && !response.double_clicked()
             && let Some(p) = response.interact_pointer_pos()

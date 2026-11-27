@@ -15,6 +15,7 @@ pub mod ghx;
 pub mod graph_api;
 pub mod import;
 pub mod kernel_bridge;
+pub mod kernel_ops;
 pub mod latest_channel;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
