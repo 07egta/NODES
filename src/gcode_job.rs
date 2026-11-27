@@ -966,7 +966,10 @@ impl GcodeJob {
             Ok(())
         })?;
         if invalid_move {
-            push(true, "生成された移動（Zホップを含む）がベッド範囲外です。".into());
+            push(
+                true,
+                "生成された移動（Zホップを含む）がベッド範囲外です。".into(),
+            );
         }
         if !has_print {
             push(true, "有効な押出経路がありません。".into());
@@ -2263,7 +2266,11 @@ mod tests {
         let mut job = job_with(vec![square(0.2, u32::MAX, PathKind::Outer)]);
         job.paths[0].pts[0][0] = f64::NAN;
         let issues = job.check(&never).unwrap();
-        assert!(issues.iter().any(|i| i.error && i.text.contains("4294967296")));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.error && i.text.contains("4294967296"))
+        );
     }
 
     #[test]
