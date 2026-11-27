@@ -125,7 +125,7 @@ impl Tutorial {
             .show(ctx, |ui| {
                 egui::Frame::new()
                     .fill(theme::panel_bg())
-                    .stroke(egui::Stroke::new(1., theme::card_border()))
+                    .stroke(egui::Stroke::new(1_f32, theme::card_border()))
                     .corner_radius(10)
                     .inner_margin(14)
                     .show(ui, |ui| {
@@ -147,7 +147,7 @@ impl Tutorial {
                                     ui.painter().circle_stroke(
                                         rect.center(),
                                         5.,
-                                        egui::Stroke::new(1.5, color),
+                                        egui::Stroke::new(1.5_f32, color),
                                     );
                                 }
                             }
