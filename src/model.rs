@@ -540,6 +540,22 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    // More exact NURBS / SubD nodes (`nurbs_nodes`), appended.
+    SubdCageEdit,
+    ExactTrimPlane,
+    ExactFilletVariable,
+    ExactOffsetSurface,
+    ExactDraft,
+    ExactMirror,
+    ExactLinearArray,
+    ExactPolarArray,
+    ExactPipe,
+    ExactPatch,
+    ExactBlendCurve,
+    ExactMatchCurve,
+    ExactContinuity,
+    ExactCurvatureComb,
+    ExactOffsetCurve,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -926,6 +942,21 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::SubdCageEdit,
+            Self::ExactTrimPlane,
+            Self::ExactFilletVariable,
+            Self::ExactOffsetSurface,
+            Self::ExactDraft,
+            Self::ExactMirror,
+            Self::ExactLinearArray,
+            Self::ExactPolarArray,
+            Self::ExactPipe,
+            Self::ExactPatch,
+            Self::ExactBlendCurve,
+            Self::ExactMatchCurve,
+            Self::ExactContinuity,
+            Self::ExactCurvatureComb,
+            Self::ExactOffsetCurve,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

@@ -217,3 +217,106 @@ fn tspline_vase_becomes_a_closed_brep() {
     let step = kb::step_export(&[&solid], &go).unwrap();
     assert!(step.contains("B_SPLINE_SURFACE"));
 }
+
+// ---- Exact intersections, general cages, cage edits, curve tools ----
+
+#[test]
+fn exact_intersection_curves_lie_on_both_cylinders() {
+    let (r, r2) = (10., 6.);
+    let z = kb::cylinder([0., 0., -30.], [0., 0., 1.], r, 60., &go).unwrap();
+    let x = kb::cylinder([-30., 0., 0.], [1., 0., 0.], r2, 60., &go).unwrap();
+    let curves = nodes::kernel_ops::exact_intersection(&z, &x, &go).unwrap();
+    assert!(!curves.is_empty());
+    let mut worst = 0f64;
+    for c in &curves {
+        assert!(
+            c.geometry.is_some(),
+            "intersection curve is not exact NURBS"
+        );
+        for p in kb::sample_curve(c, 8, &go).unwrap() {
+            let on_z = ((p[0] * p[0] + p[1] * p[1]).sqrt() - r).abs();
+            let on_x = ((p[1] * p[1] + p[2] * p[2]).sqrt() - r2).abs();
+            worst = worst.max(on_z).max(on_x);
+        }
+    }
+    assert!(
+        worst < 1e-4,
+        "intersection curve leaves the cylinders by {worst}"
+    );
+}
+
+#[test]
+fn box_cage_becomes_a_closed_nurbs_brep() {
+    let cage = Cage::box_cage(40., 40., 40., &go)
+        .unwrap()
+        .subdivide(&go)
+        .unwrap();
+    let solid = cage.to_brep(true, &go).unwrap();
+    assert!(solid.is_closed(), "ACC B-rep is not closed");
+    let v = solid.volume().unwrap();
+    // The patches follow the Catmull-Clark limit surface: same volume as its fine mesh.
+    let mesh_v = kb::mesh_volume(cage.preview()).abs();
+    assert!(
+        rel(v, mesh_v) < 2e-2,
+        "ACC volume {v} vs subdivision mesh {mesh_v}"
+    );
+}
+
+#[test]
+fn cage_edit_list_replays_moves_with_symmetry() {
+    use nodes::subd::{EditOp, edits_text};
+    let cage = Cage::box_cage(40., 40., 40., &go).unwrap();
+    // Vertex 1 is (20, -20, 0); its X mirror is vertex 0.
+    let ops = vec![
+        EditOp::Move {
+            verts: vec![1],
+            d: [5., 0., 0.],
+            sym: Some(0),
+        },
+        EditOp::Extrude {
+            faces: vec![1],
+            d: 10.,
+        },
+        EditOp::Crease { edges: vec![0] },
+    ];
+    let edited = cage.apply_edits(&edits_text(&ops), &go).unwrap();
+    assert!((edited.vertices()[1][0] - 25.).abs() < 1e-12);
+    assert!((edited.vertices()[0][0] + 25.).abs() < 1e-12);
+    assert_eq!(edited.vertices().len(), 12);
+    assert!(!edited.creases().is_empty());
+    assert!(cage.apply_edits("not json", &go).is_err());
+}
+
+#[test]
+fn match_and_blend_curves_reach_g2() {
+    let pts = |v: &[[f64; 3]]| {
+        let n = nodes::curve_geometry::NurbsCurve::uniform(v.to_vec(), 3, false).unwrap();
+        kb::curve_value(CurveGeometry::nurbs(n), &go).unwrap()
+    };
+    let a = pts(&[
+        [0., 0., 0.],
+        [10., 5., 0.],
+        [20., -3., 0.],
+        [30., 4., 0.],
+        [40., 0., 0.],
+    ]);
+    let b = pts(&[[45., 3., 0.], [55., 10., 2.], [65., 0., 4.], [75., 6., 0.]]);
+    let matched = nodes::kernel_ops::match_curve(&a, &b, 2, &go).unwrap();
+    let c = nodes::kernel_ops::continuity(&matched, &b).unwrap();
+    assert_eq!(c[0], 2., "match: {c:?}");
+    let blend = nodes::kernel_ops::blend_curve(&a, &b, true, 1., &go).unwrap();
+    let start = nodes::kernel_ops::continuity(&a, &blend).unwrap();
+    let end = nodes::kernel_ops::continuity(&blend, &b).unwrap();
+    assert_eq!(start[0], 2., "blend start: {start:?}");
+    assert_eq!(end[0], 2., "blend end: {end:?}");
+}
+
+#[test]
+fn curved_cup_is_shelled() {
+    let cyl = kb::cylinder([0., 0., 0.], [0., 0., 1.], 20., 40., &go).unwrap();
+    let cup = kb::shell(&cyl, 2., Some(usize::MAX), &go).unwrap();
+    assert!(cup.is_closed());
+    let v = cup.volume().unwrap();
+    let expected = PI * 400. * 40. - PI * 18. * 18. * 38.;
+    assert!(rel(v, expected) < 2e-2, "cup volume {v} vs {expected}");
+}

@@ -7,10 +7,16 @@
 //!   refinement and the NURBS/B-rep conversion all describe the same surface. Refinement is
 //!   exact knot insertion (the T-spline/NURBS refine of SolidCraft's `sc-geom` is used for v).
 //! - **General cages** (箱ケージ, or any cage after 面の押し出し / 折り目): Catmull-Clark
-//!   subdivision with sharp creases. Converting a general cage to an exact B-rep is the next
-//!   milestone (see docs/NURBS_ROADMAP.md); they can be meshed for preview and STL.
+//!   subdivision with sharp creases. They convert to a B-rep of bicubic NURBS patches, one per
+//!   quad, by Loop & Schaefer's approximate Catmull-Clark (ACC, 2008): exact where the cage is
+//!   regular, a close approximation of the limit surface around extraordinary points, and
+//!   watertight everywhere (neighbouring patches share their boundary control points exactly).
+//!
+//! Cages are edited by a list of operations ([`EditOp`]) kept in the ケージ編集 node; the
+//! viewport's edit mode appends to it (move, extrude, crease, subdivide, with symmetry).
 use crate::kernel_bridge::{self as kb, BrepValue, R, Stop};
 use crate::model::Mesh;
+use serde::{Deserialize, Serialize};
 use solidcraft_geom::Vec3;
 use solidcraft_geom::bspline::{Dir, NurbsSurface};
 use solidcraft_geom::tspline::TSpline;
@@ -495,7 +501,7 @@ impl Cage {
     /// into a closed solid when `cap` is set.
     pub fn to_brep(&self, cap: bool, stop: Stop) -> R<BrepValue> {
         let Some(g) = self.grid else {
-            return Err("箱ケージなど格子でないケージの厳密 B-rep 変換は次の段階で対応します。今は「SubD → メッシュ」でメッシュにしてください。".into());
+            return self.acc_brep(stop);
         };
         let s = grid_nurbs(&self.vertices, g)?;
         let halves = split_u(&s, (g.cols / 2) as f64)?;
@@ -679,4 +685,345 @@ fn triangulate(vertices: &[P3], faces: &[Vec<u32>]) -> Mesh {
         vertices: vertices.to_vec(),
         triangles,
     }
+}
+
+// -------------------------------------------------------------------------------------------
+// General cages as B-reps: approximate Catmull-Clark (Loop & Schaefer 2008)
+// -------------------------------------------------------------------------------------------
+
+/// Most patches one general cage may turn into (each is one NURBS face).
+pub const MAX_ACC_PATCHES: usize = 4096;
+
+impl Cage {
+    /// Rebuild the cage after its points moved, keeping its kind (grid or general) and creases.
+    fn with_vertices(&self, vertices: Vec<P3>, stop: Stop) -> R<Cage> {
+        Self::build(
+            vertices,
+            self.faces.clone(),
+            self.creases.clone(),
+            self.grid,
+            stop,
+        )
+    }
+
+    /// One bicubic Bézier patch per quad. A cage with other polygons is subdivided once first
+    /// (Catmull-Clark makes every face a quad).
+    pub fn acc_patches(&self, stop: Stop) -> R<Vec<[[P3; 4]; 4]>> {
+        if self.faces.iter().any(|f| f.len() != 4) {
+            let quads = self.catmull_clark(stop)?;
+            return quads.acc_patches(stop);
+        }
+        if self.faces.len() > MAX_ACC_PATCHES {
+            return Err(format!(
+                "面が多すぎます（{} 面、上限 {MAX_ACC_PATCHES}）。細分の回数を減らしてください。",
+                self.faces.len()
+            ));
+        }
+        let mut edge_faces: HashMap<(u32, u32), Vec<(usize, usize)>> = HashMap::new();
+        for (fi, f) in self.faces.iter().enumerate() {
+            for k in 0..4 {
+                if let (Some(&a), Some(&b)) = (f.get(k), f.get((k + 1) % 4)) {
+                    edge_faces.entry(key(a, b)).or_default().push((fi, k));
+                }
+            }
+        }
+        if let Some(e) = edge_faces.values().find(|v| v.len() != 2) {
+            return Err(format!(
+                "ケージに開いた辺または 3 枚以上の面が集まる辺があります（{} 枚）。閉じたケージにしてください。",
+                e.len()
+            ));
+        }
+        let point = |i: u32| self.vertices.get(i as usize).copied().unwrap_or([0.; 3]);
+        let mut valence = vec![0usize; self.vertices.len()];
+        for e in edge_faces.keys() {
+            for v in [e.0, e.1] {
+                if let Some(n) = valence.get_mut(v as usize) {
+                    *n += 1;
+                }
+            }
+        }
+        // Interior point of face f at corner k: (n·v + 2(e_prev + e_next) + d) / (n + 5).
+        let interior = |f: &[u32], k: usize| -> P3 {
+            let v = f.get(k).copied().unwrap_or(0);
+            let n = valence.get(v as usize).copied().unwrap_or(4) as f64;
+            let next = point(f.get((k + 1) % 4).copied().unwrap_or(0));
+            let prev = point(f.get((k + 3) % 4).copied().unwrap_or(0));
+            let diag = point(f.get((k + 2) % 4).copied().unwrap_or(0));
+            scale(
+                add(add(scale(point(v), n), scale(add(prev, next), 2.)), diag),
+                1. / (n + 5.),
+            )
+        };
+        let mut inner: Vec<[P3; 4]> = Vec::with_capacity(self.faces.len());
+        for f in &self.faces {
+            kb_stop(stop)?;
+            inner.push(std::array::from_fn(|k| interior(f, k)));
+        }
+        let at = |fi: usize, k: usize| {
+            inner
+                .get(fi)
+                .and_then(|c| c.get(k))
+                .copied()
+                .unwrap_or([0.; 3])
+        };
+        // Corner points: the average of the interior points around the vertex.
+        let mut corner_sum: Vec<(P3, usize)> = vec![([0.; 3], 0); self.vertices.len()];
+        for (fi, f) in self.faces.iter().enumerate() {
+            for (k, &v) in f.iter().enumerate() {
+                if let Some(slot) = corner_sum.get_mut(v as usize) {
+                    slot.0 = add(slot.0, at(fi, k));
+                    slot.1 += 1;
+                }
+            }
+        }
+        let corner = |v: u32| {
+            corner_sum
+                .get(v as usize)
+                .map_or([0.; 3], |(p, n)| scale(*p, 1. / (*n).max(1) as f64))
+        };
+        // Edge point next to corner `v` on edge (v, w): the average of the interior points at `v`
+        // of the two faces sharing the edge, in a fixed order so both patches get the same bits.
+        let edge_point = |v: u32, w: u32| -> P3 {
+            let Some(pair) = edge_faces.get(&key(v, w)) else {
+                return point(v);
+            };
+            let mut corners: Vec<(usize, usize)> = pair
+                .iter()
+                .filter_map(|&(fi, _)| {
+                    let f = self.faces.get(fi)?;
+                    let k = f.iter().position(|&x| x == v)?;
+                    Some((fi, k))
+                })
+                .collect();
+            corners.sort_unstable();
+            match corners.as_slice() {
+                [(f1, k1), (f2, k2)] => scale(add(at(*f1, *k1), at(*f2, *k2)), 0.5),
+                _ => point(v),
+            }
+        };
+        let mut patches = Vec::with_capacity(self.faces.len());
+        for (fi, f) in self.faces.iter().enumerate() {
+            let (Some(&v0), Some(&v1), Some(&v2), Some(&v3)) =
+                (f.first(), f.get(1), f.get(2), f.get(3))
+            else {
+                continue;
+            };
+            // b[i][j]: i along v0 → v1, j along v0 → v3.
+            let mut b = [[[0.; 3]; 4]; 4];
+            b[0][0] = corner(v0);
+            b[3][0] = corner(v1);
+            b[3][3] = corner(v2);
+            b[0][3] = corner(v3);
+            b[1][0] = edge_point(v0, v1);
+            b[2][0] = edge_point(v1, v0);
+            b[3][1] = edge_point(v1, v2);
+            b[3][2] = edge_point(v2, v1);
+            b[2][3] = edge_point(v2, v3);
+            b[1][3] = edge_point(v3, v2);
+            b[0][2] = edge_point(v3, v0);
+            b[0][1] = edge_point(v0, v3);
+            b[1][1] = at(fi, 0);
+            b[2][1] = at(fi, 1);
+            b[2][2] = at(fi, 2);
+            b[1][2] = at(fi, 3);
+            patches.push(b);
+        }
+        Ok(patches)
+    }
+
+    /// The cage's surface as a closed B-rep of bicubic NURBS faces (see [`Cage::acc_patches`]).
+    pub fn acc_brep(&self, stop: Stop) -> R<BrepValue> {
+        let patches = self.acc_patches(stop)?;
+        let knots = vec![0., 0., 0., 0., 1., 1., 1., 1.];
+        let mut sheets = Vec::with_capacity(patches.len());
+        for b in &patches {
+            kb_stop(stop)?;
+            let mut pts = Vec::with_capacity(16);
+            for j in 0..4 {
+                for row in b.iter() {
+                    let p = row.get(j).copied().unwrap_or([0.; 3]);
+                    pts.push(Vec3::new(p[0], p[1], p[2]));
+                }
+            }
+            let s = NurbsSurface::new([3, 3], [knots.clone(), knots.clone()], &pts, &[1.; 16])
+                .map_err(|e| format!("パッチを作れませんでした（{e}）。"))?;
+            let ts = TSpline::from_nurbs(&s)
+                .map_err(|e| format!("T-spline への変換に失敗しました（{e}）。"))?;
+            sheets.push(kb::tspline_body(&ts, stop)?);
+        }
+        kb::stitch_bodies(&sheets, stop)
+    }
+
+    /// The vertex mirroring `v` across the plane `axis = 0` (itself when it lies on the plane).
+    pub fn mirror_of(&self, v: usize, axis: usize) -> Option<usize> {
+        let p = *self.vertices.get(v)?;
+        let mut q = p;
+        *q.get_mut(axis)? = -*p.get(axis)?;
+        let size = self.vertices.iter().fold(1f64, |m, x| m.max(norm(*x)));
+        let eps = size * 1e-6;
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter(|(_, x)| norm([x[0] - q[0], x[1] - q[1], x[2] - q[2]]) <= eps)
+            .map(|(i, _)| i)
+            .next()
+    }
+
+    /// Apply one edit.
+    pub fn edit(&self, op: &EditOp, stop: Stop) -> R<Cage> {
+        match op {
+            EditOp::Move { verts, d, sym } => {
+                if d.iter()
+                    .any(|x| !x.is_finite() || x.abs() > kb::limits::MAX_COORDINATE)
+                {
+                    return Err("移動量が無効です。".into());
+                }
+                let mut v = self.vertices.clone();
+                let mut moved = BTreeSet::new();
+                for &i in verts {
+                    let mut targets = vec![(i, *d)];
+                    if let Some(axis) = sym.map(usize::from).filter(|a| *a < 3) {
+                        match self.mirror_of(i, axis) {
+                            Some(m) if m == i => {
+                                if let Some(t) = targets.first_mut() {
+                                    t.1[axis] = 0.;
+                                }
+                            }
+                            Some(m) => {
+                                let mut md = *d;
+                                md[axis] = -md[axis];
+                                targets.push((m, md));
+                            }
+                            None => {}
+                        }
+                    }
+                    for (t, dt) in targets {
+                        if !moved.insert(t) {
+                            continue;
+                        }
+                        let p = v.get_mut(t).ok_or_else(|| {
+                            format!(
+                                "点番号 {t} はありません（0〜{}）。",
+                                self.vertices.len().saturating_sub(1)
+                            )
+                        })?;
+                        *p = add(*p, dt);
+                    }
+                }
+                self.with_vertices(v, stop)
+            }
+            EditOp::Scale { verts, s } => {
+                if !(s.is_finite() && *s > 1e-6 && *s < 1e6) {
+                    return Err("拡大率は 0 より大きい値にしてください。".into());
+                }
+                let pts: Vec<P3> = verts
+                    .iter()
+                    .filter_map(|&i| self.vertices.get(i).copied())
+                    .collect();
+                if pts.is_empty() {
+                    return Err("拡大する点を選んでください。".into());
+                }
+                let c = scale(
+                    pts.iter().fold([0.; 3], |a, p| add(a, *p)),
+                    1. / pts.len() as f64,
+                );
+                let mut v = self.vertices.clone();
+                for &i in verts {
+                    if let Some(p) = v.get_mut(i) {
+                        *p = add(c, scale([p[0] - c[0], p[1] - c[1], p[2] - c[2]], *s));
+                    }
+                }
+                self.with_vertices(v, stop)
+            }
+            EditOp::Extrude { faces, d } => {
+                let mut cage = self.clone();
+                let mut seen = BTreeSet::new();
+                for &f in faces {
+                    if seen.insert(f) {
+                        cage = cage.extrude_face(f, *d, stop)?;
+                    }
+                }
+                Ok(cage)
+            }
+            EditOp::Crease { edges } => self.crease(edges, stop),
+            EditOp::Uncrease => Self::build(
+                self.vertices.clone(),
+                self.faces.clone(),
+                BTreeSet::new(),
+                self.grid,
+                stop,
+            ),
+            EditOp::Subdivide => self.subdivide(stop),
+        }
+    }
+
+    /// Apply the edit list kept as JSON text (an empty text keeps the cage).
+    pub fn apply_edits(&self, text: &str, stop: Stop) -> R<Cage> {
+        let ops = parse_edits(text)?;
+        let mut cage = self.clone();
+        for (i, op) in ops.iter().enumerate() {
+            kb_stop(stop)?;
+            cage = cage
+                .edit(op, stop)
+                .map_err(|e| format!("編集 {}（{}）: {e}", i + 1, op.label()))?;
+        }
+        Ok(cage)
+    }
+}
+
+/// Most edits one ケージ編集 node keeps.
+pub const MAX_EDITS: usize = 2000;
+
+/// One cage edit. Indices refer to the cage as it is when the edit is applied.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum EditOp {
+    /// Move points by `d` (mm). With `sym` (0 = X, 1 = Y, 2 = Z) the mirror points move mirrored.
+    Move {
+        verts: Vec<usize>,
+        d: [f64; 3],
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sym: Option<u8>,
+    },
+    /// Scale points about their centre.
+    Scale { verts: Vec<usize>, s: f64 },
+    /// Push faces out along their normals.
+    Extrude { faces: Vec<usize>, d: f64 },
+    /// Make edges sharp.
+    Crease { edges: Vec<usize> },
+    /// Remove every crease.
+    Uncrease,
+    /// One subdivision step.
+    Subdivide,
+}
+
+impl EditOp {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Move { .. } => "移動",
+            Self::Scale { .. } => "拡大縮小",
+            Self::Extrude { .. } => "面の押し出し",
+            Self::Crease { .. } => "折り目",
+            Self::Uncrease => "折り目を消す",
+            Self::Subdivide => "細分",
+        }
+    }
+}
+
+pub fn parse_edits(text: &str) -> R<Vec<EditOp>> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ops: Vec<EditOp> = serde_json::from_str(text).map_err(|e| {
+        format!("ケージ編集の記録を読めません（{e}）。「編集をリセット」でやり直してください。")
+    })?;
+    if ops.len() > MAX_EDITS {
+        return Err(format!("編集が多すぎます（上限 {MAX_EDITS}）。"));
+    }
+    Ok(ops)
+}
+
+pub fn edits_text(ops: &[EditOp]) -> String {
+    serde_json::to_string(ops).unwrap_or_default()
 }

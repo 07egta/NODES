@@ -69,7 +69,7 @@ pub mod limits {
 
 pub const STOPPED: &str = "計算を停止しました。";
 
-fn stopped(stop: Stop) -> R<()> {
+pub(crate) fn stopped(stop: Stop) -> R<()> {
     if stop() { Err(STOPPED.into()) } else { Ok(()) }
 }
 
@@ -92,7 +92,7 @@ pub fn kernel_error(what: &str, e: KernelError) -> String {
 }
 
 /// Run a kernel call with panic protection, cancel checks and a Japanese error.
-fn kernel<T>(what: &str, stop: Stop, f: impl FnOnce() -> sk::Result<T>) -> R<T> {
+pub(crate) fn kernel<T>(what: &str, stop: Stop, f: impl FnOnce() -> sk::Result<T>) -> R<T> {
     stopped(stop)?;
     let result = sk::guard(what, f).map_err(|e| kernel_error(what, e));
     stopped(stop)?;
@@ -797,11 +797,11 @@ fn loop_on(plane: &Plane, c: &Curve, stop: Stop) -> R<Loop2> {
 // Operations
 // ---------------------------------------------------------------------------------------------
 
-fn brep(body: Body, stop: Stop) -> R<BrepValue> {
+pub(crate) fn brep(body: Body, stop: Stop) -> R<BrepValue> {
     BrepValue::new(body, stop)
 }
 
-fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
+pub(crate) fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
     let mut iter = bodies.into_iter();
     let Some(first) = iter.next() else {
         return Err(format!(
@@ -818,7 +818,7 @@ fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
     brep(acc, stop)
 }
 
-fn positive(what: &str, v: f64) -> R<f64> {
+pub(crate) fn positive(what: &str, v: f64) -> R<f64> {
     if v.is_finite() && v > tol::ABS && v <= limits::MAX_COORDINATE {
         Ok(v)
     } else {
@@ -1200,7 +1200,7 @@ fn faceted_boolean_preview(
 }
 
 /// Edge pick points: every edge, or the listed edge numbers.
-fn edge_picks(b: &BrepValue, only: &[usize], stop: Stop) -> R<Vec<Vec3>> {
+pub(crate) fn edge_picks(b: &BrepValue, only: &[usize], stop: Stop) -> R<Vec<Vec3>> {
     let edges = kernel("稜線の取得", stop, || {
         b.body().edges(tol::chord(b.body().size()))
     })?;
@@ -1256,10 +1256,24 @@ pub fn shell(b: &BrepValue, thickness: f64, open: Option<usize>, stop: Stop) -> 
             )
         })?],
     };
-    let body = kernel("シェル", stop, || sk::shell(b.body(), &open_at, t)).map_err(|e| {
-        format!("{e}（現在のシェルは平面で囲まれた凸形状に対応しています。曲面の器は「厚みをつける」系のノードを使ってください。）")
-    })?;
-    brep(body, stop)
+    match kernel("シェル", stop, || sk::shell(b.body(), &open_at, t)) {
+        Ok(body) => brep(body, stop),
+        Err(e) if e == STOPPED => Err(e),
+        Err(planar) => {
+            // Curved solids: take the open face away and thicken the rest inward.
+            let face = match open {
+                Some(usize::MAX) => crate::kernel_ops::top_face(b, stop)?,
+                Some(i) => i,
+                None => {
+                    return Err(format!(
+                        "{planar}（閉じたままの中空化は平面の凸形状だけに対応しています。開ける面を選んでください。）"
+                    ));
+                }
+            };
+            crate::kernel_ops::shell_curved(b, t, face, stop)
+                .map_err(|curved| format!("{curved}（平面の方法でも失敗しました: {planar}）"))
+        }
+    }
 }
 
 /// Close the open boundary loops of a surface body with fill faces and sew it into a solid.
@@ -1735,9 +1749,22 @@ fn triangle_triangle(t1: [P3; 3], t2: [P3; 3]) -> Option<(P3, P3)> {
     (alo.max(blo) < ahi.min(bhi)).then_some((lo, hi))
 }
 
+/// Curves where two B-reps' surfaces cross. Closed solids use the kernel's exact intersection
+/// curves (`kernel_ops::exact_intersection`); open sheets fall back to the display meshes.
+pub fn brep_brep(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
+    if a.is_closed() && b.is_closed() {
+        match crate::kernel_ops::exact_intersection(a, b, stop) {
+            Ok(curves) => return Ok(curves),
+            Err(e) if e == STOPPED => return Err(e),
+            Err(_) => {}
+        }
+    }
+    brep_brep_mesh(a, b, stop)
+}
+
 /// Curves where two B-reps' surfaces cross, as polylines chained from their display meshes
 /// (approximate, within [`tol::chord`]).
-pub fn brep_brep(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
+pub fn brep_brep_mesh(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
     let (ma, mb) = (a.preview(), b.preview());
     let size = a.body().size().max(b.body().size());
     // Bin B's triangles in a grid to avoid testing every pair.
