@@ -281,6 +281,9 @@ impl Profile {
         if !in_range(self.hop_mm, 0.0, 50.0) || !in_range(self.hop_min_travel, 0.0, 500.0) {
             return Err("Zホップの値が範囲外です。".into());
         }
+        if !self.max_flow_mm3_s.is_finite() || self.max_flow_mm3_s < 0.0 {
+            return Err("最大押出流量は有限の非負値にしてください。".into());
+        }
         if self.pressure_dwell_ms > 60_000 || self.preflow_dwell_ms > 60_000 {
             return Err("待ち時間は 60000 ms 以下にしてください。".into());
         }
@@ -747,6 +750,10 @@ impl GcodeJob {
         let mut push = |error: bool, text: String| out.push(Issue { error, text });
         let pr = &self.printer;
         let pf = &self.profile;
+        if cancel() {
+            return Err(STOPPED.into());
+        }
+        self.check_limits()?;
         if self.paths.is_empty() {
             push(
                 true,
@@ -792,7 +799,7 @@ impl GcodeJob {
                 true,
                 format!(
                     "数値でない座標または極端に大きい座標が {bad} 点あります（層 {} の経路 {} が最初）。",
-                    layer + 1,
+                    u64::from(layer) + 1,
                     index + 1
                 ),
             );
@@ -890,9 +897,24 @@ impl GcodeJob {
         let mut crossings: HashMap<u32, usize> = HashMap::new();
         let mut steep = 0usize;
         let mut first_steep: Option<(u32, [f64; 3])> = None;
+        let mut has_print = false;
+        let mut invalid_move = false;
         self.walk(cancel, &mut |m| {
+            if matches!(m.op, Op::Travel | Op::Print) {
+                for p in [m.from, m.to] {
+                    let machine = [p[0] + off[0], p[1] + off[1], p[2]];
+                    if machine
+                        .iter()
+                        .zip(pr.bed)
+                        .any(|(v, size)| !in_range(*v, 0.0, size))
+                    {
+                        invalid_move = true;
+                    }
+                }
+            }
             match m.op {
                 Op::Print => {
+                    has_print = true;
                     let dxy = (m.to[0] - m.from[0]).hypot(m.to[1] - m.from[1]);
                     let dz = (m.to[2] - m.from[2]).abs();
                     if dxy > 0.01 && dz / dxy > 1.0 {
@@ -943,6 +965,12 @@ impl GcodeJob {
             }
             Ok(())
         })?;
+        if invalid_move {
+            push(true, "生成された移動（Zホップを含む）がベッド範囲外です。".into());
+        }
+        if !has_print {
+            push(true, "有効な押出経路がありません。".into());
+        }
         if !crossings.is_empty() {
             let total: usize = crossings.values().sum();
             let first = crossings.keys().min().copied().unwrap_or(0);
@@ -950,7 +978,7 @@ impl GcodeJob {
                 false,
                 format!(
                     "印刷済みの部分を横切る移動が {total} 回あります（最初は層 {}）。Zホップを入れるか、経路の並び替えを見直してください。",
-                    first + 1
+                    u64::from(first) + 1
                 ),
             );
         }
@@ -965,7 +993,7 @@ impl GcodeJob {
                 false,
                 format!(
                     "傾斜が 45° を超える部分が {steep} か所あります（層 {}、X {:.1} Y {:.1}）。ノズルが印刷物に当たる恐れがあります。",
-                    layer + 1,
+                    u64::from(layer) + 1,
                     at[0],
                     at[1]
                 ),
@@ -2196,6 +2224,46 @@ mod tests {
         assert!(job.render(&never).is_err());
         let _ = job.preview_segments(10);
         let _ = job.summary();
+    }
+
+    #[test]
+    fn preflight_rejects_generated_out_of_bounds_travel() {
+        let job = job_with(vec![square(179.0, 0, PathKind::Outer)]);
+        assert!(job.render(&never).is_err());
+
+        let mut job = job_with(vec![
+            square(0.2, 0, PathKind::Outer),
+            square(179.0, 1, PathKind::Outer),
+        ]);
+        job.profile.hop_mm = 3.0;
+        assert!(job.render(&never).is_err());
+        job.profile.hop_mm = 0.0;
+        assert!(!job.check(&never).unwrap().iter().any(|i| i.error));
+    }
+
+    #[test]
+    fn preflight_rejects_degenerate_paths_and_bad_flow_limits() {
+        let mut path = square(0.2, 0, PathKind::Outer);
+        path.pts.fill([20.0, 20.0, 0.2]);
+        let job = job_with(vec![path]);
+        assert!(job.render(&never).is_err());
+
+        let mut job = job_with(vec![square(0.2, 0, PathKind::Outer)]);
+        for invalid in [f64::NAN, f64::INFINITY, -1.0] {
+            job.profile.max_flow_mm3_s = invalid;
+            assert!(job.render(&never).is_err());
+        }
+        job.profile.max_flow_mm3_s = 0.0;
+        assert!(job.render(&never).is_ok());
+        assert!(job.check(&|| true).is_err());
+    }
+
+    #[test]
+    fn preflight_diagnostic_handles_max_layer() {
+        let mut job = job_with(vec![square(0.2, u32::MAX, PathKind::Outer)]);
+        job.paths[0].pts[0][0] = f64::NAN;
+        let issues = job.check(&never).unwrap();
+        assert!(issues.iter().any(|i| i.error && i.text.contains("4294967296")));
     }
 
     #[test]
