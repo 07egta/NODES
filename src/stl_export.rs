@@ -120,6 +120,14 @@ pub fn gather_meshes(trees: &[Tree]) -> Result<(Vec<Mesh>, usize), String> {
                 }
                 meshes.push(mesh.as_ref().clone());
             }
+            Value::Brep(b) => {
+                let mesh = b.preview();
+                triangles = triangles.saturating_add(mesh.triangles.len());
+                if triangles > MAX_TRIANGLES {
+                    return Err("形状が大きすぎます。分割数または複製数を減らしてください。".into());
+                }
+                meshes.push(mesh.as_ref().clone());
+            }
             _ => skipped += 1,
         }
     }

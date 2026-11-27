@@ -22,6 +22,10 @@ pub enum DataType {
     Surface,
     Solid,
     DisplayGeometry,
+    /// Exact SolidCraft-kernel B-rep (solid or sheet); see `kernel_bridge`.
+    Brep,
+    /// SubD / T-spline control cage; see `subd`.
+    Cage,
     /// A G-code job (printer, settings, toolpaths). See `gcode_job.rs`.
     Gcode,
 }
@@ -37,6 +41,8 @@ impl DataType {
             Self::Surface => "数学曲面",
             Self::Solid => "B-rep 立体",
             Self::DisplayGeometry => "表示形状",
+            Self::Brep => "厳密 B-rep",
+            Self::Cage => "SubD ケージ",
             Self::Gcode => "Gコード",
         }
     }
@@ -55,6 +61,8 @@ impl DataType {
                         | Self::Mesh
                         | Self::Surface
                         | Self::Solid
+                        | Self::Brep
+                        | Self::Cage
                 ))
             || (source == Self::DisplayGeometry
                 && matches!(
@@ -65,6 +73,8 @@ impl DataType {
                         | Self::Mesh
                         | Self::Surface
                         | Self::Solid
+                        | Self::Brep
+                        | Self::Cage
                 ))
     }
 }
@@ -474,6 +484,40 @@ pub enum NodeKind {
     GridArray3d,
     Gyroid,
     RevolvePoints,
+    // Exact NURBS / B-rep / T-spline nodes on the vendored SolidCraft kernel (`nurbs_nodes`).
+    ExactBox,
+    ExactCylinder,
+    ExactSphere,
+    ExactExtrude,
+    ExactRevolve,
+    ExactLoft,
+    ExactLoftSurface,
+    ExactSweep1,
+    ExactSweep2,
+    ExactNetworkSurface,
+    ExactRebuildCurve,
+    ExactCurveCurve,
+    ExactCurveBrep,
+    ExactBrepBrep,
+    ExactUnion,
+    ExactDifference,
+    ExactIntersection,
+    ExactFillet,
+    ExactChamfer,
+    ExactShell,
+    ExactCapHoles,
+    ExactBrepMesh,
+    ExactMove,
+    ExactVolume,
+    ExactStepExport,
+    ExactStepImport,
+    SubdBoxCage,
+    SubdCylinderCage,
+    SubdSubdivide,
+    SubdCrease,
+    SubdExtrudeFace,
+    SubdToBrep,
+    SubdToMesh,
     // G-code nodes (see `gcode_nodes.rs`); appended, serde names are snake_case.
     GcodePrinter,
     GcodeSlice,
@@ -828,6 +872,39 @@ impl NodeKind {
             Self::GridArray3d,
             Self::Gyroid,
             Self::RevolvePoints,
+            Self::ExactBox,
+            Self::ExactCylinder,
+            Self::ExactSphere,
+            Self::ExactExtrude,
+            Self::ExactRevolve,
+            Self::ExactLoft,
+            Self::ExactLoftSurface,
+            Self::ExactSweep1,
+            Self::ExactSweep2,
+            Self::ExactNetworkSurface,
+            Self::ExactRebuildCurve,
+            Self::ExactCurveCurve,
+            Self::ExactCurveBrep,
+            Self::ExactBrepBrep,
+            Self::ExactUnion,
+            Self::ExactDifference,
+            Self::ExactIntersection,
+            Self::ExactFillet,
+            Self::ExactChamfer,
+            Self::ExactShell,
+            Self::ExactCapHoles,
+            Self::ExactBrepMesh,
+            Self::ExactMove,
+            Self::ExactVolume,
+            Self::ExactStepExport,
+            Self::ExactStepImport,
+            Self::SubdBoxCage,
+            Self::SubdCylinderCage,
+            Self::SubdSubdivide,
+            Self::SubdCrease,
+            Self::SubdExtrudeFace,
+            Self::SubdToBrep,
+            Self::SubdToMesh,
             Self::GcodePrinter,
             Self::GcodeSlice,
             Self::GcodeContour,
@@ -1463,6 +1540,7 @@ impl NodeKind {
             other if crate::surface_nodes::KINDS.contains(&other) => {
                 crate::surface_nodes::spec(other)
             }
+            other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             Self::MeshArea
             | Self::MeshVolume
@@ -1753,6 +1831,10 @@ pub enum Value {
     Mesh(Arc<Mesh>),
     Surface(Arc<crate::surface_kernel::SurfaceValue>),
     Solid(Arc<crate::surface_kernel::ClosedSolid>),
+    /// Exact B-rep from the SolidCraft kernel.
+    Brep(Arc<crate::kernel_bridge::BrepValue>),
+    /// SubD / T-spline control cage.
+    Cage(Arc<crate::subd::Cage>),
     Gcode(Arc<crate::gcode_job::GcodeJob>),
 }
 impl Value {
@@ -1764,6 +1846,8 @@ impl Value {
             Self::Mesh(_) => DataType::Mesh,
             Self::Surface(_) => DataType::Surface,
             Self::Solid(_) => DataType::Solid,
+            Self::Brep(_) => DataType::Brep,
+            Self::Cage(_) => DataType::Cage,
             Self::Gcode(_) => DataType::Gcode,
         }
     }
@@ -1781,6 +1865,8 @@ impl Value {
                 .saturating_add(m.triangles.len().saturating_mul(3)),
             Self::Surface(s) => s.weight(),
             Self::Solid(s) => s.weight(),
+            Self::Brep(b) => b.weight(),
+            Self::Cage(c) => c.weight(),
             Self::Gcode(j) => j.weight(),
         }
     }

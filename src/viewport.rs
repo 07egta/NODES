@@ -896,8 +896,16 @@ impl Viewport {
                             5u8.hash(&mut hasher);
                             (Arc::as_ptr(s.preview()) as usize).hash(&mut hasher);
                         }
-                        Value::Gcode(j) => {
+                        Value::Brep(b) => {
                             6u8.hash(&mut hasher);
+                            (Arc::as_ptr(b.preview()) as usize).hash(&mut hasher);
+                        }
+                        Value::Cage(c) => {
+                            7u8.hash(&mut hasher);
+                            (Arc::as_ptr(c.preview()) as usize).hash(&mut hasher);
+                        }
+                        Value::Gcode(j) => {
+                            8u8.hash(&mut hasher);
                             (Arc::as_ptr(j) as usize).hash(&mut hasher);
                         }
                     }
@@ -976,6 +984,14 @@ impl Viewport {
                         Value::Solid(s) => {
                             add_mesh(&mut scene, s.preview(), item.node_id, item.selected);
                             scene.mesh_sources.push(Arc::clone(s.preview()));
+                        }
+                        Value::Brep(b) => {
+                            add_mesh(&mut scene, b.preview(), item.node_id, item.selected);
+                            scene.mesh_sources.push(Arc::clone(b.preview()));
+                        }
+                        Value::Cage(c) => {
+                            add_mesh(&mut scene, c.preview(), item.node_id, item.selected);
+                            scene.mesh_sources.push(Arc::clone(c.preview()));
                         }
                         Value::Gcode(job) => {
                             add_gcode(&mut scene, job, item.node_id, item.selected);

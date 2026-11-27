@@ -96,6 +96,7 @@ Cargo manifest の license フィールドは上流作者の宣言であり、�
 | [serde 1.0.229](https://crates.io/crates/serde/1.0.229) | 保存データ。`derive, rc` | `MIT OR Apache-2.0` | 1.56 |
 | [serde_json 1.0.154](https://crates.io/crates/serde_json/1.0.154) | JSON 保存形式 | `MIT OR Apache-2.0` | 1.71 |
 | [xml-rs 0.8.29](https://crates.io/crates/xml-rs/0.8.29) | 公開 XML に基づく GHX 読み書き | `MIT` | 1.70 |
+| solidcraft-geom / solidcraft-kernel 0.26.0（path, `crates/sc-*`） | 厳密 NURBS / B-rep / T-spline / STEP。SolidCraft から取り込み、truck の修正版を `[patch.crates-io]` で `vendor/` から使う。[SOLIDCRAFT_CHANGES.md](SOLIDCRAFT_CHANGES.md) | `MIT OR Apache-2.0`（truck は `Apache-2.0`） | 1.88（NODES 側で宣言） |
 
 スクリプトの機能フラグだけで安全性を証明したとは扱わない。実行制限と API 登録方針は [ARCHITECTURE.md](ARCHITECTURE.md) と実装で管理する。
 

@@ -42,7 +42,7 @@ WindowsでランタイムDLLが見つからない場合は、[Microsoft公式の
 
 ## 現在の実装範囲
 
-選択欄に **298種類**、定義から作るClusterを含めて **299種類の登録**があります。登録数は完全実装数・Grasshopper互換性の検証数ではありません。機能ごとの範囲は [ノード対応表](NODE_COVERAGE.md) に記載しています。
+Cluster を含む **370 種類**のノードが登録されています。このうち **精密曲面**には SolidCraft の機能を使う 33 種類があります。機能ごとの範囲は [ノード対応表](NODE_COVERAGE.md) と [精密形状の範囲](docs/NURBS_ROADMAP.md) に記載しています。
 
 | 分野 | 実装した機能 | 主な制限 |
 |---|---|---|
@@ -50,11 +50,11 @@ WindowsでランタイムDLLが見つからない場合は、[Microsoft公式の
 | Data Tree | Path・枝、Flatten/Graft/Simplify、リスト演算、Path Mapper制限構文、Shortest/Longest/Cross | native Null、一般の混合アクセス、GH全件の期待値比較が未完了 |
 | 数学・ベクトル | 四則、三角/指数/対数、統計、集合、補間、行列、点と座標変換 | Boolean・Vector・Domainは専用の値型へ移行予定 |
 | 曲線 | 解析曲線、Bezier/B-spline/NURBS、評価、導関数、長さ、分割、変換 | 数学的な曲線と表示点列を分離。一般交差・オフセット・フィレットの対応は限定 |
-| 曲面・ソリッド | NURBS・解析曲面、押し出し、ルールド面、回転面、Iso Curve、法線、曲率 | B-rep演算は箱などの限定ケース。一般のトリム・Boolean・Fillet・Shellは未完成 |
+| 曲面・ソリッド | NURBS、曲面評価、SolidCraft の B-rep プリミティブ、ロフト、スイープ、ブーリアン、フィレット | 曲面交差はメッシュ近似。シェルなどは対応形状が限定。[精密形状の範囲](docs/NURBS_ROADMAP.md) |
 | Mesh / SubD | 構築、面積・体積、境界/非多様体診断、溶接、平滑化、細分化、限定修復 | 永続SubD/Crease、一般メッシュBoolean、完全な自己交差・肉厚判定は未完成 |
 | 生成デザイン | グリッド、2D Voronoi/Delaunay/Convex Hull、配置、場、ノイズ、変形 | 3D Voronoi、一般Morph/Flow/最適化は未完成 |
 | 編集・表示 | 日本語/英語検索、最近使ったノード、Undo/Redo、複数選択、整列、グループ、注釈、ツリー表示、ライト/ダーク | 大規模画面のフレーム時間、各DPI、Intel Arc、最新Windows GUIの計測は未実施 |
-| ファイル | native JSON、STL/OBJ、試験的3MF、限定GHX解析/変換 | GH binary、STEP/IGES/3DM/glTFは未対応。未知nativeノードは読み込み拒否で元ファイルを保護 |
+| ファイル | native JSON、STL/OBJ、STEP、試験的3MF、限定GHX解析/変換 | GH binary、IGES/3DM/glTFは未対応。STEP は精密曲面のノードから読み書き |
 | 拡張・自動化 | 制限付きRhai、数式、Cluster、安全なJSONグラフAPI | 外部プラグインABI、GH Script互換、一般MCPサーバーは未完成 |
 
 > **ノードの選び方（ノード棚・アイコン・★お気に入り・おすすめ次のノード・Space で検索）の確認状況：** コンパイルもテスト実行もしていません。CIが最初の確認になります。カテゴリ分け・候補の絞り込み・お気に入りの保存形式の単体テストを `src/node_shelf.rs` に、アイコン表の確認を `src/node_icons.rs` に書きましたが、実行はしていません。使い方は [使い方](docs/USER_GUIDE_JA.md) の「ノードの選び方」を参照してください。
