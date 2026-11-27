@@ -22,7 +22,7 @@ type Glyph = &'static [Part];
 
 const GENERIC: Glyph = &[Part::Ring([0.5, 0.5, 0.34]), Part::Dot([0.5, 0.5])];
 
-const BOX: Glyph = &[
+pub(crate) const BOX: Glyph = &[
     Part::Line(&[
         [0.5, 0.12],
         [0.85, 0.3],
@@ -39,7 +39,7 @@ const MOVE: Glyph = &[
     Part::Line(&[[0.65, 0.3], [0.88, 0.5], [0.65, 0.7]]),
 ];
 
-const EXPORT: Glyph = &[
+pub(crate) const EXPORT: Glyph = &[
     Part::Line(&[[0.15, 0.5], [0.15, 0.85], [0.85, 0.85], [0.85, 0.5]]),
     Part::Line(&[[0.5, 0.12], [0.5, 0.65]]),
     Part::Line(&[[0.35, 0.27], [0.5, 0.12], [0.65, 0.27]]),
@@ -647,7 +647,7 @@ pub fn paint(painter: &egui::Painter, rect: Rect, kind: NodeKind, category: &str
     draw(painter, rect, glyph, color);
 }
 
-fn draw(painter: &egui::Painter, rect: Rect, glyph: Glyph, color: Color32) {
+pub(crate) fn draw(painter: &egui::Painter, rect: Rect, glyph: Glyph, color: Color32) {
     let inner = rect.shrink(rect.width() * 0.16);
     let at = |p: [f32; 2]| {
         Pos2::new(

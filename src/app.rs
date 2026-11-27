@@ -6,13 +6,13 @@ use crate::{
     diagnostics_ui::DiagnosticsWindow,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
-    node_icons,
+    melt, node_icons,
     node_shelf::{self, ShelfAction},
     theme,
     ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
 };
-use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
+use eframe::egui::{self, Align, Color32, FontId, Layout, Rect, RichText, Sense, Stroke};
 use nodes::{
     annotations, cluster,
     diagnostics::{self, DiagnosticReport},
@@ -1111,198 +1111,343 @@ impl NodesApp {
     }
     fn topbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("topbar")
+            .exact_height(44.)
             .frame(
                 egui::Frame::new()
                     .fill(theme::toolbar_bg())
                     .inner_margin(egui::Margin::symmetric(10, 6)),
             )
             .show(ctx, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(22., 22.), Sense::hover());
-                    let a = r.left_bottom() + egui::vec2(3., -4.);
-                    let b = r.center_top() + egui::vec2(0., 4.);
-                    let c = r.right_bottom() - egui::vec2(3., 4.);
-                    for pair in [[a, b], [b, c], [a, c]] {
-                        ui.painter()
-                            .line_segment(pair, Stroke::new(1.8_f32, theme::teal()));
-                    }
-                    for p in [a, b, c] {
-                        ui.painter().circle_filled(p, 2.6, theme::teal());
-                    }
-                    ui.label(
-                        RichText::new("NODES")
-                            .strong()
-                            .size(18.)
-                            .color(theme::ink()),
-                    );
-                    ui.separator();
-                    ui.menu_button("ファイル", |ui| {
-                        if ui.button("新規作品").clicked() {
-                            self.request(PendingAction::New, ctx);
-                            ui.close();
+                let full = ui.available_rect_before_wrap();
+                let wide = full.width() >= 1100.;
+                let labels = full.width() >= 900.;
+                // Left: file. Centre: compute status. Right: view toggles.
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(full)
+                        .layout(Layout::left_to_right(Align::Center)),
+                    |ui| {
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(22., 22.), Sense::hover());
+                        let a = r.left_bottom() + egui::vec2(3., -4.);
+                        let b = r.center_top() + egui::vec2(0., 4.);
+                        let c = r.right_bottom() - egui::vec2(3., 4.);
+                        for pair in [[a, b], [b, c], [a, c]] {
+                            ui.painter()
+                                .line_segment(pair, Stroke::new(1.8_f32, theme::teal()));
                         }
-                        if ui.button("開く  Ctrl+O").clicked() {
-                            self.open_dialog(ctx);
-                            ui.close();
+                        for p in [a, b, c] {
+                            ui.painter().circle_filled(p, 2.6, theme::teal());
                         }
-                        if ui.button("保存  Ctrl+S").clicked() {
-                            self.save(false);
-                            ui.close();
-                        }
-                        if ui.button("名前を付けて保存").clicked() {
-                            self.save(true);
-                            ui.close();
-                        }
+                        ui.label(
+                            RichText::new("NODES")
+                                .strong()
+                                .size(18.)
+                                .color(theme::ink()),
+                        );
                         ui.separator();
-                        if ui.button("STL / OBJ 書き出し").clicked() {
-                            self.stl_export.open_dialog();
-                            ui.close();
-                        }
-                        if ui.button("G-code（花瓶モード・未検証）").clicked() {
-                            self.gcode.open();
-                            ui.close();
-                        }
-                    });
-                    ui.menu_button("編集", |ui| {
-                        if ui
-                            .add_enabled(
-                                self.history.can_undo(),
-                                egui::Button::new("元に戻す  Ctrl+Z"),
-                            )
-                            .clicked()
-                        {
-                            self.undo();
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(
-                                self.history.can_redo(),
-                                egui::Button::new("やり直す  Ctrl+Y"),
-                            )
-                            .clicked()
-                        {
-                            self.redo();
-                            ui.close();
-                        }
-                        ui.separator();
-                        let selected = !self.canvas.selected.is_empty();
-                        if ui
-                            .add_enabled(selected, egui::Button::new("コピー  Ctrl+C"))
-                            .clicked()
-                        {
-                            self.copy_selected();
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(
-                                !self.clipboard.is_empty(),
-                                egui::Button::new("貼り付け  Ctrl+V"),
-                            )
-                            .clicked()
-                        {
-                            self.paste_selected();
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(selected, egui::Button::new("複製  Ctrl+D"))
-                            .clicked()
-                        {
-                            self.duplicate_selected();
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(selected, egui::Button::new("グループ  Ctrl+G"))
-                            .clicked()
-                        {
-                            self.make_group();
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(selected, egui::Button::new("削除  Delete"))
-                            .clicked()
-                        {
-                            self.delete_selected();
-                            ui.close();
-                        }
-                    });
-                    ui.menu_button("表示", |ui| {
-                        ui.checkbox(&mut self.show_library, "ノードライブラリ");
-                        ui.checkbox(&mut self.show_workspace, "3D と設定");
-                        if ui.button("診断と処理時間").clicked() {
-                            self.diagnostics_window.open = true;
-                            ui.close();
-                        }
-                        if ui.button("選択にズーム  Shift+F").clicked() {
-                            self.canvas.fit_selection_requested = true;
-                            ui.close();
-                        }
-                        if ui.button("全体表示  F").clicked() {
-                            self.canvas.fit_requested = true;
-                            self.fit_preview();
-                            ui.close();
-                        }
-                        ui.menu_button("テーマ", |ui| {
-                            for mode in theme::Mode::ALL {
-                                if ui
-                                    .selectable_label(self.theme_mode == mode, mode.label())
-                                    .clicked()
-                                {
-                                    self.set_theme(mode, ctx);
-                                    ui.close();
-                                }
+                        ui.menu_button("ファイル", |ui| {
+                            if ui.button("新規作品").clicked() {
+                                self.request(PendingAction::New, ctx);
+                                ui.close();
+                            }
+                            if ui.button("開く  Ctrl+O").clicked() {
+                                self.open_dialog(ctx);
+                                ui.close();
+                            }
+                            if ui.button("保存  Ctrl+S").clicked() {
+                                self.save(false);
+                                ui.close();
+                            }
+                            if ui.button("名前を付けて保存").clicked() {
+                                self.save(true);
+                                ui.close();
+                            }
+                            ui.separator();
+                            if ui.button("STL / OBJ 書き出し").clicked() {
+                                self.stl_export.open_dialog();
+                                ui.close();
+                            }
+                            if ui.button("G-code（花瓶モード・未検証）").clicked() {
+                                self.gcode.open();
+                                ui.close();
                             }
                         });
-                    });
-                    ui.menu_button("作例・ヘルプ", |ui| {
-                        if ui.button("作品例").clicked() {
-                            self.template_open = true;
-                            ui.close();
-                        }
-                        if ui.button("ノード辞典  F1").clicked() {
-                            self.help_window.open_index();
-                            ui.close();
-                        }
-                        if ui.button("使い方").clicked() {
-                            self.help_open = true;
-                            ui.close();
-                        }
-                        if ui.button("キー操作一覧").clicked() {
-                            self.shortcuts_open = true;
-                            ui.close();
-                        }
-                    });
-                    ui.separator();
-                    if ui
-                        .small_button("＋ ノード")
-                        .on_hover_text("Tab / Ctrl+K")
-                        .clicked()
-                    {
-                        self.open_palette(self.canvas.center_for_add(&self.project), None);
-                    }
-                    if ui.small_button("保存").on_hover_text("Ctrl+S").clicked() {
-                        self.save(false);
-                    }
-                    if ui.button("書き出し").on_hover_text("STL / OBJ").clicked() {
-                        self.stl_export.open_dialog();
-                    }
-                    let name_width = ui.available_width().min(170.);
-                    if name_width >= 100. {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut self.project.name)
-                                .desired_width(name_width)
-                                .frame(false),
-                        )
-                        .on_hover_text("作品名を編集");
-                    } else {
-                        ui.menu_button("作品名", |ui| {
-                            ui.text_edit_singleline(&mut self.project.name);
+                        ui.menu_button("編集", |ui| {
+                            if ui
+                                .add_enabled(
+                                    self.history.can_undo(),
+                                    egui::Button::new("元に戻す  Ctrl+Z"),
+                                )
+                                .clicked()
+                            {
+                                self.undo();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(
+                                    self.history.can_redo(),
+                                    egui::Button::new("やり直す  Ctrl+Y"),
+                                )
+                                .clicked()
+                            {
+                                self.redo();
+                                ui.close();
+                            }
+                            ui.separator();
+                            let selected = !self.canvas.selected.is_empty();
+                            if ui
+                                .add_enabled(selected, egui::Button::new("コピー  Ctrl+C"))
+                                .clicked()
+                            {
+                                self.copy_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(
+                                    !self.clipboard.is_empty(),
+                                    egui::Button::new("貼り付け  Ctrl+V"),
+                                )
+                                .clicked()
+                            {
+                                self.paste_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("複製  Ctrl+D"))
+                                .clicked()
+                            {
+                                self.duplicate_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("グループ  Ctrl+G"))
+                                .clicked()
+                            {
+                                self.make_group();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("削除  Delete"))
+                                .clicked()
+                            {
+                                self.delete_selected();
+                                ui.close();
+                            }
                         });
-                    }
-                    if self.dirty {
-                        ui.label(theme::small("未保存"));
-                    }
-                });
+                        ui.menu_button("表示", |ui| {
+                            ui.checkbox(&mut self.show_library, "ノードライブラリ");
+                            ui.checkbox(&mut self.show_workspace, "3D と設定");
+                            if ui.button("診断と処理時間").clicked() {
+                                self.diagnostics_window.open = true;
+                                ui.close();
+                            }
+                            if ui.button("選択にズーム  Shift+F").clicked() {
+                                self.canvas.fit_selection_requested = true;
+                                ui.close();
+                            }
+                            if ui.button("全体表示  F").clicked() {
+                                self.canvas.fit_requested = true;
+                                self.fit_preview();
+                                ui.close();
+                            }
+                            ui.menu_button("テーマ", |ui| {
+                                for mode in theme::Mode::ALL {
+                                    if ui
+                                        .selectable_label(self.theme_mode == mode, mode.label())
+                                        .clicked()
+                                    {
+                                        self.set_theme(mode, ctx);
+                                        ui.close();
+                                    }
+                                }
+                            });
+                        });
+                        ui.menu_button("作例・ヘルプ", |ui| {
+                            if ui.button("作品例").clicked() {
+                                self.template_open = true;
+                                ui.close();
+                            }
+                            if ui.button("ノード辞典  F1").clicked() {
+                                self.help_window.open_index();
+                                ui.close();
+                            }
+                            if ui.button("使い方").clicked() {
+                                self.help_open = true;
+                                ui.close();
+                            }
+                            if ui.button("キー操作一覧").clicked() {
+                                self.shortcuts_open = true;
+                                ui.close();
+                            }
+                        });
+                        ui.separator();
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Plus,
+                            "ノード",
+                            "ノードを追加  Tab / Ctrl+K",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.open_palette(self.canvas.center_for_add(&self.project), None);
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Open,
+                            "開く",
+                            "開く  Ctrl+O",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.open_dialog(ctx);
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Save,
+                            "保存",
+                            "保存  Ctrl+S",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.save(false);
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Export,
+                            "書き出し",
+                            "STL / OBJ 書き出し",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.stl_export.open_dialog();
+                        }
+                        let name_width = (full.width() * 0.5 - ui.cursor().left() + full.left()
+                            - 150.)
+                            .clamp(0., 170.);
+                        if name_width >= 80. {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.project.name)
+                                    .desired_width(name_width)
+                                    .frame(false),
+                            )
+                            .on_hover_text("作品名を編集");
+                            if self.dirty {
+                                ui.label(theme::small("未保存"));
+                            }
+                        }
+                    },
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(full)
+                        .layout(Layout::right_to_left(Align::Center)),
+                    |ui| {
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Fit,
+                            "全体",
+                            "全体表示  F",
+                            false,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.fit_requested = true;
+                            self.fit_preview();
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Diag,
+                            "診断",
+                            "エラー原因候補と処理時間",
+                            self.diagnostics_window.open,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.diagnostics_window.open = !self.diagnostics_window.open;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Map,
+                            "地図",
+                            "ミニマップの表示切替",
+                            !self.canvas.hide_minimap,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.hide_minimap = !self.canvas.hide_minimap;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Cube,
+                            "3D",
+                            "3D と設定パネル",
+                            self.show_workspace,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.show_workspace = !self.show_workspace;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Library,
+                            "ライブラリ",
+                            "ノードライブラリ",
+                            self.show_library,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.show_library = !self.show_library;
+                        }
+                    },
+                );
+                if full.width() >= 820. {
+                    let centre =
+                        Rect::from_center_size(full.center(), egui::vec2(280., full.height()));
+                    ui.scope_builder(
+                        egui::UiBuilder::new()
+                            .max_rect(centre)
+                            .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+                        |ui| self.compute_status(ui),
+                    );
+                }
             });
+    }
+    /// Short compute status for the middle of the top bar.
+    fn compute_status(&self, ui: &mut egui::Ui) {
+        if self.stale() {
+            ui.label(RichText::new("◌ 計算中…").size(12.).color(theme::muted()));
+        } else if let Some(e) = &self.evaluation {
+            let errors = e.outputs.values().filter(|r| r.is_err()).count();
+            if errors == 0 {
+                ui.label(
+                    RichText::new(format!("● 更新済み · {:.0} ms", e.elapsed_ms))
+                        .size(12.)
+                        .color(theme::teal()),
+                );
+            } else {
+                let response = ui.label(
+                    RichText::new(format!("● {errors} 個のノードにエラー"))
+                        .size(12.)
+                        .color(theme::error()),
+                );
+                if let Some(line) = self.error_line(e) {
+                    response.on_hover_text(line);
+                }
+            }
+        }
     }
     fn library(&mut self, ctx: &egui::Context) {
         let width = ctx.available_rect().width();
