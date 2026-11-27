@@ -159,6 +159,13 @@ PR、main / evolve / develop ブランチの push、手動実行に対応。使�
 
 workflow の YAML 構造と必須 step の失敗・skip が成功扱いされないことを確認している。成功 CI の記録には回収した出力の SHA-256 と検証範囲を残す。通常CIの結果は診断runと分けて記録する。Windows CI が成功しても、Windows 11 GUI 操作、Intel Arc 描画、3D プリント実機の検証を代替しない。
 
+## NURBS カーネル候補の評価（未採用・依存は追加していない）
+
+[NURBS_ROADMAP.md](NURBS_ROADMAP.md) の M1 で、`truck-*`（Apache-2.0）と `curvo`（MIT）を隔離した検証プロジェクトでビルド・実行し比較した。結果、`Cargo.toml` と `Cargo.lock` は変更せず、上記の監査件数・notice にも影響しない。採用する場合は、そのマイルストーンで本節を更新し、依存追加後の metadata から台帳を再生成すること。
+
+- `truck-meshalgo` は `vtkio` → `xz2` → `lzma-sys` を必須で引き込み、C ソース同梱の `-sys` crate が入る。[言語方針](LANGUAGE_POLICY.md) の「Rust only」に抵触しうるため、採用時は境界と配布影響を記録する。
+- 検証プロジェクトの依存全体で GPL / AGPL 宣言はなかった。`r-efi` の `LGPL-2.1-or-later` は MIT を選べる三択宣言であり、既存方針と同じ扱いにする。
+
 ## 再開する作業
 
 1. Cargo.lock・notice・台帳が変わった際はmanifest inventoryを再生成し、source SHAとartifactの出典を更新する。

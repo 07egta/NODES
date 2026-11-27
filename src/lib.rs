@@ -31,3 +31,4 @@ pub mod math_nodes;
 pub mod surface_curvature;
 pub mod surface_kernel;
 pub mod surface_nodes;
+pub mod tolerance;
