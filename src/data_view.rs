@@ -232,14 +232,24 @@ fn page_control(ui: &mut egui::Ui, id: egui::Id, count: usize, size: usize) -> (
     let last = count.saturating_sub(1) / size;
     if last > 0 {
         ui.horizontal_wrapped(|ui| {
-            if ui.add_enabled(page > 0, egui::Button::new("前へ")).clicked() {
+            if ui
+                .add_enabled(page > 0, egui::Button::new("前へ"))
+                .clicked()
+            {
                 page -= 1;
             }
             ui.label(format!("{} / {}", page + 1, last + 1));
-            if ui.add_enabled(page < last, egui::Button::new("次へ")).clicked() {
+            if ui
+                .add_enabled(page < last, egui::Button::new("次へ"))
+                .clicked()
+            {
                 page += 1;
             }
-            ui.add(egui::DragValue::new(&mut page).range(0..=last).prefix("頁 (0始まり) "));
+            ui.add(
+                egui::DragValue::new(&mut page)
+                    .range(0..=last)
+                    .prefix("頁 (0始まり) "),
+            );
         });
     }
     let (page, start, end) = page_bounds(count, page, size);
