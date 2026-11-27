@@ -4,6 +4,7 @@ mod canvas;
 mod data_view;
 mod file_picker;
 mod gcode_ui;
+mod getting_started;
 mod help;
 mod math_mapper_ui;
 mod script_ui;

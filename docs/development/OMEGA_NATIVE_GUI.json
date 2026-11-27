@@ -1,0 +1,65 @@
+{
+  "updated_at": "2026-11-27T09:14:56+09:00",
+  "source_commit": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+  "binary_sha256": "f9990b360dff6ed5ed978146a9b65c7d6f1193ca9682a73f62b3ea60de3b017c",
+  "platform": "Linux X11 virtual desktop; not Windows/Intel Arc",
+  "desktop_resolution": [
+    1364,
+    1024
+  ],
+  "initial_environment_issue": "The desktop had no window manager, so native numeric keyboard events lacked focus. Started installed xfwm4 without changing preferences; repeated the workflow with real focus. No product code was changed for this environment issue.",
+  "steps": [
+    {
+      "action": "Inspector Number +0 to -0 and Atan2(y,-1)",
+      "observed": "Number displayed -0; output -3.1416; project dirty"
+    },
+    {
+      "action": "Ctrl+Z then Ctrl+Y",
+      "observed": "Number +0/output +3.1416, then -0/output -3.1416"
+    },
+    {
+      "action": "Ctrl+S; close; restart same release binary with saved project",
+      "observed": "Saved -0 and output -3.1416 survived; no unsaved marker"
+    },
+    {
+      "action": "Independently read saved JSON and run nodes-cli evaluate",
+      "observed": "Number bits 8000000000000000; exact output -3.141592653589793"
+    },
+    {
+      "action": "Open two boxes that touch at one vertex",
+      "observed": "Viewport dimensions40x40x40mm,24triangles,1non-manifold vertex; volume/weight undetermined"
+    },
+    {
+      "action": "Open export dialog and select split files",
+      "observed": "2bodies/24triangles; matching1non-manifold vertex diagnostic; actual split file export still pending"
+    }
+  ],
+  "screenshots": {
+    "omega-contact-viewport.jpg": {
+      "bytes": 145072,
+      "sha256": "b4302e094354163f22f884963940550217be51e1298754bbdfa7a1ba8d237487"
+    },
+    "omega-export-before.jpg": {
+      "bytes": 191971,
+      "sha256": "22b9ad48bfa3f675c0e36825e0ca3e910c76bfdd862865cf2aa78132aeab0223"
+    },
+    "omega-help-before.jpg": {
+      "bytes": 149117,
+      "sha256": "341363b6e2e8ee5b83a17b79135faeb206a7389ccbbe2a1389d92a62381623f1"
+    },
+    "omega-signed-zero-entered.jpg": {
+      "bytes": 127986,
+      "sha256": "3d0db86e1c8a982567db364d4667492eb88057c0066187c3f01c36264e447ca2"
+    },
+    "omega-signed-zero-reopened.jpg": {
+      "bytes": 127692,
+      "sha256": "889dbd2b7ed6792c269f41e4cf240e929b669888e7e4b4113d22678589eda359"
+    }
+  },
+  "remaining": [
+    "Native canvas direct typing after new UI build",
+    "Responsive help/export at smaller logical sizes and both themes",
+    "Actual split export and independent STL parse",
+    "Windows native GUI, Intel Arc, physical printing"
+  ]
+}

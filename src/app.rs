@@ -1932,21 +1932,27 @@ impl MorphletApp {
             .open(&mut open)
             .collapsible(false)
             .default_width(520.)
+            .max_width((ctx.content_rect().width() - 64.0).clamp(280.0, 520.0))
             .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
                 ui.label(theme::small(
                     "? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。",
                 ));
                 ui.add_space(8.);
-                egui::Grid::new("shortcut_grid")
-                    .num_columns(2)
-                    .spacing([28., 7.])
+                egui::ScrollArea::vertical()
+                    .id_salt("keyboard_shortcuts_body")
+                    .max_height((ctx.content_rect().height() - 150.0).max(160.0))
                     .show(ui, |ui| {
-                        for (keys, what) in ui_polish::SHORTCUTS {
-                            ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
-                            ui.label(RichText::new(*what).size(12.));
-                            ui.end_row();
-                        }
+                        egui::Grid::new("shortcut_grid")
+                            .num_columns(2)
+                            .spacing([28., 7.])
+                            .show(ui, |ui| {
+                                for (keys, what) in ui_polish::SHORTCUTS {
+                                    ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
+                                    ui.label(RichText::new(*what).size(12.));
+                                    ui.end_row();
+                                }
+                            });
                     });
             });
         self.shortcuts_open = open;
@@ -2080,24 +2086,12 @@ impl MorphletApp {
         }
     }
     fn help_dialog(&mut self, ctx: &egui::Context) {
-        if !self.help_open {
-            return;
+        match crate::getting_started::show(ctx, &mut self.help_open, &mut self.ui_scale) {
+            Some(crate::getting_started::Action::Examples) => self.template_open = true,
+            Some(crate::getting_started::Action::Dictionary) => self.help_window.open_index(),
+            Some(crate::getting_started::Action::Shortcuts) => self.shortcuts_open = true,
+            None => {}
         }
-        let mut open = true;
-        egui::Window::new("Morphlet の使い方").open(&mut open).collapsible(false).default_width(570.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.heading("つなぐ。変える。形になる。");ui.add_space(10.);
-            for (title,body) in [("1  作品例を開く","まずは「ねじれの花器」。ノードを選ぶと右下に設定が出ます。"),("2  数値を動かす","スライダーを動かすか、数値を直接入力。形がすぐに変わります。"),("3  処理を追加する","左で「移動」「円形配列」などを検索。選択した形状に自動でつながります。"),("4  線をつなぐ","右の丸から左の丸へドラッグ。または出力→入力の順にクリック。入力の丸を右クリックで切断。"),("5  保存して、つくる",".morph は編集できる作品ファイル。STL はスライサー用、OBJ は3Dソフト用です。")]{
-                ui.label(RichText::new(title).strong());ui.label(body);ui.add_space(8.);
-            }
-            ui.separator();
-            egui::Grid::new("shortcuts").num_columns(2).spacing([24.,6.]).show(ui,|ui|{
-                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("F1","選択中のノードのヘルプ（ノード辞典）"),("Ctrl+E","選択ノードを無効 / 有効"),("Ctrl+G","選択ノードをグループで囲む"),("右クリック（空き）","ここにノード / メモを追加"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
-            });
-            ui.add_space(8.);if ui.button("ノード辞典を開く（全ノードの説明）").clicked(){self.help_window.open_index();}
-            ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
-            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
-        });
-        self.help_open = open;
     }
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
         let Some(action) = self.confirm_action.clone() else {
