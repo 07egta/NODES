@@ -799,6 +799,10 @@ impl CurveGeometry {
             .collect()
     }
     pub fn length_table(&self, cancel: &dyn Fn() -> bool) -> R<LengthTable> {
+        stopped(cancel)?;
+        if let Some(n) = self.as_nurbs().filter(|n| n.degree() == 1) {
+            return self.linear_length_table(n, cancel);
+        }
         let mut table = LengthTable {
             leaves: vec![],
             total: 0.,
@@ -809,6 +813,57 @@ impl CurveGeometry {
             stopped(cancel)?;
             let whole = self.gauss(w[0], w[1], &mut work)?;
             self.refine([w[0], w[1]], whole, 0, &mut work, &mut table, cancel)?;
+        }
+        Ok(table)
+    }
+    /// Each degree-one rational span is a straight segment, even when the
+    /// parameter speed is extremely uneven. Integrating its speed numerically
+    /// can miss almost all its length near a tiny endpoint weight.
+    fn linear_length_table(
+        &self,
+        n: &NurbsCurve,
+        cancel: &dyn Fn() -> bool,
+    ) -> R<LengthTable> {
+        let [a, b] = self.interval;
+        let mut knots = vec![a, b];
+        knots.extend(
+            n.knots()
+                .iter()
+                .copied()
+                .filter(|&k| k > a.min(b) && k < a.max(b)),
+        );
+        knots.sort_by(f64::total_cmp);
+        knots.dedup();
+        if a > b {
+            knots.reverse();
+        }
+        let mut table = LengthTable {
+            leaves: Vec::with_capacity(knots.len() - 1),
+            total: 0.,
+        };
+        for w in knots.windows(2) {
+            stopped(cancel)?;
+            let lo = (w[0] - a) / (b - a);
+            let hi = (w[1] - a) / (b - a);
+            if hi <= lo {
+                return Err("曲線のノット間隔が正規化パラメータの精度を超えています。".into());
+            }
+            let h0 = n.homogeneous(w[0]);
+            let h1 = n.homogeneous(w[1]);
+            let p0 = checked(xyz(h0).map(|v| v / h0[3]))?;
+            let p1 = checked(xyz(h1).map(|v| v / h1[3]))?;
+            let len = norm(sub(p1, p0));
+            table.total += len;
+            if !table.total.is_finite() {
+                return Err("弧長が大きすぎます。".into());
+            }
+            table.leaves.push(LengthLeaf {
+                lo,
+                hi,
+                len,
+                end: table.total,
+                linear_weights: Some([h0[3], h1[3]]),
+            });
         }
         Ok(table)
     }
@@ -863,6 +918,7 @@ impl CurveGeometry {
                     hi,
                     len,
                     end: table.total,
+                    linear_weights: None,
                 });
             }
             Ok(())
@@ -931,6 +987,8 @@ struct LengthLeaf {
     hi: f64,
     len: f64,
     end: f64,
+    // Degree-one spans have a closed-form arc-length inverse. Other spans use quadrature.
+    linear_weights: Option<[f64; 2]>,
 }
 #[derive(Clone, Debug)]
 pub struct LengthTable {
@@ -954,6 +1012,17 @@ impl LengthTable {
         let i = self.leaves.partition_point(|l| l.end < s);
         let leaf = self.leaves.get(i).ok_or("弧長の区間がありません。")?;
         let target = s - (leaf.end - leaf.len);
+        if let Some([w0, w1]) = leaf.linear_weights {
+            stopped(cancel)?;
+            if leaf.len == 0. {
+                return Ok(leaf.lo);
+            }
+            let f = (target / leaf.len).clamp(0., 1.);
+            let t = f * w0 / ((1. - f) * w1 + f * w0);
+            return Ok((leaf.hi - leaf.lo)
+                .mul_add(t, leaf.lo)
+                .clamp(leaf.lo, leaf.hi));
+        }
         let mut lo = leaf.lo;
         let mut hi = leaf.hi;
         let mut work = 0;
