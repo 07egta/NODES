@@ -117,7 +117,7 @@ impl PreviewTest {
         self.results
             .send(ComputeResult {
                 revision: self.app.revision,
-                diagnostics: crate::diagnostics::diagnose(&self.app.project.graph, &evaluation),
+                diagnostics: nodes::diagnostics::diagnose(&self.app.project.graph, &evaluation),
                 evaluation,
             })
             .unwrap_or_else(|_| panic!("completion mailbox closed"));
@@ -239,7 +239,7 @@ fn pending_camera_controls_work_and_stale_worker_results_are_not_published() {
     test.results
         .send(ComputeResult {
             revision: test.app.revision.wrapping_sub(1),
-            diagnostics: crate::diagnostics::diagnose(
+            diagnostics: nodes::diagnostics::diagnose(
                 &test.app.project.graph,
                 &Evaluation::default(),
             ),

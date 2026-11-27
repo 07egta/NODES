@@ -174,6 +174,8 @@ struct WorldSegment {
     b: V3,
     node_id: u64,
     selected: bool,
+    /// Own colour (G-code path preview). None = the normal curve colour.
+    color: Option<[u8; 3]>,
 }
 
 struct WorldPoint {
@@ -894,6 +896,10 @@ impl Viewport {
                             5u8.hash(&mut hasher);
                             (Arc::as_ptr(s.preview()) as usize).hash(&mut hasher);
                         }
+                        Value::Gcode(j) => {
+                            6u8.hash(&mut hasher);
+                            (Arc::as_ptr(j) as usize).hash(&mut hasher);
+                        }
                     }
                 }
             }
@@ -970,6 +976,9 @@ impl Viewport {
                         Value::Solid(s) => {
                             add_mesh(&mut scene, s.preview(), item.node_id, item.selected);
                             scene.mesh_sources.push(Arc::clone(s.preview()));
+                        }
+                        Value::Gcode(job) => {
+                            add_gcode(&mut scene, job, item.node_id, item.selected);
                         }
                     }
                 }
@@ -1165,7 +1174,9 @@ impl Viewport {
             if !Rect::from_two_pos(a, b).expand(3.0).intersects(rect) {
                 continue;
             }
-            let color = if segment.selected {
+            let color = if let (Some(c), false) = (segment.color, segment.selected) {
+                Color32::from_rgb(c[0], c[1], c[2])
+            } else if segment.selected {
                 Color32::from_rgb(29, 156, 126)
             } else if dark {
                 Color32::from_rgb(184, 211, 222)
@@ -1301,6 +1312,30 @@ impl Viewport {
     }
 }
 
+/// Coloured toolpath lines of a G-code job (colours follow the パスプレビュー node).
+fn add_gcode(scene: &mut Scene, job: &nodes::gcode_job::GcodeJob, node_id: u64, selected: bool) {
+    let remaining = MAX_SEGMENTS.saturating_sub(scene.segments.len());
+    if remaining == 0 {
+        scene.reduced = true;
+        return;
+    }
+    for (a, b, color) in job.preview_segments(remaining) {
+        if !valid(a) || !valid(b) {
+            scene.invalid += 1;
+            continue;
+        }
+        scene.include(a);
+        scene.include(b);
+        scene.segments.push(WorldSegment {
+            a,
+            b,
+            node_id,
+            selected,
+            color: Some(color),
+        });
+    }
+}
+
 fn add_curve(scene: &mut Scene, curve: &Curve, node_id: u64, selected: bool) {
     let remaining = MAX_SEGMENTS.saturating_sub(scene.segments.len());
     if remaining == 0 {
@@ -1337,6 +1372,7 @@ fn add_curve(scene: &mut Scene, curve: &Curve, node_id: u64, selected: bool) {
                 b: p,
                 node_id,
                 selected,
+                color: None,
             });
         }
         previous = Some(p);
@@ -1351,6 +1387,7 @@ fn add_curve(scene: &mut Scene, curve: &Curve, node_id: u64, selected: bool) {
             b,
             node_id,
             selected,
+            color: None,
         });
     }
     if n == 1 && valid(curve.points[0]) && scene.points.len() < MAX_POINTS {

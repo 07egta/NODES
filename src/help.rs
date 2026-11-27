@@ -288,6 +288,7 @@ fn type_hint(kind: DataType) -> &'static str {
         DataType::Surface => "数学曲面（メッシュとは別）",
         DataType::Solid => "閉じたB-rep立体",
         DataType::DisplayGeometry => "表示可能な形状（出力）",
+        DataType::Gcode => "Gコード（機種・設定・経路）",
     }
 }
 

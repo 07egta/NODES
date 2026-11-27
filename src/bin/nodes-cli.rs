@@ -145,6 +145,7 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Mesh(_) => "mesh",
         Value::Surface(_) => "surface",
         Value::Solid(_) => "solid",
+        Value::Gcode(_) => "gcode",
     }
 }
 
@@ -161,6 +162,9 @@ fn preview(value: &Value) -> Json {
         }),
         Value::Surface(_) => json!({"kind": "surface"}),
         Value::Solid(_) => json!({"kind": "solid"}),
+        Value::Gcode(job) => json!({
+            "kind": "gcode", "path_count": job.paths.len(), "layers": job.layer_count()
+        }),
     }
 }
 

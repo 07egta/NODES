@@ -253,3 +253,63 @@ impl GcodeDialog {
         save
     }
 }
+
+/// Text box for the 開始Gコード / 終了Gコード nodes. The text is applied when the box
+/// loses focus or the button is pressed, so each key press does not re-run the graph.
+pub fn script_editor(ui: &mut egui::Ui, graph: &mut nodes::model::Graph, id: nodes::model::NodeId) {
+    let Some(node) = graph.node_mut(id) else {
+        return;
+    };
+    ui.add_space(6.);
+    ui.label(RichText::new("G-code の文章").strong());
+    ui.label(theme::small(
+        "1 行に 1 つ。モードが「標準＋文章」「文章のみ」のときだけ使われます。M82 / M83 と G92 E0 は、あとから必ず出力されます。",
+    ));
+    let key = egui::Id::new(("gcode_script_buffer", id));
+    let (mut buffer, mut base): (String, String) = ui
+        .data_mut(|d| d.get_temp::<(String, String)>(key))
+        .unwrap_or_else(|| (node.script.clone(), node.script.clone()));
+    if base != node.script {
+        buffer = node.script.clone();
+        base = node.script.clone();
+    }
+    let response = ui.add(
+        egui::TextEdit::multiline(&mut buffer)
+            .code_editor()
+            .desired_rows(5)
+            .desired_width(f32::INFINITY)
+            .char_limit(nodes::gcode_job::MAX_SCRIPT_BYTES),
+    );
+    let mut apply = response.lost_focus();
+    if ui.button("適用").clicked() {
+        apply = true;
+    }
+    if apply && buffer != node.script {
+        node.script = buffer.clone();
+        base = buffer.clone();
+    }
+    ui.data_mut(|d| d.insert_temp(key, (buffer, base)));
+}
+
+/// What the Gコード書き出し node shows in the inspector. Returns true when the
+/// 書き出す button was pressed.
+pub fn write_panel(ui: &mut egui::Ui, job: Option<&nodes::gcode_job::GcodeJob>) -> bool {
+    ui.add_space(6.);
+    ui.label(RichText::new("書き出し").strong());
+    let Some(job) = job else {
+        ui.label(theme::small(
+            "Gコードがまだありません。上流のノードのエラーを確認してください。",
+        ));
+        return false;
+    };
+    ui.label(theme::small(job.summary()));
+    ui.label(theme::small(
+        "安全チェックでエラーがあると書き出せません。実機では未検証です。初回は必ず印刷を見守ってください。Bambu の .gcode.3mf は未対応（TODO）です。",
+    ));
+    ui.button(
+        RichText::new(".gcode を書き出す…")
+            .strong()
+            .color(theme::TEAL),
+    )
+    .clicked()
+}

@@ -70,6 +70,16 @@ pub const TEMPLATES: &[Template] = &[
         description: "網目状のジャイロイドを箱の中に作ります。単位の大きさと壁の太さで、すき間の大きさを調整。",
         tag: "格子・網目",
     },
+    Template {
+        name: "シンプル花瓶→らせんGコード",
+        description: "花瓶の形を 1 本のらせんで印刷する G-code にします（Bambu A1 mini 向け・実機では未検証）。STL はこれまでどおり出力ノードから。",
+        tag: "Gコード",
+    },
+    Template {
+        name: "波模様の粘土の器",
+        description: "粘土プリンタ（TRONXY Moore 1）向け。壁を波打たせ、層ごとにずらしてうろこ模様にします（実機では未検証）。",
+        tag: "Gコード",
+    },
 ];
 
 fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
@@ -463,6 +473,126 @@ fn build(index: usize) -> Result<Project, String> {
             let info = add(&mut graph, NodeKind::MeshInfo, [262.0, 310.0], &[])?;
             graph.connect(smooth, info, "geometry")?;
             finish(&mut graph, smooth, [504.0, 30.0])?;
+        }
+        12 => {
+            let vase = add(
+                &mut graph,
+                NodeKind::Vase,
+                [20.0, 30.0],
+                &[
+                    ("radius", 30.0),
+                    ("height", 90.0),
+                    ("thickness", 2.4),
+                    ("lobes", 6.0),
+                    ("amplitude", 0.12),
+                    ("segments", 72.0),
+                    ("layers", 40.0),
+                ],
+            )?;
+            let printer = add(
+                &mut graph,
+                NodeKind::GcodePrinter,
+                [20.0, 310.0],
+                &[("preset", 0.0)],
+            )?;
+            let temp = add(
+                &mut graph,
+                NodeKind::GcodeTemp,
+                [262.0, 310.0],
+                &[("nozzle", 215.0), ("bed", 55.0), ("fan", 100.0)],
+            )?;
+            graph.connect(printer, temp, "job")?;
+            let slice = add(
+                &mut graph,
+                NodeKind::GcodeSlice,
+                [504.0, 170.0],
+                &[("layer_height", 0.2)],
+            )?;
+            graph.connect(vase, slice, "mesh")?;
+            graph.connect(temp, slice, "job")?;
+            let spiral = add(
+                &mut graph,
+                NodeKind::GcodeSpiral,
+                [746.0, 170.0],
+                &[("bottom_layers", 4.0)],
+            )?;
+            graph.connect(slice, spiral, "job")?;
+            let safety = add(&mut graph, NodeKind::GcodeSafety, [988.0, 170.0], &[])?;
+            graph.connect(spiral, safety, "job")?;
+            let preview = add(&mut graph, NodeKind::GcodePreview, [1230.0, 170.0], &[])?;
+            graph.connect(safety, preview, "job")?;
+            let write = add(&mut graph, NodeKind::GcodeWrite, [1472.0, 170.0], &[])?;
+            graph.connect(preview, write, "job")?;
+            if let Some(node) = graph.node_mut(write) {
+                node.preview = true;
+            }
+            let output = graph.add(NodeKind::Output, [262.0, 30.0])?;
+            graph.connect(vase, output, "geometry")?;
+            if let Some(node) = graph.node_mut(output) {
+                node.preview = false;
+            }
+        }
+        13 => {
+            let bowl = add(
+                &mut graph,
+                NodeKind::Vase,
+                [20.0, 30.0],
+                &[
+                    ("radius", 42.0),
+                    ("height", 80.0),
+                    ("thickness", 5.0),
+                    ("lobes", 0.0),
+                    ("amplitude", 0.0),
+                    ("segments", 72.0),
+                    ("layers", 32.0),
+                ],
+            )?;
+            let printer = add(
+                &mut graph,
+                NodeKind::GcodePrinter,
+                [20.0, 310.0],
+                &[("preset", 3.0)],
+            )?;
+            let clay = add(&mut graph, NodeKind::GcodeClay, [262.0, 310.0], &[])?;
+            graph.connect(printer, clay, "job")?;
+            let slice = add(
+                &mut graph,
+                NodeKind::GcodeSlice,
+                [504.0, 170.0],
+                &[("layer_height", 1.0)],
+            )?;
+            graph.connect(bowl, slice, "mesh")?;
+            graph.connect(clay, slice, "job")?;
+            let contour = add(
+                &mut graph,
+                NodeKind::GcodeContour,
+                [746.0, 170.0],
+                &[("walls", 1.0), ("bottom_layers", 2.0), ("spacing", 1.5)],
+            )?;
+            graph.connect(slice, contour, "job")?;
+            let texture = add(
+                &mut graph,
+                NodeKind::GcodeTexture,
+                [988.0, 170.0],
+                &[
+                    ("amplitude", 1.2),
+                    ("wavelength", 18.0),
+                    ("z_wavelength", 40.0),
+                    ("twist", 4.0),
+                ],
+            )?;
+            graph.connect(contour, texture, "job")?;
+            let sort = add(&mut graph, NodeKind::GcodeSort, [1230.0, 170.0], &[])?;
+            graph.connect(texture, sort, "job")?;
+            let safety = add(&mut graph, NodeKind::GcodeSafety, [1472.0, 170.0], &[])?;
+            graph.connect(sort, safety, "job")?;
+            let preview = add(&mut graph, NodeKind::GcodePreview, [1714.0, 170.0], &[])?;
+            graph.connect(safety, preview, "job")?;
+            let write = add(&mut graph, NodeKind::GcodeWrite, [1956.0, 170.0], &[])?;
+            graph.connect(preview, write, "job")?;
+            if let Some(node) = graph.node_mut(write) {
+                node.preview = true;
+            }
         }
         _ => {
             let base = add(

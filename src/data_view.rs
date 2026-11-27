@@ -120,6 +120,7 @@ pub fn value_text(value: &Value) -> String {
             m.triangles.len()
         ),
         Value::Surface(s) => format!("数学曲面 · {} · UV 0–1", s.geometry().name()),
+        Value::Gcode(j) => j.summary(),
         Value::Solid(s) => format!(
             "閉じた B-rep · {} 面 / {} 稜線 · 体積 {}",
             s.brep().shell().faces().len(),
