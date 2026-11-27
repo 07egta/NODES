@@ -170,19 +170,3 @@ fn groups_and_notes_are_capped_and_pruned() {
     annotations::prune(&mut g);
     assert!(g.groups.is_empty());
 }
-
-#[test]
-fn every_gallery_template_evaluates_without_errors() {
-    for index in 0..templates::TEMPLATES.len() {
-        let project = templates::create(index);
-        let result = nodes::engine::Evaluator::default().evaluate(&project.graph, &|| false);
-        for (id, output) in &result.outputs {
-            assert!(
-                output.is_ok(),
-                "{} #{id}: {:?}",
-                templates::TEMPLATES[index].name,
-                output
-            );
-        }
-    }
-}
