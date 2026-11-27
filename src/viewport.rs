@@ -72,6 +72,8 @@ pub struct Viewport {
     first_fit: bool,
     fit_requested: bool,
     texture: Option<egui::TextureHandle>,
+    #[cfg(test)]
+    cache_work: CacheWork,
 }
 
 impl Default for Viewport {
@@ -99,8 +101,28 @@ impl Default for Viewport {
             first_fit: true,
             fit_requested: false,
             texture: None,
+            #[cfg(test)]
+            cache_work: CacheWork::default(),
         }
     }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct CacheWork {
+    pub scene_builds: usize,
+    pub diagnostic_attempts: usize,
+    pub completed_diagnostics: usize,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct CacheState {
+    pub work: CacheWork,
+    pub triangles: usize,
+    pub selected_triangles: usize,
+    pub has_bounds: bool,
+    pub camera: [f64; 6],
 }
 
 #[derive(Clone, Copy)]
@@ -296,15 +318,56 @@ impl Camera {
 }
 
 impl Viewport {
+    #[cfg(test)]
+    pub(crate) fn test_cache_state(&self) -> CacheState {
+        CacheState {
+            work: self.cache_work,
+            triangles: self.scene.triangles.len(),
+            selected_triangles: self.scene.triangles.iter().filter(|t| t.selected).count(),
+            has_bounds: self.scene.bounds.is_some(),
+            camera: [
+                self.yaw,
+                self.pitch,
+                self.span,
+                self.target[0],
+                self.target[1],
+                self.target[2],
+            ],
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_pick_point(&self) -> Option<Pos2> {
+        self.projected.as_ref()?.triangles.iter().find_map(|t| {
+            let a = t.p[1] - t.p[0];
+            let b = t.p[2] - t.p[0];
+            ((a.x * b.y - a.y * b.x).abs() > 4.).then(|| t.p[0] + (a + b) / 3.)
+        })
+    }
+
     /// Fill the remaining UI area and return the picked geometry's source node.
     pub fn show(&mut self, ui: &mut egui::Ui, items: &[PreviewItem]) -> Option<u64> {
+        self.show_snapshot(ui, Some(items))
+    }
+
+    /// Keep the completed scene while another evaluation is pending. Camera
+    /// controls and picking remain live; the caller labels this as a previous result.
+    pub fn show_previous(&mut self, ui: &mut egui::Ui) -> Option<u64> {
+        self.show_snapshot(ui, None)
+    }
+
+    fn show_snapshot(&mut self, ui: &mut egui::Ui, items: Option<&[PreviewItem]>) -> Option<u64> {
+        // Accept a completed snapshot even if a temporarily tiny viewport cannot
+        // paint it; the caller can then safely record which revision is installed.
+        if let Some(items) = items {
+            self.ensure_scene(items);
+        }
         let rect = ui.available_rect_before_wrap();
         if rect.width() < 2.0 || rect.height() < 2.0 {
             return None;
         }
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
         self.last_size = rect.size();
-        self.ensure_scene(items);
         if self.first_fit && self.scene.bounds.is_some() {
             self.fit_cached();
             self.first_fit = false;
@@ -498,8 +561,17 @@ impl Viewport {
 
     pub fn fit(&mut self, items: &[PreviewItem]) {
         self.ensure_scene(items);
+        self.fit_previous();
+    }
+
+    pub fn fit_previous(&mut self) {
         self.fit_cached();
         self.first_fit = self.scene.bounds.is_none();
+    }
+
+    /// Invalidate a result superseded while the viewport was not being shown.
+    pub fn clear(&mut self) {
+        self.ensure_scene(&[]);
     }
 
     pub fn set_view(&mut self, view: &str) {
@@ -669,17 +741,22 @@ impl Viewport {
                 ),
                 ink,
             ),
-            (
-                format!(
-                    "体積  {:.2} cm³  ・  重さ（PLA 中実の目安）約 {:.1} g",
-                    volume_cm3, weight
-                ),
-                ink,
-            ),
+            if report.is_closed() {
+                (
+                    format!(
+                        "体積  {:.2} cm³  ・  重さ（PLA 中実の目安）約 {:.1} g",
+                        volume_cm3, weight
+                    ),
+                    ink,
+                )
+            } else {
+                ("体積・重量は未判定（閉じた多様体が必要です）".into(), warn)
+            },
             (
                 format!("三角形 {} 枚  ・  {}", report.triangles, mesh_state(report)),
                 ink,
             ),
+            ("自己交差・殻の内外・肉厚は未検査".into(), muted),
         ];
         if let Some(plan) = self.bed_plan() {
             let [w, d, h] = plan.volume;
@@ -846,6 +923,10 @@ impl Viewport {
             return;
         }
 
+        #[cfg(test)]
+        {
+            self.cache_work.scene_builds += 1;
+        }
         let mut scene = Scene::default();
         let mut value_count = 0;
         'items: for item in items {
@@ -896,6 +977,11 @@ impl Viewport {
         }
         let trees: Vec<Tree> = items.iter().map(|item| item.tree.clone()).collect();
         scene.report = persistence::mesh_stats(&trees).ok();
+        #[cfg(test)]
+        {
+            self.cache_work.diagnostic_attempts += 1;
+            self.cache_work.completed_diagnostics += usize::from(scene.report.is_some());
+        }
         self.scene = scene;
         self.geometry_hash = Some(hash);
         self.selection_hash = Some(selection_hash);
@@ -1552,13 +1638,24 @@ fn raster_scale(rect: Rect, pixels_per_point: f32) -> f32 {
 
 fn mesh_state(report: &ExportReport) -> String {
     if report.is_closed() {
-        "閉じたメッシュ".to_owned()
+        return "閉じた多様体".to_owned();
+    }
+    let problems: Vec<_> = [
+        ("境界", report.open_edges, "辺"),
+        ("非多様体", report.non_manifold_edges, "辺"),
+        ("向きの不整合", report.inconsistent_edges, "辺"),
+        ("非多様体", report.non_manifold_vertices, "頂点"),
+        ("重複", report.duplicate_faces, "面"),
+        ("退化", report.degenerate_triangles, "面"),
+    ]
+    .into_iter()
+    .filter(|(_, count, _)| *count > 0)
+    .map(|(label, count, unit)| format!("{label} {count} {unit}"))
+    .collect();
+    if problems.is_empty() {
+        "面なし".to_owned()
     } else {
-        format!(
-            "開いた箇所あり（境界の辺 {} ・ 不正な辺 {}）",
-            report.open_edges,
-            report.non_manifold_edges + report.inconsistent_edges
-        )
+        format!("要確認（{}）", problems.join("・"))
     }
 }
 

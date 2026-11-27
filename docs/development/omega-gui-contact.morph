@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "name": "Ω GUI検証・頂点で接する二つの箱",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "一つ目の箱",
+        "position": [
+          30,
+          100
+        ],
+        "params": {
+          "width": 20,
+          "depth": 20,
+          "height": 20
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "move",
+        "name": "角で接する二つ目",
+        "position": [
+          300,
+          230
+        ],
+        "params": {
+          "x": 20,
+          "y": 20,
+          "z": 20
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "部品 A",
+        "position": [
+          570,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "部品 B",
+        "position": [
+          570,
+          290
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    20,
+    100
+  ],
+  "zoom": 0.7
+}

@@ -4,7 +4,6 @@ use morphlet::diagnostics::{
 };
 use morphlet::engine::{Evaluation, Evaluator, NodeTiming};
 use morphlet::model::{Graph, NodeId, NodeKind, Tree};
-use std::cell::Cell;
 
 fn add(graph: &mut Graph, kind: NodeKind) -> NodeId {
     graph.add(kind, [0.; 2]).unwrap()
@@ -115,10 +114,9 @@ fn cancellation_keeps_finished_results_and_marks_the_interrupted_visit() {
         .insert("count".into(), 512.);
     let later = add(&mut graph, NodeKind::Add);
     graph.connect(interrupted, later, "a").unwrap();
-    let calls = Cell::new(0);
+    let calls = std::sync::atomic::AtomicUsize::new(0);
     let evaluation = Evaluator::default().evaluate(&graph, &|| {
-        calls.set(calls.get() + 1);
-        calls.get() == 30
+        calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == 30
     });
     assert!(evaluation.cancelled);
     assert!(evaluation.outputs[&completed].is_ok());

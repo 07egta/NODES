@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "Ω GUI検証・符号付きゼロ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "number",
+        "name": "Y の符号を確認",
+        "position": [
+          50.0,
+          100.0
+        ],
+        "params": {
+          "value": -0.0
+        },
+        "inputs": {},
+        "preview": true
+      },
+      {
+        "id": 1,
+        "kind": "atan2",
+        "name": "atan2 の角度",
+        "position": [
+          350.0,
+          100.0
+        ],
+        "params": {
+          "x": -1.0,
+          "y": 0.0
+        },
+        "inputs": {
+          "y": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    -19.240631,
+    212.55
+  ],
+  "zoom": 1.15
+}

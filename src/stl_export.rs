@@ -11,6 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_MAX_SIZE_MM: f64 = 256.0;
@@ -24,6 +25,7 @@ const MAX_HOLE_EDGES: usize = 64;
 const MAX_HOLE_LOOPS: usize = 256;
 const MIN_SIZE_MM: f64 = 1.0;
 const JST_OFFSET_SECS: i64 = 9 * 3600;
+static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -752,14 +754,14 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
         return Ok((vec![none], stats));
     }
     let report = persistence::mesh_stats(&to_trees(bodies))?;
-    let mut checks = Vec::with_capacity(7);
-    checks.push(if report.open_edges == 0 && report.non_manifold_edges == 0 {
-        check(Level::Ok, "閉じている（水密）", "座標の結合後、すべての辺が 2 枚の面で囲まれています。頂点の多様体性と自己交差は未検査です。")
+    let mut checks = Vec::with_capacity(9);
+    checks.push(if report.is_closed() {
+        check(Level::Ok, "閉じている（水密）", "座標の結合後、辺・頂点が閉じた多様体を構成し、面方向は一貫しています。自己交差・殻の内外・肉厚は未検査です。")
     } else {
         check(
             Level::Error,
             "閉じている（水密）",
-            format!("境界辺 {} 本、3 枚以上の面が共有する辺 {} 本があります。水密な多様体メッシュとは判定できません。", report.open_edges, report.non_manifold_edges),
+            format!("境界辺 {} 本、非多様体の辺 {} 本・頂点 {} 個、向きの不整合辺 {} 本、重複面 {} 枚、退化面 {} 枚。閉じた多様体の条件を満たしません。", report.open_edges, report.non_manifold_edges, report.non_manifold_vertices, report.inconsistent_edges, report.duplicate_faces, report.degenerate_triangles),
         )
     });
     let inside_out = bodies.iter().filter(|b| signed_volume(b) < 0.0).count();
@@ -769,7 +771,7 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
             "面の向きがそろっている",
             format!("向きが食い違う辺が {} 本あります。「自動修復」で直せます。", report.inconsistent_edges),
         )
-    } else if report.open_edges > 0 || report.non_manifold_edges > 0 || report.degenerate_triangles > 0 {
+    } else if !report.is_closed() {
         check(Level::Warn, "面の向きがそろっている", "閉じた有効な面構成ではないため、体積の符号による内外の判定は行いません。")
     } else if inside_out > 0 {
         check(
@@ -793,6 +795,35 @@ pub fn check_bodies(bodies: &[Mesh], max_size_mm: f64) -> Result<(Vec<Check>, Bo
             format!(
                 "3枚以上の面が共有する辺が {} 本あります。",
                 report.non_manifold_edges
+            ),
+        )
+    });
+    checks.push(if report.non_manifold_vertices == 0 {
+        check(
+            Level::Ok,
+            "頂点で面が枝分かれしていない",
+            "頂点まわりの面は一続きです。自己交差の検査とは異なります。",
+        )
+    } else {
+        check(
+            Level::Error,
+            "頂点で面が枝分かれしていない",
+            format!("非多様体の頂点が {} 個あります。点だけで接触する形状や、頂点まわりの面の分岐を確認してください。", report.non_manifold_vertices),
+        )
+    });
+    checks.push(if report.duplicate_faces == 0 {
+        check(
+            Level::Ok,
+            "重複する面がない",
+            "同じ頂点を使う重複面はありません。",
+        )
+    } else {
+        check(
+            Level::Error,
+            "重複する面がない",
+            format!(
+                "頂点の結合後に重複する面が {} 枚あります。表裏を逆にした重複も含みます。",
+                report.duplicate_faces
             ),
         )
     });
@@ -863,29 +894,222 @@ pub struct WriteSummary {
     pub triangles: usize,
 }
 
-/// Writes one file, or one file per body when `separate` is set and there is more than one body.
+/// A batch can fail during replacement after some complete files were saved.
+/// Preparation errors have an empty `completed`; every destination is unchanged.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WriteFailure {
+    pub completed: WriteSummary,
+    pub failed_path: Option<PathBuf>,
+    pub message: String,
+}
+
+impl From<String> for WriteFailure {
+    fn from(message: String) -> Self {
+        Self {
+            completed: WriteSummary::default(),
+            failed_path: None,
+            message,
+        }
+    }
+}
+
+impl WriteFailure {
+    fn at(path: &Path, message: impl Into<String>) -> Self {
+        Self {
+            failed_path: Some(path.to_path_buf()),
+            ..Self::from(message.into())
+        }
+    }
+}
+
+impl std::fmt::Display for WriteFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.completed.files.is_empty() {
+            writeln!(
+                f,
+                "書き出しを完了できませんでした。保存先は変更されていません。"
+            )?;
+        } else {
+            writeln!(
+                f,
+                "書き出しが途中で停止しました。{} 個のファイル（{} 面）は保存済みです。",
+                self.completed.files.len(),
+                self.completed.triangles
+            )?;
+            for path in &self.completed.files {
+                writeln!(f, "保存済み: {}", path.display())?;
+            }
+        }
+        if let Some(path) = &self.failed_path {
+            writeln!(f, "失敗した保存先: {}", path.display())?;
+        }
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for WriteFailure {}
+
+/// Compatibility wrapper. Detailed callers can inspect which files were saved.
 pub fn write_bodies(
     format: OutputFormat,
     path: &Path,
     bodies: &[Mesh],
     separate: bool,
 ) -> Result<WriteSummary, String> {
+    write_bodies_detailed(format, path, bodies, separate).map_err(|error| error.to_string())
+}
+
+/// Prepare all split bodies before replacing any destination. Each replacement
+/// is atomic; multiple replacements are not one atomic filesystem transaction.
+pub fn write_bodies_detailed(
+    format: OutputFormat,
+    path: &Path,
+    bodies: &[Mesh],
+    separate: bool,
+) -> Result<WriteSummary, WriteFailure> {
     if bodies.is_empty() {
-        return Err("書き出せる立体がありません。".into());
+        return Err(WriteFailure::from(
+            "書き出せる立体がありません。".to_owned(),
+        ));
     }
-    let mut summary = WriteSummary::default();
     if separate && bodies.len() > 1 {
-        let total = bodies.len();
-        for (index, body) in bodies.iter().enumerate() {
-            let target = numbered_path(path, index + 1, total);
-            summary.triangles += write_file(format, &target, std::slice::from_ref(body))?;
-            summary.files.push(target);
-        }
+        commit_prepared(prepare_split(format, path, bodies)?)
     } else {
-        summary.triangles = write_file(format, path, bodies)?;
-        summary.files.push(path.to_path_buf());
+        // The existing single-file writers already validate, flush and replace
+        // atomically; an additional staging pass would provide no extra safety.
+        let triangles =
+            write_file(format, path, bodies).map_err(|message| WriteFailure::at(path, message))?;
+        Ok(WriteSummary {
+            files: vec![path.to_path_buf()],
+            triangles,
+        })
     }
-    Ok(summary)
+}
+
+fn export_parent(path: &Path) -> &Path {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+}
+
+struct PreparedOutput {
+    destination: PathBuf,
+    stage: PathBuf,
+    triangles: usize,
+    committed: bool,
+}
+
+impl PreparedOutput {
+    fn reserve(destination: PathBuf) -> Result<Self, String> {
+        let parent = export_parent(&destination);
+        for _ in 0..32 {
+            let sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let stage = parent.join(format!(
+                ".morphlet-export-{}-{sequence}.stage",
+                std::process::id()
+            ));
+            // A user may choose any name, including our temporary-name pattern.
+            if stage.file_name() == destination.file_name() {
+                continue;
+            }
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&stage)
+            {
+                Ok(file) => {
+                    drop(file);
+                    return Ok(Self {
+                        destination,
+                        stage,
+                        triangles: 0,
+                        committed: false,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!(
+                        "書き出し準備用ファイルを作成できませんでした: {error}"
+                    ));
+                }
+            }
+        }
+        Err("書き出し準備用ファイルの名前を確保できませんでした。".into())
+    }
+}
+
+impl Drop for PreparedOutput {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = fs::remove_file(&self.stage);
+        }
+    }
+}
+
+fn prepare_split(
+    format: OutputFormat,
+    path: &Path,
+    bodies: &[Mesh],
+) -> Result<Vec<PreparedOutput>, WriteFailure> {
+    let targets: Vec<_> = (0..bodies.len())
+        .map(|index| numbered_path(path, index + 1, bodies.len()))
+        .collect();
+    // Reject predictable destination failures before preparing or replacing any file.
+    for target in &targets {
+        if target.file_name().is_none() || target.is_dir() {
+            return Err(WriteFailure::at(
+                target,
+                "保存先にはフォルダーではなくファイル名を指定してください。",
+            ));
+        }
+        if !export_parent(target).is_dir() {
+            return Err(WriteFailure::at(
+                target,
+                "保存先のフォルダーが見つかりません。",
+            ));
+        }
+    }
+    let mut prepared = Vec::with_capacity(bodies.len());
+    let mut triangles = 0usize;
+    for (target, body) in targets.into_iter().zip(bodies) {
+        let mut output = PreparedOutput::reserve(target.clone())
+            .map_err(|message| WriteFailure::at(&target, message))?;
+        // Reuse the exact writer/validator for each format. It finishes its
+        // atomic write to our owned stage, leaving all destinations untouched.
+        output.triangles = write_file(format, &output.stage, std::slice::from_ref(body))
+            .map_err(|message| WriteFailure::at(&target, message))?;
+        triangles = triangles
+            .checked_add(output.triangles)
+            .ok_or_else(|| WriteFailure::at(&target, "合計の面数が大きすぎます。"))?;
+        prepared.push(output);
+    }
+    Ok(prepared)
+}
+
+fn commit_prepared(prepared: Vec<PreparedOutput>) -> Result<WriteSummary, WriteFailure> {
+    let mut completed = WriteSummary::default();
+    for mut output in prepared {
+        // Same-directory std::fs::rename replaces existing regular files on
+        // Windows and Unix, as in persistence::atomic_write. Never delete the
+        // destination first; locked files must remain intact on failure.
+        if let Err(error) = fs::rename(&output.stage, &output.destination) {
+            return Err(WriteFailure {
+                completed,
+                failed_path: Some(output.destination.clone()),
+                message: format!(
+                    "保存先を更新できませんでした。別のアプリで開いていないか確認してください: {error}"
+                ),
+            });
+        }
+        output.committed = true;
+        #[cfg(unix)]
+        if let Ok(directory) = fs::File::open(export_parent(&output.destination)) {
+            let _ = directory.sync_all();
+        }
+        completed.triangles += output.triangles;
+        completed.files.push(output.destination.clone());
+    }
+    Ok(completed)
 }
 
 fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usize, String> {
@@ -1183,4 +1407,62 @@ pub fn save_stored(path: &Path, settings: &StoredSettings) -> Result<(), String>
     let bytes = serde_json::to_vec_pretty(settings)
         .map_err(|e| format!("設定を保存形式に変換できませんでした: {e}"))?;
     persistence::atomic_write(path, |file| file.write_all(&bytes))
+}
+
+#[cfg(test)]
+mod batch_commit_tests {
+    use super::*;
+
+    #[test]
+    fn failed_replacement_reports_completed_files_and_cleans_uncommitted_stages() {
+        struct TemporaryDirectory(PathBuf);
+        impl Drop for TemporaryDirectory {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let temp = TemporaryDirectory(std::env::temp_dir().join(format!(
+            "nodes-export-commit-{}-{sequence}",
+            std::process::id()
+        )));
+        fs::create_dir_all(&temp.0).unwrap();
+        let base = temp.0.join("parts.stl");
+        let targets: Vec<_> = (1..=3)
+            .map(|index| numbered_path(&base, index, 3))
+            .collect();
+        for target in &targets {
+            fs::write(target, b"EXISTING").unwrap();
+        }
+        let mesh = Mesh {
+            vertices: vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+            triangles: vec![[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
+        };
+        let prepared = prepare_split(
+            OutputFormat::StlBinary,
+            &base,
+            &[mesh.clone(), mesh.clone(), mesh],
+        )
+        .unwrap();
+        for target in &targets {
+            assert_eq!(fs::read(target).unwrap(), b"EXISTING");
+        }
+        // A real filesystem change between preparation and replacement must
+        // produce a partial result, without a timing race or injected mock.
+        fs::remove_file(&targets[1]).unwrap();
+        fs::create_dir(&targets[1]).unwrap();
+        let failure = commit_prepared(prepared).unwrap_err();
+        assert_eq!(failure.completed.files, vec![targets[0].clone()]);
+        assert_eq!(failure.completed.triangles, 4);
+        assert_eq!(failure.failed_path.as_ref(), Some(&targets[1]));
+        assert!(
+            failure
+                .to_string()
+                .contains("1 個のファイル（4 面）は保存済み")
+        );
+        assert_ne!(fs::read(&targets[0]).unwrap(), b"EXISTING");
+        assert!(targets[1].is_dir());
+        assert_eq!(fs::read(&targets[2]).unwrap(), b"EXISTING");
+        assert_eq!(fs::read_dir(&temp.0).unwrap().count(), 3);
+    }
 }

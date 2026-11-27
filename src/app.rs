@@ -148,6 +148,8 @@ pub struct MorphletApp {
     confirm_action: Option<PendingAction>,
     allow_close: bool,
     preview_mode: u8,
+    /// Completed evaluation represented by the viewport, including an empty scene.
+    preview_revision: Option<u64>,
     edits: EditTracker,
     last_autosave: Instant,
     recovery: Option<Project>,
@@ -261,6 +263,7 @@ impl MorphletApp {
             confirm_action: None,
             allow_close: false,
             preview_mode: 0,
+            preview_revision: None,
             last_autosave: Instant::now(),
             recovery,
             ui_scale: 1.,
@@ -337,12 +340,13 @@ impl MorphletApp {
         };
         collect_export_trees(&self.project.graph, e, &self.canvas.selected)
     }
-    fn previews(&self) -> Vec<PreviewItem> {
+    /// Pending has no new snapshot; a completed empty/error result is Some([]).
+    fn previews(&self) -> Option<Vec<PreviewItem>> {
         if self.stale() {
-            return vec![];
+            return None;
         }
         let Some(e) = &self.evaluation else {
-            return vec![];
+            return Some(vec![]);
         };
         let ids: Vec<_> = match self.preview_mode {
             1 => self.canvas.selected.iter().copied().collect(),
@@ -370,18 +374,41 @@ impl MorphletApp {
                 }
             }
         };
-        ids.into_iter()
-            .filter_map(|id| {
-                e.outputs
-                    .get(&id)
-                    .and_then(|r| r.as_ref().ok())
-                    .map(|tree| PreviewItem {
-                        node_id: id,
-                        tree: tree.clone(),
-                        selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
-                    })
-            })
-            .collect()
+        Some(
+            ids.into_iter()
+                .filter_map(|id| {
+                    e.outputs
+                        .get(&id)
+                        .and_then(|r| r.as_ref().ok())
+                        .map(|tree| PreviewItem {
+                            node_id: id,
+                            tree: tree.clone(),
+                            selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                        })
+                })
+                .collect(),
+        )
+    }
+    fn discard_outdated_preview(&mut self) {
+        // An evaluation may finish while the 3D panel is hidden. If another edit
+        // is pending when it reopens, never resurrect a scene older than that
+        // completed result (which may now be empty or an error).
+        if self
+            .preview_revision
+            .is_some_and(|revision| revision != self.result_revision)
+        {
+            self.viewport.clear();
+            self.preview_revision = None;
+        }
+    }
+    fn fit_preview(&mut self) {
+        if let Some(items) = self.previews() {
+            self.viewport.fit(&items);
+            self.preview_revision = Some(self.result_revision);
+        } else {
+            self.discard_outdated_preview();
+            self.viewport.fit_previous();
+        }
     }
     fn save(&mut self, save_as: bool) -> bool {
         if save_as || self.file_path.is_none() {
@@ -448,6 +475,7 @@ impl MorphletApp {
             self.canvas.connecting = None;
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
+            self.preview_revision = None;
             self.evaluation = None;
             self.diagnostics = None;
             self.queue_compute();
@@ -1057,8 +1085,7 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F)) {
                 self.canvas.fit_selection_requested = true;
             } else if ctx.input(|i| i.key_pressed(egui::Key::F)) {
-                let items = self.previews();
-                self.viewport.fit(&items);
+                self.fit_preview();
                 self.canvas.fit_requested = true;
             }
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
@@ -1208,8 +1235,7 @@ impl MorphletApp {
                         }
                         if ui.button("全体表示  F").clicked() {
                             self.canvas.fit_requested = true;
-                            let items = self.previews();
-                            self.viewport.fit(&items);
+                            self.fit_preview();
                             ui.close();
                         }
                         if ui
@@ -1598,7 +1624,7 @@ impl MorphletApp {
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
                                 let value = n.params.entry(input.key.into()).or_insert(default);
-                                ui.add(parameter_slider(value, input));
+                                parameter_editor(ui, value, input);
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -1779,14 +1805,17 @@ impl MorphletApp {
             .resizable(true)
             .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
-                let items = self.previews();
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(14, 10))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("3D プレビュー").strong().size(13.));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(theme::small("LIVE"));
+                                ui.label(theme::small(if self.stale() {
+                                    "更新中"
+                                } else {
+                                    "LIVE"
+                                }));
                             });
                         });
                         ui.horizontal_wrapped(|ui| {
@@ -1798,22 +1827,44 @@ impl MorphletApp {
                                 .on_hover_text("形を画面に収める · F")
                                 .clicked()
                             {
-                                self.viewport.fit(&items);
+                                self.fit_preview();
                             }
                         });
                     });
+                // Read the mode after its controls so a completed snapshot uses
+                // the current selection/filter immediately.
+                let items = self.previews();
+                if items.is_none() {
+                    self.discard_outdated_preview();
+                }
                 let h = (ui.available_height() * 0.48).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                    if let Some(id) = self.viewport.show(ui, &items) {
+                    let picked = if let Some(items) = &items {
+                        let picked = self.viewport.show(ui, items);
+                        self.preview_revision = Some(self.result_revision);
+                        picked
+                    } else {
+                        self.viewport.show_previous(ui)
+                    };
+                    // Undo can reuse a previous shape's node ID for a different
+                    // node. Only a completed current preview may select nodes;
+                    // camera controls remain live while showing previous geometry.
+                    if items.is_some()
+                        && let Some(id) = picked.filter(|id| self.project.graph.node(*id).is_some())
+                    {
                         self.canvas.select_only(id);
                     }
-                    if self.stale() {
+                    if items.is_none() {
                         ui.painter().text(
                             rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            "形を更新しています…",
+                            if self.preview_revision.is_some() {
+                                "更新中\n前回の形状を表示"
+                            } else {
+                                "形を更新しています…"
+                            },
                             FontId::proportional(13.),
                             theme::muted(),
                         );
@@ -2090,21 +2141,27 @@ impl MorphletApp {
             .open(&mut open)
             .collapsible(false)
             .default_width(520.)
+            .max_width((ctx.content_rect().width() - 64.0).clamp(280.0, 520.0))
             .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
                 ui.label(theme::small(
                     "? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。",
                 ));
                 ui.add_space(8.);
-                egui::Grid::new("shortcut_grid")
-                    .num_columns(2)
-                    .spacing([28., 7.])
+                egui::ScrollArea::vertical()
+                    .id_salt("keyboard_shortcuts_body")
+                    .max_height((ctx.content_rect().height() - 150.0).max(160.0))
                     .show(ui, |ui| {
-                        for (keys, what) in ui_polish::SHORTCUTS {
-                            ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
-                            ui.label(RichText::new(*what).size(12.));
-                            ui.end_row();
-                        }
+                        egui::Grid::new("shortcut_grid")
+                            .num_columns(2)
+                            .spacing([28., 7.])
+                            .show(ui, |ui| {
+                                for (keys, what) in ui_polish::SHORTCUTS {
+                                    ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
+                                    ui.label(RichText::new(*what).size(12.));
+                                    ui.end_row();
+                                }
+                            });
                     });
             });
         self.shortcuts_open = open;
@@ -2238,24 +2295,12 @@ impl MorphletApp {
         }
     }
     fn help_dialog(&mut self, ctx: &egui::Context) {
-        if !self.help_open {
-            return;
+        match crate::getting_started::show(ctx, &mut self.help_open, &mut self.ui_scale) {
+            Some(crate::getting_started::Action::Examples) => self.template_open = true,
+            Some(crate::getting_started::Action::Dictionary) => self.help_window.open_index(),
+            Some(crate::getting_started::Action::Shortcuts) => self.shortcuts_open = true,
+            None => {}
         }
-        let mut open = true;
-        egui::Window::new("Morphlet の使い方").open(&mut open).collapsible(false).default_width(570.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.heading("つなぐ。変える。形になる。");ui.add_space(10.);
-            for (title,body) in [("1  作品例を開く","まずは「ねじれの花器」。ノードを選ぶと右下に設定が出ます。"),("2  数値を動かす","スライダーを動かすか、数値を直接入力。形がすぐに変わります。"),("3  処理を追加する","左で「移動」「円形配列」などを検索。選択した形状に自動でつながります。"),("4  線をつなぐ","右の丸から左の丸へドラッグ。または出力→入力の順にクリック。入力の丸を右クリックで切断。"),("5  保存して、つくる",".morph は編集できる作品ファイル。STL はスライサー用、OBJ は3Dソフト用です。")]{
-                ui.label(RichText::new(title).strong());ui.label(body);ui.add_space(8.);
-            }
-            ui.separator();
-            egui::Grid::new("shortcuts").num_columns(2).spacing([24.,6.]).show(ui,|ui|{
-                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("F1","選択中のノードのヘルプ（ノード辞典）"),("Ctrl+E","選択ノードを無効 / 有効"),("Ctrl+G","選択ノードをグループで囲む"),("右クリック（空き）","ここにノード / メモを追加"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
-            });
-            ui.add_space(8.);if ui.button("ノード辞典を開く（全ノードの説明）").clicked(){self.help_window.open_index();}
-            ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
-            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
-        });
-        self.help_open = open;
     }
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
         let Some(action) = self.confirm_action.clone() else {
@@ -2712,21 +2757,25 @@ impl EditTracker {
 }
 
 fn document_changed(a: &Project, b: &Project) -> bool {
-    a.name != b.name || a.graph != b.graph
+    a.name != b.name || a.graph != b.graph || !persistence::same_parameter_bits(&a.graph, &b.graph)
 }
 fn same_calculation(a: &Graph, b: &Graph) -> bool {
     a.nodes.len() == b.nodes.len()
         && a.clusters == b.clusters
+        && persistence::same_parameter_bits(a, b)
         && a.nodes.iter().zip(&b.nodes).all(|(x, y)| {
             x.id == y.id
                 && x.kind == y.kind
-                && x.params == y.params
                 && x.inputs == y.inputs
                 && x.script == y.script
                 && x.cluster == y.cluster
                 && x.off == y.off
         })
 }
+#[cfg(test)]
+#[path = "signed_zero_tests.rs"]
+mod signed_zero_tests;
+
 #[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
     ui_polish::query_score(kind, query).is_some()
@@ -2827,6 +2876,27 @@ pub(crate) fn parameter_drag_value<'a>(
         .custom_parser(parse_parameter_number)
 }
 
+/// Keep the text field bound directly to the parameter. Slider's built-in value
+/// editor copies through ordinary f64 equality, which discards a +0 -> -0 edit.
+pub(crate) fn parameter_editor(
+    ui: &mut egui::Ui,
+    value: &mut f64,
+    spec: &InputSpec,
+) -> egui::Response {
+    let before = value.to_bits();
+    let mut response = ui
+        .horizontal(|ui| {
+            let track = ui.add(parameter_slider(value, spec).show_value(false));
+            let number = ui.add(parameter_drag_value(value, spec));
+            track.union(number)
+        })
+        .inner;
+    if value.to_bits() != before {
+        response.mark_changed();
+    }
+    response
+}
+
 pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
         "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
@@ -2849,6 +2919,10 @@ pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64,
 #[cfg(test)]
 #[path = "numeric_editor_tests.rs"]
 mod numeric_editor_tests;
+
+#[cfg(test)]
+#[path = "viewport_cache_tests.rs"]
+mod viewport_cache_tests;
 
 #[cfg(test)]
 mod tests {

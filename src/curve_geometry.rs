@@ -665,8 +665,43 @@ impl CurveGeometry {
         if a == b {
             return Ok(true);
         }
-        let scale = norm(self.derivatives(0.)?[1]).max(norm(self.derivatives(1.)?[1]));
-        Ok(scale.is_finite() && scale > 0. && norm(sub(a, b)) <= 1e-12 * scale)
+        let gap = norm(sub(a, b));
+        // Parameter speed is not a geometric tolerance: a short knot span can
+        // make an ordinary open curve's end derivative arbitrarily large.
+        // Estimate the active interval's geometric extent instead. Bound the
+        // probes independently of the number of controls; an underestimated
+        // extent conservatively reports "open", never widens the tolerance.
+        // A tiny trim uses its own extent, not the extent of its whole basis.
+        let mut extent = gap;
+        let mut probe = |t| -> R<()> {
+            extent = extent.max(norm(sub(self.point(t)?, a)));
+            Ok(())
+        };
+        for t in [0.25, 0.5, 0.75] {
+            probe(t)?;
+        }
+        let [lo, hi] = self.interval;
+        match self.basis.as_ref() {
+            Basis::Nurbs(c) => {
+                let first = c.knots.partition_point(|k| *k <= lo.min(hi));
+                let end = c.knots.partition_point(|k| *k < lo.max(hi));
+                let count = end.saturating_sub(first);
+                let samples = count.min(16);
+                for j in 0..samples {
+                    let index = first + j * (count - 1) / samples.saturating_sub(1).max(1);
+                    probe((c.knots[index] - lo) / (hi - lo))?;
+                }
+            }
+            Basis::Helix { turns, .. } => {
+                // Uniform quarter points can all coincide on a many-turn helix.
+                // An eighth-turn probe avoids that alias without visiting every turn.
+                let turns = (turns * (hi - lo)).abs();
+                if turns > 0. {
+                    probe((0.125 / turns).min(0.5))?;
+                }
+            }
+        }
+        Ok(extent.is_finite() && extent > 0. && gap <= 1e-12 * extent)
     }
     pub fn subcurve(&self, start: f64, end: f64) -> R<Self> {
         let a = self.native(start)?;
@@ -861,15 +896,15 @@ impl CurveGeometry {
             if d < best.1 {
                 best = (ts[i], d);
             }
-            if i == 0
-                || i + 1 == ts.len()
-                || d > ds[i - 1]
-                || d > ds[i + 1]
-                || d == ds[i - 1] && d == ds[i + 1]
-            {
+            let left = i.saturating_sub(1);
+            let right = (i + 1).min(ts.len() - 1);
+            if d > ds[left] || d > ds[right] || d == ds[left] && d == ds[right] {
                 continue;
             }
-            let (mut a, mut b) = (ts[i - 1], ts[i + 1]);
+            // The endpoint can be the best sample even when the true minimum
+            // lies just inside the first/last sample interval. Refine that
+            // one-sided bracket while retaining the exact endpoint candidate.
+            let (mut a, mut b) = (ts[left], ts[right]);
             for _ in 0..36 {
                 stopped(cancel)?;
                 let x = a + (b - a) / 3.;

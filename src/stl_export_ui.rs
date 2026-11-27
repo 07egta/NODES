@@ -6,13 +6,20 @@ use eframe::egui::{self, Align2, Color32, RichText};
 use morphlet::model::{Mesh, Tree};
 use morphlet::stl_export::{
     BodyStats, Check, ExportOptions, Level, OutputFormat, RepairReport, StoredSettings,
-    WriteSummary, check_bodies, config_path, default_file_name, detect_slicer, gather_meshes,
-    launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored, write_bodies,
+    WriteFailure, WriteSummary, check_bodies, config_path, default_file_name, detect_slicer,
+    gather_meshes, launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored,
+    write_bodies_detailed,
 };
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-const WARN: Color32 = Color32::from_rgb(196, 138, 36);
+fn warning_color() -> Color32 {
+    if theme::is_dark() {
+        Color32::from_rgb(235, 187, 99)
+    } else {
+        Color32::from_rgb(132, 85, 12)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceMode {
@@ -263,22 +270,33 @@ impl StlExportUi {
                 self.last_files = summary.files;
                 self.say(text, false);
             }
-            Err(error) => self.say(error, true),
+            Err(error) => {
+                let message = error.to_string();
+                if !error.completed.files.is_empty() {
+                    self.last_files = error.completed.files;
+                    self.remember_destination(base);
+                }
+                self.say(message, true);
+            }
         }
     }
 
-    fn write(&mut self, sources: &StlSources, base: &Path) -> Result<WriteSummary, String> {
+    fn remember_destination(&mut self, base: &Path) {
+        self.stored.last_dir = base.parent().map(Path::to_path_buf);
+        self.stored.last_base_file = Some(base.to_path_buf());
+        self.persist();
+    }
+
+    fn write(&mut self, sources: &StlSources, base: &Path) -> Result<WriteSummary, WriteFailure> {
         self.options.validate()?;
         let (bodies, _) = self.prepared(sources)?;
-        let summary = write_bodies(
+        let summary = write_bodies_detailed(
             self.options.format,
             base,
             &bodies,
             self.options.split_bodies,
         )?;
-        self.stored.last_dir = base.parent().map(Path::to_path_buf);
-        self.stored.last_base_file = Some(base.to_path_buf());
-        self.persist();
+        self.remember_destination(base);
         Ok(summary)
     }
 
@@ -379,10 +397,16 @@ impl StlExportUi {
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(480.0)
+            .default_width(560.0)
+            .max_width((ctx.content_rect().width() - 64.0).clamp(280.0, 560.0))
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                request = self.body(ui, sources);
+                egui::ScrollArea::vertical()
+                    .id_salt("stl_export_body")
+                    .max_height((ctx.content_rect().height() - 110.0).max(180.0))
+                    .show(ui, |ui| {
+                        request = self.body(ui, sources);
+                    });
             });
         if !open {
             self.open = false;
@@ -395,7 +419,7 @@ impl StlExportUi {
         let mut request: Option<UiRequest> = None;
 
         ui.label("「出力」ノードの形（または選んだノード）を、印刷用のファイルにします。");
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("書き出す形");
             ui.radio_value(&mut self.mode, SourceMode::Output, "完成形（出力ノード）");
             ui.radio_value(&mut self.mode, SourceMode::Selected, "選択ノード");
@@ -412,7 +436,7 @@ impl StlExportUi {
             &mut self.options.split_bodies,
             "離れた部品ごとに別ファイルにする（部品が複数あるとき）",
         );
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("置き方");
             ui.radio_value(
                 &mut self.options.place_on_bed,
@@ -427,7 +451,7 @@ impl StlExportUi {
         );
         ui.separator();
 
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("単位");
             ui.label(RichText::new("mm で書き出します").strong());
             ui.label("倍率");
@@ -445,7 +469,7 @@ impl StlExportUi {
         ui.label(theme::small(
             "STL には単位が書かれないため、スライサーは mm と見なします。cm のデータなら ×10、inch なら ×25.4 を押してください。",
         ));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("印刷できる最大の大きさ");
             ui.add(
                 egui::DragValue::new(&mut self.options.max_size_mm)
@@ -491,12 +515,15 @@ impl StlExportUi {
                 let (verdict, color) = if has_error {
                     (
                         "印刷には向かない箇所があります。「自動修復」を試してから書き出してください。",
-                        theme::ERROR,
+                        theme::error(),
                     )
                 } else if analysis.checks.iter().any(|c| c.level == Level::Warn) {
-                    ("注意があります。内容を確認してください。", WARN)
+                    ("注意があります。内容を確認してください。", warning_color())
                 } else {
-                    ("問題は見つかりませんでした。", theme::TEAL)
+                    (
+                        "この検査では問題は見つかりませんでした。自己交差・最小肉厚は未検査です。",
+                        theme::teal(),
+                    )
                 };
                 ui.colored_label(color, verdict);
                 if analysis.skipped > 0 {
@@ -507,7 +534,7 @@ impl StlExportUi {
                 }
             }
             Some(Err(error)) => {
-                ui.colored_label(theme::ERROR, error);
+                ui.colored_label(theme::error(), error);
                 ui.label(theme::small(
                     "立体を作り、「出力」ノードにつないでください。",
                 ));
@@ -517,7 +544,7 @@ impl StlExportUi {
             }
         }
 
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             if ui
                 .button("自動修復")
                 .on_hover_text("ほぼ同じ頂点の統合、つぶれた面と重なった面の削除、向きそろえ、小さな穴のふさぎ。作品は変えません。")
@@ -538,11 +565,18 @@ impl StlExportUi {
         } else {
             "書き出す…"
         };
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             if ui
                 .add_enabled(
                     ready,
-                    egui::Button::new(RichText::new(export_label).strong()).fill(theme::TEAL_PALE),
+                    egui::Button::new(RichText::new(export_label).strong().color(
+                        if theme::is_dark() {
+                            Color32::from_rgb(18, 36, 31)
+                        } else {
+                            Color32::WHITE
+                        },
+                    ))
+                    .fill(theme::teal()),
                 )
                 .clicked()
             {
@@ -560,14 +594,14 @@ impl StlExportUi {
             "保存名: {}",
             default_file_name(&sources.base_name, self.options.format, SystemTime::now())
         )));
-        ui.horizontal(|ui| {
-            let slicer = self
-                .stored
-                .slicer_exe
-                .as_ref()
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|| "未設定（開くときに自動で探します）".into());
-            ui.label(theme::small(format!("スライサー: {slicer}")));
+        let slicer = self
+            .stored
+            .slicer_exe
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "未設定（開くときに自動で探します）".into());
+        ui.add(egui::Label::new(theme::small(format!("スライサー: {slicer}"))).wrap());
+        ui.horizontal_wrapped(|ui| {
             if ui
                 .add_enabled(
                     !self.last_files.is_empty(),
@@ -582,7 +616,11 @@ impl StlExportUi {
             }
         });
         if let Some((text, error)) = &self.status {
-            let color = if *error { theme::ERROR } else { theme::TEAL };
+            let color = if *error {
+                theme::error()
+            } else {
+                theme::teal()
+            };
             ui.add(egui::Label::new(RichText::new(text.as_str()).color(color)).wrap());
         }
 
@@ -604,11 +642,11 @@ impl StlExportUi {
 
 fn check_row(ui: &mut egui::Ui, check: &Check) {
     let color = match check.level {
-        Level::Ok => theme::TEAL,
-        Level::Warn => WARN,
-        Level::Error => theme::ERROR,
+        Level::Ok => theme::teal(),
+        Level::Warn => warning_color(),
+        Level::Error => theme::error(),
     };
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.colored_label(color, "●");
         ui.label(RichText::new(check.title).strong());
         ui.add(egui::Label::new(theme::small(check.detail.as_str())).wrap());

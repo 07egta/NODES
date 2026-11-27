@@ -6,7 +6,7 @@ use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, 
 use morphlet::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
-    model::{Node, NodeId, NodeKind},
+    model::{InputSpec, Node, NodeId, NodeKind},
     persistence::Project,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -217,6 +217,40 @@ fn note_fill() -> Color32 {
 fn height(node: &Node) -> f32 {
     HEADER + ROW * node.kind.spec().inputs.len() as f32 + 27.0
 }
+
+fn parameter_number(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    node: NodeId,
+    spec: &InputSpec,
+    value: &mut f64,
+    zoom: f32,
+) -> egui::Response {
+    let full_value = value.to_string();
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            // Auto IDs based on drawing order lose focus when cards are culled,
+            // reordered, or a connection changes which inputs have sliders.
+            .id(("canvas_parameter", node, spec.key))
+            .max_rect(rect)
+            .layout(egui::Layout::centered_and_justified(
+                egui::Direction::TopDown,
+            )),
+        |ui| {
+            // DragValue deliberately grows to fit its full precision string.
+            // Clip painting AND hit testing so it cannot cover a card's ports.
+            ui.set_clip_rect(ui.clip_rect().intersect(rect));
+            ui.spacing_mut().interact_size = rect.size();
+            ui.spacing_mut().button_padding = egui::vec2(2., 1.) * zoom;
+            ui.style_mut().override_font_id = Some(FontId::proportional(10. * zoom));
+            ui.style_mut().explanation_tooltips = false;
+            ui.add(crate::app::parameter_drag_value(value, spec))
+        },
+    )
+    .inner
+    .on_hover_text(format!("{full_value}\nクリックで直接入力 · ドラッグで調整"))
+}
+
 fn to_screen(world: [f32; 2], rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     rect.min + egui::vec2(world[0] * zoom + pan[0], world[1] * zoom + pan[1])
 }
@@ -862,7 +896,7 @@ impl GraphCanvas {
                     && slider_keys.contains(&spec.key)
                     && !linked
                 {
-                    // The first numeric inputs of a card are drawn as small sliders.
+                    // The first numeric inputs have a track and a direct-entry field.
                     let m = &mut p.graph.nodes[*node_index];
                     let value = m.params.entry(spec.key.into()).or_insert(default);
                     let track = Rect::from_min_size(
@@ -873,22 +907,18 @@ impl GraphCanvas {
                     let slider = crate::app::parameter_slider(value, spec)
                         .show_value(false)
                         .trailing_fill(true);
-                    ui.scope(|ui| {
-                        ui.spacing_mut().slider_width = width;
-                        ui.put(track, slider)
-                    });
-                    let shown = if spec.integer {
-                        format!("{:.0}", *value)
-                    } else {
-                        format!("{:.2}", *value)
-                    };
-                    painter.text(
-                        ip + egui::vec2(153., 0.) * p.zoom,
-                        Align2::LEFT_CENTER,
-                        shown,
-                        FontId::proportional(10. * p.zoom),
-                        theme::ink(),
+                    ui.scope_builder(
+                        egui::UiBuilder::new().id(("canvas_parameter_track", n.id, spec.key)),
+                        |ui| {
+                            ui.spacing_mut().slider_width = width;
+                            ui.put(track, slider)
+                        },
                     );
+                    let number = Rect::from_min_size(
+                        ip + egui::vec2(153., -10.) * p.zoom,
+                        egui::vec2(48., 22.) * p.zoom,
+                    );
+                    parameter_number(ui, number, n.id, spec, value, p.zoom);
                 } else if p.zoom > 0.62
                     && let Some(default) = spec.default
                 {
@@ -930,7 +960,7 @@ impl GraphCanvas {
                     } else {
                         let m = &mut p.graph.nodes[*node_index];
                         let value = m.params.entry(spec.key.into()).or_insert(default);
-                        ui.put(vr, crate::app::parameter_drag_value(value, spec));
+                        parameter_number(ui, vr, n.id, spec, value, p.zoom);
                     }
                 }
             }
@@ -1754,3 +1784,7 @@ mod premium_tests {
 #[cfg(test)]
 #[path = "canvas_perf.rs"]
 mod perf;
+
+#[cfg(test)]
+#[path = "canvas_numeric_tests.rs"]
+mod numeric_tests;

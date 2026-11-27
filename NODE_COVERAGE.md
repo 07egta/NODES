@@ -9,7 +9,7 @@
 | ノード選択欄の登録 | 実行したGUIで298種類を確認 |
 | Cluster | 選択欄に含めず、定義から生成する1種類 |
 | 完全実装済みノード数 | 未集計。登録には限定・近似の演算を含むため、298を完全実装数としない |
-| 機能検証 | c44a897aの通常CIでLinux437件・Windows436件、各0 failed / 2 ignored / 35 suites。両OSのGUI/CLI release build、Linux fmt/check/strict Clippyも成功。差1件はUnix限定FIFO回帰。4件の数値UI回帰は両OSで成功。個別ノードの完全検証数とは異なる |
+| 機能検証 | UI25fのCIでLinux523件・Windows521件（各0 failed / 3 ignored / 48 targets）、両release成功。後続preview-cache関連4件は別ソース。テスト件数はノード完全検証数ではない。最新source別結果はOMEGA_CI_RESULTS.json |
 | GH期待値でVERIFIED | 0。Rhino/GHから採取した版付きoracle fixtureとの比較は未実施 |
 | GH2公式index | 取得時1419件。build 9.3.26329.6001 / export 2026-11-25T15:23:50Z。詳細未調査はUNKNOWN |
 
@@ -19,6 +19,8 @@
 - [REFERENCE_NOTES.md](docs/compatibility/REFERENCE_NOTES.md): 公式資料、枝照合、Simplify、版の相違など。
 - `docs/compatibility/nodes_inventory.json`: compiled registryから再生成する出力先。ID、分類、入力/出力型、既定値、範囲、アクセス規則、metadata fingerprintを記録する。生成器は [coverage_inventory.rs](examples/coverage_inventory.rs)。
 - `docs/compatibility/gh2_official_inventory.json`: 公式indexの全件出力先。生成器は [update_gh2_inventory.py](scripts/update_gh2_inventory.py)。入力portや数学的意味を名称から推測しない。
+- [OMEGA_CI_RESULTS.json](docs/development/OMEGA_CI_RESULTS.json): Ω開発のソース別Linux/Windows CI・配布物の検証。
+- [OMEGA_NATIVE_GUI.json](docs/development/OMEGA_NATIVE_GUI.json): Ωの数値入力・診断・実書出し記録。
 - [TEST_RESULTS.md](TEST_RESULTS.md): 実際のコマンドと成功/失敗/未実施を記録する。
 - [CI_NUMERIC_VALIDATION.json](docs/development/CI_NUMERIC_VALIDATION.json): c44a897aの通常CIとsource/tree/artifactの記録。後続の証拠文書コミットを検証対象ソースと混同しない。
 - [NUMERIC_INPUT_VALIDATION.json](docs/development/NUMERIC_INPUT_VALIDATION.json): 実GUIで発見した数値の0.1ずれ、修正後の既定値・直接入力・保存再起動・STLの検証記録。
@@ -42,10 +44,10 @@
 | 分野 | 現在の機能 | 主要な不足 |
 |---|---|---|
 | Data Tree / Lists | Path/枝、Flatten/Graft/Simplify、結合、Path Mapper制限構文、転置、リスト操作、Shortest/Longest/Cross | native Null、複数出力、一般混合アクセス、GH全件oracle |
-| 数学・ベクトル | 演算、三角/指数/対数、統計、集合、行列、Domainの数値表現、補間、座標系 | 専用Boolean/Vector/Domain型、全成分の極値/誤差証拠 |
+| 数学・ベクトル | 演算、三角/指数/対数、統計、集合、行列、Domainの数値表現、整数累積による総和/平均/補間、座標系 | 専用Boolean/Vector/Domain型、全成分の極値/誤差証拠 |
 | 曲線 | 数学的NURBS/Bezier/B-splineと表示点列を分離、解析curve、評価・導関数・長さ等 | 一般の曲線交差、fillet/offset等の全入力での頑健性 |
 | 曲面・ソリッド | NURBS/解析曲面、extrude/ruled/revolve/iso、法線・曲率、箱限定のB-rep演算 | 一般トリム/Boolean/fillet/shell/STEP |
-| Mesh / SubD | 生成、診断、面積/体積、法線、溶接、平滑化、細分化、限定修復 | 永続SubD/crease、一般mesh Boolean、完全な交差/肉厚/包含判定 |
+| Mesh / SubD | 生成、辺/頂点fan/重複面の診断、面積/条件付き体積、法線、溶接、平滑化、細分化、限定修復 | 永続SubD/crease、一般mesh Boolean、完全な交差/肉厚/包含判定 |
 | 生成デザイン | グリッド、2D Voronoi/Delaunay/hull、配置、attractor、noise/field、変形 | 3D Voronoi、一般morph/flow/最適化の標準全件 |
 | ファイル / API | native JSON、STL/OBJ/3MF、限定GHX archive/変換、安全なJSON編集API | GH binary、広いGHX、STEP/IGES/3DM/glTF、未知nativeノードの編集保持 |
 | 表示 / Script | 日本語UI、値/ツリー表示、プレビュー、制限付きRhai、式、クラスター | GH Display/Script完全互換、plugin ABI、OS/GPU/DPI網羅検証 |
@@ -59,4 +61,4 @@
 
 GH2 indexはcomponentとparameterを含む。1419をGH1の標準ノード数やNODESとの直接の互換率の分母へ転用しない。
 
-次の対応基盤は [複数出力・未知nativeノード・Nullの移行計画](docs/development/MULTI_OUTPUT_MIGRATION.md)。現在は設計段階であり、ここに挙げた機能を実装済みへ数えない。
+次の対応基盤は [複数出力・未知nativeノード・Nullの移行計画](docs/development/MULTI_OUTPUT_MIGRATION.md)。当ブランチは複数出力を未統合。PR #14/#17等の別実装の存在だけで対応済みへ数えない。

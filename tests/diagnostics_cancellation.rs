@@ -207,10 +207,9 @@ fn evaluation_cancellation_is_preserved_unless_diagnostic_construction_is_cancel
         .params
         .insert("count".into(), 512.);
     let unvisited = add(&mut graph, NodeKind::Add, &[("a", interrupted)]);
-    let evaluation_calls = Cell::new(0);
+    let evaluation_calls = std::sync::atomic::AtomicUsize::new(0);
     let evaluation = Evaluator::default().evaluate(&graph, &|| {
-        evaluation_calls.set(evaluation_calls.get() + 1);
-        evaluation_calls.get() == 30
+        evaluation_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == 30
     });
     assert!(evaluation.cancelled);
     assert!(evaluation.outputs[&completed].is_ok());

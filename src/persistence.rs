@@ -226,6 +226,29 @@ pub(crate) fn atomic_write(
     Ok(())
 }
 
+/// Compare parameter representations as well as their numeric values.
+///
+/// Graph/Project retain ordinary structural PartialEq. Editor and history checks
+/// supplement it with this comparison because +0 and -0 are equal numerically
+/// but produce different branch-cut results and evaluator cache identities.
+/// This also checks parameters inside saved cluster definitions, without
+/// allocating or serializing the graph. Use it alongside the structural checks.
+pub fn same_parameter_bits(a: &Graph, b: &Graph) -> bool {
+    a.nodes.len() == b.nodes.len()
+        && a.clusters.len() == b.clusters.len()
+        && a.nodes.iter().zip(&b.nodes).all(|(a, b)| {
+            a.params.len() == b.params.len()
+                && a.params
+                    .iter()
+                    .zip(&b.params)
+                    .all(|((ak, av), (bk, bv))| ak == bk && av.to_bits() == bv.to_bits())
+        })
+        && a.clusters
+            .iter()
+            .zip(&b.clusters)
+            .all(|(a, b)| same_parameter_bits(&a.graph, &b.graph))
+}
+
 /// Call checkpoint immediately before an actual document edit.
 #[derive(Default)]
 pub struct History {
@@ -244,7 +267,9 @@ impl History {
     }
 
     fn store_checkpoint(&mut self, project: Cow<'_, Project>) {
-        if self.undo.last() != Some(project.as_ref()) {
+        if self.undo.last().is_none_or(|previous| {
+            previous != project.as_ref() || !same_parameter_bits(&previous.graph, &project.graph)
+        }) {
             self.undo.push(project.into_owned());
             if self.undo.len() > HISTORY_LIMIT {
                 self.undo.remove(0);
@@ -288,7 +313,11 @@ pub struct ExportReport {
     /// Edges incident to one triangle, after coordinate welding at 0.000001 mm.
     pub open_edges: usize,
     pub non_manifold_edges: usize,
+    /// Welded vertices whose incident faces do not form one manifold fan.
+    pub non_manifold_vertices: usize,
     pub inconsistent_edges: usize,
+    /// Repeated non-degenerate faces after welding, including opposite winding.
+    pub duplicate_faces: usize,
     pub degenerate_triangles: usize,
     pub mesh_count: usize,
     pub signed_volume_mm3: f64,
@@ -297,11 +326,16 @@ pub struct ExportReport {
 }
 
 impl ExportReport {
+    /// Closed, consistently oriented manifold topology after coordinate welding.
+    /// Does not establish absence of self-intersections, correct shell nesting,
+    /// material volume, wall thickness, or printability.
     pub fn is_closed(&self) -> bool {
         self.triangles > 0
             && self.open_edges == 0
             && self.non_manifold_edges == 0
+            && self.non_manifold_vertices == 0
             && self.inconsistent_edges == 0
+            && self.duplicate_faces == 0
             && self.degenerate_triangles == 0
     }
 }
@@ -340,7 +374,7 @@ pub fn mesh_stats(trees: &[Tree]) -> Result<ExportReport, String> {
         ..ExportReport::default()
     };
     let mut welded: HashMap<[i64; 3], usize> = HashMap::new();
-    let mut edges: HashMap<(usize, usize), (u32, i32)> = HashMap::new();
+    let mut faces = Vec::with_capacity(all_meshes.iter().map(|mesh| mesh.triangles.len()).sum());
     let mut minimum = [f64::INFINITY; 3];
     let mut maximum = [f64::NEG_INFINITY; 3];
     for mesh in all_meshes {
@@ -388,29 +422,18 @@ pub fn mesh_stats(trees: &[Tree]) -> Result<ExportReport, String> {
                 sub(a, volume_origin),
                 cross(sub(b, volume_origin), sub(c, volume_origin)),
             ) / 6.0;
-            for (from, to) in [(wa, wb), (wb, wc), (wc, wa)] {
-                let (key, direction) = if from < to {
-                    ((from, to), 1)
-                } else {
-                    ((to, from), -1)
-                };
-                let edge = edges.entry(key).or_insert((0, 0));
-                edge.0 = edge.0.saturating_add(1);
-                edge.1 += direction;
-            }
+            // The aggregate export budget is 2m vertices, well within u32.
+            // Analyse all meshes together: their welded vertices can touch even
+            // when every separately indexed source is individually manifold.
+            faces.push([wa as u32, wb as u32, wc as u32]);
         }
     }
-    for (count, direction) in edges.values() {
-        if *count == 1 {
-            report.open_edges += 1;
-        }
-        if *count > 2 {
-            report.non_manifold_edges += 1;
-        }
-        if *count == 2 && *direction != 0 {
-            report.inconsistent_edges += 1;
-        }
-    }
+    let topology = crate::mesh_fabrication::audit_topology(welded.len(), &faces, &|| false)?;
+    report.open_edges = topology.boundary_edges;
+    report.non_manifold_edges = topology.non_manifold_edges;
+    report.non_manifold_vertices = topology.non_manifold_vertices;
+    report.inconsistent_edges = topology.orientation_conflicts;
+    report.duplicate_faces = topology.duplicate_faces;
     if minimum.iter().all(|v| v.is_finite()) {
         report.bounds = Some([minimum, maximum]);
     }
@@ -503,7 +526,9 @@ pub fn export_obj(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
         for (object, mesh) in all_meshes.iter().enumerate() {
             writeln!(file, "o Morphlet_{}", object + 1)?;
             for point in &mesh.vertices {
-                writeln!(file, "v {:.9} {:.9} {:.9}", point[0], point[1], point[2])?;
+                // Preserve the validated binary64 coordinates on text round-trip.
+                // Fixed decimals can flatten valid thin triangles after checking.
+                writeln!(file, "v {} {} {}", point[0], point[1], point[2])?;
             }
             for t in &mesh.triangles {
                 writeln!(

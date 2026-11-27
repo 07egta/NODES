@@ -1,0 +1,17 @@
+{
+  "source_commit": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+  "profile": "release; opt-level=3; thin LTO; 16 codegen units; strip=true",
+  "cargo_reported_seconds": 61,
+  "exit_code": 0,
+  "command": "env PATH=/home/agent/.cargo/bin:$PATH CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 cargo build --release --locked --offline --bins",
+  "binaries": {
+    "Morphlet": {
+      "bytes": 19283528,
+      "sha256": "f9990b360dff6ed5ed978146a9b65c7d6f1193ca9682a73f62b3ea60de3b017c"
+    },
+    "nodes-cli": {
+      "bytes": 5490712,
+      "sha256": "602069027a46eee841a19f2e4894ee4e521ab635e8faceea68f9a51fdb198f45"
+    }
+  }
+}

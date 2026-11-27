@@ -32,11 +32,19 @@ fn mul(a: Point3, t: f64) -> Point3 {
 fn dot(a: Point3, b: Point3) -> f64 {
     a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
+fn difference_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    let product = c * d;
+    // Recover the rounding error of c*d, then form a*b-product with one
+    // rounding. Subtracting two separately rounded products can erase a small
+    // plane normal even when all input coordinates are exactly representable.
+    let correction = (-c).mul_add(d, product);
+    a.mul_add(b, -product) + correction
+}
 fn cross(a: Point3, b: Point3) -> Point3 {
     [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
+        difference_of_products(a[1], b[2], a[2], b[1]),
+        difference_of_products(a[2], b[0], a[0], b[2]),
+        difference_of_products(a[0], b[1], a[1], b[0]),
     ]
 }
 fn norm(a: Point3) -> f64 {
@@ -135,15 +143,27 @@ fn check_knots(n: usize, p: usize, k: &[f64]) -> R<()> {
     Ok(())
 }
 
+/// The same one-sided span selects basis values and their local support.
+fn knot_span(k: &[f64], n: usize, p: usize, t: f64) -> usize {
+    if t == k[n] {
+        n - 1
+    } else {
+        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
+    }
+}
+
+fn support_window(k: &[f64], n: usize, p: usize, t: f64) -> std::ops::Range<usize> {
+    let span = knot_span(k, n, p, t);
+    // Keep the whole p+1 window: at endpoints and repeated knots a zero basis
+    // value can still have nonzero first or second derivatives.
+    span - p..span + 1
+}
+
 /// Cox-de Boor basis and analytical first derivative. At the right endpoint use
 /// the interval on its left. At an interior knot choose the right-hand derivative.
 fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
     let mut b = vec![0.; k.len() - 1];
-    let span = if t == k[n] {
-        n - 1
-    } else {
-        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
-    };
+    let span = knot_span(k, n, p, t);
     b[span] = 1.;
     let mut lower = Vec::new();
     for d in 1..=p {
@@ -151,7 +171,9 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
             lower = b.clone();
         }
         let mut next = vec![0.; b.len() - 1];
-        for i in 0..next.len() {
+        // From the degree-zero seed at span, each recurrence can extend its
+        // support one index to the left. Other full-vector entries stay zero.
+        for i in span - d..=span {
             let l = k[i + d] - k[i];
             let r = k[i + d + 1] - k[i + 1];
             if l > 0. {
@@ -163,19 +185,18 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
         }
         b = next;
     }
-    let d = (0..n)
-        .map(|i| {
-            let l = k[i + p] - k[i];
-            let r = k[i + p + 1] - k[i + 1];
-            let a = if l > 0. { p as f64 * lower[i] / l } else { 0. };
-            let z = if r > 0. {
-                p as f64 * lower[i + 1] / r
-            } else {
-                0.
-            };
-            a - z
-        })
-        .collect();
+    let mut d = vec![0.; n];
+    for i in span - p..=span {
+        let l = k[i + p] - k[i];
+        let r = k[i + p + 1] - k[i + 1];
+        let a = if l > 0. { p as f64 * lower[i] / l } else { 0. };
+        let z = if r > 0. {
+            p as f64 * lower[i + 1] / r
+        } else {
+            0.
+        };
+        d[i] = a - z;
+    }
     (b, d)
 }
 /// Values and exact first/second derivatives of the B-spline basis.
@@ -183,11 +204,7 @@ fn basis(k: &[f64], n: usize, p: usize, t: f64) -> (Vec<f64>, Vec<f64>) {
 /// p*N_(i+1,p-1)/(k[i+p+1]-k[i+1]); differentiate once more for N''.
 fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
     let mut b = vec![0.; k.len() - 1];
-    let span = if t == k[n] {
-        n - 1
-    } else {
-        (p..n).find(|&i| k[i] <= t && t < k[i + 1]).unwrap_or(p)
-    };
+    let span = knot_span(k, n, p, t);
     b[span] = 1.;
     let mut d = vec![0.; b.len()];
     let mut dd = d.clone();
@@ -195,7 +212,9 @@ fn basis_second(k: &[f64], n: usize, p: usize, t: f64) -> [Vec<f64>; 3] {
         let mut next = vec![0.; b.len() - 1];
         let mut nd = next.clone();
         let mut ndd = next.clone();
-        for i in 0..next.len() {
+        // Values and both derivatives share this support. Keep endpoint terms
+        // even when their basis value alone is zero.
+        for i in span - degree..=span {
             let l = k[i + degree] - k[i];
             let r = k[i + degree + 1] - k[i + 1];
             if l > 0. {
@@ -511,6 +530,30 @@ impl NurbsSurface {
             knots.clone(),
         )?))
     }
+    /// Work near the most influential control point. Rational derivatives are
+    /// translation invariant; subtracting a large world offset only after
+    /// homogeneous accumulation can otherwise erase the whole derivative.
+    fn evaluation_origin(
+        &self,
+        bu: &[f64],
+        bv: &[f64],
+        us: std::ops::Range<usize>,
+        vs: std::ops::Range<usize>,
+    ) -> Point3 {
+        let mut largest = 0.;
+        let mut origin = self.points[0];
+        for i in us {
+            for j in vs.clone() {
+                let k = i * self.nv + j;
+                let influence = bu[i] * bv[j] * self.weights[k];
+                if influence > largest {
+                    largest = influence;
+                    origin = self.points[k];
+                }
+            }
+        }
+        origin
+    }
     /// Rational derivatives from homogeneous tensor-product derivatives, not a
     /// finite difference or the display mesh. Internal non-C2 knots are rejected.
     pub fn derivatives2(&self, u: f64, v: f64, stop: &dyn Fn() -> bool) -> R<SurfaceJet2> {
@@ -523,16 +566,24 @@ impl NurbsSurface {
         require_second_order_continuity(&self.kv, self.nv, self.pv, tv)?;
         let [bu, du, duu] = basis_second(&self.ku, self.nu, self.pu, tu);
         let [bv, dv, dvv] = basis_second(&self.kv, self.nv, self.pv, tv);
+        let us = support_window(&self.ku, self.nu, self.pu, tu);
+        let vs = support_window(&self.kv, self.nv, self.pv, tv);
+        let origin = self.evaluation_origin(&bu, &bv, us.clone(), vs.clone());
         let su = b - a;
         let sv = d - c;
         let max_weight = self.weights.iter().copied().fold(0., f64::max);
         let mut h = [[0.; 4]; 6];
         for i in 0..self.nu {
             check_cancel(stop)?;
-            for j in 0..self.nv {
+            // Preserve the existing cancellation checkpoints even for rows
+            // whose basis and derivatives vanish on this knot span.
+            if !us.contains(&i) {
+                continue;
+            }
+            for j in vs.clone() {
                 let k = i * self.nv + j;
                 let w = self.weights[k] / max_weight;
-                let p = self.points[k];
+                let p = sub(self.points[k], origin);
                 let q = [p[0] * w, p[1] * w, p[2] * w, w];
                 let coeff = [
                     bu[i] * bv[j],
@@ -564,7 +615,12 @@ impl NurbsSurface {
         let dvv =
             std::array::from_fn(|i| (h[5][i] - point[i] * h[5][3] - 2. * dv[i] * h[2][3]) / w);
         SurfaceJet2 {
-            first: Sample { point, du, dv }.checked()?,
+            first: Sample {
+                point: add(origin, point),
+                du,
+                dv,
+            }
+            .checked()?,
             duu,
             duv,
             dvv,
@@ -582,18 +638,32 @@ impl NurbsSurface {
         let [[a, b], [c, d]] = self.native_domain();
         let tu = if u == 1. { b } else { a + (b - a) * u };
         let tv = if v == 1. { d } else { c + (d - c) * v };
+        let native = self.evaluate_native(tu, tv)?;
+        Sample {
+            point: native.point,
+            du: mul(native.du, b - a),
+            dv: mul(native.dv, d - c),
+        }
+        .checked()
+    }
+    /// Native knot coordinates and native derivatives. Area integration uses
+    /// these directly so short knot spans survive normalized-domain rounding.
+    fn evaluate_native(&self, tu: f64, tv: f64) -> R<Sample> {
         let (bu, du) = basis(&self.ku, self.nu, self.pu, tu);
         let (bv, dv) = basis(&self.kv, self.nv, self.pv, tv);
+        let us = support_window(&self.ku, self.nu, self.pu, tu);
+        let vs = support_window(&self.kv, self.nv, self.pv, tv);
+        let origin = self.evaluation_origin(&bu, &bv, us.clone(), vs.clone());
         let (mut h, mut hu, mut hv) = ([0.; 4], [0.; 4], [0.; 4]);
-        for i in 0..self.nu {
-            for j in 0..self.nv {
+        for i in us {
+            for j in vs.clone() {
                 let k = i * self.nv + j;
                 let w = self.weights[k];
-                let p = self.points[k];
+                let p = sub(self.points[k], origin);
                 let q = [p[0] * w, p[1] * w, p[2] * w, w];
                 let x = bu[i] * bv[j];
-                let y = du[i] * bv[j] * (b - a);
-                let z = bu[i] * dv[j] * (d - c);
+                let y = du[i] * bv[j];
+                let z = bu[i] * dv[j];
                 for s in 0..4 {
                     h[s] += x * q[s];
                     hu[s] += y * q[s];
@@ -607,7 +677,127 @@ impl NurbsSurface {
         let point = std::array::from_fn(|i| h[i] / h[3]);
         let du = std::array::from_fn(|i| (hu[i] - point[i] * hu[3]) / h[3]);
         let dv = std::array::from_fn(|i| (hv[i] - point[i] * hv[3]) / h[3]);
-        Sample { point, du, dv }.checked()
+        Sample {
+            point: add(origin, point),
+            du,
+            dv,
+        }
+        .checked()
+    }
+}
+
+#[derive(Default)]
+struct AreaSum {
+    value: f64,
+    correction: f64,
+}
+impl AreaSum {
+    fn add(&mut self, value: f64) {
+        let adjusted = value - self.correction;
+        let next = self.value + adjusted;
+        self.correction = (next - self.value) - adjusted;
+        self.value = next;
+    }
+}
+
+/// Paired estimates from tensor Gauss-Legendre rules, evaluated separately
+/// on every nonzero knot cell. The difference is a numerical error indicator,
+/// not a certified bound. Refuse an answer if bounded refinement cannot resolve
+/// it; in particular, do not quietly miss narrow rational boundary layers.
+struct NurbsAreaIntegrator<'a> {
+    surface: &'a NurbsSurface,
+    stop: &'a dyn Fn() -> bool,
+    remaining: usize,
+    relative_tolerance: f64,
+}
+impl NurbsAreaIntegrator<'_> {
+    const RULE_3: [(f64, f64); 3] = [
+        (-0.7745966692414834, 5. / 9.),
+        (0., 8. / 9.),
+        (0.7745966692414834, 5. / 9.),
+    ];
+    const RULE_5: [(f64, f64); 5] = [
+        (-0.906179845938664, 0.23692688505618908),
+        (-0.5384693101056831, 0.47862867049936647),
+        (0., 128. / 225.),
+        (0.5384693101056831, 0.47862867049936647),
+        (0.906179845938664, 0.23692688505618908),
+    ];
+
+    fn quadrature(&mut self, bounds: [[f64; 2]; 2], rule: &[(f64, f64)]) -> R<f64> {
+        let [[ua, ub], [va, vb]] = bounds;
+        let half_u = (ub - ua) / 2.;
+        let half_v = (vb - va) / 2.;
+        let mut area = AreaSum::default();
+        for &(u, wu) in rule {
+            let tu = half_u.mul_add(u + 1., ua);
+            for &(v, wv) in rule {
+                check_cancel(self.stop)?;
+                if self.remaining == 0 {
+                    return fail("曲面の面積積分が評価回数の上限までに収束しませんでした。");
+                }
+                self.remaining -= 1;
+                let tv = half_v.mul_add(v + 1., va);
+                if !(ua < tu && tu < ub && va < tv && tv < vb) {
+                    return fail(
+                        "曲面の面積積分が浮動小数点精度の上限に達し、収束を確認できません。",
+                    );
+                }
+                let sample = self.surface.evaluate_native(tu, tv)?;
+                // Apply the change of variables before the cross product. Tiny
+                // knot intervals can have large native derivatives but ordinary
+                // geometric area, which should not overflow an intermediate.
+                let contribution =
+                    norm(cross(mul(sample.du, half_u), mul(sample.dv, half_v))) * wu * wv;
+                if !contribution.is_finite() {
+                    return fail("曲面の面積積分が有限値に収束しませんでした。");
+                }
+                area.add(contribution);
+            }
+        }
+        Ok(area.value)
+    }
+
+    fn cell(&mut self, bounds: [[f64; 2]; 2], depth: usize) -> R<f64> {
+        let coarse = self.quadrature(bounds, &Self::RULE_3)?;
+        let fine = self.quadrature(bounds, &Self::RULE_5)?;
+        if (fine - coarse).abs() <= self.relative_tolerance * fine {
+            return Ok(fine);
+        }
+        if depth == 12 {
+            return fail("曲面の面積積分が細分化の上限までに収束しませんでした。");
+        }
+        let [[ua, ub], [va, vb]] = bounds;
+        let um = ua + (ub - ua) / 2.;
+        let vm = va + (vb - va) / 2.;
+        if !(ua < um && um < ub && va < vm && vm < vb) {
+            return fail("曲面の面積積分が浮動小数点精度の上限に達し、収束を確認できません。");
+        }
+        let mut area = AreaSum::default();
+        for us in [[ua, um], [um, ub]] {
+            for vs in [[va, vm], [vm, vb]] {
+                area.add(self.cell([us, vs], depth + 1)?);
+            }
+        }
+        Ok(area.value)
+    }
+
+    fn integrate(&mut self) -> R<f64> {
+        let mut area = AreaSum::default();
+        for i in self.surface.pu..self.surface.nu {
+            let u = [self.surface.ku[i], self.surface.ku[i + 1]];
+            if u[0] == u[1] {
+                continue;
+            }
+            for j in self.surface.pv..self.surface.nv {
+                check_cancel(self.stop)?;
+                let v = [self.surface.kv[j], self.surface.kv[j + 1]];
+                if v[0] != v[1] {
+                    area.add(self.cell([u, v], 0)?);
+                }
+            }
+        }
+        Ok(area.value)
     }
 }
 
@@ -652,38 +842,52 @@ impl PlaneSurface {
     pub fn area(&self) -> f64 {
         norm(cross(self.u, self.v))
     }
-    /// Exact constrained least-squares solution for a planar parallelogram.
+    /// Constrained least-squares solution for a planar parallelogram. An
+    /// orthogonal frame avoids squaring the conditioning of skew plane axes.
     pub fn closest(&self, p: Point3) -> R<Point3> {
         if !finite(p) {
             return fail("点の座標が無効です。");
         }
         let q = sub(p, self.origin);
-        let a = dot(self.u, self.u);
-        let b = dot(self.u, self.v);
-        let c = dot(self.v, self.v);
-        let d = dot(q, self.u);
-        let e = dot(q, self.v);
-        let det = norm(cross(self.u, self.v)).powi(2);
-        let (x, y) = ((c * d - b * e) / det, (a * e - b * d) / det);
-        let mut candidates = vec![
-            (0., (e / c).clamp(0., 1.)),
-            (1., ((e - b) / c).clamp(0., 1.)),
-            ((d / a).clamp(0., 1.), 0.),
-            (((d - b) / a).clamp(0., 1.), 1.),
-        ];
+        let normal = cross(self.u, self.v);
+        let normal = mul(normal, 1. / norm(normal));
+        let projected = sub(p, mul(normal, dot(q, normal)));
+        let in_plane = sub(projected, self.origin);
+        let u_length = norm(self.u);
+        let e1 = mul(self.u, 1. / u_length);
+        let e2 = cross(normal, e1);
+        let e2 = mul(e2, 1. / norm(e2));
+        let y = dot(in_plane, e2) / dot(self.v, e2);
+        let x = dot(sub(in_plane, mul(self.v, y)), e1) / u_length;
         if (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y) {
-            candidates.push((x, y));
+            // Project in world coordinates instead of reconstructing from
+            // ill-conditioned UV. An interior point on the plane stays put.
+            return Ok(projected);
         }
-        let mut best = None;
-        for (u, v) in candidates {
-            let q = self.evaluate(u, v)?.point;
-            let dist = norm(sub(q, p));
-            if best.is_none_or(|(d, _)| dist < d) {
-                best = Some((dist, q));
+
+        let on_segment = |origin: Point3, axis: Point3| {
+            let t = (dot(sub(projected, origin), axis) / dot(axis, axis)).clamp(0., 1.);
+            std::array::from_fn(|i| t.mul_add(axis[i], origin[i]))
+        };
+        let candidates = [
+            on_segment(self.origin, self.u),
+            on_segment(self.origin, self.v),
+            on_segment(add(self.origin, self.u), self.v),
+            on_segment(add(self.origin, self.v), self.u),
+        ];
+        let mut best = candidates[0];
+        // The squared normal distance is common to all candidates. Excluding
+        // it preserves small in-plane differences for distant query points.
+        let mut distance = dot(sub(best, projected), sub(best, projected));
+        for candidate in candidates.into_iter().skip(1) {
+            let delta = sub(candidate, projected);
+            let candidate_distance = dot(delta, delta);
+            if candidate_distance < distance {
+                best = candidate;
+                distance = candidate_distance;
             }
         }
-        best.map(|(_, p)| p)
-            .ok_or_else(|| "最近点を決定できません。".into())
+        Ok(best)
     }
 }
 
@@ -861,8 +1065,11 @@ impl Surface {
             _ => fail("最近点は現在、平面曲面だけに対応しています。"),
         }
     }
-    /// Analytic primitives have analytic area. NURBS uses bounded midpoint
-    /// integration of |Su x Sv|; this is an estimate, not an error certificate.
+    /// Analytic primitives have analytic area. NURBS integrates |Su x Sv| on
+    /// every nonzero knot cell with adaptive Gauss-Legendre rules. `steps`
+    /// (4..=128) controls the relative convergence target, 1e-3 / steps^2.
+    /// Refinement is bounded by 12 levels and 262144 surface evaluations.
+    /// This remains an estimate, not a certified geometric error bound.
     pub fn area(&self, steps: usize, stop: &dyn Fn() -> bool) -> R<f64> {
         check_cancel(stop)?;
         let area = match &self.0 {
@@ -870,22 +1077,17 @@ impl Surface {
             Geometry::Frustum { r0, r1, h } => PI * (r0 + r1) * ((r1 - r0).powi(2) + h * h).sqrt(),
             Geometry::Sphere { r } => 4. * PI * r * r,
             Geometry::Torus { major, minor } => 4. * PI * PI * major * minor,
-            Geometry::Nurbs(_) => {
+            Geometry::Nurbs(n) => {
                 if !(4..=128).contains(&steps) {
-                    return fail("面積積分の分割数は4〜128です。");
+                    return fail("面積積分の精度設定は4〜128です。");
                 }
-                let mut area = 0.;
-                for i in 0..steps {
-                    check_cancel(stop)?;
-                    for j in 0..steps {
-                        let s = self.evaluate(
-                            (i as f64 + 0.5) / steps as f64,
-                            (j as f64 + 0.5) / steps as f64,
-                        )?;
-                        area += norm(cross(s.du, s.dv));
-                    }
+                NurbsAreaIntegrator {
+                    surface: n,
+                    stop,
+                    remaining: 262_144,
+                    relative_tolerance: 1e-3 / (steps * steps) as f64,
                 }
-                area / (steps * steps) as f64
+                .integrate()?
             }
         };
         if area.is_finite() && area > 0. {
