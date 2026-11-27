@@ -724,7 +724,11 @@ mod directory_listing_tests {
         entries.sort_unstable_by(compare_entries);
         assert_eq!(
             entries.map(|e| e.name),
-            ["zzz".to_string(), "A.morph".to_string(), "a.morph".to_string()]
+            [
+                "zzz".to_string(),
+                "A.morph".to_string(),
+                "a.morph".to_string()
+            ]
         );
     }
 
