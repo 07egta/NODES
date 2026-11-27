@@ -1,0 +1,27 @@
+{
+  "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+      "bytes": 19342
+    },
+    {
+      "label": "after",
+      "revision": "24e92ebd46bfd59cc5ba532c5c9a79df86e16379",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+      "bytes": 21010
+    }
+  ],
+  "before_published_equivalent_revision": "545bcd4208cc6bf7069a75c7e4aadd6d2e915910",
+  "before_published_source_bytes_equal": true,
+  "after_published_equivalent_revision": "46417ae91af8cbe11eb45934d535278ce23df06b",
+  "after_published_source_bytes_equal": true,
+  "after_local_tree": "98b1ffc61c79fdeb7d0bbe11496a4cd3ec0833c3",
+  "after_published_tree": "98b1ffc61c79fdeb7d0bbe11496a4cd3ec0833c3"
+}

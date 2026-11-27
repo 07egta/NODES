@@ -54,8 +54,8 @@ fixture and these exact steps make the check reproducible after that session end
   keyboard input did not reach the native numeric field in this environment.
   Pointer/sliders worked after moving the pointer before clicking. This is an
   automation limitation; it does not establish an application keyboard defect.
-- No numeric editing, clipboard, screen-reader or touch accessibility claim is
-  made from this pointer-driven check.
+- No keyboard-based numeric entry, clipboard, screen-reader or touch
+  accessibility claim is made from this pointer-driven check.
 - Timing values on this small graph are transient measurements, not a benchmark
   or a performance guarantee.
 - Geometry preview, printability and fabrication remain separate verification

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "name": "診断と数値の詳細表示",
+  "pan": [
+    24.0,
+    40.0
+  ],
+  "zoom": 0.9,
+  "graph": {
+    "next_id": 6,
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "construct_vector",
+        "name": "方向 A",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "x": 1000000000.0,
+          "y": 999999999.0,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 1,
+        "kind": "construct_vector",
+        "name": "方向 B",
+        "position": [
+          20,
+          250
+        ],
+        "params": {
+          "x": 999999999.0,
+          "y": 999999998.0,
+          "z": 0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 2,
+        "kind": "vector_angle",
+        "name": "ほぼ平行な角度",
+        "position": [
+          330,
+          120
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 3,
+        "kind": "number",
+        "name": "最小の正数",
+        "position": [
+          20,
+          490
+        ],
+        "params": {
+          "value": 5e-324
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 4,
+        "kind": "number",
+        "name": "符号を持つゼロ",
+        "position": [
+          330,
+          490
+        ],
+        "params": {
+          "value": -0.0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      },
+      {
+        "id": 5,
+        "kind": "number",
+        "name": "大きな数値",
+        "position": [
+          570,
+          490
+        ],
+        "params": {
+          "value": 1000000.0
+        },
+        "inputs": {},
+        "preview": false,
+        "off": false
+      }
+    ]
+  }
+}

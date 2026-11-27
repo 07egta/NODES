@@ -11,7 +11,9 @@ part of the normal application.
 - `diagnostics_before.rs` is byte-exact `src/diagnostics.rs` from
   `7c1a0956adb8edcc29945717a6eb32e0d6335be3`.
 - `diagnostics_after.rs` is byte-exact `src/diagnostics.rs` from
-  `9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856`.
+  local `9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856`, published with the identical
+  Git tree at `545bcd4208cc6bf7069a75c7e4aadd6d2e915910`. Use that published
+  revision for the `git show` reproduction below.
 - `library-module-shim.rs` is appended once to a disposable 7c worktree's
   `src/lib.rs`. It includes both source files as separate library modules.
 - `diagnostics_heap_perf.rs` is copied into that worktree's `examples` directory.
@@ -120,6 +122,9 @@ implementations separately.
   serialization sizes/times and peak complete-process RSS.
 - `smoke-*.json`: earlier small correctness runs, excluded from timing claims.
 - `package-clean.log` and `paired-build.log`: actual successful clean/build logs.
+- The library artifact path in the manifest is historical: later owned benchmark
+  rebuilds can replace that file. The preserved executable and source snapshots
+  retain the evidence for this experiment.
 - `SHA256SUMS`: checksums for the files in this artifact directory, excluding
   the checksum file itself.
 

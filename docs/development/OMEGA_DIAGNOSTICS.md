@@ -385,3 +385,41 @@ upstream documents will be merged into this branch without importing other
 unfinished feature branches. PR #16 now also touches `math_nodes.rs`, but its
 change is confined to Summation/Mean aggregation and does not replace this
 workstream's matrix/vector/angle sections. Preserve both during future integration.
+
+## Functional checkpoint 7: measured memory and faithful numeric display
+
+The compact-root and angle changes are preserved at `46417ae91af8cbe11eb45934d535278ce23df06b`.
+The verified upstream language-policy merge is preserved at
+`bf98da477f3cbe9826d04f12ce885ecaf1380cf3`, with both parents retained. It contains
+only the ten upstream documentation changes; no unreviewed feature branch was
+merged. GitHub Check run `45911704790` on upstream policy head `3a8c99e` was
+independently confirmed successful before publication.
+
+The [root-ordinal memory study](DIAGNOSTICS_ROOT_ORDINAL_RESULTS.md) is complete.
+All 40 fresh measurement processes and two separate complete-report equality
+checks passed. On 16,384 nodes with two high-ID roots, median whole-process peak
+RSS fell from 84,056 to 52,304 KiB (82.09 to 51.08 MiB, **37.77%**). Every before
+RSS sample exceeded every after sample. The first-diagnosis median was 92.437 vs
+46.479 ms, but the full timing range includes an after sample of 218.593 ms; no
+universal latency guarantee is inferred. The 10,000-node successful control's
+memory was essentially unchanged, and its timing also reflects the new
+no-failure early return. Each process includes graph construction, evaluation,
+diagnosis and lightweight checks, rather than measuring only diagnostic memory.
+
+The numerical UI review found a separate problem: the detailed value viewer
+rounded every number to four decimal places, hiding recovered tiny angles as
+`0.0000`. It now keeps ordinary four-place values and signed zero, uses compact
+scientific notation for small nonzero/large values and offers lazy hover detail
+plus **詳しい値をコピー** for full round-trippable scalar/XYZ text. A finite-range
+guard avoids a rounded maximum value being described as infinity. Existing row
+caps remain. Two new formatting tests cover extrema, bounded preview length,
+exact finite-value reconstruction and coordinate components; all four value-viewer
+tests passed. Independent review approved the implementation and context-menu
+wiring. Actual clipboard interaction and a final full-suite/build run remain to
+be checked at this checkpoint.
+
+The successful numeric fixture
+[`numeric-details.morph`](../../tests/fixtures/diagnostics/numeric-details.morph)
+contains the tiny-angle graph, the least positive subnormal, signed zero and a
+large number. It supports the next native GUI check and is separate from the
+intentional two-root failure fixture.
