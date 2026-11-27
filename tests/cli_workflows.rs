@@ -90,6 +90,32 @@ fn save_graph(path: &Path, graph: Graph) {
     persistence::save(path, &Project::new("CLI fixture", graph)).unwrap();
 }
 
+#[test]
+fn text_components_save_reopen_and_measure_unicode() {
+    let dir = TemporaryDirectory::new();
+    let req = dir.path("request.json");
+    let saved = dir.path("text.morph");
+    let edits = json!({ "api_version": 1, "edits": [
+        {"op":"add", "alias":"a", "kind":"text", "position":[0,0]},
+        {"op":"set_text", "node":"a", "value":"曲線,🌳"},
+        {"op":"add", "alias":"separator", "kind":"text", "position":[0,90]},
+        {"op":"set_text", "node":"separator", "value":","},
+        {"op":"add", "alias":"split", "kind":"text_split", "position":[220,0]},
+        {"op":"connect", "from":"a", "to":"split", "input":"text"},
+        {"op":"connect", "from":"separator", "to":"split", "input":"separator"},
+        {"op":"add", "alias":"length", "kind":"text_length", "position":[440,0]},
+        {"op":"connect", "from":"split", "to":"length", "input":"text"}
+    ] });
+    fs::write(&req, serde_json::to_vec(&edits).unwrap()).unwrap();
+    successful("build", &[&req, &saved]);
+    let reopened = successful("evaluate", &[&saved]);
+    let values = node(&reopened, 3)["data"]["preview"].as_array().unwrap();
+    assert_eq!(
+        values.iter().map(|v| &v["value"]).collect::<Vec<_>>(),
+        [&json!(2.), &json!(1.)]
+    );
+}
+
 fn mesh_graph(with_output: bool) -> Graph {
     let mut graph = Graph::default();
     let shape = graph.add(NodeKind::Box, [0.0, 0.0]).unwrap();

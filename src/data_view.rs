@@ -66,6 +66,15 @@ pub fn path_text(path: &[u32]) -> String {
 pub fn value_text(value: &Value) -> String {
     match value {
         Value::Number(v) => format!("{v:.4}"),
+        Value::Text(text) => {
+            const PREVIEW_BYTES: usize = 160;
+            let prefix = morphlet::text_nodes::utf8_prefix(text, PREVIEW_BYTES);
+            if prefix.len() < text.len() {
+                format!("{prefix:?}… ({} バイト)", text.len())
+            } else {
+                format!("{text:?}")
+            }
+        }
         Value::Point(p) => format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2]),
         Value::Curve(c) => format!(
             "{} · 表示 {} 点 · {}",
@@ -173,7 +182,14 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
                                         .size(11.)
                                         .color(theme::MUTED),
                                 );
-                                ui.label(RichText::new(value_text(v)).size(11.).monospace());
+                                let label = egui::Label::new(
+                                    RichText::new(value_text(v)).size(11.).monospace(),
+                                );
+                                ui.add(if matches!(v, Value::Text(_)) {
+                                    label.wrap()
+                                } else {
+                                    label
+                                });
                             });
                         }
                         shown_rows += limit;

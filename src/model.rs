@@ -22,11 +22,13 @@ pub enum DataType {
     Surface,
     Solid,
     DisplayGeometry,
+    Text,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
         match self {
             Self::Number => "数値",
+            Self::Text => "文字列",
             Self::Point => "点",
             Self::Curve => "曲線",
             Self::Mesh => "メッシュ",
@@ -521,6 +523,14 @@ pub enum NodeKind {
     SurfaceDistance,
     SurfaceFramesUv,
     BrepBoxTwoPoints,
+    Text,
+    Concatenate,
+    TextJoin,
+    TextSplit,
+    TextLength,
+    TextTrim,
+    TextFragment,
+    TextDistance,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -904,6 +914,14 @@ impl NodeKind {
             Self::SurfaceDistance,
             Self::SurfaceFramesUv,
             Self::BrepBoxTwoPoints,
+            Self::Text,
+            Self::Concatenate,
+            Self::TextJoin,
+            Self::TextSplit,
+            Self::TextLength,
+            Self::TextTrim,
+            Self::TextFragment,
+            Self::TextDistance,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1562,6 +1580,7 @@ impl NodeKind {
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| crate::transform_nodes::spec(other))
                 .or_else(|| crate::point_nodes::spec(other))
+                .or_else(|| crate::text_nodes::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
                 })
@@ -1580,7 +1599,7 @@ pub struct Node {
     pub params: BTreeMap<String, f64>,
     pub inputs: BTreeMap<String, NodeId>,
     pub preview: bool,
-    /// Script source of a `Script` node. Empty (and not saved) for other nodes.
+    /// Node-specific text, such as script source or a literal Text value.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub script: String,
     /// Definition id (`Graph::clusters`) of a `Cluster` node.
@@ -1821,11 +1840,13 @@ pub enum Value {
     Mesh(Arc<Mesh>),
     Surface(Arc<crate::surface_kernel::SurfaceValue>),
     Solid(Arc<crate::surface_kernel::ClosedSolid>),
+    Text(Arc<str>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
         match self {
             Self::Number(_) => DataType::Number,
+            Self::Text(_) => DataType::Text,
             Self::Point(_) => DataType::Point,
             Self::Curve(_) => DataType::Curve,
             Self::Mesh(_) => DataType::Mesh,
@@ -1836,6 +1857,7 @@ impl Value {
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
+            Self::Text(s) => s.len().max(1),
             Self::Curve(c) => c
                 .points
                 .len()
@@ -1847,6 +1869,12 @@ impl Value {
                 .saturating_add(m.triangles.len().saturating_mul(3)),
             Self::Surface(s) => s.weight(),
             Self::Solid(s) => s.weight(),
+        }
+    }
+    pub fn text(&self) -> Result<&str, String> {
+        match self {
+            Self::Text(value) => Ok(value),
+            _ => Err("文字列を接続してください。".into()),
         }
     }
     pub fn number(&self) -> Result<f64, String> {

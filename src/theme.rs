@@ -217,6 +217,7 @@ pub fn port_color(kind: morphlet::model::DataType) -> Color32 {
     use morphlet::model::DataType::*;
     let (light, dark) = match kind {
         Number => ((149, 95, 26), (239, 186, 95)),
+        Text => ((135, 68, 33), (246, 164, 107)),
         Point => ((158, 61, 112), (242, 154, 203)),
         Curve => ((39, 99, 174), (135, 189, 255)),
         Surface => ((30, 106, 137), (113, 198, 230)),

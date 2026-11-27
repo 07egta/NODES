@@ -37,6 +37,7 @@ pub struct GraphCanvas {
     /// Note being edited in place, and whether its text box still needs focus.
     editing_note: Option<usize>,
     note_focus: bool,
+    text_edit: Option<(NodeId, String, String)>,
     /// World position of the last right-click on the empty canvas.
     menu_at: [f32; 2],
 }
@@ -564,6 +565,11 @@ impl GraphCanvas {
             hr.clone()
                 .on_hover_text(format!("{} · {}", n.name, n.kind.spec().description));
             hr.context_menu(|ui| {
+                if n.kind == NodeKind::Text && ui.button("文字列を編集").clicked() {
+                    self.select_only(n.id);
+                    self.text_edit = Some((n.id, n.script.clone(), n.script.clone()));
+                    ui.close();
+                }
                 if ui.button("このノードを選択").clicked() {
                     self.select_only(n.id);
                     ui.close();
@@ -841,6 +847,16 @@ impl GraphCanvas {
                 "無効 · 出力なし".into()
             } else if let Some(message) = error {
                 format!("! {}", short(message, 15))
+            } else if n.kind == NodeKind::Text {
+                let prefix = morphlet::text_nodes::utf8_prefix(&n.script, 30);
+                format!(
+                    "{prefix:?}{}",
+                    if prefix.len() < n.script.len() {
+                        "…"
+                    } else {
+                        ""
+                    }
+                )
             } else if let Some(Ok(tree)) = evaluation.and_then(|e| e.outputs.get(&n.id)) {
                 format!(
                     "{} · {} 枝 / {} 個",
@@ -965,7 +981,49 @@ impl GraphCanvas {
         if let Some(map) = map_rect {
             self.draw_minimap(ui, &painter, p, rect, map);
         }
+        self.show_text_editor(ui.ctx(), p);
         out
+    }
+
+    fn show_text_editor(&mut self, ctx: &egui::Context, project: &mut Project) {
+        let Some((id, original, draft)) = self.text_edit.take() else {
+            return;
+        };
+        let Some(node) = project.graph.node_mut(id) else {
+            return;
+        };
+        if node.kind != NodeKind::Text || node.script != original {
+            return;
+        }
+        let mut draft = draft;
+        let mut open = true;
+        let mut apply = false;
+        let mut cancel = false;
+        egui::Window::new("文字列を編集")
+            .id(Id::new(("text_literal", id)))
+            .default_width(360.)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                let before = draft.clone();
+                ui.add(
+                    egui::TextEdit::multiline(&mut draft)
+                        .desired_rows(5)
+                        .char_limit(morphlet::text_nodes::MAX_LITERAL_BYTES),
+                );
+                if morphlet::text_nodes::validate_literal(&draft).is_err() {
+                    draft = before;
+                    ui.colored_label(theme::error(), "入力できる文字列は 8192 バイトまでです。");
+                }
+                ui.horizontal(|ui| {
+                    apply = ui.button("適用").clicked();
+                    cancel = ui.button("キャンセル").clicked();
+                });
+            });
+        if apply {
+            node.script = draft;
+        } else if open && !cancel {
+            self.text_edit = Some((id, original, draft));
+        }
     }
 
     fn draw_minimap(

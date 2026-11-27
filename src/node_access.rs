@@ -50,7 +50,7 @@ impl InputAccess {
 /// The evaluator must retain those two nodes' existing empty-input behavior when
 /// using this helper in place of its former narrower list-adapter dispatch flag.
 pub fn uses_list_access(kind: NodeKind) -> bool {
-    matches!(kind, NodeKind::Merge | NodeKind::Loft)
+    matches!(kind, NodeKind::Merge | NodeKind::Loft | NodeKind::TextJoin)
         || crate::mesh_fabrication::is_list_kind(kind)
         || crate::gh_nodes::is_list_kind(kind)
         || crate::data_tree_nodes::is_list_kind(kind)
@@ -85,6 +85,8 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         }
         Merge | Loft if index == 0 => List,
         Loft => FirstItem,
+        TextJoin if index == 0 => List,
+        TextJoin => Item,
         MeshConstruct => List,
         MeshDeleteFaces | MeshCullFaces | MeshDeleteVertices | MeshCullVertices if index == 0 => {
             SingleItem

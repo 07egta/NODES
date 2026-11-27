@@ -87,13 +87,13 @@ pub fn validate_topology(tree: &Tree) -> Result<(), String> {
 
 /// Incremental checks happen before cloning, including for geometry payloads.
 #[derive(Default)]
-struct Builder {
+pub(crate) struct Builder {
     tree: Tree,
     items: usize,
     weight: usize,
 }
 impl Builder {
-    fn append(&mut self, path: Path, items: &[Value]) -> Result<(), String> {
+    pub(crate) fn append(&mut self, path: Path, items: &[Value]) -> Result<(), String> {
         validate_path(&path)?;
         let new = !self.tree.branches.contains_key(&path);
         if new && self.tree.branches.len() >= MAX_ITEMS {
@@ -122,7 +122,7 @@ impl Builder {
         self.weight = weight;
         Ok(())
     }
-    fn finish(self) -> Tree {
+    pub(crate) fn finish(self) -> Tree {
         self.tree
     }
 }

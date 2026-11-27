@@ -235,6 +235,8 @@ pub(crate) fn evaluate_node(
             Tree::single(Value::Number(
                 *node.params.get(spec.key).unwrap_or(&default),
             ))
+        } else if let Some(default) = crate::text_nodes::default_input(node.kind, spec.key) {
+            Tree::single(Value::Text(default.into()))
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
@@ -279,6 +281,9 @@ pub(crate) fn evaluate_node(
             }
         }
         inputs.push(tree);
+    }
+    if crate::text_nodes::spec(node.kind).is_some() {
+        return checked_tree(crate::text_nodes::evaluate(node, &inputs, cancel)?, cancel);
     }
     if crate::data_tree_nodes::is_tree_kind(node.kind) {
         return checked_tree(
@@ -510,6 +515,7 @@ pub(crate) fn checked_tree(tree: Tree, cancel: &dyn Fn() -> bool) -> Result<Tree
                 return Err("計算結果が有限の数値ではありません。".into());
             }
             Value::Point(p) if !finite_point(*p) => return Err("点の座標が無効です。".into()),
+            Value::Text(text) => crate::text_nodes::validate_text(text)?,
             Value::Curve(c)
                 if c.points.len() > MAX_VERTICES || c.points.iter().any(|p| !finite_point(*p)) =>
             {
@@ -1115,7 +1121,9 @@ pub(crate) fn map_shape(
             validate_mesh(&mesh, cancel)?;
             Ok(Value::Mesh(Arc::new(mesh)))
         }
-        Value::Number(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
+        Value::Number(_) | Value::Text(_) => {
+            Err("点・曲線・メッシュのいずれかを接続してください。".into())
+        }
         Value::Surface(_) | Value::Solid(_) => {
             Err("精密曲面・B-rep は専用ノードで変換するか、明示的にメッシュ化してください。".into())
         }

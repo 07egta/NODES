@@ -133,6 +133,7 @@ fn checked_evaluate(project: &Project) -> Result<Evaluation, CliError> {
 fn value_kind(value: &Value) -> &'static str {
     match value {
         Value::Number(_) => "number",
+        Value::Text(_) => "text",
         Value::Point(_) => "point",
         Value::Curve(_) => "curve",
         Value::Mesh(_) => "mesh",
@@ -144,6 +145,10 @@ fn value_kind(value: &Value) -> &'static str {
 fn preview(value: &Value) -> Json {
     match value {
         Value::Number(number) => json!({"kind": "number", "value": number}),
+        Value::Text(text) => {
+            let summary = morphlet::text_nodes::utf8_prefix(text, 4096);
+            json!({"kind": "text", "value": summary, "bytes": text.len(), "value_truncated": summary.len() != text.len()})
+        }
         Value::Point(point) => json!({"kind": "point", "value": point}),
         Value::Curve(curve) => json!({
             "kind": "curve", "display_points": curve.points.len(), "closed": curve.closed,

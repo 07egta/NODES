@@ -25,6 +25,7 @@ pub mod script;
 mod sets_nodes;
 pub mod stl_export;
 pub mod templates;
+pub mod text_nodes;
 mod transform_nodes;
 
 pub mod curve_geometry;

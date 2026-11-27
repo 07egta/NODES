@@ -208,6 +208,7 @@ const CATEGORY_ORDER: [&str; 8] = [
 fn type_hint(kind: DataType) -> &'static str {
     match kind {
         DataType::Number => "数値",
+        DataType::Text => "文字列",
         DataType::Point => "点",
         DataType::Curve => "曲線",
         DataType::Mesh => "メッシュ",

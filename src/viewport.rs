@@ -791,6 +791,7 @@ impl Viewport {
                             0u8.hash(&mut hasher);
                             n.to_bits().hash(&mut hasher);
                         }
+                        Value::Text(_) => 6u8.hash(&mut hasher),
                         Value::Point(p) => {
                             1u8.hash(&mut hasher);
                             for v in p {
@@ -857,7 +858,7 @@ impl Viewport {
                         break 'items;
                     }
                     match value {
-                        Value::Number(_) => {}
+                        Value::Number(_) | Value::Text(_) => {}
                         Value::Point(p) => {
                             if !valid(*p) {
                                 scene.invalid += 1;

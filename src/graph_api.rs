@@ -124,6 +124,7 @@ pub fn permitted(kind: NodeKind) -> bool {
         || crate::transform_nodes::spec(kind).is_some()
         || crate::sets_nodes::spec(kind).is_some()
         || crate::point_nodes::spec(kind).is_some()
+        || crate::text_nodes::spec(kind).is_some()
         || crate::curve_nodes::is_curve_kind(kind)
         || crate::surface_nodes::KINDS.contains(&kind)
         || crate::generative::is_kind(kind)
@@ -222,6 +223,10 @@ pub enum Edit {
         input: String,
         value: f64,
     },
+    SetText {
+        node: String,
+        value: String,
+    },
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -267,7 +272,10 @@ pub fn validate_safe(graph: &Graph) -> Result<(), String> {
     }
     graph.validate()?;
     for node in &graph.nodes {
-        if !permitted(node.kind) || !node.script.is_empty() || node.cluster.is_some() {
+        if !permitted(node.kind)
+            || (node.kind != NodeKind::Text && !node.script.is_empty())
+            || node.cluster.is_some()
+        {
             return Err("untrusted graph contains an executable or unsupported node".into());
         }
         for (key, value) in &node.params {
@@ -342,6 +350,15 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
                 let n = candidate.node_mut(id).ok_or("missing node")?;
                 validate_numeric(n.kind, input, *value)?;
                 n.params.insert(input.clone(), *value);
+            }
+            Edit::SetText { node, value } => {
+                let id = *names.get(node).ok_or("unknown text alias")?;
+                let n = candidate.node_mut(id).ok_or("missing text node")?;
+                if n.kind != NodeKind::Text {
+                    return Err("set_text requires a text literal node".into());
+                }
+                crate::text_nodes::validate_literal(value)?;
+                n.script.clone_from(value);
             }
         }
     }

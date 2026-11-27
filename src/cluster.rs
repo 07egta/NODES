@@ -86,7 +86,9 @@ pub struct ClusterDef {
 /// Extra cache-key text: script source, or a fingerprint of the definitions a cluster uses.
 pub fn key_extra(graph: &Graph, node: &Node) -> String {
     match node.kind {
-        NodeKind::Script | NodeKind::Expression | NodeKind::PathMapper => node.script.clone(),
+        NodeKind::Script | NodeKind::Expression | NodeKind::PathMapper | NodeKind::Text => {
+            node.script.clone()
+        }
         // Path, modified time and size: editing the file on disk recomputes the node.
         NodeKind::ImportMesh => crate::import::source_key(&node.script),
         NodeKind::Cluster => node
@@ -366,9 +368,10 @@ pub fn input_label(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -
     }
     spec.label.to_string()
 }
-/// The Script node's shape input `g` may stay unconnected.
+/// Inputs that may stay unconnected even without a numeric default.
 pub fn input_is_optional(node: &Node, spec: &InputSpec) -> bool {
-    node.kind == NodeKind::Script && spec.key == "g"
+    (node.kind == NodeKind::Script && spec.key == "g")
+        || crate::text_nodes::default_input(node.kind, spec.key).is_some()
 }
 /// True when an unconnected input cannot use a slider value (a shape must be connected).
 pub fn input_needs_link(graph: &Graph, node: &Node, index: usize, spec: &InputSpec) -> bool {
@@ -410,7 +413,9 @@ pub fn validate_graph(graph: &Graph) -> Result<(), String> {
 }
 fn check_nodes(nodes: &[Node], defs: &[ClusterDef]) -> Result<(), String> {
     for node in nodes {
-        if node.script.len() > MAX_SCRIPT_BYTES {
+        if node.kind == NodeKind::Text {
+            crate::text_nodes::validate_literal(&node.script)?;
+        } else if node.script.len() > MAX_SCRIPT_BYTES {
             return Err(format!(
                 "「{}」のスクリプトが長すぎます（上限 {MAX_SCRIPT_BYTES} バイト）。",
                 node.name
