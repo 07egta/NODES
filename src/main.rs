@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
+mod cage_edit;
 mod canvas;
 mod data_view;
 mod diagnostics_ui;
@@ -184,10 +185,12 @@ fn export_demos(dir: &Path) -> Result<(), String> {
             .filter_map(|n| e.outputs.get(&n.id).and_then(|v| v.as_ref().ok()).cloned())
             .collect();
         if trees.iter().any(|t| {
-            t.branches
-                .values()
-                .flatten()
-                .any(|v| matches!(v, nodes::model::Value::Mesh(_)))
+            t.branches.values().flatten().any(|v| {
+                matches!(
+                    v,
+                    nodes::model::Value::Mesh(_) | nodes::model::Value::Brep(_)
+                )
+            })
         }) {
             let r = persistence::export_stl(&dir.join(format!("{:02}.stl", index + 1)), &trees)?;
             println!(

@@ -346,7 +346,13 @@ fn meshes(trees: &[Tree]) -> Result<(Vec<&Mesh>, usize), String> {
     let mut vertices = 0usize;
     let mut triangles = 0usize;
     for value in trees.iter().flat_map(|t| t.branches.values()).flatten() {
-        if let Value::Mesh(mesh) = value {
+        // Exact B-reps export their welded display mesh (`kernel_bridge::display_mesh`).
+        let mesh = match value {
+            Value::Mesh(mesh) => Some(mesh),
+            Value::Brep(b) => Some(b.preview()),
+            _ => None,
+        };
+        if let Some(mesh) = mesh {
             vertices = vertices.saturating_add(mesh.vertices.len());
             triangles = triangles.saturating_add(mesh.triangles.len());
             if vertices > MAX_EXPORT_VERTICES || triangles > MAX_EXPORT_TRIANGLES {

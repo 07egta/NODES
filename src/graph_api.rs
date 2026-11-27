@@ -110,6 +110,7 @@ pub fn permitted(kind: NodeKind) -> bool {
     ) || crate::math_nodes::spec(kind).is_some()
         || crate::curve_nodes::is_curve_kind(kind)
         || crate::surface_nodes::KINDS.contains(&kind)
+        || (crate::nurbs_nodes::is_kind(kind) && !matches!(kind, ExactStepExport | ExactStepImport))
         || crate::gcode_nodes::is_kind(kind)
         || crate::generative::is_kind(kind)
         || (crate::data_tree_nodes::spec(kind).is_some() && kind != PathMapper)
@@ -483,12 +484,22 @@ mod tests {
 
     #[test]
     fn untrusted_capabilities_and_versions_are_rejected() {
-        for kind in ["script", "import_mesh", "cluster", "expression"] {
+        for kind in [
+            "script",
+            "import_mesh",
+            "cluster",
+            "expression",
+            "exact_step_export",
+            "exact_step_import",
+        ] {
             let s = format!(
                 r#"{{"api_version":1,"edits":[{{"op":"add","alias":"bad","kind":"{kind}","position":[0,0]}}]}}"#
             );
             assert!(build(&parse_request(s.as_bytes()).unwrap()).is_err());
         }
+        assert!(permitted(NodeKind::ExactBox));
+        assert!(!permitted(NodeKind::ExactStepExport));
+        assert!(!permitted(NodeKind::ExactStepImport));
         assert!(parse_request(br#"{"api_version":2,"edits":[]}"#).is_err());
         assert!(parse_request(&vec![b' '; MAX_REQUEST_BYTES + 1]).is_err());
     }
