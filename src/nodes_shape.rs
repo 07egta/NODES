@@ -894,10 +894,7 @@ type Frame = ([f64; 3], [f64; 3], [f64; 3]);
 /// Tangent, normal and binormal at each path point. The normal is carried from point to
 /// point by projection (a parallel-transport approximation), so a profile does not spin.
 /// Requires at least two path points.
-fn tube_frames(
-    path: &[[f64; 3]],
-    closed: bool,
-) -> Result<Vec<Frame>, String> {
+fn tube_frames(path: &[[f64; 3]], closed: bool) -> Result<Vec<Frame>, String> {
     let n = path.len();
     let mut tangents = Vec::with_capacity(n);
     for i in 0..n {

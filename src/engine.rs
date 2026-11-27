@@ -209,8 +209,7 @@ impl Evaluator {
                         scope.spawn(|| {
                             loop {
                                 let k = next.fetch_add(1, Ordering::Relaxed);
-                                let (Some(&i), Some(cell)) = (misses.get(k), results.get(k))
-                                else {
+                                let (Some(&i), Some(cell)) = (misses.get(k), results.get(k)) else {
                                     break;
                                 };
                                 if stop() {

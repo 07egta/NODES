@@ -334,10 +334,7 @@ pub fn apply(graph: &mut Graph, request: &Request) -> Result<BTreeMap<String, No
     Ok(names)
 }
 
-pub fn evaluate(
-    graph: &Graph,
-    cancel: &(dyn Fn() -> bool + Sync),
-) -> Result<Evaluation, String> {
+pub fn evaluate(graph: &Graph, cancel: &(dyn Fn() -> bool + Sync)) -> Result<Evaluation, String> {
     validate_safe(graph)?;
     Ok(Evaluator::default().evaluate(graph, cancel))
 }

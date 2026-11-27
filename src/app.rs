@@ -5,7 +5,8 @@ use crate::{
     data_view,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
-    node_icons, node_shelf::{self, ShelfAction},
+    node_icons,
+    node_shelf::{self, ShelfAction},
     theme,
     ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
@@ -656,11 +657,15 @@ impl MorphletApp {
         } else {
             None
         };
-        let selected =
-            selected.and_then(|id| self.project.graph.node(id).map(|n| (id, n.kind.spec().output)));
-        let Some(action) = self
-            .shelf
-            .show(ctx, self.recent.kinds(), selected, self.canvas.last_rect)
+        let selected = selected.and_then(|id| {
+            self.project
+                .graph
+                .node(id)
+                .map(|n| (id, n.kind.spec().output))
+        });
+        let Some(action) =
+            self.shelf
+                .show(ctx, self.recent.kinds(), selected, self.canvas.last_rect)
         else {
             return;
         };
@@ -685,7 +690,10 @@ impl MorphletApp {
             Ok(id) => {
                 self.recent.push(kind);
                 self.canvas.select_only(id);
-                self.notify(format!("「{}」を追加して線をつなぎました", kind.spec().label), false);
+                self.notify(
+                    format!("「{}」を追加して線をつなぎました", kind.spec().label),
+                    false,
+                );
             }
             Err(e) => self.notify(e, true),
         }
@@ -709,7 +717,10 @@ impl MorphletApp {
     }
     /// Writes favourites and recent nodes to the settings file when they change.
     fn persist_shelf_lists(&mut self) {
-        let now = (self.shelf.favorites().to_vec(), self.recent.kinds().to_vec());
+        let now = (
+            self.shelf.favorites().to_vec(),
+            self.recent.kinds().to_vec(),
+        );
         if now != self.saved_lists {
             if now.0 != self.saved_lists.0 {
                 let set: BTreeSet<NodeKind> = now.0.iter().copied().collect();

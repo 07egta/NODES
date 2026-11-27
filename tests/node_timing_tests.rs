@@ -106,9 +106,7 @@ fn interrupted_node_has_partial_time_but_no_partial_output_or_cache() {
     g.node_mut(id).unwrap().params.insert("count".into(), 512.);
     let calls = AtomicUsize::new(0);
     let mut engine = Evaluator::default();
-    let stopped = engine.evaluate(&g, &|| {
-        calls.fetch_add(1, Ordering::SeqCst) + 1 == 20
-    });
+    let stopped = engine.evaluate(&g, &|| calls.fetch_add(1, Ordering::SeqCst) + 1 == 20);
     assert!(stopped.cancelled);
     assert!(stopped.outputs.is_empty());
     assert_eq!((stopped.computed, stopped.cached), (0, 0));
