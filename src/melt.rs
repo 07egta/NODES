@@ -384,7 +384,6 @@ mod tests {
         assert_eq!(down, theme::BTN_DOWN);
     }
 
-    use super::*;
     use nodes::model::NodeKind;
 
     #[test]
@@ -401,8 +400,6 @@ mod tests {
         let only_c = |id: NodeId| id == c;
         assert_eq!(root_cause(&graph, &only_c, c), c);
     }
-
-    use super::*;
 
     #[test]
     fn every_data_type_has_a_marker_and_shapes_differ() {

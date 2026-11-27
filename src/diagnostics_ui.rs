@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn nonempty_filter_does_not_expand_the_window_each_frame() {
         let ctx = egui::Context::default();
-        theme::configure(&ctx, true);
+        theme::configure(&ctx, theme::Mode::Melt);
         let mut graph = Graph::default();
         let id = graph.add(NodeKind::Divide, [0.; 2]).unwrap();
         graph.node_mut(id).unwrap().params.insert("b".into(), 0.);
