@@ -449,6 +449,28 @@ pub enum NodeKind {
     SurfaceGaussianCurvature,
     SurfaceMeanCurvature,
     SurfacePrincipalCurvatures,
+    // Curve, tube, mesh-repair, transform and gyroid nodes (see `nodes_shape.rs`). Appended
+    // after the kinds above; the serde names are the snake_case names of these variants.
+    ArcCurve,
+    Polyline,
+    SmoothCurve,
+    OffsetCurve,
+    PointOnCurve,
+    DivideCurve,
+    Pipe,
+    Sweep,
+    SmoothMesh,
+    Subdivide,
+    WeldMesh,
+    UnifyNormals,
+    MeshInfo,
+    // Same meaning as `Taper` but base/top scale ports; renamed to avoid a serde-name clash.
+    TaperScale,
+    Bend,
+    // 3D grid; `GridArray` (generative) is the 2D one.
+    GridArray3d,
+    Gyroid,
+    RevolvePoints,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -763,6 +785,24 @@ impl NodeKind {
             Self::SurfaceGaussianCurvature,
             Self::SurfaceMeanCurvature,
             Self::SurfacePrincipalCurvatures,
+            Self::ArcCurve,
+            Self::Polyline,
+            Self::SmoothCurve,
+            Self::OffsetCurve,
+            Self::PointOnCurve,
+            Self::DivideCurve,
+            Self::Pipe,
+            Self::Sweep,
+            Self::SmoothMesh,
+            Self::Subdivide,
+            Self::WeldMesh,
+            Self::UnifyNormals,
+            Self::MeshInfo,
+            Self::TaperScale,
+            Self::Bend,
+            Self::GridArray3d,
+            Self::Gyroid,
+            Self::RevolvePoints,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1407,6 +1447,9 @@ impl NodeKind {
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
+                })
+                .or_else(|| {
+                    crate::nodes_shape::is_kind(other).then(|| crate::nodes_shape::spec(other))
                 })
                 .unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }

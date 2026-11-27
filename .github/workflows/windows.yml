@@ -3,7 +3,7 @@ name: Check
 on:
   pull_request:
   push:
-    branches: [main, "evolve/**", "develop/**"]
+    branches: [main, "evolve/**", "develop/**", "unify/**"]
   workflow_dispatch:
 
 permissions:
@@ -142,3 +142,22 @@ jobs:
           path: ${{ runner.temp }}/NODES-windows-x64
           if-no-files-found: error
           retention-days: 14
+      - name: Package Windows zip
+        shell: pwsh
+        run: |
+          $d = "Morphlet-windows"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          Copy-Item target/release/Morphlet.exe $d/
+          Copy-Item examples $d/examples -Recurse
+          New-Item -ItemType Directory -Force $d/docs | Out-Null
+          Copy-Item docs/USER_GUIDE_JA.md $d/docs/ -ErrorAction SilentlyContinue
+          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE $d/
+          Copy-Item "はじめに.txt" $d/ -ErrorAction SilentlyContinue
+          Copy-Item licenses $d/licenses -Recurse -ErrorAction SilentlyContinue
+          Compress-Archive -Path $d -DestinationPath Morphlet-windows.zip
+      - name: Upload Windows zip
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Morphlet-windows
+          path: Morphlet-windows.zip
+          retention-days: 30

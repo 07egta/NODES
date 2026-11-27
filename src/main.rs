@@ -6,6 +6,8 @@ mod file_picker;
 mod gcode_ui;
 mod help;
 mod math_mapper_ui;
+mod node_icons;
+mod node_shelf;
 mod script_ui;
 mod stl_export_ui;
 mod theme;

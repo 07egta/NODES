@@ -5,6 +5,7 @@ use crate::{
     data_view,
     gcode_ui::GcodeDialog,
     help::HelpWindow,
+    node_icons, node_shelf::{self, ShelfAction},
     theme,
     ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
@@ -153,6 +154,10 @@ pub struct MorphletApp {
     shortcuts_open: bool,
     /// Dark theme is on (saved in the settings file).
     dark: bool,
+    /// Node shelf: tabs, favourites, and the drag / Space state.
+    shelf: node_shelf::Shelf,
+    /// Favourites and recent nodes as last written to the settings file.
+    saved_lists: (Vec<NodeKind>, Vec<NodeKind>),
 }
 
 impl MorphletApp {
@@ -190,6 +195,14 @@ impl MorphletApp {
         } else {
             None
         };
+        let (mut favorites, saved_recent) = node_shelf::load_lists();
+        let loaded_favorites = ui_polish::load_favorites();
+        for kind in &loaded_favorites {
+            if !favorites.contains(kind) {
+                favorites.push(*kind);
+            }
+        }
+        let recent = node_shelf::recent_from_saved(&saved_recent);
         let mut app = Self {
             project,
             history: History::default(),
@@ -209,7 +222,7 @@ impl MorphletApp {
             palette_query: String::new(),
             palette_ime: false,
             library_filter: 0,
-            favorites: ui_polish::load_favorites(),
+            favorites: favorites.iter().copied().collect(),
             show_library: true,
             show_workspace: true,
             clipboard: Vec::new(),
@@ -238,10 +251,12 @@ impl MorphletApp {
             values_open: false,
             import_target: None,
             wire_source: None,
-            recent: Recent::default(),
+            recent,
             palette_cursor: 0,
             shortcuts_open: false,
             dark,
+            shelf: node_shelf::Shelf::new(favorites.clone()),
+            saved_lists: (favorites, saved_recent),
         };
         if let Some(e) = initial_error {
             app.notify(e, true);
@@ -634,6 +649,83 @@ impl MorphletApp {
             Err(e) => self.notify(e, true),
         }
     }
+    /// Node shelf strip above the canvas (see `node_shelf.rs`).
+    fn shelf_panel(&mut self, ctx: &egui::Context) {
+        let selected = if self.canvas.selected.len() == 1 {
+            self.canvas.selected.iter().next().copied()
+        } else {
+            None
+        };
+        let selected =
+            selected.and_then(|id| self.project.graph.node(id).map(|n| (id, n.kind.spec().output)));
+        let Some(action) = self
+            .shelf
+            .show(ctx, self.recent.kinds(), selected, self.canvas.last_rect)
+        else {
+            return;
+        };
+        match action {
+            ShelfAction::Add(kind) => match selected {
+                Some((source, output)) if node_shelf::first_input_accepts(kind, output) => {
+                    self.add_suggestion(source, kind)
+                }
+                _ => self.add_node(kind, None),
+            },
+            ShelfAction::Suggest(source, kind) => self.add_suggestion(source, kind),
+            ShelfAction::Place(kind, pos) => {
+                if let Some(at) = self.canvas.world_at(&self.project, pos) {
+                    self.add_node_at(kind, at);
+                }
+            }
+        }
+    }
+    /// Adds a node after `source` and connects it to the first input (shelf and suggestions).
+    fn add_suggestion(&mut self, source: NodeId, kind: NodeKind) {
+        match node_shelf::add_suggested(&mut self.project.graph, source, kind) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(format!("「{}」を追加して線をつなぎました", kind.spec().label), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Adds a dropped node exactly where it was released, without connecting it.
+    fn add_node_at(&mut self, kind: NodeKind, at: [f32; 2]) {
+        match self.project.graph.add(kind, at) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(format!("「{}」を配置しました", kind.spec().label), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Where a keyboard-opened search puts its node: under the pointer on the canvas, else the centre.
+    fn palette_anchor(&self, ctx: &egui::Context) -> [f32; 2] {
+        node_shelf::pointer_in(ctx, self.canvas.last_rect)
+            .and_then(|p| self.canvas.world_at(&self.project, p))
+            .unwrap_or_else(|| self.canvas.center_for_add(&self.project))
+    }
+    /// Writes favourites and recent nodes to the settings file when they change.
+    fn persist_shelf_lists(&mut self) {
+        let now = (self.shelf.favorites().to_vec(), self.recent.kinds().to_vec());
+        if now != self.saved_lists {
+            if now.0 != self.saved_lists.0 {
+                let set: BTreeSet<NodeKind> = now.0.iter().copied().collect();
+                if set != self.favorites {
+                    self.favorites = set;
+                    if let Err(e) = ui_polish::save_favorites(&self.favorites) {
+                        self.notify(e, true);
+                    }
+                }
+            }
+            if let Err(e) = node_shelf::save_lists(&now.0, &now.1) {
+                self.notify(e, true);
+            }
+            self.saved_lists = now;
+        }
+    }
     fn group_selected(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         let name = format!("部品 {}", self.project.graph.clusters.len() + 1);
@@ -766,6 +858,9 @@ impl MorphletApp {
         }
         if let Err(e) = ui_polish::save_favorites(&self.favorites) {
             self.notify(e, true);
+        }
+        if self.shelf.is_favorite(kind) != self.favorites.contains(&kind) {
+            self.shelf.toggle(kind);
         }
     }
     /// Toggle 無効 on the selection: if any selected node is on, turn all off; else on.
@@ -938,7 +1033,11 @@ impl MorphletApp {
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
                 || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::K))
             {
-                self.open_palette(self.canvas.center_for_add(&self.project), None);
+                self.open_palette(self.palette_anchor(ctx), None);
+            }
+            // Space tapped over the canvas (Space + drag still pans; see node_shelf.rs).
+            if self.shelf.space_opens_search(ctx, self.canvas.last_rect) {
+                self.open_palette(self.palette_anchor(ctx), None);
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
@@ -1846,6 +1945,8 @@ impl MorphletApp {
         }
         let mut open = true;
         let mut add = None;
+        // Right-click on a row toggles its favourite (applied after the window closes).
+        let mut star: Option<NodeKind> = None;
         let ordered = ordered_kinds();
         let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
         let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
@@ -1904,12 +2005,21 @@ impl MorphletApp {
                 egui::ScrollArea::vertical().max_height(max_height).show(ui, |ui| {
                     for (index, kind) in matches.iter().enumerate() {
                         let spec = kind.spec();
+                        let favorite = self.favorites.contains(kind);
                         let response = ui.horizontal(|ui| {
-                            let (r, _) = ui.allocate_exact_size(egui::vec2(6., 20.), Sense::hover());
-                            ui.painter().rect_filled(r, 2, theme::category_color(spec.category));
-                            ui.selectable_label(index == cursor, format!("{}  ·  {}", spec.label, spec.category))
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(26., 26.), Sense::hover());
+                            node_icons::paint(ui.painter(), r, *kind, spec.category, theme::category_color(spec.category));
+                            let star = if favorite { "★ " } else { "" };
+                            ui.selectable_label(index == cursor, format!("{star}{}  ·  {}", spec.label, spec.category))
                                 .on_hover_text(spec.description)
                         }).inner;
+                        response.context_menu(|ui| {
+                            let text = if favorite { "★ お気に入りから外す" } else { "★ お気に入りに追加" };
+                            if ui.button(text).clicked() {
+                                star = Some(*kind);
+                                ui.close();
+                            }
+                        });
                         if index == cursor && (first || up || down || r.changed()) { response.scroll_to_me(None); }
                         if response.clicked() { add = Some(*kind); }
                     }
@@ -1919,6 +2029,9 @@ impl MorphletApp {
                     }
                 });
             });
+        if let Some(kind) = star {
+            self.toggle_favorite(kind);
+        }
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
@@ -2268,6 +2381,7 @@ impl eframe::App for MorphletApp {
             self.keyboard(ctx);
         }
         self.topbar(ctx);
+        self.shelf_panel(ctx);
         self.statusbar(ctx);
         if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
             self.library(ctx);
@@ -2277,6 +2391,7 @@ impl eframe::App for MorphletApp {
         }
         self.center_panel(ctx);
         self.palette(ctx);
+        self.persist_shelf_lists();
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
         self.gcode_dialog(ctx);

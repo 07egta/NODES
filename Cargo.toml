@@ -20,9 +20,9 @@ rhai = { version = "=1.27.0", default-features = false, features = ["std", "no_m
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = "fat"
 strip = true
-codegen-units = 16
+codegen-units = 1
 
 [profile.dev]
 opt-level = 1

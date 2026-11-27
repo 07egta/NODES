@@ -285,18 +285,43 @@ pub fn settings_path() -> Option<PathBuf> {
 
 /// Saved theme; dark when nothing is saved yet.
 pub fn load_dark() -> bool {
-    settings_path()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|text| parse_dark(&text))
+    // The settings file holds other lines too (node lists), so only the theme line is read.
+    read_setting("theme")
+        .and_then(|value| parse_dark(&format!("theme={value}")))
         .unwrap_or(true)
 }
 
 pub fn save_dark(dark: bool) -> Result<(), String> {
+    save_setting_line(format_dark(dark))
+}
+
+/// Value of the `key=value` line in the settings file (the text after `key=`).
+pub fn read_setting(key: &str) -> Option<String> {
+    let text = std::fs::read_to_string(settings_path()?).ok()?;
+    let prefix = format!("{key}=");
+    text.lines()
+        .find_map(|line| line.strip_prefix(prefix.as_str()))
+        .map(|value| value.trim().to_owned())
+}
+
+/// Writes a `key=value` line, replacing an older line with the same key and keeping every
+/// other line, so the theme and the node lists can be saved independently.
+pub fn save_setting_line(line: &str) -> Result<(), String> {
     let path = settings_path().ok_or("設定を保存する場所が見つかりません。")?;
+    let key = line.split_once('=').map_or("", |(key, _)| key);
+    let prefix = format!("{key}=");
+    let old = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut text: String = old
+        .lines()
+        .filter(|l| !l.starts_with(prefix.as_str()))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    text.push_str(line);
+    text.push('\n');
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("設定フォルダーを作れません: {e}"))?;
     }
-    std::fs::write(&path, format_dark(dark)).map_err(|e| format!("設定を保存できません: {e}"))
+    std::fs::write(&path, text).map_err(|e| format!("設定を保存できません: {e}"))
 }
 
 /// Favorites are stored separately from the project and theme, using stable enum IDs.
@@ -335,7 +360,9 @@ pub const SHORTCUTS: &[(&str, &str)] = &[
     ("Ctrl+A", "すべて選択"),
     ("Shift+クリック", "選択に追加・外す"),
     ("空きをドラッグ", "範囲選択"),
-    ("Tab / Ctrl+K", "ノードを検索して追加"),
+    ("Tab / Ctrl+K", "ノードを検索して追加（ポインタがキャンバス上ならその位置）"),
+    ("Space を押して離す", "キャンバス上でノードを検索して追加（Space+ドラッグは移動）"),
+    ("ノード棚のボタンをドラッグ", "キャンバスの好きな場所に配置"),
     ("空きをダブルクリック", "その場所にノードを追加"),
     ("出力の丸から空きへドラッグ", "検索して、つないだ状態で追加"),
     ("Ctrl+E", "選択ノードを無効 / 有効"),

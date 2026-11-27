@@ -1,7 +1,7 @@
 //! Recreated after runtime loss; observed times have no hardware speed threshold.
 use morphlet::engine::{Evaluation, Evaluator};
 use morphlet::model::{Graph, NodeId, NodeKind};
-use std::cell::Cell;
+use std::sync::atomic::{AtomicUsize, Ordering};
 fn node(g: &mut Graph, k: NodeKind) -> NodeId {
     g.add(k, [0.; 2]).unwrap()
 }
@@ -104,11 +104,10 @@ fn interrupted_node_has_partial_time_but_no_partial_output_or_cache() {
     let mut g = Graph::default();
     let id = node(&mut g, NodeKind::Series);
     g.node_mut(id).unwrap().params.insert("count".into(), 512.);
-    let calls = Cell::new(0);
+    let calls = AtomicUsize::new(0);
     let mut engine = Evaluator::default();
     let stopped = engine.evaluate(&g, &|| {
-        calls.set(calls.get() + 1);
-        calls.get() == 20
+        calls.fetch_add(1, Ordering::SeqCst) + 1 == 20
     });
     assert!(stopped.cancelled);
     assert!(stopped.outputs.is_empty());

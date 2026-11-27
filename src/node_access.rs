@@ -58,6 +58,7 @@ pub fn uses_list_access(kind: NodeKind) -> bool {
         || crate::math_nodes::is_list_kind(kind)
         || crate::curve_nodes::is_list_kind(kind)
         || crate::generative::is_list(kind)
+        || crate::nodes_shape::is_list_kind(kind)
 }
 
 /// Return the actual input-access contract, or None for a nonexistent port.
