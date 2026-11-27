@@ -12,11 +12,29 @@ eframe = { version = "=0.33.3", default-features = false, features = ["default_f
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 # Already present in Cargo.lock via desktop dependencies; no proprietary GH SDK.
-xml-rs = "=0.8.29"
+xml-rs = "=1.0.0"
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Sandboxed user scripts (スクリプトノード). Exact pin; see docs/ARCHITECTURE.md section 10.
 # No "sync" (the engine lives on one helper thread) and no "unchecked" (limits must stay on).
 rhai = { version = "=1.27.0", default-features = false, features = ["std", "no_module", "no_time", "no_custom_syntax"] }
+# Exact NURBS / B-rep / T-spline kernel vendored from SolidCraft (MIT OR Apache-2.0).
+# See docs/SOLIDCRAFT_CHANGES.md and src/kernel_bridge.rs.
+solidcraft-geom = { path = "crates/sc-geom" }
+solidcraft-kernel = { path = "crates/sc-kernel" }
+
+[workspace]
+resolver = "3"
+members = [".", "crates/sc-geom", "crates/sc-kernel"]
+# Third-party truck crates kept with SolidCraft's local fixes (vendor/README.md); not linted as ours.
+exclude = ["vendor"]
+
+# SolidCraft's fixed truck copies (Apache-2.0), wired in exactly as upstream SolidCraft does.
+[patch.crates-io]
+truck-geometry = { path = "vendor/truck-geometry" }
+truck-shapeops = { path = "vendor/truck-shapeops" }
+truck-stepio = { path = "vendor/truck-stepio" }
+truck-meshalgo = { path = "vendor/truck-meshalgo" }
+matext4cgmath = { path = "vendor/matext4cgmath" }
 
 [profile.release]
 opt-level = 3
@@ -29,6 +47,17 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 2
+# truck's debug-only checks reject valid geometry (seam edges, closed edges); SolidCraft builds
+# its tests without them for the same reason.
+debug-assertions = false
+
+[profile.dev.package.solidcraft-geom]
+opt-level = 2
+debug-assertions = false
+
+[profile.dev.package.solidcraft-kernel]
+opt-level = 2
+debug-assertions = false
 
 [[bin]]
 name = "NODES"

@@ -59,6 +59,7 @@ pub fn uses_list_access(kind: NodeKind) -> bool {
         || crate::curve_nodes::is_list_kind(kind)
         || crate::generative::is_list(kind)
         || crate::nodes_shape::is_list_kind(kind)
+        || crate::nurbs_nodes::is_list_kind(kind)
 }
 
 /// Return the actual input-access contract, or None for a nonexistent port.
@@ -88,6 +89,9 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         Merge | Loft if index == 0 => List,
         Loft => FirstItem,
         MeshConstruct => List,
+        ExactNetworkSurface if index <= 1 => List,
+        SubdCageEdit => Tree,
+        ExactStepExport => Tree,
         CurveWeightedNurbs if index <= 2 => List,
         CurveShatter if index <= 1 => List,
         PointArray if index == 1 => SingleItem,

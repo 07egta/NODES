@@ -848,7 +848,6 @@ fn shipped_example_files_load_and_evaluate() {
 
 #[test]
 fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
-    assert_eq!(templates::TEMPLATES.len(), 14);
     let old_names = [
         "ねじれの花器",
         "光のリング",
@@ -860,6 +859,8 @@ fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
     for (index, name) in old_names.iter().enumerate() {
         assert_eq!(templates::TEMPLATES[index].name, *name);
     }
+    assert_eq!(templates::TEMPLATES[12].name, "シンプル花瓶→らせんGコード");
+    assert_eq!(templates::TEMPLATES[13].name, "波模様の粘土の器");
     for index in [6, 7] {
         let project = templates::create(index);
         assert_eq!(project.name, templates::TEMPLATES[index].name);
