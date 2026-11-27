@@ -363,6 +363,8 @@ impl Viewport {
     }
 
     /// Fill the remaining UI area and return the picked geometry's source node.
+    /// Plain-slice entry point; the app uses `show_shared`.
+    #[cfg(test)]
     pub fn show(&mut self, ui: &mut egui::Ui, items: &[PreviewItem]) -> Option<u64> {
         self.show_snapshot(ui, Some(items), false)
     }
