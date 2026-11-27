@@ -309,6 +309,7 @@ impl Evaluator {
                 out.outputs.insert(id, result);
                 out.node_timings
                     .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
+            }
         }
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
