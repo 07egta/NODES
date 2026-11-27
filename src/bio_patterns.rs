@@ -393,8 +393,7 @@ fn reaction(args: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, St
                 let lap_b = neighbors.iter().map(|&k| b[k]).sum::<f64>() - 4. * b[j];
                 let uvv = a[j] * b[j] * b[j];
                 next_a[j] = (a[j] + 0.2 * (lap_a - uvv + feed * (1. - a[j]))).clamp(0., 1.);
-                next_b[j] = (b[j] + 0.2 * (0.5 * lap_b + uvv - (feed + kill) * b[j]))
-                    .clamp(0., 1.);
+                next_b[j] = (b[j] + 0.2 * (0.5 * lap_b + uvv - (feed + kill) * b[j])).clamp(0., 1.);
             }
         }
         std::mem::swap(&mut a, &mut next_a);
@@ -425,8 +424,7 @@ pub(crate) fn run_item(
     match kind {
         Phyllotaxis => {
             let n = count(args, 0)?;
-            let (spacing, rise, angle) =
-                (num(args, 1)?, num(args, 2)?, num(args, 3)?.to_radians());
+            let (spacing, rise, angle) = (num(args, 1)?, num(args, 2)?, num(args, 3)?.to_radians());
             let mut out = Vec::with_capacity(n);
             for k in 0..n {
                 cancelled(cancel)?;
