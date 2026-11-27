@@ -127,4 +127,24 @@ the actual button/spacing width. The follow-up lays out the button first at the
 right, then lets the text field consume the remaining width. A real-theme,
 60-frame headless egui regression failed on the old layout and passed after this
 change. All five diagnostic UI tests passed. Native confirmation of the fixed
-window width is recorded separately when performed.
+window width follows below.
+
+## Native confirmation of the search-layout fix
+
+Repeated the search workflow on 2026-11-27 at approximately 09:27–09:29 JST with
+the debug binary built from `3e3bb46185628e479888053fe4e4ff606047c244` and the same
+`paging.morph` fixture. Entering **#100** showed the one expected ID; replacing
+it with **001** showed **#01 原因001**. Across successive native observations,
+the diagnostic window kept the same approximately 604-pixel width and the clear
+button remained visible. This is an observed layout result, not a timing test.
+
+Clicked the actual clear button. The empty filter and all 101 root candidates
+returned, with **1–100件目** on the first page and the same stable window width.
+Stopped only this owned test instance; the other developer's independent NODES
+window remained running. No fixture file was saved or modified by this check.
+
+The controlled pre-fix regression failure and the five passing post-fix UI
+tests are preserved alongside the exact-source full test run in
+[the cancellation validation evidence](diagnostics-cancellation-validation/README.md).
+This additional check does not establish Japanese IME, Windows GUI or live-rename
+behavior; the limitations of the earlier workflows still apply.

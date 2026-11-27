@@ -1,0 +1,346 @@
+{
+  "started_at_utc": "2026-11-27T00:30:04.996758+00:00",
+  "completed_at_utc": "2026-11-27T00:30:06.951956+00:00",
+  "pooling": "Median of ten repeated samples/path/case pooled from two processes with reversed corresponding orders. First-report calls excluded. Positive percentage change means slower diagnosis.",
+  "cases": [
+    {
+      "case": "success-10000",
+      "nodes": 10000,
+      "expected_roots": 0,
+      "expected_blocked": 0,
+      "paths": {
+        "before": {
+          "samples_ms": [
+            8.334825,
+            10.588547,
+            9.111367,
+            6.893624999999999,
+            7.431748,
+            6.6893650000000004,
+            7.038799,
+            7.825866,
+            7.634875999999999,
+            7.6987000000000005
+          ],
+          "median_ms": 7.666788,
+          "min_ms": 6.6893650000000004,
+          "max_ms": 10.588547,
+          "first_report_calls_ms": [
+            10.031829,
+            7.02582
+          ],
+          "first_serialization_ms": [
+            2.804283,
+            2.511834
+          ]
+        },
+        "after_wrapper": {
+          "samples_ms": [
+            10.183443,
+            9.942729000000002,
+            9.543681,
+            8.395605,
+            8.742945,
+            7.114811,
+            7.104907,
+            7.398078,
+            7.551033,
+            6.918482999999999
+          ],
+          "median_ms": 7.973319,
+          "min_ms": 6.918482999999999,
+          "max_ms": 10.183443,
+          "first_report_calls_ms": [
+            10.35222,
+            11.388534
+          ],
+          "first_serialization_ms": [
+            5.051217,
+            3.106738
+          ]
+        },
+        "after_atomic": {
+          "samples_ms": [
+            8.567637,
+            8.353252,
+            7.749414,
+            7.717737,
+            6.705629,
+            7.153698,
+            7.994444,
+            7.264661,
+            8.917231,
+            6.956348
+          ],
+          "median_ms": 7.7335755,
+          "min_ms": 6.705629,
+          "max_ms": 8.917231,
+          "first_report_calls_ms": [
+            21.786102000000003,
+            12.599615
+          ],
+          "first_serialization_ms": [
+            10.191255,
+            6.440269
+          ]
+        }
+      },
+      "after_wrapper_change_vs_before_percent": 3.998167159441479,
+      "after_atomic_change_vs_before_percent": 0.8711275178079791,
+      "after_atomic_change_vs_wrapper_percent": -3.006821876811905,
+      "fixture_build_ms": [
+        16.205886999999997,
+        13.671752
+      ],
+      "evaluation_ms": [
+        36.888867999999995,
+        54.620117
+      ],
+      "json_bytes": [
+        1471787,
+        1474494
+      ],
+      "oracle": {
+        "all_calls_equal_complete_serialized_report": true,
+        "checked_fields": "All node/root/blocked counts; all sorted capped relationship IDs and exact counts; all truncation flags; real error messages; complete timing coverage; successful chain value",
+        "full_report_json_bytes": 1471787,
+        "independently_verified_implementations": [
+          "after_atomic",
+          "after_wrapper",
+          "before"
+        ],
+        "maximum_affected_count": 0,
+        "maximum_upstream_root_count": 0,
+        "method": "Analytic prefix intervals or balanced-tree root intervals plus explicit ID permutation; no diagnostic traversal reused",
+        "truncated_affected_records": 0,
+        "truncated_upstream_records": 0
+      }
+    },
+    {
+      "case": "prefix-1024",
+      "nodes": 2047,
+      "expected_roots": 1024,
+      "expected_blocked": 1023,
+      "paths": {
+        "before": {
+          "samples_ms": [
+            5.46112,
+            5.33199,
+            5.571491,
+            5.965241,
+            5.960374,
+            6.246535,
+            5.897691,
+            5.518243,
+            5.401381000000001,
+            5.628085
+          ],
+          "median_ms": 5.599788,
+          "min_ms": 5.33199,
+          "max_ms": 6.246535,
+          "first_report_calls_ms": [
+            6.600465,
+            5.594265
+          ],
+          "first_serialization_ms": [
+            3.484764,
+            2.26425
+          ]
+        },
+        "after_wrapper": {
+          "samples_ms": [
+            6.492707,
+            5.774841,
+            5.686240000000001,
+            5.989116,
+            5.887267,
+            6.075773,
+            5.78066,
+            5.950199,
+            6.2577300000000005,
+            6.184162
+          ],
+          "median_ms": 5.9696575,
+          "min_ms": 5.686240000000001,
+          "max_ms": 6.492707,
+          "first_report_calls_ms": [
+            6.463423000000001,
+            6.373981
+          ],
+          "first_serialization_ms": [
+            2.670256,
+            2.253213
+          ]
+        },
+        "after_atomic": {
+          "samples_ms": [
+            6.142771,
+            6.586595,
+            6.419148000000001,
+            6.300744,
+            6.774291,
+            6.171083,
+            5.883541,
+            6.302848,
+            6.189100000000001,
+            5.934184999999999
+          ],
+          "median_ms": 6.244922000000001,
+          "min_ms": 5.883541,
+          "max_ms": 6.774291,
+          "first_report_calls_ms": [
+            6.54305,
+            7.112458
+          ],
+          "first_serialization_ms": [
+            2.262016,
+            3.3761550000000002
+          ]
+        }
+      },
+      "after_wrapper_change_vs_before_percent": 6.605062548796492,
+      "after_atomic_change_vs_before_percent": 11.520686140261027,
+      "after_atomic_change_vs_wrapper_percent": 4.6110601822634045,
+      "fixture_build_ms": [
+        2.2524110000000004,
+        2.9183
+      ],
+      "evaluation_ms": [
+        3.751966,
+        3.7242159999999997
+      ],
+      "json_bytes": [
+        2307891,
+        2308565
+      ],
+      "oracle": {
+        "all_calls_equal_complete_serialized_report": true,
+        "checked_fields": "All node/root/blocked counts; all sorted capped relationship IDs and exact counts; all truncation flags; real error messages; complete timing coverage; successful chain value",
+        "full_report_json_bytes": 2307891,
+        "independently_verified_implementations": [
+          "after_atomic",
+          "after_wrapper",
+          "before"
+        ],
+        "maximum_affected_count": 1023,
+        "maximum_upstream_root_count": 1024,
+        "method": "Analytic prefix intervals or balanced-tree root intervals plus explicit ID permutation; no diagnostic traversal reused",
+        "truncated_affected_records": 768,
+        "truncated_upstream_records": 960
+      }
+    },
+    {
+      "case": "interleaved-512",
+      "nodes": 1805,
+      "expected_roots": 767,
+      "expected_blocked": 1038,
+      "paths": {
+        "before": {
+          "samples_ms": [
+            7.558472999999999,
+            7.444425,
+            8.546466,
+            9.029036000000001,
+            7.852626,
+            7.751106,
+            7.956849,
+            7.681633000000001,
+            7.621416,
+            8.42703
+          ],
+          "median_ms": 7.801866,
+          "min_ms": 7.444425,
+          "max_ms": 9.029036000000001,
+          "first_report_calls_ms": [
+            7.8912830000000005,
+            8.431687
+          ],
+          "first_serialization_ms": [
+            2.485033,
+            1.657386
+          ]
+        },
+        "after_wrapper": {
+          "samples_ms": [
+            8.102482,
+            7.715094,
+            8.448331,
+            8.002977,
+            7.88982,
+            7.906575000000001,
+            8.450975,
+            8.582649,
+            8.405719000000001,
+            8.130214
+          ],
+          "median_ms": 8.116348,
+          "min_ms": 7.715094,
+          "max_ms": 8.582649,
+          "first_report_calls_ms": [
+            7.9222779999999995,
+            8.935728000000001
+          ],
+          "first_serialization_ms": [
+            1.642184,
+            1.518492
+          ]
+        },
+        "after_atomic": {
+          "samples_ms": [
+            9.108162,
+            7.890492000000001,
+            8.505526,
+            8.436012999999999,
+            8.584591000000001,
+            8.559155,
+            8.927376,
+            8.44051,
+            8.724929,
+            8.506006
+          ],
+          "median_ms": 8.5325805,
+          "min_ms": 7.890492000000001,
+          "max_ms": 9.108162,
+          "first_report_calls_ms": [
+            8.416425,
+            16.049648
+          ],
+          "first_serialization_ms": [
+            1.587364,
+            2.796452
+          ]
+        }
+      },
+      "after_wrapper_change_vs_before_percent": 4.03085620798922,
+      "after_atomic_change_vs_before_percent": 9.365894005357166,
+      "after_atomic_change_vs_wrapper_percent": 5.128322491839921,
+      "fixture_build_ms": [
+        2.285961,
+        3.063274
+      ],
+      "evaluation_ms": [
+        3.503922,
+        5.201207
+      ],
+      "json_bytes": [
+        1484309,
+        1484733
+      ],
+      "oracle": {
+        "all_calls_equal_complete_serialized_report": true,
+        "checked_fields": "All node/root/blocked counts; all sorted capped relationship IDs and exact counts; all truncation flags; real error messages; complete timing coverage; successful chain value",
+        "full_report_json_bytes": 1484309,
+        "independently_verified_implementations": [
+          "after_atomic",
+          "after_wrapper",
+          "before"
+        ],
+        "maximum_affected_count": 536,
+        "maximum_upstream_root_count": 513,
+        "method": "Analytic prefix intervals or balanced-tree root intervals plus explicit ID permutation; no diagnostic traversal reused",
+        "truncated_affected_records": 512,
+        "truncated_upstream_records": 534
+      }
+    }
+  ]
+}

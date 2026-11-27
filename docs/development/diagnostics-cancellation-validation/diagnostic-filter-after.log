@@ -1,0 +1,13 @@
+   Compiling morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES)
+    Finished `test` profile [optimized] target(s) in 4.64s
+     Running unittests src/main.rs (target/debug/build/morphlet/9d17213954843cf7/out/Morphlet-9d17213954843cf7)
+
+running 5 tests
+test diagnostics_ui::tests::cached_node_lookup_keeps_live_names_and_rejects_reordered_indices ... ok
+test diagnostics_ui::tests::incomplete_or_cancelled_results_never_display_success ... ok
+test diagnostics_ui::tests::name_filter_uses_live_renames_without_new_diagnosis ... ok
+test diagnostics_ui::tests::the_101st_root_is_reachable_by_page_and_exact_id_filter ... ok
+test diagnostics_ui::tests::nonempty_filter_does_not_expand_the_window_each_frame ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+

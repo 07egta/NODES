@@ -501,3 +501,49 @@ the field into the remaining width. A 60-frame real-theme egui regression failed
 on the old code and passed after the fix; all **five diagnostic UI tests** passed.
 The [GUI record](DIAGNOSTICS_GUI_CHECK.md) and saved paging fixture preserve the
 reproduction and distinguish native checks from automated layout verification.
+
+## Functional checkpoint 10: verified current source and cancellation costs
+
+The preceding implementation is remotely preserved at
+`3e3bb46185628e479888053fe4e4ff606047c244` (tree
+`8f5f93cf0c4b64ac2059b698b7e4f88de12fc75c`). A complete local run on that exact
+source passed **486 tests, 0 failed, 2 ignored across 44 suites**, formatting,
+all-target check, strict all-target Clippy and both debug/release binaries.
+The release build took 91.066 seconds using cached dependencies; it is not a
+startup-time claim. The previous 481-test evidence remains separately attributed.
+[Commands, logs, source hashes and binary fingerprints](diagnostics-cancellation-validation/README.md)
+are retained, including the controlled old-layout failure and five passing UI tests.
+
+Actual release CLI diagnosis of the three saved fixtures returned the expected
+exit codes and counts: six successful numeric nodes; two roots/two blocked nodes;
+and 101 independent roots plus one disabled node. Before/after SHA256 values
+confirm that all three input documents remained unchanged. Native use of the
+fixed debug application confirmed that `#100`, the name fragment `001`, and the
+clear button kept the resizable diagnostic window's width stable. This completes
+the observed layout fix without broadening the GUI/platform claims.
+
+A final bounded [ordinary-path cancellation experiment](DIAGNOSTICS_CANCELLATION_COST.md)
+compared the exact `f858186` and `3e3bb46` diagnostic modules in one fresh binary
+with a fixed model/evaluator baseline. Six processes provide ten repeated samples
+per path/case, reversing corresponding execution orders. Complete report bytes
+and independent analytic expectations passed for every call. The actual Worker-like
+Atomic callback is measured separately from the constant-false public wrapper.
+
+Worker-like median times changed from 7.667 to 7.734 ms on a successful 10,000-node
+chain (**+0.87%**), 5.600 to 6.245 ms for 1,024 prefix roots (**+11.52%**), and
+7.802 to 8.533 ms for the interleaved fixture with 512 core roots (**+9.37%**).
+These measured costs are retained in full. They buy the ability to abandon an
+obsolete diagnostic; they are not a speedup, universal overhead bound, or measured
+cancellation-latency guarantee. No additional runs were used to search for better
+numbers. Separate review verified the actual snapshots, oracle, measurement
+orders, raw files and median/percentage calculations.
+
+At 09:29 JST, the source's
+[CI run45916532302](https://github.com/07egta/NODES/actions/runs/45916532302) had
+completed Linux tests/build/artifact upload; Windows was still testing. Subsequent
+status belongs in the PR or a later dated record rather than being inferred here.
+PR #16 advanced to `25f981b794e3e0f037cd664915ce144347b49f40`; its new offline help
+and app shortcuts do not alter the Worker/diagnostic sections. Its rewritten user
+guide does require deliberate migration of these diagnostic and precise-number
+instructions. PR #20's public command/schema conflict remains unresolved. See the
+updated [handoff](OMEGA_HANDOFF_20261127.md) before combining branches.
