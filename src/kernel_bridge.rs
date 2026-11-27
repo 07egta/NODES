@@ -436,7 +436,7 @@ pub fn curve_pieces(c: &Curve, stop: Stop) -> R<(Vec<Piece>, bool)> {
     if pieces
         .iter()
         .flat_map(|p| p.points())
-        .any(|(p, w)| !finite(p) || !(w > 0.))
+        .any(|(p, w)| !finite(p) || w.is_nan() || w <= 0.)
     {
         return Err("曲線に無効な座標または重みがあります。".into());
     }
@@ -1385,7 +1385,10 @@ pub fn rebuild_curve(c: &Curve, count: usize, degree: usize, stop: Stop) -> R<Cu
 }
 
 /// Dense polyline of a curve with the piece parameter of every sample, for intersections.
-fn dense(c: &Curve, stop: Stop) -> R<(Vec<Piece>, Vec<(usize, f64, P3)>)> {
+/// A dense sample: piece index, piece parameter and point.
+type Sample = (usize, f64, P3);
+
+fn dense(c: &Curve, stop: Stop) -> R<(Vec<Piece>, Vec<Sample>)> {
     let (pieces, _) = curve_pieces(c, stop)?;
     let mut out = Vec::new();
     for (i, piece) in pieces.iter().enumerate() {
