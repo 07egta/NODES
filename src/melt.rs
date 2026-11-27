@@ -331,8 +331,13 @@ pub fn tool_button(
     let on_t = ctx.animate_value_with_time(resp.id.with("on"), if on { 1.0 } else { 0.0 }, 0.12);
     let pressed = enabled && resp.is_pointer_button_down_on();
     let (fill, edge) = button_colors(hot, on_t, pressed);
-    ui.painter()
-        .rect(rect, 6, fill, Stroke::new(1.0, edge), StrokeKind::Inside);
+    ui.painter().rect(
+        rect,
+        6,
+        fill,
+        Stroke::new(1.0_f32, edge),
+        StrokeKind::Inside,
+    );
     let ink = if !enabled {
         theme::MELT_DIM.gamma_multiply(0.5)
     } else if on {

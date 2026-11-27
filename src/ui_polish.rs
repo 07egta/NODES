@@ -389,7 +389,7 @@ pub fn settings_path() -> Option<PathBuf> {
 pub fn load_theme() -> theme::Mode {
     // The settings file holds other lines too (node lists), so only the theme line is read.
     read_setting("theme")
-        .and_then(|value| theme::Mode::parse(&value))
+        .and_then(|value| parse_theme(&format!("theme={value}")))
         .unwrap_or(theme::Mode::Melt)
 }
 

@@ -102,8 +102,6 @@ pub const MELT_DIM: Color32 = c(158, 158, 158);
 pub const MELT_ACCENT: Color32 = c(52, 178, 120);
 pub const MELT_ACCENT_SOFT: Color32 = c(34, 118, 82);
 pub const MELT_ERROR: Color32 = c(244, 124, 132);
-pub const MELT_SELECTION: Color32 = c(250, 200, 110);
-pub const MELT_INFO: Color32 = c(74, 163, 216);
 /// Button surface states (flat fill and a 1px edge).
 pub const BTN_FILL: Color32 = c(42, 42, 44);
 pub const BTN_EDGE: Color32 = c(48, 48, 50);
