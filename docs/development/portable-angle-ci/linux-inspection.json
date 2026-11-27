@@ -1,0 +1,29 @@
+{
+  "artifact_id": 15164386802,
+  "artifact_zip_sha256": "8c8d0c2ef4f1f3df941be2db38c8728a77300acfab0106de2c014559f0ec1573",
+  "github_digest_verified": true,
+  "size_bytes": 14008773,
+  "archive_members": [
+    "NODES-linux-x64.tar.gz"
+  ],
+  "build_info": "NODES development build\nCommit: d3128a29f45f142873ca0ba8a0d2d72d1161d924\nTarget: x86_64-unknown-linux-gnu\nGUI and physical 3D printing validation are separate from CI.\n",
+  "build_commit": "d3128a29f45f142873ca0ba8a0d2d72d1161d924",
+  "tested_tree": "55903180e8609378657c00095833c295b9e4caf9",
+  "head_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+  "binaries": {
+    "Morphlet": {
+      "size_bytes": 19390752,
+      "sha256": "da2fbf21d77a20077d53735cb344ecd4d4088a9c621946787e17541ff4bb8752",
+      "format": "ELF64 little-endian",
+      "machine": 62
+    },
+    "nodes-cli": {
+      "size_bytes": 5587920,
+      "sha256": "16b14142945a1e27a87660b6fbdb2c8e055ce2b5ad0c986131c2ec5aac8457ab",
+      "format": "ELF64 little-endian",
+      "machine": 62
+    }
+  },
+  "runtime_execution_performed": true,
+  "runtime_execution_scope": "nodes-cli only; three actual diagnose fixtures, see linux-cli-smoke.json; desktop binary not run."
+}

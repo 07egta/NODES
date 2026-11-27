@@ -1,0 +1,61 @@
+2026-11-27T00:56:08.0498621Z   1.100.0-x86_64-unknown-linux-gnu installed - rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T00:56:08.0760264Z   1.100.0-x86_64-unknown-linux-gnu unchanged - rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T00:56:08.1760769Z rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T00:56:59.3756253Z rustc 1.100.0 (0ef1bc386 2026-11-09)
+2026-11-27T00:56:59.3894382Z ##[group]Run cargo fmt --all -- --check
+2026-11-27T00:57:01.1041858Z ##[group]Run cargo check --all-targets --locked
+2026-11-27T00:58:20.6095904Z [1m[92m    Finished[0m `dev` profile [optimized] target(s) in 1m 19s
+2026-11-27T00:58:20.6275542Z ##[group]Run cargo clippy --all-targets --locked -- -D warnings
+2026-11-27T00:58:24.3954734Z [1m[92m    Finished[0m `dev` profile [optimized] target(s) in 3.74s
+2026-11-27T00:58:24.4202083Z ##[group]Run cargo test --all-targets --locked
+2026-11-27T01:00:51.7406047Z [1m[92m    Finished[0m `test` profile [optimized] target(s) in 2m 27s
+2026-11-27T01:00:51.8206186Z test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+2026-11-27T01:00:51.8382988Z test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+2026-11-27T01:00:51.8394645Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:51.8410147Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:51.8896239Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-11-27T01:00:52.0750715Z test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.18s
+2026-11-27T01:00:52.0817471Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.0861317Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.0880007Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.0962294Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.1405141Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+2026-11-27T01:00:52.1568536Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.1648325Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.1753468Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.1848987Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.3023129Z test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+2026-11-27T01:00:52.3990545Z test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.10s
+2026-11-27T01:00:52.4138535Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.4176913Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.4193721Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.5409172Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+2026-11-27T01:00:52.5429457Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.5947781Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-11-27T01:00:52.7688098Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+2026-11-27T01:00:52.7728439Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.7748995Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.7762432Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.7775101Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.7789568Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.7803965Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.8334874Z test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-11-27T01:00:52.8359732Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9349888Z test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+2026-11-27T01:00:52.9375451Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9395272Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9418558Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9503782Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-27T01:00:52.9518268Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9539448Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9552504Z test independent_scaling_and_subnormal_directions_preserve_angles ... ok
+2026-11-27T01:00:52.9553452Z test tiny_axis_angles_preserve_bits_across_the_normal_boundary ... ok
+2026-11-27T01:00:52.9554849Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9570422Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9898766Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+2026-11-27T01:00:52.9908046Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9916766Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-11-27T01:00:52.9978803Z ##[group]Run cargo build --release --locked --bins
+2026-11-27T01:02:08.5178430Z [1m[92m    Finished[0m `release` profile [optimized] target(s) in 1m 15s
+2026-11-27T01:02:10.8810852Z Artifact NODES-linux-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924.zip successfully finalized. Artifact ID 15164386802
+2026-11-27T01:02:10.8811621Z Artifact NODES-linux-x64-d3128a29f45f142873ca0ba8a0d2d72d1161d924 has been successfully uploaded! Final size is 14008773 bytes. Artifact ID is 15164386802

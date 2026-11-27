@@ -1,0 +1,185 @@
+{
+  "head_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+  "head_tree": "55903180e8609378657c00095833c295b9e4caf9",
+  "tested_merge_sha": "d3128a29f45f142873ca0ba8a0d2d72d1161d924",
+  "tested_merge_tree": "55903180e8609378657c00095833c295b9e4caf9",
+  "tested_merge_parents": [
+    "6b29c1cab3239494766e11c4799b557acc54469a",
+    "ca6147a0b639b9429900313147d4e288972373e5"
+  ],
+  "identical_trees_verified": true,
+  "run_id": 45919617590,
+  "run_url": "https://github.com/07egta/NODES/actions/runs/45919617590",
+  "observed_at_jst": "2026-11-27T10:10:19+09:00",
+  "linux": {
+    "job_id": 140246959469,
+    "conclusion": "success",
+    "test_results": {
+      "suites": 44,
+      "passed": 487,
+      "failed": 0,
+      "ignored": 2
+    },
+    "log_source": "https://github.com/07egta/NODES/actions/runs/45919617590/job/140246959469",
+    "excerpt_policy": "Exact compiler, Cargo gate, test summary, extreme-angle regression, build and artifact lines; omitted setup/dependency-install output.",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-11-27T00:55:54Z",
+        "completed_at": "2026-11-27T00:55:56Z"
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-11-27T00:55:56Z",
+        "completed_at": "2026-11-27T00:56:00Z"
+      },
+      {
+        "name": "Install Rust and quality tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-11-27T00:56:00Z",
+        "completed_at": "2026-11-27T00:56:08Z"
+      },
+      {
+        "name": "Install desktop build libraries",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-11-27T00:56:08Z",
+        "completed_at": "2026-11-27T00:56:29Z"
+      },
+      {
+        "name": "Restore Rust cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-11-27T00:56:29Z",
+        "completed_at": "2026-11-27T00:56:59Z"
+      },
+      {
+        "name": "Record compiler",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-11-27T00:56:59Z",
+        "completed_at": "2026-11-27T00:56:59Z"
+      },
+      {
+        "name": "Check formatting",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-11-27T00:56:59Z",
+        "completed_at": "2026-11-27T00:56:59Z"
+      },
+      {
+        "name": "Test inventory and checkpoint scripts",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-11-27T00:56:59Z",
+        "completed_at": "2026-11-27T00:57:00Z"
+      },
+      {
+        "name": "Audit exact dependency declarations",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-11-27T00:57:00Z",
+        "completed_at": "2026-11-27T00:57:01Z"
+      },
+      {
+        "name": "Check all targets",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-11-27T00:57:01Z",
+        "completed_at": "2026-11-27T00:58:20Z"
+      },
+      {
+        "name": "Check Clippy warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-11-27T00:58:20Z",
+        "completed_at": "2026-11-27T00:58:24Z"
+      },
+      {
+        "name": "Test all targets",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-11-27T00:58:24Z",
+        "completed_at": "2026-11-27T01:00:52Z"
+      },
+      {
+        "name": "Build Linux desktop and console applications",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-11-27T01:00:52Z",
+        "completed_at": "2026-11-27T01:02:08Z"
+      },
+      {
+        "name": "Prepare Linux development artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-11-27T01:02:08Z",
+        "completed_at": "2026-11-27T01:02:09Z"
+      },
+      {
+        "name": "Upload Linux development artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-11-27T01:02:09Z",
+        "completed_at": "2026-11-27T01:02:10Z"
+      },
+      {
+        "name": "Post Restore Rust cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29,
+        "started_at": "2026-11-27T01:02:10Z",
+        "completed_at": "2026-11-27T01:02:11Z"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30,
+        "started_at": "2026-11-27T01:02:11Z",
+        "completed_at": "2026-11-27T01:02:11Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31,
+        "started_at": "2026-11-27T01:02:11Z",
+        "completed_at": "2026-11-27T01:02:11Z"
+      }
+    ]
+  },
+  "windows": {
+    "job_id": 140248896250,
+    "status": "in_progress",
+    "conclusion": null,
+    "completed_claimed": false,
+    "test_step": {
+      "status": "completed",
+      "conclusion": "success",
+      "started_at_utc": "2026-11-27T01:02:38Z",
+      "completed_at_utc": "2026-11-27T01:09:16Z"
+    },
+    "current_step": "Build Windows desktop and console applications"
+  }
+}

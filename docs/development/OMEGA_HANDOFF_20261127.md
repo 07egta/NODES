@@ -3,6 +3,8 @@
 > このWIPブランチの最新状況は [PR16統合候補の記録](OMEGA_PR16_INTEGRATION_20261127.md)。
 > PR18単独ca6147は487/0/2、更新した統合候補は572/0/4でLinux全体検証済み。
 > 以下の3e3bb46・486件は履歴であり、最新の原ログと対象SHAは上記リンクを優先する。
+> 修正後CI・配布artifactの照合は [portable-angle-ci/README.md](portable-angle-ci/README.md)。
+> CIの合否は同フォルダの観測時刻とjob状態で確認する。統合候補のWindows成功とは区別する。
 
 > 追加のWindows CI確認で極小角度の回帰1件が失敗した。修正と根拠は
 > [Windows角度の移植性記録](WINDOWS_ANGLE_PORTABILITY.md)を優先して読む。
