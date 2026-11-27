@@ -5,6 +5,8 @@ use crate::curve_geometry::{self as cg, CurveGeometry, NurbsCurve, Point3};
 use crate::engine::{cancelled, num};
 use crate::model::*;
 use std::{f64::consts::TAU, sync::Arc};
+mod operations;
+
 type R<T> = Result<T, String>;
 const C: InputSpec = g("curve", "曲線", DataType::Curve);
 const P: InputSpec = g("points", "点のリスト", DataType::Point);
@@ -12,6 +14,11 @@ const A: InputSpec = g("a", "始点 A", DataType::Point);
 const B: InputSpec = g("b", "終点 B", DataType::Point);
 const D: InputSpec = g("direction", "方向 (XYZ)", DataType::Point);
 const T: InputSpec = n("t", "パラメータ (0–1)", 0.5, 0., 1., 0.01);
+const START: InputSpec = n("start", "開始 (0–1)", 0., 0., 1., 0.01);
+const END: InputSpec = n("end", "終了 (0–1)", 1., 0., 1., 0.01);
+const NORMALIZED: InputSpec = i("normalized", "弧長の割合 (0–1)", 0., 0., 1.);
+const PATTERN: InputSpec = g("pattern", "破線と間隔の長さ", DataType::Number);
+const THIRD: InputSpec = g("c", "点 C", DataType::Point);
 const DEG: InputSpec = i("degree", "次数", 3., 1., 12.);
 const SEG: InputSpec = i("segments", "表示分割", 96., 4., 1024.);
 const RAD: InputSpec = n("radius", "半径", 30., 0.000001, 1000000., 0.5);
@@ -68,6 +75,27 @@ pub fn is_curve_kind(k: NodeKind) -> bool {
             | CurveFrameY
             | CurveLineLine
             | CurveLinePlane
+            | CurveLengthDomain
+            | CurveLengthParameter
+            | CurveParameterAtLength
+            | CurveTangentAtLength
+            | CurvePeriodic
+            | CurveShortestSegment
+            | CurveLongestSegment
+            | CurveControlPolygon
+            | CurveDashPattern
+            | CurveDashGaps
+            | CurvePolygonCenterVertices
+            | CurvePolygonCenterEdges
+            | CurvePolygonCenterArea
+            | CurveSmoothPolyline
+            | CurveReducePolyline
+            | CurveRectangleThree
+            | CurvePolygonEdge
+            | CurveIncircle
+            | CurveInEllipse
+            | CurveArcSed
+            | CurveLineFour
     )
 }
 pub fn is_list_kind(k: NodeKind) -> bool {
@@ -80,6 +108,8 @@ pub fn is_list_kind(k: NodeKind) -> bool {
             | CurveWeightedNurbs
             | CurveInterpolate
             | CurveShatter
+            | CurveDashPattern
+            | CurveDashGaps
     )
 }
 pub fn spec(k: NodeKind) -> &'static NodeSpec {
@@ -405,6 +435,157 @@ pub fn spec(k: NodeKind) -> &'static NodeSpec {
                 TOL
             ]
         ),
+        CurveLengthDomain => spec!(
+            "曲線区間の長さ",
+            "length domain curve subdomain",
+            "正規化パラメータの2端で指定した区間の弧長。",
+            Number,
+            [C, START, END]
+        ),
+        CurveLengthParameter => spec!(
+            "曲線位置の前後の長さ",
+            "length parameter curve before after",
+            "指定位置までの弧長と指定位置から終点までの弧長を、この順に返す。",
+            Number,
+            [C, T]
+        ),
+        CurveParameterAtLength => spec!(
+            "弧長から曲線パラメータ",
+            "evaluate length parameter",
+            "指定弧長に対応する正規化曲線パラメータ。割合の場合は0〜1。",
+            Number,
+            [C, LEN, NORMALIZED]
+        ),
+        CurveTangentAtLength => spec!(
+            "弧長から曲線接線",
+            "evaluate length tangent",
+            "指定弧長に対応する単位接線（XYZ）。割合の場合は0〜1。",
+            Point,
+            [C, LEN, NORMALIZED]
+        ),
+        CurvePeriodic => spec!(
+            "周期曲線判定",
+            "closed periodic curve",
+            "曲線が周期NURBSの全区間なら1、その他は0。",
+            Number,
+            [C]
+        ),
+        CurveShortestSegment => spec!(
+            "ポリラインの最短辺長",
+            "segment lengths shortest curve polyline",
+            "有効な曲線区間に含まれるポリラインの最短辺の長さ。",
+            Number,
+            [C]
+        ),
+        CurveLongestSegment => spec!(
+            "ポリラインの最長辺長",
+            "segment lengths longest curve polyline",
+            "有効な曲線区間に含まれるポリラインの最長辺の長さ。",
+            Number,
+            [C]
+        ),
+        CurveControlPolygon => spec!(
+            "制御多角形",
+            "control polygon nurbs curve",
+            "基底NURBSの制御点を折れ線で結ぶ。周期曲線の繰り返し制御点は除く。",
+            Curve,
+            [C]
+        ),
+        CurveDashPattern => spec!(
+            "曲線の破線部分",
+            "dash pattern curve dashes",
+            "枝内の正の弧長を繰り返し、破線部分を元の曲線から切り出す。最大512区間。",
+            Curve,
+            [C, PATTERN, SEG]
+        ),
+        CurveDashGaps => spec!(
+            "曲線の破線間隔",
+            "dash pattern curve gaps",
+            "枝内の正の弧長を繰り返し、間隔部分を元の曲線から切り出す。最大512区間。",
+            Curve,
+            [C, PATTERN, SEG]
+        ),
+        CurvePolygonCenterVertices => spec!(
+            "ポリラインの頂点中心",
+            "polygon center vertex average",
+            "ポリライン頂点の平均を返す。閉じ目の頂点を一度だけ数える。",
+            Point,
+            [C]
+        ),
+        CurvePolygonCenterEdges => spec!(
+            "ポリラインの辺中心",
+            "polygon center edge length average",
+            "辺の中点を辺の長さで重み付けした平均。",
+            Point,
+            [C]
+        ),
+        CurvePolygonCenterArea => spec!(
+            "ポリラインの面積重心",
+            "polygon center area centroid",
+            "閉じた平面ポリラインの符号付き面積から重心を求める。",
+            Point,
+            [C]
+        ),
+        CurveSmoothPolyline => spec!(
+            "ポリラインを平滑化",
+            "smooth polyline",
+            "頂点を両隣の平均に近付ける。開いたポリラインの端点は保持。",
+            Curve,
+            [
+                C,
+                n("strength", "強さ", 0.5, 0., 1., 0.05),
+                i("iterations", "反復回数", 1., 0., 64.)
+            ]
+        ),
+        CurveReducePolyline => spec!(
+            "ポリラインの頂点を削減",
+            "reduce polyline douglas peucker",
+            "元の頂点と置換線分との距離が許容値以下になるように頂点を削減。",
+            Curve,
+            [C, TOL]
+        ),
+        CurveRectangleThree => spec!(
+            "3点の長方形",
+            "rectangle 3pt three points",
+            "AとBを一辺とし、Cを通る反対側の辺を持つ長方形。",
+            Curve,
+            [A, B, THIRD]
+        ),
+        CurvePolygonEdge => spec!(
+            "一辺から正多角形",
+            "polygon edge regular polygon",
+            "AからBへの辺を持つ正多角形。第3点の側に生成。",
+            Curve,
+            [A, B, THIRD, i("count", "辺数", 6., 3., 512.)]
+        ),
+        CurveIncircle => spec!(
+            "三角形の内接円",
+            "incircle triangle",
+            "3点の三角形の全辺に接する有理円。",
+            Curve,
+            [A, B, THIRD, SEG]
+        ),
+        CurveInEllipse => spec!(
+            "三角形の内接楕円",
+            "inellipse steiner triangle",
+            "三角形の各辺の中点に接するシュタイナーの内接楕円。",
+            Curve,
+            [A, B, THIRD, SEG]
+        ),
+        CurveArcSed => spec!(
+            "始点・終点・接線の円弧",
+            "arc sed start end tangent",
+            "始点の接線と終点で定まる有理円弧。",
+            Curve,
+            [A, B, D, SEG]
+        ),
+        CurveLineFour => spec!(
+            "ガイド線に投影した線分",
+            "line 4pt four points project",
+            "2点をガイド線の延長上に直交投影し、投影点を結ぶ。",
+            Curve,
+            [C, A, B]
+        ),
         _ => unreachable!("curve node dispatch"),
     }
 }
@@ -437,7 +618,7 @@ pub fn geometry(c: &Curve) -> R<CurveGeometry> {
 fn curve<'a>(a: &[&'a Value], k: usize) -> R<&'a Curve> {
     cv(a.get(k).copied().ok_or("曲線の入力がありません。")?)
 }
-fn preview(g: CurveGeometry, seg: usize, cancel: &dyn Fn() -> bool) -> R<Value> {
+pub(crate) fn preview(g: CurveGeometry, seg: usize, cancel: &dyn Fn() -> bool) -> R<Value> {
     let closed = g.closed()?;
     let points = g.preview(seg, cancel)?;
     if points.len() < 2 {
@@ -449,7 +630,7 @@ fn preview(g: CurveGeometry, seg: usize, cancel: &dyn Fn() -> bool) -> R<Value> 
         geometry: Some(g),
     })))
 }
-fn polyline(points: Vec<Point3>, closed: bool) -> R<Value> {
+pub(crate) fn polyline(points: Vec<Point3>, closed: bool) -> R<Value> {
     if points.len() < 2 || points.windows(2).any(|p| p[0] == p[1]) {
         return Err("曲線には異なる隣接点が必要です。".into());
     }
@@ -559,6 +740,13 @@ pub fn run_list(k: NodeKind, l: &[&[Value]], cancel: &dyn Fn() -> bool) -> R<Vec
             }
             out
         }
+        CurveDashPattern | CurveDashGaps => operations::dash_pattern(
+            first,
+            l.get(1).copied().ok_or("破線パターンがありません。")?,
+            setting(l, 2)? as usize,
+            k == CurveDashGaps,
+            cancel,
+        )?,
         _ => return Err("曲線リストノードが無効です。".into()),
     };
     guard(&out)?;
@@ -732,6 +920,8 @@ pub fn run_item(k: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> R<Vec<V
                 cancel,
             )?
         }
+        CurveRectangleThree | CurvePolygonEdge | CurveIncircle | CurveInEllipse | CurveArcSed
+        | CurveLineFour => operations::primitive(k, a, cancel)?,
         CurveLineLine => return line_line(curve(a, 0)?, curve(a, 1)?, num(a, 2)?),
         CurveLinePlane => return line_plane(curve(a, 0)?, arg(a, 1)?, arg(a, 2)?, num(a, 3)?),
         CurveOffsetPreview => offset(curve(a, 0)?, num(a, 1)?, cancel)?,
@@ -753,6 +943,19 @@ pub fn run_item(k: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> R<Vec<V
             let c = curve(a, 0)?;
             let g = geometry(c)?;
             match k {
+                CurveLengthDomain
+                | CurveLengthParameter
+                | CurveParameterAtLength
+                | CurveTangentAtLength
+                | CurvePeriodic
+                | CurveShortestSegment
+                | CurveLongestSegment
+                | CurveControlPolygon
+                | CurvePolygonCenterVertices
+                | CurvePolygonCenterEdges
+                | CurvePolygonCenterArea
+                | CurveSmoothPolyline
+                | CurveReducePolyline => return operations::analyze_or_edit(k, &g, a, cancel),
                 CurveLength => Value::Number(g.length_table(cancel)?.total()),
                 CurveEvaluate => Value::Point(g.point(num(a, 1)?)?),
                 CurveEvaluateLength | CurveMiddle => {

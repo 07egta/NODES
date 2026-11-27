@@ -107,7 +107,23 @@ pub fn permitted(kind: NodeKind) -> bool {
             | MeshThicknessSample
             | MeshCompact
             | MeshNonManifold
+            | MeshTriangle
+            | MeshQuad
+            | MeshFaceBoundaries
+            | MeshFaceCenters
+            | MeshFaceCircles
+            | MeshFaceAspectRatio
+            | MeshDisjoint
+            | MeshDeleteFaces
+            | MeshCullFaces
+            | MeshDeleteVertices
+            | MeshCullVertices
+            | MeshInteriorEdges
+            | MeshVertexNormals
     ) || crate::math_nodes::spec(kind).is_some()
+        || crate::transform_nodes::spec(kind).is_some()
+        || crate::sets_nodes::spec(kind).is_some()
+        || crate::point_nodes::spec(kind).is_some()
         || crate::curve_nodes::is_curve_kind(kind)
         || crate::surface_nodes::KINDS.contains(&kind)
         || crate::generative::is_kind(kind)

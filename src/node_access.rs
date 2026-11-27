@@ -50,12 +50,12 @@ impl InputAccess {
 /// The evaluator must retain those two nodes' existing empty-input behavior when
 /// using this helper in place of its former narrower list-adapter dispatch flag.
 pub fn uses_list_access(kind: NodeKind) -> bool {
-    matches!(
-        kind,
-        NodeKind::Merge | NodeKind::Loft | NodeKind::MeshConstruct
-    ) || crate::gh_nodes::is_list_kind(kind)
+    matches!(kind, NodeKind::Merge | NodeKind::Loft)
+        || crate::mesh_fabrication::is_list_kind(kind)
+        || crate::gh_nodes::is_list_kind(kind)
         || crate::data_tree_nodes::is_list_kind(kind)
         || crate::math_nodes::is_list_kind(kind)
+        || crate::point_nodes::is_list_kind(kind)
         || crate::curve_nodes::is_list_kind(kind)
         || crate::generative::is_list(kind)
 }
@@ -86,13 +86,17 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         Merge | Loft if index == 0 => List,
         Loft => FirstItem,
         MeshConstruct => List,
+        MeshDeleteFaces | MeshCullFaces | MeshDeleteVertices | MeshCullVertices if index == 0 => {
+            SingleItem
+        }
+        MeshDeleteFaces | MeshCullFaces | MeshDeleteVertices | MeshCullVertices => List,
         CurveWeightedNurbs if index <= 2 => List,
-        CurveShatter if index <= 1 => List,
+        CurveShatter | CurveDashPattern | CurveDashGaps if index <= 1 => List,
         PointArray if index == 1 => SingleItem,
         // These adapters consume both leading lists, not only the first one.
         ConcatList | SetContains | SetUnion | SetIntersection | SetDifference
-        | DomainIntersection | DomainUnion | EvaluateDomain | ClosestPoint | MatrixMultiply
-        | LinearSolve | MultiAttractor
+        | DomainIntersection | DomainUnion | EvaluateDomain | DomainIncludes | ClosestPoint
+        | MatrixMultiply | LinearSolve | MultiAttractor
             if index <= 1 =>
         {
             List
@@ -100,6 +104,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         ListItem | CullPattern | CullIndex | ReplaceItems | InsertItems if index == 1 => List,
         ReplaceItems | InsertItems if index == 2 => List,
         MemberIndex if index == 1 => List,
+        StackData | Weave | SetSymmetricDifference | SetSubset | SetDisjoint | SetMajority => List,
         k if uses_list_access(k) => {
             if index == 0 {
                 List

@@ -5,6 +5,8 @@ use crate::model::{DataType, MAX_ITEMS, NodeKind, NodeSpec, Value, g, i, n};
 use std::collections::BTreeSet;
 use std::f64::consts::{E, PI, TAU};
 
+const MAX_EXACT_INTEGER: f64 = 9_007_199_254_740_991.0;
+
 pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
     use NodeKind::*;
     match kind {
@@ -184,6 +186,50 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
             };
             Some(&SPEC)
         }
+        Sinc => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "サインカーディナル",
+                category: "数値",
+                description: "ラジアンの sin(x) / x。x が 0 のときは 1。",
+                keywords: "sinc sinus cardinalis",
+                inputs: &[n("angle", "角度 (rad)", 0.0, -1e12, 1e12, 0.01)],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        Secant => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "正割",
+                category: "数値",
+                description: "ラジアンの余弦の逆数。余弦が 0 の点は未定義。",
+                keywords: "sec secant reciprocal cosine セカント",
+                inputs: &[n("angle", "角度 (rad)", 0.0, -1e12, 1e12, 0.01)],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        Cosecant => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "余割",
+                category: "数値",
+                description: "ラジアンの正弦の逆数。正弦が 0 の点は未定義。",
+                keywords: "csc cosecant reciprocal sine コセカント",
+                inputs: &[n("angle", "角度 (rad)", PI / 2.0, -1e12, 1e12, 0.01)],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        Cotangent => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "余接",
+                category: "数値",
+                description: "ラジアンの余弦を正弦で割る。正弦が 0 の点は未定義。",
+                keywords: "cot cotangent reciprocal tangent コタンジェント",
+                inputs: &[n("angle", "角度 (rad)", PI / 4.0, -1e12, 1e12, 0.01)],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
         Atan2 => {
             static SPEC: NodeSpec = NodeSpec {
                 label: "二引数逆正接",
@@ -234,6 +280,31 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
                 keywords: "factorial",
                 inputs: &[i("x", "整数", 5.0, 0.0, 170.0)],
                 output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        IntegerDivision => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "整数除算",
+                category: "数値",
+                description: "整数の商を求め、小数部分をゼロ方向へ切り捨てる。",
+                keywords: "integer division quotient truncate",
+                inputs: &[
+                    i("a", "被除数", 0.0, -MAX_EXACT_INTEGER, MAX_EXACT_INTEGER),
+                    i("b", "除数", 1.0, -MAX_EXACT_INTEGER, MAX_EXACT_INTEGER),
+                ],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        RelativeDifferences => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "隣接要素の差",
+                category: "数値",
+                description: "枝ごとに次の要素から前の要素を引く。数値、点、ベクトルに対応。",
+                keywords: "relative differences consecutive adjacent delta",
+                inputs: &[g("values", "数値または XYZ のリスト", DataType::Any)],
+                output: DataType::Any,
             };
             Some(&SPEC)
         }
@@ -423,6 +494,35 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
                 inputs: &[
                     g("domain", "区間 [始点, 終点]", DataType::Number),
                     g("other", "区間 B [始点, 終点]", DataType::Number),
+                ],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        DomainIncludes => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "区間に含まれるか",
+                category: "数値",
+                description: "両端を含めて判定し、0/1 または区間までの距離を返す。",
+                keywords: "includes domain membership deviation contains interval",
+                inputs: &[
+                    g("values", "値リスト", DataType::Number),
+                    g("domain", "区間 [始点, 終点]", DataType::Number),
+                    i("deviation", "0:判定 1:距離", 0.0, 0.0, 1.0),
+                ],
+                output: DataType::Number,
+            };
+            Some(&SPEC)
+        }
+        ConsecutiveDomains => {
+            static SPEC: NodeSpec = NodeSpec {
+                label: "連続区間",
+                category: "数値",
+                description: "枝ごとに端点の組 [a,b,b,c,…] を出力。加算時は 0 から各値を順に足す。",
+                keywords: "consecutive domains intervals additive cumulative",
+                inputs: &[
+                    g("values", "数値リスト", DataType::Number),
+                    i("additive", "加算 (0/1)", 1.0, 0.0, 1.0),
                 ],
                 output: DataType::Number,
             };
@@ -1222,6 +1322,9 @@ pub fn is_list_kind(kind: NodeKind) -> bool {
             | DivideDomain
             | DomainIntersection
             | DomainUnion
+            | DomainIncludes
+            | ConsecutiveDomains
+            | RelativeDifferences
             | SetContains
             | SetUnion
             | SetIntersection
@@ -1254,30 +1357,30 @@ fn scalar(x: f64) -> Result<Vec<Value>, String> {
         Err("計算結果が有限ではありません。".into())
     }
 }
-fn point(p: [f64; 3]) -> Result<Vec<Value>, String> {
+pub(crate) fn point(p: [f64; 3]) -> Result<Vec<Value>, String> {
     if crate::engine::finite_point(p) {
         Ok(vec![Value::Point(p)])
     } else {
         Err("座標が有限または許容範囲内ではありません。".into())
     }
 }
-fn xyz(a: &[&Value], index: usize) -> Result<[f64; 3], String> {
+pub(crate) fn xyz(a: &[&Value], index: usize) -> Result<[f64; 3], String> {
     match a.get(index).copied() {
         Some(Value::Point(p)) if crate::engine::finite_point(*p) => Ok(*p),
         _ => Err("有効な XYZ を接続してください。".into()),
     }
 }
-fn plus(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn plus(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
-fn scale(v: [f64; 3], k: f64) -> [f64; 3] {
+pub(crate) fn scale(v: [f64; 3], k: f64) -> [f64; 3] {
     v.map(|x| x * k)
 }
 use crate::engine::{cross, dot, sub};
-fn norm(v: [f64; 3]) -> f64 {
+pub(crate) fn norm(v: [f64; 3]) -> f64 {
     v[0].hypot(v[1]).hypot(v[2])
 }
-fn unit(v: [f64; 3]) -> Result<[f64; 3], String> {
+pub(crate) fn unit(v: [f64; 3]) -> Result<[f64; 3], String> {
     // Scaling first prevents a reciprocal overflow for subnormal inputs.
     let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
     if m == 0.0 || !m.is_finite() {
@@ -1295,14 +1398,14 @@ fn rotate(v: [f64; 3], axis: [f64; 3], radians: f64) -> Result<[f64; 3], String>
     ))
 }
 #[derive(Clone, Copy)]
-struct Frame {
+pub(crate) struct Frame {
     origin: [f64; 3],
     x: [f64; 3],
     y: [f64; 3],
     z: [f64; 3],
 }
 impl Frame {
-    fn new(origin: [f64; 3], x: [f64; 3], y: [f64; 3]) -> Result<Self, String> {
+    pub(crate) fn new(origin: [f64; 3], x: [f64; 3], y: [f64; 3]) -> Result<Self, String> {
         let x = unit(x)?;
         let guide = unit(y)?;
         let normal = cross(x, guide);
@@ -1313,11 +1416,11 @@ impl Frame {
         let y = unit(cross(z, x))?;
         Ok(Self { origin, x, y, z })
     }
-    fn local(self, p: [f64; 3]) -> [f64; 3] {
+    pub(crate) fn local(self, p: [f64; 3]) -> [f64; 3] {
         let d = sub(p, self.origin);
         [dot(d, self.x), dot(d, self.y), dot(d, self.z)]
     }
-    fn world(self, p: [f64; 3]) -> [f64; 3] {
+    pub(crate) fn world(self, p: [f64; 3]) -> [f64; 3] {
         plus(
             self.origin,
             plus(
@@ -1386,7 +1489,7 @@ fn bool_value(x: f64) -> Result<bool, String> {
     }
 }
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-enum Key {
+pub(crate) enum Key {
     Number(u64),
     Point([u64; 3]),
 }
@@ -1397,7 +1500,7 @@ fn bits(x: f64) -> Result<u64, String> {
         Ok(if x == 0.0 { 0 } else { x.to_bits() })
     }
 }
-fn key(value: &Value) -> Result<Key, String> {
+pub(crate) fn key(value: &Value) -> Result<Key, String> {
     match value {
         Value::Number(x) => Ok(Key::Number(bits(*x)?)),
         Value::Point(p) => Ok(Key::Point([bits(p[0])?, bits(p[1])?, bits(p[2])?])),
@@ -1417,7 +1520,27 @@ fn domain(a: &[Value]) -> Result<(f64, f64), String> {
         Err("区間は枝ごとにちょうど 2 数値が必要です。".into())
     }
 }
-fn stable_sum(a: &[f64]) -> f64 {
+fn exact_integer(value: f64) -> Result<i64, String> {
+    if value.abs() > MAX_EXACT_INTEGER || value.fract() != 0.0 {
+        return Err("整数除算には絶対値が 2^53 未満の整数を指定してください。".into());
+    }
+    Ok(value as i64)
+}
+
+fn trig_quotient(angle: f64, numerator: f64, denominator: f64) -> Result<f64, String> {
+    // Recognize floating-point multiples of π/2 that correspond to poles
+    // without rejecting valid small angles on either side of a pole.
+    let half_pi = PI / 2.0;
+    let multiple = (angle / half_pi).round();
+    if denominator == 0.0
+        || (denominator.abs() <= 4.0 * f64::EPSILON && angle == multiple * half_pi)
+    {
+        return Err("三角関数の極では未定義です。".into());
+    }
+    Ok(numerator / denominator)
+}
+
+pub(crate) fn stable_sum(a: &[f64]) -> f64 {
     let (mut s, mut c) = (0.0_f64, 0.0_f64);
     for &x in a {
         let t = s + x;
@@ -1720,6 +1843,84 @@ pub fn run_list(
                 _ => unreachable!(),
             }
         }
+        DomainIncludes => {
+            if a.is_empty() {
+                return Ok(vec![]);
+            }
+            let (start, end) = domain(b)?;
+            let (lo, hi) = (start.min(end), start.max(end));
+            let deviation = bool_value(
+                lists
+                    .get(2)
+                    .and_then(|values| values.first())
+                    .ok_or("区間判定の出力指定がありません。")?
+                    .number()?,
+            )?;
+            let mut result = Vec::with_capacity(a.len());
+            for value in a {
+                cancelled(stop)?;
+                let value = value.number()?;
+                result.push(if deviation {
+                    (value - value.clamp(lo, hi)).abs()
+                } else {
+                    flag((lo..=hi).contains(&value))
+                });
+            }
+            values(result)
+        }
+        ConsecutiveDomains => {
+            if a.is_empty() {
+                return Ok(vec![]);
+            }
+            let additive = bool_value(b.first().ok_or("加算設定がありません。")?.number()?)?;
+            let count = a.len() - usize::from(!additive);
+            if count.saturating_mul(2) > MAX_ITEMS {
+                return Err("連続区間の端点数が上限を超えました。".into());
+            }
+            let mut input = a.iter();
+            let mut start = if additive {
+                0.0
+            } else {
+                input.next().ok_or("始点がありません。")?.number()?
+            };
+            let mut result = Vec::with_capacity(count * 2);
+            for value in input {
+                cancelled(stop)?;
+                let value = value.number()?;
+                let end = if additive { start + value } else { value };
+                result.extend([start, end]);
+                start = end;
+            }
+            values(result)
+        }
+        RelativeDifferences => {
+            let mut result = Vec::with_capacity(a.len().saturating_sub(1));
+            for pair in a.windows(2) {
+                cancelled(stop)?;
+                let value = match (&pair[0], &pair[1]) {
+                    (start @ Value::Number(_), end @ Value::Number(_)) => {
+                        let difference = end.number()? - start.number()?;
+                        if !difference.is_finite() {
+                            return Err("数値の差が有限ではありません。".into());
+                        }
+                        Value::Number(difference)
+                    }
+                    (Value::Point(start), Value::Point(end))
+                        if crate::engine::finite_point(*start)
+                            && crate::engine::finite_point(*end) =>
+                    {
+                        let difference = sub(*end, *start);
+                        if !crate::engine::finite_point(difference) {
+                            return Err("座標の差が許容範囲を超えました。".into());
+                        }
+                        Value::Point(difference)
+                    }
+                    _ => return Err("同じ型の数値または有効な XYZ が必要です。".into()),
+                };
+                result.push(value);
+            }
+            Ok(result)
+        }
         ClosestPoint => {
             if a.is_empty() {
                 return Ok(vec![]);
@@ -1896,6 +2097,27 @@ pub fn run_item(
             }
             t.tan()
         }
+        Sinc => {
+            let angle = x()?;
+            if angle == 0.0 {
+                1.0
+            } else {
+                angle.sin() / angle
+            }
+        }
+        Secant => {
+            let angle = x()?;
+            trig_quotient(angle, 1.0, angle.cos())?
+        }
+        Cosecant => {
+            let angle = x()?;
+            trig_quotient(angle, 1.0, angle.sin())?
+        }
+        Cotangent => {
+            let angle = x()?;
+            let (sin, cos) = angle.sin_cos();
+            trig_quotient(angle, cos, sin)?
+        }
         Asin => x()?.asin(),
         Acos => x()?.acos(),
         Atan => x()?.atan(),
@@ -1933,6 +2155,13 @@ pub fn run_item(
                 return Err("階乗は 0〜170 の整数です。".into());
             }
             (1..=a as u32).fold(1.0, |p, n| p * n as f64)
+        }
+        IntegerDivision => {
+            let dividend = exact_integer(x()?)?;
+            let divisor = exact_integer(y()?)?;
+            dividend
+                .checked_div(divisor)
+                .ok_or("ゼロでは割れません。")? as f64
         }
         Clamp => {
             let (lo, hi) = (y()?, num(a, 2)?);
@@ -2129,6 +2358,179 @@ mod tests {
     }
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-10, "{a} != {b}");
+    }
+    #[test]
+    fn sinc_and_reciprocal_trigonometry() {
+        for (kind, angle, expected) in [
+            (Sinc, -0.0, 1.0),
+            (Sinc, -PI / 2.0, 2.0 / PI),
+            (Secant, PI / 3.0, 2.0),
+            (Cosecant, -PI / 6.0, -2.0),
+            (Cotangent, PI / 4.0, 1.0),
+            (Cotangent, PI / 2.0, 0.0),
+        ] {
+            close(
+                run(kind, &[Value::Number(angle)]).unwrap()[0]
+                    .number()
+                    .unwrap(),
+                expected,
+            );
+        }
+        for (kind, angle) in [(Secant, 5.0 * PI / 2.0), (Cosecant, -PI), (Cotangent, 0.0)] {
+            assert!(run(kind, &[Value::Number(angle)]).is_err());
+        }
+        let near_zero = run(Cosecant, &[Value::Number(1e-16)]).unwrap()[0]
+            .number()
+            .unwrap();
+        close(near_zero * 1e-16, 1.0);
+    }
+    #[test]
+    fn integer_division_truncates_toward_zero_and_rejects_nonintegers() {
+        for (operands, expected) in [
+            ([-7.0, 3.0], -2.0),
+            ([7.0, -3.0], -2.0),
+            ([-7.0, -3.0], 2.0),
+            ([MAX_EXACT_INTEGER, 2.0], 4_503_599_627_370_495.0),
+        ] {
+            assert_eq!(
+                run(IntegerDivision, &operands.map(Value::Number)).unwrap(),
+                [Value::Number(expected)]
+            );
+        }
+        for operands in [[1.0, -0.0], [1.5, 1.0], [MAX_EXACT_INTEGER + 1.0, 1.0]] {
+            assert!(run(IntegerDivision, &operands.map(Value::Number)).is_err());
+        }
+    }
+    #[test]
+    fn relative_differences_keep_direction_and_validate_types() {
+        let numbers = [1.0, 4.0, -2.0].map(Value::Number);
+        assert_eq!(
+            run_list(RelativeDifferences, &[&numbers], &|| false).unwrap(),
+            [3.0, -6.0].map(Value::Number)
+        );
+        let points = [[1.0, 2.0, 3.0], [4.0, 0.0, 8.0]].map(Value::Point);
+        assert_eq!(
+            run_list(RelativeDifferences, &[&points], &|| false).unwrap(),
+            [Value::Point([3.0, -2.0, 5.0])]
+        );
+        assert!(
+            run_list(RelativeDifferences, &[&points[..1]], &|| false)
+                .unwrap()
+                .is_empty()
+        );
+        let mixed = [points[0].clone(), numbers[0].clone()];
+        assert!(run_list(RelativeDifferences, &[&mixed], &|| false).is_err());
+    }
+    #[test]
+    fn domain_adapters_cover_reversed_endpoints_empty_inputs_and_limits() {
+        let list = [-2.0, -1.0, 0.0, 2.0, 4.0].map(Value::Number);
+        let reversed = [2.0, -1.0].map(Value::Number);
+        for (mode, expected) in [(0.0, [0., 1., 1., 1., 0.]), (1.0, [1., 0., 0., 0., 2.])] {
+            assert_eq!(
+                run_list(
+                    DomainIncludes,
+                    &[&list, &reversed, &[Value::Number(mode)]],
+                    &|| false
+                )
+                .unwrap(),
+                expected.map(Value::Number)
+            );
+        }
+        let mode = [Value::Number(0.0)];
+        assert!(run_list(DomainIncludes, &[&list, &reversed[..1], &mode], &|| false).is_err());
+        assert!(
+            run_list(DomainIncludes, &[&[], &reversed, &mode], &|| false)
+                .unwrap()
+                .is_empty()
+        );
+
+        let list = [2.0, -3.0, 1.0].map(Value::Number);
+        let divide = |additive| {
+            run_list(
+                ConsecutiveDomains,
+                &[&list, &[Value::Number(additive)]],
+                &|| false,
+            )
+            .unwrap()
+        };
+        assert_eq!(divide(0.0), [2.0, -3.0, -3.0, 1.0].map(Value::Number));
+        assert_eq!(
+            divide(1.0),
+            [0.0, 2.0, 2.0, -1.0, -1.0, 0.0].map(Value::Number)
+        );
+        let additive = [Value::Number(1.0)];
+        let too_many = vec![Value::Number(1.0); MAX_ITEMS / 2 + 1];
+        assert!(run_list(ConsecutiveDomains, &[&too_many, &additive], &|| false).is_err());
+        assert!(run_list(ConsecutiveDomains, &[&list, &additive], &|| true).is_err());
+    }
+    #[test]
+    fn new_math_nodes_use_graph_dispatch_and_survive_project_reload() {
+        use crate::engine::Evaluator;
+        use crate::model::Graph;
+        use crate::persistence::{Project, load, save};
+
+        let mut graph = Graph::default();
+        let inputs = graph.add(GhRange, [0.0; 2]).unwrap();
+        let grafted = graph.add(Graft, [0.0; 2]).unwrap();
+        let series = graph.add(Series, [0.0; 2]).unwrap();
+        let domain = graph.add(ConstructDomain, [0.0; 2]).unwrap();
+        let includes = graph.add(DomainIncludes, [0.0; 2]).unwrap();
+        let diffs = graph.add(RelativeDifferences, [0.0; 2]).unwrap();
+        let consecutive = graph.add(ConsecutiveDomains, [0.0; 2]).unwrap();
+        let sinc = graph.add(Sinc, [0.0; 2]).unwrap();
+        let sec = graph.add(Secant, [0.0; 2]).unwrap();
+        let csc = graph.add(Cosecant, [0.0; 2]).unwrap();
+        let cot = graph.add(Cotangent, [0.0; 2]).unwrap();
+        let division = graph.add(IntegerDivision, [0.0; 2]).unwrap();
+        for (node, key, value) in [
+            (inputs, "steps", 1.0),
+            (series, "step", 1.0),
+            (series, "count", 3.0),
+            (consecutive, "additive", 0.0),
+            (division, "a", -7.0),
+            (division, "b", 3.0),
+        ] {
+            graph
+                .node_mut(node)
+                .unwrap()
+                .params
+                .insert(key.into(), value);
+        }
+        for (from, to, input) in [
+            (inputs, grafted, "geometry"),
+            (grafted, series, "start"),
+            (series, includes, "values"),
+            (domain, includes, "domain"),
+            (series, diffs, "values"),
+            (series, consecutive, "values"),
+        ] {
+            graph.connect(from, to, input).unwrap();
+        }
+        let project = Project::new("Grasshopper Maths", graph);
+        let path = std::env::temp_dir().join(format!("nodes-gh-math-{}.morph", std::process::id()));
+        save(&path, &project).unwrap();
+        let restored = load(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(restored, project);
+
+        let evaluation = Evaluator::default().evaluate(&restored.graph, &|| false);
+        let branch = |id, path: &[u32]| &evaluation.outputs[&id].as_ref().unwrap().branches[path];
+        for (node, path, expected) in [
+            (includes, &[0, 0][..], &[1.0, 1.0, 0.0][..]),
+            (includes, &[0, 1], &[1.0, 0.0, 0.0]),
+            (diffs, &[0, 1], &[1.0, 1.0]),
+            (consecutive, &[0, 1], &[1.0, 2.0, 2.0, 3.0]),
+            (division, &[0], &[-2.0]),
+        ] {
+            let actual: Vec<_> = branch(node, path)
+                .iter()
+                .map(|v| v.number().unwrap())
+                .collect();
+            assert_eq!(actual, expected);
+        }
+        for node in [sinc, sec, csc, cot] {
+            close(branch(node, &[0])[0].number().unwrap(), 1.0);
+        }
     }
     #[test]
     fn scalar_domains_and_errors() {

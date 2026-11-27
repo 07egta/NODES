@@ -182,6 +182,8 @@ fn all_precise_nodes_have_stable_specs_and_evaluate_on_examples() {
                 "p01" => points[1],
                 "p10" => points[2],
                 "p11" => points[3],
+                "a" if kind == BrepBoxTwoPoints => points[0],
+                "b" if kind == BrepBoxTwoPoints => points[3],
                 "a" | "curve" => curve,
                 "b" => raised,
                 _ => panic!("unexpected input {}", s.key),
@@ -223,10 +225,10 @@ fn tree_matching_and_safe_unsupported_operations() {
         .map(|v| v.number().unwrap())
         .collect();
     assert_eq!(values, vec![20., 30., 40.]);
-    let sphere = node(&mut g, K::SphereSurface, &[]);
+    let nurbs = node(&mut g, K::NurbsPanel, &[]);
     let p = node(&mut g, K::Point, &[]);
     let closest = node(&mut g, K::SurfaceClosestPoint, &[]);
-    link(&mut g, sphere, closest, "surface");
+    link(&mut g, nurbs, closest, "surface");
     link(&mut g, p, closest, "point");
     assert!(Evaluator::default().evaluate(&g, &|| false).outputs[&closest].is_err());
 }

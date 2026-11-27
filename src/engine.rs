@@ -419,12 +419,19 @@ pub(crate) fn evaluate_node(
                     (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
                     cancel,
                 )?
+            } else if crate::point_nodes::is_list_kind(node.kind) {
+                crate::point_nodes::run_list(
+                    node.kind,
+                    &lists,
+                    MAX_ITEMS.saturating_sub(total_items),
+                    cancel,
+                )?
             } else if crate::math_nodes::is_list_kind(node.kind) {
                 crate::math_nodes::run_list(node.kind, &lists, cancel)?
             } else if crate::generative::is_list(node.kind) {
                 crate::generative::run_list(node.kind, &lists, cancel)?
-            } else if node.kind == NodeKind::MeshConstruct {
-                crate::mesh_fabrication::run_list(&lists, cancel)?
+            } else if crate::mesh_fabrication::is_list_kind(node.kind) {
+                crate::mesh_fabrication::run_list_kind(node.kind, &lists, cancel)?
             } else if curve_list {
                 crate::curve_nodes::run_list(node.kind, &lists, cancel)?
             } else if list_kind {
@@ -531,10 +538,17 @@ fn preflight_run(
         | NodeKind::Scale
         | NodeKind::ScaleXyz
         | NodeKind::Twist
-        | NodeKind::Wave => (shape(args)?.weight(), 1),
+        | NodeKind::Wave
+        | NodeKind::CameraObscura
+        | NodeKind::ProjectGeometry
+        | NodeKind::ProjectGeometryAlong
+        | NodeKind::RotateDirection
+        | NodeKind::OrientDirection
+        | NodeKind::OrientPlane => (shape(args)?.weight(), 1),
+        NodeKind::BoxArray => crate::transform_nodes::array_estimate(args)?,
         // A mirror that keeps the original can double the shape.
         NodeKind::Mirror => (shape(args)?.weight().saturating_mul(2), 1),
-        NodeKind::Series | NodeKind::Range => {
+        NodeKind::Series | NodeKind::Range | NodeKind::Fibonacci => {
             let count = num(args, 2)? as usize;
             (count, count)
         }
@@ -703,6 +717,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
                 })
                 .collect())
         }
+        Fibonacci => crate::sets_nodes::fibonacci(a, cancel),
         Series => {
             let start = num(a, 0)?;
             let step = num(a, 1)?;
@@ -952,6 +967,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
+        PointPolar | PointCylindrical | PointToPolar | PointBarycentric => {
+            crate::point_nodes::run_item(kind, a)
+        }
         PlaneSurface
         | NurbsPanel
         | BilinearSurface
@@ -984,21 +1002,32 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | BrepOffset
         | SurfaceGaussianCurvature
         | SurfaceMeanCurvature
-        | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
+        | SurfacePrincipalCurvatures
+        | ConeSurface
+        | SurfaceClosestUv
+        | SurfaceDistance
+        | SurfaceFramesUv
+        | BrepBoxTwoPoints => crate::surface_nodes::run(kind, a, cancel),
         MeshArea | MeshVolume | MeshCenter | MeshDimensions | MeshMass | MeshAudit
         | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
         | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
         | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
-        | MeshCompact | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
-        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem
-        | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList
-        | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree
-        | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper
-        | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex
-        | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems
-        | InsertItems | MemberIndex | RandomReduce | Jitter => {
-            Err("このノードはリスト評価が必要です。".into())
+        | MeshCompact | MeshNonManifold | MeshTriangle | MeshQuad | MeshFaceBoundaries
+        | MeshFaceCenters | MeshFaceCircles | MeshFaceAspectRatio | MeshDisjoint
+        | MeshInteriorEdges | MeshVertexNormals => {
+            crate::mesh_fabrication::run_item(kind, a, cancel)
         }
+        CameraObscura | ProjectGeometry | ProjectGeometryAlong | RotateDirection
+        | OrientDirection | OrientPlane | BoxArray => crate::transform_nodes::run(kind, a, cancel),
+        MeshConstruct | MeshDeleteFaces | MeshCullFaces | MeshDeleteVertices | MeshCullVertices
+        | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem | ListLength
+        | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList | Bounds
+        | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree | PruneTree
+        | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper | PartitionList
+        | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex | DuplicateData
+        | RepeatData | MassAddition | MassMultiplication | ReplaceItems | InsertItems
+        | MemberIndex | RandomReduce | Jitter => Err("このノードはリスト評価が必要です。".into()),
+        k if crate::sets_nodes::is_list_kind(k) => Err("このノードはリスト評価が必要です。".into()),
         other => crate::math_nodes::run_item(other, a, cancel),
     }
 }

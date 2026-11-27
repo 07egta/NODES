@@ -577,12 +577,18 @@ fn numbers(a: impl IntoIterator<Item = f64>) -> Vec<Value> {
 }
 fn count(n: usize) -> Result<(), String> {
     if n > MAX_ITEMS {
-        Err("取り出す要素が8192個を超えます。".into())
+        Err(format!("取り出す要素が{MAX_ITEMS}個を超えます。"))
     } else {
         Ok(())
     }
 }
 const M: InputSpec = g("mesh", "メッシュ", DataType::Mesh);
+const A: InputSpec = i("a", "頂点 A", 0., 0., MAX_VERTICES as f64 - 1.);
+const B: InputSpec = i("b", "頂点 B", 1., 0., MAX_VERTICES as f64 - 1.);
+const C: InputSpec = i("c", "頂点 C", 2., 0., MAX_VERTICES as f64 - 1.);
+const D: InputSpec = i("d", "頂点 D", 3., 0., MAX_VERTICES as f64 - 1.);
+const INDICES: InputSpec = g("indices", "削除番号", DataType::Number);
+const PATTERN: InputSpec = g("pattern", "パターン (0:保持 1:削除)", DataType::Number);
 macro_rules! specs{
     ($($kind:ident => ($label:literal,$description:literal,$keywords:literal,$output:ident,[$($input:expr),*]);)+)=>{
         pub fn spec(kind:NodeKind)->&'static NodeSpec{
@@ -601,11 +607,11 @@ specs! {
     MeshDimensions => ("メッシュ寸法","XYZ方向の外接箱の長さを点の3成分として出力。","mesh dimensions bounds size 寸法",Point,[M]);
     MeshMass => ("材料重量概算","符号付き体積と密度から100%充填相当のgを概算。交差・入れ子・実際のスライスは未検査。座標はmm。","mesh material mass weight density 重量",Number,[M,n("density","密度 g/cm³",1.24,0.01,30.,0.01)]);
     MeshAudit => ("メッシュ診断","境界辺、非多様体辺、面方向不一致、非多様体頂点、同一座標頂点、重複面、退化面、孤立頂点の順に8数値を出力。自己交差は未検査。","mesh topology audit diagnostics nonmanifold 検査",Number,[M]);
-    MeshVertices => ("メッシュ頂点","頂点をインデックス順のリストに取り出します（8192点まで）。","mesh vertices deconstruct 頂点",Point,[M]);
-    MeshFaces => ("メッシュ面番号","三角形の頂点番号を3個ずつ連続して出力（0始まり、8192数値まで）。","mesh faces indices deconstruct 面",Number,[M]);
-    MeshNormals => ("メッシュ面法線","単位面法線をXYZ点として出力（8192面まで）。","mesh face normals 法線",Point,[M]);
-    MeshEdges => ("メッシュ辺","インデックスで共有する辺を1本ずつ線分として出力（8192本まで）。","mesh edges topology 辺",Curve,[M]);
-    MeshBoundary => ("メッシュ開境界","1面だけが接続する辺を線分として出力（8192本まで）。","mesh boundary naked edges 開境界",Curve,[M]);
+    MeshVertices => ("メッシュ頂点","頂点をインデックス順のリストに取り出します。","mesh vertices deconstruct 頂点",Point,[M]);
+    MeshFaces => ("メッシュ面番号","三角形の頂点番号を3個ずつ連続して出力（0始まり）。","mesh faces indices deconstruct 面",Number,[M]);
+    MeshNormals => ("メッシュ面法線","単位面法線をXYZ点として出力。","mesh face normals 法線",Point,[M]);
+    MeshEdges => ("メッシュ辺","インデックスで共有する辺を1本ずつ線分として出力。","mesh edges topology 辺",Curve,[M]);
+    MeshBoundary => ("メッシュ開境界","1面だけが接続する辺を線分として出力。","mesh boundary naked edges 開境界",Curve,[M]);
     MeshClosest => ("メッシュ最近点","全三角形を走査し、指定点に最も近い表面上の点を返します。","mesh closest point 最近点",Point,[M,g("point","点",DataType::Point)]);
     MeshFlip => ("メッシュ反転","全三角形の頂点順を反転します。","mesh flip normals 反転",Mesh,[M]);
     MeshWeldExact => ("メッシュ同一点結合","完全に同じXYZの頂点だけを結合。面の崩壊はエラー。Booleanではありません。","mesh weld merge exact vertices 溶接",Mesh,[M]);
@@ -619,8 +625,21 @@ specs! {
     MeshSelfContact => ("メッシュ自己接触候補","共有頂点のない面同士の接触ペア数。近似判定。隣接面の重なりは未検査。上限超過はエラー。","mesh self intersection contact 自己交差",Number,[M]);
     MeshThicknessSample => ("肉厚サンプル推定","面中心から内向き法線に沿った出口距離の最小サンプル値と実サンプル数。真の最小肉厚ではありません。","mesh thickness thin wall sample 肉厚",Number,[M,i("samples","サンプル数",64.,1.,512.)]);
     MeshCompact => ("未使用頂点削除","面が参照しない頂点を削除して面番号を更新します。","mesh compact cull unused vertices 整理",Mesh,[M]);
-    MeshNonManifold => ("メッシュ非多様体辺","3枚以上の面が共有する辺を線分で出力（8192本まで）。","mesh non manifold edges 非多様体 辺",Curve,[M]);
+    MeshNonManifold => ("メッシュ非多様体辺","3枚以上の面が共有する辺を線分で出力。","mesh non manifold edges 非多様体 辺",Curve,[M]);
     MeshConstruct => ("メッシュ構築","各枝の点リストと0始まりの三角形番号列（3個ずつ）を使用。","construct mesh from points indices 構築",Mesh,[g("vertices","頂点リスト",DataType::Point),g("faces","面番号リスト",DataType::Number)]);
+    MeshTriangle => ("三角メッシュ面番号","3個の0始まりの頂点番号を面の順序でまとめます。メッシュ構築の面番号に接続できます。","mesh triangle face index メッシュ三角形",Number,[A,B,C]);
+    MeshQuad => ("四角メッシュ面番号","4個の0始まりの頂点番号を対角線ACで分割した2枚の三角形の面番号に変換します。","mesh quad face index メッシュ四角形",Number,[A,B,C,D]);
+    MeshFaceBoundaries => ("メッシュ面境界","各三角形の境界を閉じたポリラインとして面番号順に出力します。","mesh face boundaries polyline 面境界",Curve,[M]);
+    MeshFaceCenters => ("メッシュ面中心","各三角形の3頂点の平均を面番号順に出力します。","mesh face centers face normals centroid 面中心",Point,[M]);
+    MeshFaceCircles => ("メッシュ面外接円","各三角形の頂点を通る精密外接円を面番号順に出力します。","mesh face circles circumcircle 面外接円",Curve,[M]);
+    MeshFaceAspectRatio => ("メッシュ面縦横比","最長辺を底辺とした高さをその辺の長さで割り、面番号順に出力します。","mesh face circles ratio altitude quality 面品質",Number,[M]);
+    MeshDisjoint => ("メッシュの連結成分","頂点番号を共有する面を連結成分に分けます。座標だけが一致する頂点は結合しません。未使用頂点は省きます。","mesh disjoint split components メッシュ分離",Mesh,[M]);
+    MeshDeleteFaces => ("メッシュ面の一括削除","枝ごとに1個のメッシュから、指定した0始まりの三角形を削除します。","mesh delete faces indices 面削除",Mesh,[M,INDICES]);
+    MeshCullFaces => ("メッシュ面のパターン除去","枝ごとに1個のメッシュを処理し、1の面を削除して0の面を保持します。パターンは繰り返し、空なら全て保持します。","mesh cull faces pattern 面除去",Mesh,[M,PATTERN]);
+    MeshDeleteVertices => ("メッシュ頂点の一括削除","枝ごとに1個のメッシュから指定した0始まりの頂点と接する三角形を削除し、番号を振り直します。","mesh delete vertices indices 頂点削除",Mesh,[M,INDICES]);
+    MeshCullVertices => ("メッシュ頂点のパターン除去","枝ごとに1個のメッシュを処理し、1の頂点と接する三角形を削除します。パターンは繰り返し、空なら全て保持します。","mesh cull vertices pattern 頂点除去",Mesh,[M,PATTERN]);
+    MeshInteriorEdges => ("メッシュの内部辺","ちょうど2枚の面が頂点番号で共有する辺を線分で出力します。","mesh edges interior internal edges 内部辺",Curve,[M]);
+    MeshVertexNormals => ("メッシュ頂点法線","面積で重み付けした単位法線を頂点番号順にXYZ点で出力します。法線を定められない頂点はゼロです。","mesh vertex normals deconstruct 頂点法線",Point,[M]);
 }
 pub fn run_list(lists: &[&[Value]], stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     let pts = lists.first().ok_or("頂点リストがありません。")?;
@@ -664,6 +683,9 @@ pub fn run_item(
     stop: &dyn Fn() -> bool,
 ) -> Result<Vec<Value>, String> {
     use NodeKind::*;
+    if matches!(kind, MeshTriangle | MeshQuad) {
+        return face_indices(a, kind == MeshQuad);
+    }
     let m = mesh_arg(a)?;
     raw_check(m, stop)?;
     match kind {
@@ -726,11 +748,17 @@ pub fn run_item(
             }
             Ok(values)
         }
-        MeshEdges | MeshBoundary | MeshNonManifold => {
+        MeshFaceBoundaries | MeshFaceCenters | MeshFaceCircles | MeshFaceAspectRatio => {
+            face_properties(kind, m, stop)
+        }
+        MeshVertexNormals => vertex_normals(m, stop),
+        MeshDisjoint => disjoint(m, stop),
+        MeshEdges | MeshBoundary | MeshNonManifold | MeshInteriorEdges => {
             let es = topology(m, stop)?;
             let select = |uses: &Vec<(usize, bool)>| {
                 kind == MeshEdges
                     || (kind == MeshBoundary && uses.len() == 1)
+                    || (kind == MeshInteriorEdges && uses.len() == 2)
                     || (kind == MeshNonManifold && uses.len() > 2)
             };
             let total = es.values().filter(|us| select(us)).count();
@@ -831,6 +859,234 @@ pub fn run_item(
         }
         _ => Err("メッシュノードの評価方式が不正です。".into()),
     }
+}
+
+pub(crate) fn is_list_kind(kind: NodeKind) -> bool {
+    use NodeKind::*;
+    matches!(
+        kind,
+        MeshConstruct | MeshDeleteFaces | MeshCullFaces | MeshDeleteVertices | MeshCullVertices
+    )
+}
+
+pub(crate) fn run_list_kind(
+    kind: NodeKind,
+    lists: &[&[Value]],
+    stop: &dyn Fn() -> bool,
+) -> Result<Vec<Value>, String> {
+    use NodeKind::*;
+    if kind == MeshConstruct {
+        return run_list(lists, stop);
+    }
+    let [Value::Mesh(mesh)] = lists[0] else {
+        return Err("各枝のメッシュ入力にはメッシュ1個が必要です。".into());
+    };
+    let by_vertex = matches!(kind, MeshDeleteVertices | MeshCullVertices);
+    let by_pattern = matches!(kind, MeshCullFaces | MeshCullVertices);
+    let size = if by_vertex {
+        mesh.vertices.len()
+    } else {
+        mesh.triangles.len()
+    };
+    raw_check(mesh, stop)?;
+    let removed = removed_elements(lists[1], size, by_pattern, stop)?;
+    if !removed.contains(&true) {
+        return Ok(vec![Value::Mesh(mesh.clone())]);
+    }
+    if by_vertex {
+        as_mesh(remove_vertices(mesh, &removed, stop)?, stop)
+    } else {
+        let mut triangles = Vec::with_capacity(mesh.triangles.len());
+        for (i, &triangle) in mesh.triangles.iter().enumerate() {
+            tick(i, stop)?;
+            if !removed[i] {
+                triangles.push(triangle);
+            }
+        }
+        as_mesh(
+            Mesh {
+                vertices: mesh.vertices.clone(),
+                triangles,
+            },
+            stop,
+        )
+    }
+}
+
+fn removed_elements(
+    selection: &[Value],
+    size: usize,
+    by_pattern: bool,
+    stop: &dyn Fn() -> bool,
+) -> Result<Vec<bool>, String> {
+    let mut removed = vec![false; size];
+    if by_pattern && !selection.is_empty() {
+        let mut pattern = Vec::with_capacity(selection.len());
+        for (i, value) in selection.iter().enumerate() {
+            tick(i, stop)?;
+            pattern.push(match value.number()? {
+                0. => false,
+                1. => true,
+                _ => return Err("除去パターンには0または1が必要です。".into()),
+            });
+        }
+        for (i, flag) in removed.iter_mut().enumerate() {
+            tick(i, stop)?;
+            *flag = pattern[i % pattern.len()];
+        }
+    } else {
+        for (i, value) in selection.iter().enumerate() {
+            tick(i, stop)?;
+            let index = value.number()?;
+            if !(0. ..size as f64).contains(&index) || index.fract() != 0. {
+                return Err("削除番号は範囲内の整数である必要があります。".into());
+            }
+            removed[index as usize] = true;
+        }
+    }
+    Ok(removed)
+}
+
+fn remove_vertices(mesh: &Mesh, removed: &[bool], stop: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    let mut result = Mesh::default();
+    let mut index_map = vec![None; mesh.vertices.len()];
+    for (i, &point) in mesh.vertices.iter().enumerate() {
+        tick(i, stop)?;
+        if !removed[i] {
+            index_map[i] = Some(result.vertices.len() as u32);
+            result.vertices.push(point);
+        }
+    }
+    for (i, triangle) in mesh.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        if let [Some(a), Some(b), Some(c)] = triangle.map(|index| index_map[index as usize]) {
+            result.triangles.push([a, b, c]);
+        }
+    }
+    Ok(result)
+}
+
+fn face_indices(args: &[&Value], quad: bool) -> Result<Vec<Value>, String> {
+    let mut indices = Vec::with_capacity(args.len());
+    for value in args {
+        let index = value.number()?;
+        if !(0. ..MAX_VERTICES as f64).contains(&index) || index.fract() != 0. {
+            return Err("面の頂点番号は範囲内の整数である必要があります。".into());
+        }
+        if indices.contains(&index) {
+            return Err("面の頂点番号が重複しています。".into());
+        }
+        indices.push(index);
+    }
+    if quad {
+        let [a, b, c, d] = indices[..] else {
+            return Err("四角形には4個の頂点番号が必要です。".into());
+        };
+        Ok(numbers([a, b, c, a, c, d]))
+    } else {
+        Ok(numbers(indices))
+    }
+}
+
+fn face_properties(
+    kind: NodeKind,
+    mesh: &Mesh,
+    stop: &dyn Fn() -> bool,
+) -> Result<Vec<Value>, String> {
+    use NodeKind::*;
+    count(mesh.triangles.len())?;
+    let mut result = Vec::with_capacity(mesh.triangles.len());
+    for (i, triangle) in mesh.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        let [a, b, c] = triangle.map(|index| mesh.vertices[index as usize]);
+        let value = match kind {
+            MeshFaceBoundaries => crate::curve_nodes::polyline(vec![a, b, c], true)?,
+            MeshFaceCenters => Value::Point(mul(add(add(a, b), c), 1. / 3.)),
+            MeshFaceCircles => crate::curve_nodes::preview(
+                crate::curve_geometry::CurveGeometry::through_three(a, b, c, true)?,
+                32,
+                stop,
+            )?,
+            MeshFaceAspectRatio => {
+                let [ab, ac, bc] = [sub(b, a), sub(c, a), sub(c, b)];
+                let longest_squared = dot(ab, ab).max(dot(ac, ac)).max(dot(bc, bc));
+                if longest_squared == 0. {
+                    return Err("面の辺長が全てゼロです。".into());
+                }
+                Value::Number(length(cross(ab, ac)) / longest_squared)
+            }
+            _ => unreachable!("mesh face property dispatch"),
+        };
+        result.push(value);
+    }
+    Ok(result)
+}
+
+fn vertex_normals(mesh: &Mesh, stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
+    count(mesh.vertices.len())?;
+    let mut normals = vec![[0.; 3]; mesh.vertices.len()];
+    for (i, triangle) in mesh.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        let [a, b, c] = triangle.map(|index| mesh.vertices[index as usize]);
+        let weighted_normal = cross(sub(b, a), sub(c, a));
+        for &index in triangle {
+            normals[index as usize] = add(normals[index as usize], weighted_normal);
+        }
+    }
+    let mut result = Vec::with_capacity(normals.len());
+    for (i, normal) in normals.into_iter().enumerate() {
+        tick(i, stop)?;
+        let norm = length(normal);
+        result.push(Value::Point(if norm > 0. {
+            mul(normal, 1. / norm)
+        } else {
+            [0.; 3]
+        }));
+    }
+    Ok(result)
+}
+
+fn disjoint(mesh: &Mesh, stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
+    let mut parents: Vec<_> = (0..mesh.vertices.len()).collect();
+    for (i, &[a, b, c]) in mesh.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        union(&mut parents, a as usize, b as usize);
+        union(&mut parents, a as usize, c as usize);
+    }
+
+    let mut components = BTreeMap::new();
+    let mut pieces: Vec<Mesh> = Vec::new();
+    let mut vertex_indices = vec![None; mesh.vertices.len()];
+    for (i, triangle) in mesh.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        let representative = root(&mut parents, triangle[0] as usize);
+        let piece = match components.get(&representative) {
+            Some(&index) => index,
+            None => {
+                let index = pieces.len();
+                count(index + 1)?;
+                components.insert(representative, index);
+                pieces.push(Mesh::default());
+                index
+            }
+        };
+        let out = &mut pieces[piece];
+        out.triangles.push(triangle.map(|index| {
+            let index = index as usize;
+            *vertex_indices[index].get_or_insert_with(|| {
+                let new_index = out.vertices.len() as u32;
+                out.vertices.push(mesh.vertices[index]);
+                new_index
+            })
+        }));
+    }
+    pieces
+        .into_iter()
+        .map(|piece| {
+            validate_mesh(&piece, stop)?;
+            Ok(Value::Mesh(Arc::new(piece)))
+        })
+        .collect()
 }
 
 #[cfg(test)]

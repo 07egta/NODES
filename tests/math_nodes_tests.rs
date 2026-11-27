@@ -35,7 +35,7 @@ fn registered_specs_have_stable_unique_serde_names() {
             assert_eq!(kind.spec().label, spec.label);
         }
     }
-    assert_eq!(count, 90);
+    assert_eq!(count, 98);
     assert_eq!(serde_json::to_string(&Range).unwrap(), "\"range\"");
     assert_eq!(serde_json::to_string(&Sine).unwrap(), "\"sine\"");
 }

@@ -1,6 +1,6 @@
 //! Node adapters for the mathematical surface kernel. One output per node
 //! because the current graph schema has one output per node.
-use crate::engine::{as_mesh, cancelled, num, shape};
+use crate::engine::{as_mesh, cancelled, finite_point, num, shape};
 use crate::model::{DataType as D, NodeKind as K, NodeSpec, Value, g, i, n};
 use crate::surface_kernel::{ClosedSolid, NurbsSurface, Surface, SurfaceValue};
 use std::sync::Arc;
@@ -39,6 +39,11 @@ pub const KINDS: &[K] = &[
     K::SurfaceGaussianCurvature,
     K::SurfaceMeanCurvature,
     K::SurfacePrincipalCurvatures,
+    K::ConeSurface,
+    K::SurfaceClosestUv,
+    K::SurfaceDistance,
+    K::SurfaceFramesUv,
+    K::BrepBoxTwoPoints,
 ];
 const S: crate::model::InputSpec = g("surface", "曲面", D::Surface);
 const B: crate::model::InputSpec = g("solid", "閉じた立体", D::Solid);
@@ -87,6 +92,13 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "円筒曲面",
             "解析的な円筒の側面。上下の蓋はありません。",
             "cylinder surface pipe 円筒",
+            Surface,
+            [R, H]
+        ),
+        K::ConeSurface => spec!(
+            "円錐曲面",
+            "XY平面の円を底辺とし、+Zの頂点に向かう解析的な円錐の側面。",
+            "cone surface analytic 円錐",
             Surface,
             [R, H]
         ),
@@ -164,11 +176,36 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             [S, i("steps", "積分分割", 32., 4., 128.)]
         ),
         K::SurfaceClosestPoint => spec!(
-            "曲面の最近点（平面）",
-            "現在は長方形・平行四辺形の平面曲面に限定。",
+            "曲面の最近点",
+            "平面・円筒・円錐・円錐台・球・トーラスの上で入力点に最も近い点。",
             "surface closest point projection 最近点 投影",
             Point,
             [S, g("point", "点", D::Point)]
+        ),
+        K::SurfaceClosestUv => spec!(
+            "曲面の最近点UV",
+            "解析曲面上の最近点の正規化座標をXYZ点 (U, V, 0) で出力します。",
+            "surface closest point UV parameter 最近点",
+            Point,
+            [S, g("point", "点", D::Point)]
+        ),
+        K::SurfaceDistance => spec!(
+            "曲面への最短距離",
+            "入力点から平面・円筒・円錐・円錐台・球・トーラスの曲面部分までの距離。",
+            "surface closest point distance 最短距離 最近点",
+            Number,
+            [S, g("point", "点", D::Point)]
+        ),
+        K::SurfaceFramesUv => spec!(
+            "曲面フレーム格子UV",
+            "端を含む格子点の正規化座標 (U, V, 0) をV行・U列の順に1つのリストで返します。",
+            "surface frames grid parameters 分割 UV格子",
+            Point,
+            [
+                S,
+                i("u_count", "U分割数", 8., 1., 64.),
+                i("v_count", "V分割数", 8., 1., 64.)
+            ]
         ),
         K::SurfaceIsoCurve => spec!(
             "曲面の等値曲線",
@@ -210,6 +247,13 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "brep box solid exact 箱 立体",
             Solid,
             [W, DEP, H]
+        ),
+        K::BrepBoxTwoPoints => spec!(
+            "2点からB-rep箱",
+            "対角の2点を通る軸平行のB-rep箱を作成します。",
+            "box 2pt two points diagonal cuboid 2点 対角 箱",
+            Solid,
+            [g("a", "対角点 A", D::Point), g("b", "対角点 B", D::Point)]
         ),
         K::BrepVolume => spec!(
             "B-rep 体積",
@@ -374,6 +418,7 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         ),
         K::CylinderSurface => made(Surface::frustum(num(a, 0)?, num(a, 0)?, num(a, 1)?)?, stop),
+        K::ConeSurface => made(Surface::cone(num(a, 0)?, num(a, 1)?)?, stop),
         K::FrustumSurface => made(Surface::frustum(num(a, 0)?, num(a, 1)?, num(a, 2)?)?, stop),
         K::SphereSurface => made(Surface::sphere(num(a, 0)?)?, stop),
         K::TorusSurface => made(Surface::torus(num(a, 0)?, num(a, 1)?)?, stop),
@@ -417,9 +462,38 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
         K::SurfaceArea => Ok(vec![Value::Number(
             surface(a)?.area(num(a, 1)? as usize, stop)?,
         )]),
-        K::SurfaceClosestPoint => Ok(vec![Value::Point(
-            surface(a)?.closest_plane_point(point(a, 1)?)?,
-        )]),
+        K::SurfaceClosestPoint | K::SurfaceClosestUv | K::SurfaceDistance => {
+            let projection = surface(a)?.closest_point(point(a, 1)?)?;
+            let [u, v] = projection.uv;
+            Ok(vec![match kind {
+                K::SurfaceClosestPoint => Value::Point(projection.point),
+                K::SurfaceClosestUv => Value::Point([u, v, 0.]),
+                _ => Value::Number(projection.distance),
+            }])
+        }
+        K::SurfaceFramesUv => {
+            let [[u0, u1], [v0, v1]] = surface(a)?.domain();
+            let count = |index| {
+                let n = num(a, index)?;
+                if !(1. ..=64.).contains(&n) || n.fract() != 0. {
+                    return Err("曲面格子の分割数は1〜64の整数にしてください。".to_owned());
+                }
+                Ok(n as usize)
+            };
+            let (nu, nv) = (count(1)?, count(2)?);
+            let mut points = Vec::with_capacity((nu + 1) * (nv + 1));
+            for j in 0..=nv {
+                cancelled(stop)?;
+                for i in 0..=nu {
+                    points.push(Value::Point([
+                        u0 + (u1 - u0) * (i as f64 / nu as f64),
+                        v0 + (v1 - v0) * (j as f64 / nv as f64),
+                        0.,
+                    ]));
+                }
+            }
+            Ok(points)
+        }
         K::SurfaceIsoCurve => Ok(vec![Value::Curve(Arc::new(surface(a)?.iso_curve(
             num(a, 1)? == 0.,
             num(a, 2)?,
@@ -450,6 +524,16 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             num(a, 1)?,
             num(a, 2)?,
         )?)),
+        K::BrepBoxTwoPoints => {
+            let (p, q) = (point(a, 0)?, point(a, 1)?);
+            if !finite_point(p) || !finite_point(q) {
+                return Err("対角点の座標が無効です。".into());
+            }
+            Ok(body(ClosedSolid::box_bounds(
+                std::array::from_fn(|i| p[i].min(q[i])),
+                std::array::from_fn(|i| p[i].max(q[i])),
+            )?))
+        }
         K::BrepVolume => Ok(vec![Value::Number(solid(a, 0)?.volume())]),
         K::BrepArea => Ok(vec![Value::Number(solid(a, 0)?.area())]),
         K::BrepIntersection => Ok(body(solid(a, 0)?.intersection(solid(a, 1)?)?)),

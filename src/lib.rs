@@ -17,12 +17,15 @@ pub mod mesh_geometry_checks;
 pub mod model;
 pub mod node_access;
 pub mod persistence;
+mod point_nodes;
 pub mod polygon_triangulation;
 pub mod print_info;
 pub mod raster;
 pub mod script;
+mod sets_nodes;
 pub mod stl_export;
 pub mod templates;
+mod transform_nodes;
 
 pub mod curve_geometry;
 pub mod curve_nodes;

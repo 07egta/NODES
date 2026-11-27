@@ -652,38 +652,52 @@ impl PlaneSurface {
     pub fn area(&self) -> f64 {
         norm(cross(self.u, self.v))
     }
-    /// Exact constrained least-squares solution for a planar parallelogram.
-    pub fn closest(&self, p: Point3) -> R<Point3> {
-        if !finite(p) {
+    /// Closest point on a bounded parallelogram.
+    pub fn closest(&self, point: Point3) -> R<Point3> {
+        Ok(self.closest_with_uv(point)?.0)
+    }
+
+    fn closest_with_uv(&self, point: Point3) -> R<(Point3, [f64; 2])> {
+        if !finite(point) {
             return fail("点の座標が無効です。");
         }
-        let q = sub(p, self.origin);
-        let a = dot(self.u, self.u);
-        let b = dot(self.u, self.v);
-        let c = dot(self.v, self.v);
-        let d = dot(q, self.u);
-        let e = dot(q, self.v);
-        let det = norm(cross(self.u, self.v)).powi(2);
-        let (x, y) = ((c * d - b * e) / det, (a * e - b * d) / det);
-        let mut candidates = vec![
-            (0., (e / c).clamp(0., 1.)),
-            (1., ((e - b) / c).clamp(0., 1.)),
-            ((d / a).clamp(0., 1.), 0.),
-            (((d - b) / a).clamp(0., 1.), 1.),
-        ];
-        if (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y) {
-            candidates.push((x, y));
+        // Solve in an orthogonal frame to avoid subtracting nearly equal
+        // squared axis lengths when the parallelogram is skew.
+        let normal = cross(self.u, self.v);
+        let normal = mul(normal, 1. / norm(normal));
+        let projected = sub(point, mul(normal, dot(sub(point, self.origin), normal)));
+        let in_plane = sub(projected, self.origin);
+        let u_length = norm(self.u);
+        let u_unit = mul(self.u, 1. / u_length);
+        let transverse = cross(normal, u_unit);
+        let v = dot(in_plane, transverse) / dot(self.v, transverse);
+        let u = dot(sub(in_plane, mul(self.v, v)), u_unit) / u_length;
+        if (0. ..=1.).contains(&u) && (0. ..=1.).contains(&v) {
+            return Ok((projected, [u, v]));
         }
+
+        let along = |base: Point3, axis: Point3| {
+            (dot(sub(projected, base), axis) / dot(axis, axis)).clamp(0., 1.)
+        };
+        let candidates = [
+            [along(self.origin, self.u), 0.],
+            [0., along(self.origin, self.v)],
+            [1., along(add(self.origin, self.u), self.v)],
+            [along(add(self.origin, self.v), self.u), 1.],
+        ];
         let mut best = None;
-        for (u, v) in candidates {
-            let q = self.evaluate(u, v)?.point;
-            let dist = norm(sub(q, p));
-            if best.is_none_or(|(d, _)| dist < d) {
-                best = Some((dist, q));
+        for [u, v] in candidates {
+            let candidate = self.evaluate(u, v)?.point;
+            // The normal distance is constant, and could obscure which edge
+            // is nearest when the query is far from the plane.
+            let delta = sub(candidate, projected);
+            let distance = dot(delta, delta);
+            if best.is_none_or(|(d, _, _)| distance < d) {
+                best = Some((distance, candidate, [u, v]));
             }
         }
-        best.map(|(_, p)| p)
-            .ok_or_else(|| "最近点を決定できません。".into())
+        let (_, point, uv) = best.ok_or("最近点を決定できません。")?;
+        Ok((point, uv))
     }
 }
 
@@ -697,6 +711,22 @@ enum Geometry {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Surface(Geometry);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SurfaceProjection {
+    pub point: Point3,
+    pub uv: [f64; 2],
+    pub distance: f64,
+}
+
+/// Normalized polar angle with a single seam representation.
+fn polar_parameter(x: f64, y: f64) -> f64 {
+    if x == 0. && y == 0. {
+        return 0.;
+    }
+    let angle = (y.atan2(x) / TAU).rem_euclid(1.);
+    if angle == 1. { 0. } else { angle }
+}
 impl Surface {
     pub fn plane(w: f64, d: f64) -> R<Self> {
         Ok(Self(Geometry::Plane(PlaneSurface::xy(w, d)?)))
@@ -714,6 +744,13 @@ impl Surface {
             h: size(h)?,
         }))
     }
+    pub fn cone(radius: f64, height: f64) -> R<Self> {
+        Ok(Self(Geometry::Frustum {
+            r0: size(radius)?,
+            r1: 0.,
+            h: size(height)?,
+        }))
+    }
     pub fn sphere(r: f64) -> R<Self> {
         Ok(Self(Geometry::Sphere { r: size(r)? }))
     }
@@ -729,6 +766,7 @@ impl Surface {
         match &self.0 {
             Geometry::Plane(_) => "Plane",
             Geometry::Nurbs(_) => "NURBS",
+            Geometry::Frustum { r1: 0., .. } => "Cone",
             Geometry::Frustum { .. } => "Cylinder / Frustum",
             Geometry::Sphere { .. } => "Sphere",
             Geometry::Torus { .. } => "Torus",
@@ -761,7 +799,13 @@ impl Surface {
                 }
             }
             Geometry::Sphere { r } => {
-                let (sl, cl) = (PI * (v - 0.5)).sin_cos();
+                let (sl, cl) = if v == 0. {
+                    (-1., 0.)
+                } else if v == 1. {
+                    (1., 0.)
+                } else {
+                    (PI * (v - 0.5)).sin_cos()
+                };
                 Sample {
                     point: [r * cl * c, r * cl * s, r * sl],
                     du: [-TAU * r * cl * s, TAU * r * cl * c, 0.],
@@ -861,6 +905,44 @@ impl Surface {
             _ => fail("最近点は現在、平面曲面だけに対応しています。"),
         }
     }
+    /// Closest point on a supported bounded analytic surface. UV is normalized.
+    /// Ties on an axis or tube center choose a deterministic representative.
+    pub fn closest_point(&self, query: Point3) -> R<SurfaceProjection> {
+        if !finite(query) {
+            return fail("点の座標が無効です。");
+        }
+        let (point, uv) = if let Geometry::Plane(plane) = &self.0 {
+            plane.closest_with_uv(query)?
+        } else {
+            let [x, y, z] = query;
+            let rho = x.hypot(y);
+            let u = polar_parameter(x, y);
+            let v = match &self.0 {
+                Geometry::Frustum { r0, r1, h } => {
+                    let dr = r1 - r0;
+                    ((dr * (rho - r0) + h * z) / (dr * dr + h * h)).clamp(0., 1.)
+                }
+                Geometry::Sphere { .. } => {
+                    if rho == 0. && z == 0. {
+                        0.5
+                    } else {
+                        z.atan2(rho) / PI + 0.5
+                    }
+                }
+                Geometry::Torus { major, .. } => polar_parameter(rho - major, z),
+                Geometry::Nurbs(_) => {
+                    return fail("最近点は平面・円錐・円錐台・球・トーラスに対応しています。");
+                }
+                Geometry::Plane(_) => unreachable!("plane projection delegated above"),
+            };
+            (self.evaluate(u, v)?.point, [u, v])
+        };
+        Ok(SurfaceProjection {
+            point,
+            uv,
+            distance: norm(sub(point, query)),
+        })
+    }
     /// Analytic primitives have analytic area. NURBS uses bounded midpoint
     /// integration of |Su x Sv|; this is an estimate, not an error certificate.
     pub fn area(&self, steps: usize, stop: &dyn Fn() -> bool) -> R<f64> {
@@ -895,43 +977,50 @@ impl Surface {
         }
     }
     /// Explicit display/export approximation. Periodic directions share seam
-    /// indices; sphere poles have a single vertex each, never zero-area pole fans.
+    /// indices; sphere poles and the cone apex each use one vertex.
     pub fn tessellate(&self, nu: usize, nv: usize, stop: &dyn Fn() -> bool) -> R<Mesh> {
         if !(4..=128).contains(&nu) || !(4..=128).contains(&nv) {
             return fail("曲面の分割数は4〜128です。");
         }
         check_cancel(stop)?;
         let (pu, pv) = self.periodic();
-        if let Geometry::Sphere { r } = &self.0 {
-            let mut m = Mesh {
-                vertices: vec![[0., 0., -*r]],
-                triangles: vec![],
-            };
-            for j in 1..nv {
+        let poles = match &self.0 {
+            Geometry::Sphere { r } => Some((Some([0., 0., -*r]), [0., 0., *r])),
+            Geometry::Frustum { r1: 0., h, .. } => Some((None, [0., 0., *h])),
+            _ => None,
+        };
+        if let Some((bottom, top)) = poles {
+            let mut mesh = Mesh::default();
+            mesh.vertices.extend(bottom);
+            let first_ring = usize::from(bottom.is_some());
+            for j in first_ring..nv {
                 check_cancel(stop)?;
                 for i in 0..nu {
-                    m.vertices.push(
+                    mesh.vertices.push(
                         self.evaluate(i as f64 / nu as f64, j as f64 / nv as f64)?
                             .point,
                     );
                 }
             }
-            let top = m.vertices.len() as u32;
-            m.vertices.push([0., 0., *r]);
-            let idx = |i: usize, j: usize| 1 + ((j - 1) * nu + i % nu) as u32;
+            let top_index = mesh.vertices.len() as u32;
+            mesh.vertices.push(top);
+            let index = |i: usize, j: usize| (first_ring + (j - first_ring) * nu + i % nu) as u32;
             for i in 0..nu {
-                m.triangles.push([0, idx(i + 1, 1), idx(i, 1)]);
-                for j in 1..nv - 1 {
-                    let a = idx(i, j);
-                    let b = idx(i + 1, j);
-                    let c = idx(i + 1, j + 1);
-                    let d = idx(i, j + 1);
-                    m.triangles.extend([[a, b, c], [a, c, d]]);
+                if bottom.is_some() {
+                    mesh.triangles.push([0, index(i + 1, 1), index(i, 1)]);
                 }
-                m.triangles.push([idx(i, nv - 1), idx(i + 1, nv - 1), top]);
+                for j in first_ring..nv - 1 {
+                    let a = index(i, j);
+                    let b = index(i + 1, j);
+                    let c = index(i + 1, j + 1);
+                    let d = index(i, j + 1);
+                    mesh.triangles.extend([[a, b, c], [a, c, d]]);
+                }
+                mesh.triangles
+                    .push([index(i, nv - 1), index(i + 1, nv - 1), top_index]);
             }
-            crate::engine::validate_mesh(&m, stop)?;
-            return Ok(m);
+            crate::engine::validate_mesh(&mesh, stop)?;
+            return Ok(mesh);
         }
         // Mandatory knot lines preserve corners and derivative discontinuities.
         // Retain distinct knots, but omit a uniform sample extremely close to a knot

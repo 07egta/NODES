@@ -301,7 +301,7 @@ pub fn is_tree_kind(kind: NodeKind) -> bool {
     )
 }
 pub fn is_list_kind(kind: NodeKind) -> bool {
-    spec(kind).is_some() && !is_tree_kind(kind)
+    (spec(kind).is_some() && !is_tree_kind(kind)) || crate::sets_nodes::is_list_kind(kind)
 }
 
 /// The legacy Script/Cluster evaluator is separate. Tree and list nodes have
@@ -540,6 +540,9 @@ pub fn run_list(
                 }
             }
             Ok(vec![Value::Number(value)])
+        }
+        kind if crate::sets_nodes::is_list_kind(kind) => {
+            crate::sets_nodes::run_list(kind, lists, remaining, weight, cancel)
         }
         _ if len == 0 && kind != InsertItems => Ok(Vec::new()),
         CullNth => {
