@@ -363,7 +363,11 @@ fn curve_value(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
-    Ok(vec![Value::Curve(Arc::new(Curve { points, closed }))])
+    Ok(vec![Value::Curve(Arc::new(Curve {
+        points,
+        closed,
+        geometry: None,
+    }))])
 }
 fn numbers_value(values: Vec<f64>) -> Result<Vec<Value>, String> {
     if values.iter().any(|v| !v.is_finite()) {
@@ -804,6 +808,9 @@ fn value_points(v: &Value) -> Result<&[[f64; 3]], String> {
         Value::Curve(c) => Ok(c.points.as_slice()),
         Value::Mesh(m) => Ok(m.vertices.as_slice()),
         Value::Number(_) => Err("形状を接続してください。".into()),
+        Value::Surface(_) | Value::Solid(_) => {
+            Err("曲面・ソリッドはメッシュに変換してから接続してください。".into())
+        }
     }
 }
 
