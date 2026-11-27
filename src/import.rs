@@ -76,9 +76,20 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
     }
     let file = File::open(path).map_err(|_| "ファイルを開けませんでした。".to_string())?;
     let mut bytes = Vec::new();
-    file.take(MAX_IMPORT_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "ファイルを読み込めませんでした。".to_string())?;
+    let mut reader = file.take(MAX_IMPORT_BYTES + 1);
+    let mut chunk = [0u8; 64 * 1024];
+    loop {
+        cancelled(cancel)?;
+        let count = match reader.read(&mut chunk) {
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err("ファイルを読み込めませんでした。".into()),
+        };
+        if count == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&chunk[..count]);
+    }
     if bytes.len() as u64 > MAX_IMPORT_BYTES {
         return Err("ファイルが大きすぎます（上限 64 MiB）。".into());
     }
@@ -96,7 +107,10 @@ pub fn parse_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String
     if let Some(count) = binary_stl_count(bytes) {
         return parse_binary_stl(bytes, count, cancel);
     }
-    let ascii = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes).trim_ascii_start();
+    let ascii = bytes
+        .strip_prefix(b"\xef\xbb\xbf")
+        .unwrap_or(bytes)
+        .trim_ascii_start();
     if ascii.starts_with(b"solid") {
         return parse_ascii_stl(ascii, cancel);
     }
@@ -168,7 +182,12 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
         let Some(keyword) = words.next() else {
             continue;
         };
-        let bad = || format!("STL の {} 行目: 面または solid の構造が不正です。", line_no + 1);
+        let bad = || {
+            format!(
+                "STL の {} 行目: 面または solid の構造が不正です。",
+                line_no + 1
+            )
+        };
         match (state, keyword) {
             (0, "solid") => state = 1,
             (1, "endsolid") => state = 0,

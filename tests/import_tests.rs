@@ -258,13 +258,15 @@ fn import_node_keeps_its_serde_name_and_is_listed() {
     assert!(NodeKind::all().contains(&NodeKind::ImportMesh));
 }
 
-
 #[test]
 fn ascii_stl_requires_complete_facet_and_solid_structure() {
     let valid = ascii_stl(&cube());
     for missing in ["endfacet", "endloop", "endsolid cube", "outer loop"] {
         let broken = valid.replacen(missing, "", 1);
-        assert!(parse_stl(broken.as_bytes(), &no_cancel).is_err(), "{missing}");
+        assert!(
+            parse_stl(broken.as_bytes(), &no_cancel).is_err(),
+            "{missing}"
+        );
     }
     let vertices_only = b"solid x\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid x\n";
     assert!(parse_stl(vertices_only, &no_cancel).is_err());
