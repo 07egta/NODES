@@ -819,11 +819,7 @@ impl CurveGeometry {
     /// Each degree-one rational span is a straight segment, even when the
     /// parameter speed is extremely uneven. Integrating its speed numerically
     /// can miss almost all its length near a tiny endpoint weight.
-    fn linear_length_table(
-        &self,
-        n: &NurbsCurve,
-        cancel: &dyn Fn() -> bool,
-    ) -> R<LengthTable> {
+    fn linear_length_table(&self, n: &NurbsCurve, cancel: &dyn Fn() -> bool) -> R<LengthTable> {
         let [a, b] = self.interval;
         let mut knots = vec![a, b];
         knots.extend(
