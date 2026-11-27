@@ -122,7 +122,12 @@ fn compare_node(report: &mut Report, old: &Node, new: &Node) {
         );
     }
     if old.off != new.off {
-        record("off", Evaluation, Some(json!(old.off)), Some(json!(new.off)));
+        record(
+            "off",
+            Evaluation,
+            Some(json!(old.off)),
+            Some(json!(new.off)),
+        );
     }
     if old.cluster != new.cluster {
         record(
