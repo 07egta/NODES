@@ -283,6 +283,7 @@ impl NodesApp {
             shelf: node_shelf::Shelf::new(favorites.clone()),
             saved_lists: (favorites, saved_recent),
         };
+        app.canvas.hide_grid = ui_polish::read_setting("grid").is_some_and(|v| v == "off");
         if let Some(e) = initial_error {
             app.notify(e, true);
         }
@@ -1387,6 +1388,26 @@ impl NodesApp {
                         .clicked()
                         {
                             self.canvas.hide_minimap = !self.canvas.hide_minimap;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Grid,
+                            "格子",
+                            "ドット格子の表示切替",
+                            !self.canvas.hide_grid,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.hide_grid = !self.canvas.hide_grid;
+                            let line = if self.canvas.hide_grid {
+                                "grid=off"
+                            } else {
+                                "grid=on"
+                            };
+                            if let Err(e) = ui_polish::save_setting_line(line) {
+                                self.notify(e, true);
+                            }
                         }
                         if melt::tool_button(
                             ui,

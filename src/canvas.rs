@@ -31,6 +31,8 @@ pub struct GraphCanvas {
     pub snap: bool,
     /// Hide the navigation overlay when editing dense graphs.
     pub hide_minimap: bool,
+    /// Hide the faint dot grid.
+    pub hide_grid: bool,
     dragging: Option<NodeId>,
     /// A wire was pulled out of an output port and the mouse button is still held.
     wire_drag: bool,
@@ -468,7 +470,7 @@ impl GraphCanvas {
         painter.rect_filled(rect, 0, theme::canvas_bg());
         let zoom = p.zoom;
         let spacing = GRID * zoom;
-        if spacing >= 8. {
+        if !self.hide_grid && spacing >= 8. {
             let sx = rect.left() + p.pan[0].rem_euclid(spacing);
             let sy = rect.top() + p.pan[1].rem_euclid(spacing);
             let mut x = sx;
@@ -621,7 +623,8 @@ impl GraphCanvas {
             let nr = *nr;
             let selected = self.selected.contains(&n.id);
             let col = theme::category_color(n.kind.spec().category);
-            let overview = p.zoom < 0.38 && self.connecting.is_none();
+            let lod = melt::lod(p.zoom, self.connecting.is_some());
+            let overview = lod == melt::Lod::Shape;
             let error = evaluation
                 .filter(|_| !stale && !n.off)
                 .and_then(|e| e.outputs.get(&n.id))
@@ -824,14 +827,12 @@ impl GraphCanvas {
                 pos + egui::vec2(WIDTH - 15., 20.) * p.zoom,
                 egui::vec2(20., 22.) * p.zoom,
             );
-            painter.circle_stroke(
-                eye.center(),
-                4.5 * p.zoom,
-                Stroke::new(1_f32, if n.preview { col } else { theme::muted() }),
+            melt::eye(
+                &painter,
+                Rect::from_center_size(eye.center(), egui::vec2(16., 16.) * p.zoom),
+                n.preview,
+                if n.preview { col } else { theme::muted() },
             );
-            if n.preview {
-                painter.circle_filled(eye.center(), 2. * p.zoom, col);
-            }
             if ui
                 .interact(eye, Id::new(("node_preview", n.id)), Sense::click())
                 .on_hover_text("表示対象を切替（「表示中」モード）")
@@ -839,6 +840,10 @@ impl GraphCanvas {
             {
                 let m = &mut p.graph.nodes[*node_index];
                 m.preview = !m.preview;
+            }
+            if lod == melt::Lod::Header {
+                // Header only while zoomed out: no ports, rows or footer.
+                continue;
             }
             let slider_keys: Vec<&str> = n
                 .kind
@@ -1245,10 +1250,10 @@ impl GraphCanvas {
             p.pan = [pan.x.clamp(-1e7, 1e7), pan.y.clamp(-1e7, 1e7)];
             ui.ctx().request_repaint();
         }
-        painter.rect_filled(map, 7, theme::panel_bg());
+        painter.rect_filled(map, 8, theme::panel_bg());
         painter.rect_stroke(
             map,
-            7,
+            8,
             Stroke::new(1_f32, theme::card_border()),
             egui::StrokeKind::Inside,
         );
@@ -1258,6 +1263,7 @@ impl GraphCanvas {
         let b = to_world(canvas.max, canvas, p.pan, p.zoom);
         let view = Rect::from_two_pos(drawing.project(a.into()), drawing.project(b.into()));
         if view.intersects(inner) {
+            mini.rect_filled(view.intersect(inner), 2, theme::teal().gamma_multiply(0.14));
             mini.rect_stroke(
                 view.intersect(inner),
                 2,

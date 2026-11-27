@@ -111,6 +111,51 @@ pub fn error_badge(painter: &Painter, card: Rect, zoom: f32) -> Rect {
     Rect::from_center_size(center, egui::vec2(r * 2.0 + 6.0, r * 2.0 + 6.0))
 }
 
+/// How much of a card is drawn at a zoom level: the whole card, the header only, or just the shape.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Lod {
+    Full,
+    Header,
+    Shape,
+}
+
+/// Level of detail for the canvas zoom. While a wire is being pulled every port stays visible.
+pub fn lod(zoom: f32, connecting: bool) -> Lod {
+    if connecting {
+        Lod::Full
+    } else if zoom < 0.38 {
+        Lod::Shape
+    } else if zoom < 0.62 {
+        Lod::Header
+    } else {
+        Lod::Full
+    }
+}
+
+const EYE: &[Part] = &[
+    Part::Line(&[
+        [0.06, 0.5],
+        [0.28, 0.3],
+        [0.5, 0.24],
+        [0.72, 0.3],
+        [0.94, 0.5],
+        [0.72, 0.7],
+        [0.5, 0.76],
+        [0.28, 0.7],
+        [0.06, 0.5],
+    ]),
+    Part::Ring([0.5, 0.5, 0.13]),
+];
+const EYE_OFF: &[Part] = &[Part::Line(&[[0.15, 0.85], [0.85, 0.15]])];
+
+/// The per-node preview eye: open when the node is shown, struck through when hidden.
+pub fn eye(painter: &Painter, rect: Rect, shown: bool, color: Color32) {
+    node_icons::draw(painter, rect, EYE, color);
+    if !shown {
+        node_icons::draw(painter, rect, EYE_OFF, color);
+    }
+}
+
 /// Toolbar glyphs, drawn from the same stroke tables as the node icons.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tool {
@@ -362,6 +407,14 @@ mod tests {
         for kind in [DataType::Surface, DataType::Solid, DataType::Mesh] {
             assert_eq!(marker_of(kind), Marker::Square);
         }
+    }
+
+    #[test]
+    fn lod_thresholds() {
+        assert_eq!(lod(0.3, false), Lod::Shape);
+        assert_eq!(lod(0.5, false), Lod::Header);
+        assert_eq!(lod(0.9, false), Lod::Full);
+        assert_eq!(lod(0.3, true), Lod::Full);
     }
 
     #[test]
