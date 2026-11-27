@@ -23,7 +23,8 @@
       ],
       "exit_code": 0,
       "elapsed_s": 0.686,
-      "log": "fmt.log"
+      "log": "before-fmt.log",
+      "original_log": "fmt.log"
     },
     {
       "name": "check",
@@ -36,7 +37,9 @@
       ],
       "exit_code": 101,
       "elapsed_s": 1.784,
-      "log": "check.log"
+      "log": "before-check.log",
+      "original_log": "check.log"
     }
-  ]
+  ],
+  "source_manifest": "before-source-sha256.json"
 }
