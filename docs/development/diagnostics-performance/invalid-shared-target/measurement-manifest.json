@@ -1,0 +1,514 @@
+{
+  "experiment_schema_version": 1,
+  "started_at_utc": "2026-11-26T23:34:48.025777+00:00",
+  "build_manifest": "build-manifest.json",
+  "measurement_scope": "Public graph diagnostics only. Reuses real evaluated graph snapshots; no geometry/UI speed claim.",
+  "ordering": "Ascending cases before/after, then descending cases after/before; five repeated samples per process. Optimized-only full matrix last.",
+  "resources_before": {
+    "load_average": [
+      1.001953125,
+      2.8203125,
+      3.18505859375
+    ],
+    "free_disk_bytes": 8156491776,
+    "memory": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6530300 kB"
+    }
+  },
+  "runs": [
+    {
+      "label": "before",
+      "case": "prefix-512",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:48.026351+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "before-prefix-512-round-1.json",
+      "stderr_log": "before-prefix-512-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.001953125,
+          2.8203125,
+          3.18505859375
+        ],
+        "free_disk_bytes": 8156487680,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6530300 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.4044616529999985,
+      "completed_at_utc": "2026-11-26T23:34:48.431274+00:00",
+      "stdout_sha256": "ba3b87f2a5d76899c48e0fdd250b1ce6004911a9832bae2c79246f6f4f08a08a",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-512",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:48.441992+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "after-prefix-512-round-1.json",
+      "stderr_log": "after-prefix-512-round-1.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.001953125,
+          2.8203125,
+          3.18505859375
+        ],
+        "free_disk_bytes": 8156483584,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6527668 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.3086964720000651,
+      "completed_at_utc": "2026-11-26T23:34:48.751496+00:00",
+      "stdout_sha256": "c5096ec3fd5b7a549ede6ca94f4ba8bb1a3687bb740e3627f55e47b2ba4be687",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-1024",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:48.752817+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "before-prefix-1024-round-1.json",
+      "stderr_log": "before-prefix-1024-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.001953125,
+          2.8203125,
+          3.18505859375
+        ],
+        "free_disk_bytes": 8156479488,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6522416 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.3380039759999818,
+      "completed_at_utc": "2026-11-26T23:34:50.091250+00:00",
+      "stdout_sha256": "88b618ce02c41e0643044b313774b9ad263bb56868c60b62a4cdf81e038b51cc",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-1024",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:50.092355+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "after-prefix-1024-round-1.json",
+      "stderr_log": "after-prefix-1024-round-1.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.08203125,
+          2.806640625,
+          3.17822265625
+        ],
+        "free_disk_bytes": 8156471296,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6548904 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.443500044999837,
+      "completed_at_utc": "2026-11-26T23:34:51.536216+00:00",
+      "stdout_sha256": "076dfd55fc34d8a6cd4dd461e678758be2d647a5320800c21cff0df7a84be41c",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-2048",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:51.541597+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "before-prefix-2048-round-1.json",
+      "stderr_log": "before-prefix-2048-round-1.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.08203125,
+          2.806640625,
+          3.17822265625
+        ],
+        "free_disk_bytes": 8156467200,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6549172 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 5.941871585000172,
+      "completed_at_utc": "2026-11-26T23:34:57.484569+00:00",
+      "stdout_sha256": "7b7087c11435a56316789af8d5d6c4e2c667e3d292b60f0fe6b66fd37369b6fb",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-2048",
+      "round": 1,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:34:57.491095+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "after-prefix-2048-round-1.json",
+      "stderr_log": "after-prefix-2048-round-1.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.0751953125,
+          2.7763671875,
+          3.16650390625
+        ],
+        "free_disk_bytes": 8156389376,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6576116 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 6.131158039000184,
+      "completed_at_utc": "2026-11-26T23:35:03.623594+00:00",
+      "stdout_sha256": "35beef9988180ab48fe64a82dcf4619bd0bbb778d6a75f6e6dcbc7fd50e231e0",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-2048",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:03.629912+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "after-prefix-2048-round-2.json",
+      "stderr_log": "after-prefix-2048-round-2.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.7900390625,
+          2.896484375,
+          3.20361328125
+        ],
+        "free_disk_bytes": 8156372992,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6598828 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 5.679962036999768,
+      "completed_at_utc": "2026-11-26T23:35:09.310700+00:00",
+      "stdout_sha256": "879b8a9d62bb84e480574187b714b7d224ce62e4afb6aa9b13cfeb3ba56e082e",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-2048",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:09.313975+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-2048"
+      ],
+      "stdout_json": "before-prefix-2048-round-2.json",
+      "stderr_log": "before-prefix-2048-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.66796875,
+          2.83349609375,
+          3.17919921875
+        ],
+        "free_disk_bytes": 8156368896,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6587512 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 5.539912063999964,
+      "completed_at_utc": "2026-11-26T23:35:14.854506+00:00",
+      "stdout_sha256": "572ed18e679f83f26b419a0350f4558e61350a6c75561415ca75f2c867bbc3a0",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-1024",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:14.859084+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "after-prefix-1024-round-2.json",
+      "stderr_log": "after-prefix-1024-round-2.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.6142578125,
+          2.802734375,
+          3.16748046875
+        ],
+        "free_disk_bytes": 8156364800,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6575112 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.235387303999687,
+      "completed_at_utc": "2026-11-26T23:35:16.094794+00:00",
+      "stdout_sha256": "f725682d9f32b32113fe7a1770809ca9662446f2c308cb98363ef7b5e9240cec",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-1024",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:16.096143+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-1024"
+      ],
+      "stdout_json": "before-prefix-1024-round-2.json",
+      "stderr_log": "before-prefix-1024-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.6142578125,
+          2.802734375,
+          3.16748046875
+        ],
+        "free_disk_bytes": 8156356608,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6564612 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 1.2303175170000031,
+      "completed_at_utc": "2026-11-26T23:35:17.326681+00:00",
+      "stdout_sha256": "3b5e36e0945213abed900acc5a9d89c383674f9944a8eea931cb740771e727d4",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": "prefix-512",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:17.331514+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "after-prefix-512-round-2.json",
+      "stderr_log": "after-prefix-512-round-2.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.6142578125,
+          2.802734375,
+          3.16748046875
+        ],
+        "free_disk_bytes": 8156246016,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6560976 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.2415180490002058,
+      "completed_at_utc": "2026-11-26T23:35:17.573309+00:00",
+      "stdout_sha256": "783bb1316952a0ee84f0f12acc1b68def01e654084c61d63852f8a387f394c9d",
+      "validated": true
+    },
+    {
+      "label": "before",
+      "case": "prefix-512",
+      "round": 2,
+      "mode": "--quick",
+      "started_at_utc": "2026-11-26T23:35:17.574444+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-before",
+        "--quick",
+        "--repetitions",
+        "5",
+        "--case",
+        "prefix-512"
+      ],
+      "stdout_json": "before-prefix-512-round-2.json",
+      "stderr_log": "before-prefix-512-round-2.stderr.log",
+      "binary_sha256": "cc4d8b7bc250de53ef3b3d081d489c5a83c1a25083f0fbd1804cbcc76862b799",
+      "diagnostics_source_sha256": "fed5781666904650ff971c63a5eb5cd7a02f6e2276ca490f0d7cff08828dd949",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.6142578125,
+          2.802734375,
+          3.16748046875
+        ],
+        "free_disk_bytes": 8156241920,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6565840 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 0.258146193000357,
+      "completed_at_utc": "2026-11-26T23:35:17.832739+00:00",
+      "stdout_sha256": "857c21ed482ce05149bc472f2c996d6630c75402b779c369a0b6cd8225dc6873",
+      "validated": true
+    },
+    {
+      "label": "after",
+      "case": null,
+      "round": 1,
+      "mode": "--full",
+      "started_at_utc": "2026-11-26T23:35:17.834157+00:00",
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-after",
+        "--full",
+        "--repetitions",
+        "5"
+      ],
+      "stdout_json": "after-full-matrix-round-1.json",
+      "stderr_log": "after-full-matrix-round-1.stderr.log",
+      "binary_sha256": "97ea6f226e229003e48a37877424c0b464645f77a67d86ae316c664d94ad3488",
+      "diagnostics_source_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+      "harness_sha256": "133790dd07cd33937f9ead158764ca14d07f218ef4d7b73dcc9b9ec8efbce1a0",
+      "resources_before": {
+        "load_average": [
+          1.6142578125,
+          2.802734375,
+          3.16748046875
+        ],
+        "free_disk_bytes": 8156233728,
+        "memory": {
+          "MemTotal": "10206472 kB",
+          "MemAvailable": "6568724 kB"
+        }
+      },
+      "exit_code": 0,
+      "process_wall_seconds": 155.54108925599985,
+      "completed_at_utc": "2026-11-26T23:37:53.375549+00:00",
+      "stdout_sha256": "f8e54b11783ee4a8814830338146df0313babce9130a57eaff305c0bb5a67acd",
+      "validated": true
+    }
+  ],
+  "completed_at_utc": "2026-11-26T23:37:53.377211+00:00",
+  "resources_after": {
+    "load_average": [
+      1.89208984375,
+      2.57421875,
+      3.0263671875
+    ],
+    "free_disk_bytes": 8146944000,
+    "memory": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6561332 kB"
+    }
+  },
+  "all_runs_passed": true
+}

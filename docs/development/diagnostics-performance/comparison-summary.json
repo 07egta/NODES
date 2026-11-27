@@ -1,0 +1,666 @@
+{
+  "schema_version": 1,
+  "scope": "Public graph diagnostics only. Reuses real evaluated graph snapshots; no geometry/UI speed claim.",
+  "comparisons": [
+    {
+      "case": "prefix-512",
+      "before": {
+        "samples_ms": [
+          46.303881,
+          39.495207,
+          38.618193000000005,
+          37.39928,
+          44.434222000000005,
+          39.788164,
+          38.959576000000006,
+          76.402017,
+          75.766597,
+          60.848416
+        ],
+        "sample_count": 10,
+        "median_ms": 42.111193,
+        "minimum_ms": 37.39928,
+        "maximum_ms": 76.402017,
+        "per_process_medians_ms": [
+          39.495207,
+          60.848416
+        ],
+        "first_call_ms": [
+          46.030499000000006,
+          37.177085999999996
+        ],
+        "raw_results": [
+          "before-prefix-512-round-1.json",
+          "before-prefix-512-round-2.json"
+        ],
+        "nodes": 1023,
+        "roots": 512
+      },
+      "after": {
+        "samples_ms": [
+          2.5900179999999997,
+          2.159995,
+          2.026239,
+          1.983195,
+          2.127919,
+          2.2405340000000002,
+          2.494327,
+          2.243618,
+          1.986421,
+          2.132195
+        ],
+        "sample_count": 10,
+        "median_ms": 2.146095,
+        "minimum_ms": 1.983195,
+        "maximum_ms": 2.5900179999999997,
+        "per_process_medians_ms": [
+          2.127919,
+          2.2405340000000002
+        ],
+        "first_call_ms": [
+          2.3191599999999997,
+          2.330416
+        ],
+        "raw_results": [
+          "after-prefix-512-round-1.json",
+          "after-prefix-512-round-2.json"
+        ],
+        "nodes": 1023,
+        "roots": 512
+      },
+      "median_ratio_before_over_after": 19.622240860726112,
+      "median_reduction_percent": 94.903742100111
+    },
+    {
+      "case": "prefix-1024",
+      "before": {
+        "samples_ms": [
+          201.691816,
+          230.893926,
+          210.77546,
+          207.961342,
+          209.132815,
+          200.134576,
+          200.167495,
+          195.141776,
+          200.389511,
+          195.58931399999997
+        ],
+        "sample_count": 10,
+        "median_ms": 201.0406635,
+        "minimum_ms": 195.141776,
+        "maximum_ms": 230.893926,
+        "per_process_medians_ms": [
+          209.132815,
+          200.134576
+        ],
+        "first_call_ms": [
+          271.523374,
+          202.217078
+        ],
+        "raw_results": [
+          "before-prefix-1024-round-1.json",
+          "before-prefix-1024-round-2.json"
+        ],
+        "nodes": 2047,
+        "roots": 1024
+      },
+      "after": {
+        "samples_ms": [
+          15.600414,
+          6.319901,
+          6.246062,
+          5.655403,
+          5.557119999999999,
+          7.21774,
+          6.023035,
+          5.556598999999999,
+          5.541667,
+          5.672339
+        ],
+        "sample_count": 10,
+        "median_ms": 5.8476870000000005,
+        "minimum_ms": 5.541667,
+        "maximum_ms": 15.600414,
+        "per_process_medians_ms": [
+          6.246062,
+          5.672339
+        ],
+        "first_call_ms": [
+          7.200936,
+          7.28512
+        ],
+        "raw_results": [
+          "after-prefix-1024-round-1.json",
+          "after-prefix-1024-round-2.json"
+        ],
+        "nodes": 2047,
+        "roots": 1024
+      },
+      "median_ratio_before_over_after": 34.37951851732146,
+      "median_reduction_percent": 97.09129143418292
+    },
+    {
+      "case": "prefix-2048",
+      "before": {
+        "samples_ms": [
+          958.493297,
+          1079.4645249999999,
+          951.122716,
+          914.182333,
+          1126.846006,
+          964.594478,
+          928.472862,
+          1292.8020089999998,
+          936.336518,
+          1023.5291799999999
+        ],
+        "sample_count": 10,
+        "median_ms": 961.5438875,
+        "minimum_ms": 914.182333,
+        "maximum_ms": 1292.8020089999998,
+        "per_process_medians_ms": [
+          958.493297,
+          964.594478
+        ],
+        "first_call_ms": [
+          1122.549539,
+          1051.983583
+        ],
+        "raw_results": [
+          "before-prefix-2048-round-1.json",
+          "before-prefix-2048-round-2.json"
+        ],
+        "nodes": 4095,
+        "roots": 2048
+      },
+      "after": {
+        "samples_ms": [
+          22.775303,
+          18.175842,
+          18.546575999999998,
+          17.100710000000003,
+          18.772349000000002,
+          21.97064,
+          18.169332,
+          17.675796000000002,
+          17.726,
+          18.235559
+        ],
+        "sample_count": 10,
+        "median_ms": 18.2057005,
+        "minimum_ms": 17.100710000000003,
+        "maximum_ms": 22.775303,
+        "per_process_medians_ms": [
+          18.546575999999998,
+          18.169332
+        ],
+        "first_call_ms": [
+          20.765578,
+          20.236421
+        ],
+        "raw_results": [
+          "after-prefix-2048-round-1.json",
+          "after-prefix-2048-round-2.json"
+        ],
+        "nodes": 4095,
+        "roots": 2048
+      },
+      "median_ratio_before_over_after": 52.81553914939994,
+      "median_reduction_percent": 98.10661783235557
+    }
+  ],
+  "optimized_full_matrix": [
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 0,
+      "expected_root_failures": 0,
+      "name": "success-1000",
+      "nodes": 1000,
+      "report": {
+        "affected_count_max": null,
+        "affected_count_min": null,
+        "blocked_records": 0,
+        "first_errors": [],
+        "max_affected_preview_length": 0,
+        "max_root_preview_length": 0,
+        "root_records": 0,
+        "serialized_json_bytes": 146180,
+        "summary": {
+          "blocked_count": 0,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 1000,
+          "computed_count": 1000,
+          "connection_count": 999,
+          "disabled_count": 0,
+          "elapsed_ms": 12.429944,
+          "failed_count": 0,
+          "measured_node_ms": 11.821435000000001,
+          "node_count": 1000,
+          "root_failure_count": 0,
+          "successful_count": 1000,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 0,
+        "truncated_upstream_records": 0,
+        "upstream_root_count_max": null
+      },
+      "shape": "Number(2.5) followed by Add(1) nodes",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 0.9117599999999999,
+        "diagnostics_warm_max": 0.87103,
+        "diagnostics_warm_median": 0.45063200000000003,
+        "diagnostics_warm_min": 0.439596,
+        "diagnostics_warm_samples": [
+          0.87103,
+          0.445455,
+          0.492524,
+          0.439596,
+          0.45063200000000003
+        ],
+        "evaluation_reported": 12.429944,
+        "evaluation_wall": 12.786148,
+        "fixture_build_and_validate": 7.527005,
+        "report_json_serialization": 0.8661829999999999
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 0,
+      "expected_root_failures": 0,
+      "name": "success-10000",
+      "nodes": 10000,
+      "report": {
+        "affected_count_max": null,
+        "affected_count_min": null,
+        "blocked_records": 0,
+        "first_errors": [],
+        "max_affected_preview_length": 0,
+        "max_root_preview_length": 0,
+        "root_records": 0,
+        "serialized_json_bytes": 1474328,
+        "summary": {
+          "blocked_count": 0,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 10000,
+          "computed_count": 10000,
+          "connection_count": 9999,
+          "disabled_count": 0,
+          "elapsed_ms": 78.738878,
+          "failed_count": 0,
+          "measured_node_ms": 73.85310400000019,
+          "node_count": 10000,
+          "root_failure_count": 0,
+          "successful_count": 10000,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 0,
+        "truncated_upstream_records": 0,
+        "upstream_root_count_max": null
+      },
+      "shape": "Number(2.5) followed by Add(1) nodes",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 11.832816,
+        "diagnostics_warm_max": 9.627544,
+        "diagnostics_warm_median": 6.414631,
+        "diagnostics_warm_min": 6.039319,
+        "diagnostics_warm_samples": [
+          9.627544,
+          6.873835,
+          6.414631,
+          6.2097999999999995,
+          6.039319
+        ],
+        "evaluation_reported": 78.738878,
+        "evaluation_wall": 84.15808399999999,
+        "fixture_build_and_validate": 25.708185,
+        "report_json_serialization": 9.063585000000002
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 16384,
+      "expected_root_failures": 1,
+      "name": "failure-chain-16384",
+      "nodes": 16384,
+      "report": {
+        "affected_count_max": 16383,
+        "affected_count_min": 16383,
+        "blocked_records": 16383,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 1,
+        "root_records": 1,
+        "serialized_json_bytes": 8078431,
+        "summary": {
+          "blocked_count": 16383,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 16384,
+          "computed_count": 16384,
+          "connection_count": 16383,
+          "disabled_count": 0,
+          "elapsed_ms": 35.615429,
+          "failed_count": 16384,
+          "measured_node_ms": 27.810651000000032,
+          "node_count": 16384,
+          "root_failure_count": 1,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 1,
+        "truncated_upstream_records": 0,
+        "upstream_root_count_max": 1
+      },
+      "shape": "Divide-by-zero root followed by one-input Add chain",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 35.461854,
+        "diagnostics_warm_max": 31.271814000000003,
+        "diagnostics_warm_median": 19.70508,
+        "diagnostics_warm_min": 18.823723,
+        "diagnostics_warm_samples": [
+          31.271814000000003,
+          19.70508,
+          18.823723,
+          19.683888,
+          20.765559
+        ],
+        "evaluation_reported": 35.615429,
+        "evaluation_wall": 41.457347999999996,
+        "fixture_build_and_validate": 9.689165,
+        "report_json_serialization": 33.043668999999994
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 16384,
+      "expected_root_failures": 1024,
+      "name": "balanced-1024-tail",
+      "nodes": 16384,
+      "report": {
+        "affected_count_max": 14347,
+        "affected_count_min": 14347,
+        "blocked_records": 15360,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 1
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 2
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 64,
+        "root_records": 1024,
+        "serialized_json_bytes": 11993469,
+        "summary": {
+          "blocked_count": 15360,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 16384,
+          "computed_count": 16384,
+          "connection_count": 16383,
+          "disabled_count": 0,
+          "elapsed_ms": 20.830995,
+          "failed_count": 16384,
+          "measured_node_ms": 13.688923000000054,
+          "node_count": 16384,
+          "root_failure_count": 1024,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 1024,
+        "truncated_upstream_records": 14352,
+        "upstream_root_count_max": 1024
+      },
+      "shape": "independent Divide-by-zero roots, balanced binary Add joins, then a long chain",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 24.612683999999998,
+        "diagnostics_warm_max": 27.868891,
+        "diagnostics_warm_median": 25.215290000000003,
+        "diagnostics_warm_min": 24.233436,
+        "diagnostics_warm_samples": [
+          27.868891,
+          24.768493999999997,
+          25.536322,
+          25.215290000000003,
+          24.233436
+        ],
+        "evaluation_reported": 20.830995,
+        "evaluation_wall": 25.876331,
+        "fixture_build_and_validate": 7.9117809999999995,
+        "report_json_serialization": 53.133885
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 2047,
+      "expected_root_failures": 1024,
+      "name": "prefix-1024",
+      "nodes": 2047,
+      "report": {
+        "affected_count_max": 1023,
+        "affected_count_min": 1,
+        "blocked_records": 1023,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 1
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 2
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 64,
+        "root_records": 1024,
+        "serialized_json_bytes": 2308177,
+        "summary": {
+          "blocked_count": 1023,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 2047,
+          "computed_count": 2047,
+          "connection_count": 2046,
+          "disabled_count": 0,
+          "elapsed_ms": 2.8245620000000002,
+          "failed_count": 2047,
+          "measured_node_ms": 2.006585000000001,
+          "node_count": 2047,
+          "root_failure_count": 1024,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 768,
+        "truncated_upstream_records": 960,
+        "upstream_root_count_max": 1024
+      },
+      "shape": "independent Divide-by-zero roots, incremental Add joins adding one root per step",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 7.955146,
+        "diagnostics_warm_max": 6.275275000000001,
+        "diagnostics_warm_median": 5.5816360000000005,
+        "diagnostics_warm_min": 5.220365,
+        "diagnostics_warm_samples": [
+          5.816902,
+          5.506966,
+          5.5816360000000005,
+          5.220365,
+          6.275275000000001
+        ],
+        "evaluation_reported": 2.8245620000000002,
+        "evaluation_wall": 3.083022,
+        "fixture_build_and_validate": 1.083032,
+        "report_json_serialization": 2.5658920000000003
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 8191,
+      "expected_root_failures": 4096,
+      "name": "prefix-4096",
+      "nodes": 8191,
+      "report": {
+        "affected_count_max": 4095,
+        "affected_count_min": 1,
+        "blocked_records": 4095,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 1
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 2
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 64,
+        "root_records": 4096,
+        "serialized_json_bytes": 9756706,
+        "summary": {
+          "blocked_count": 4095,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 8191,
+          "computed_count": 8191,
+          "connection_count": 8190,
+          "disabled_count": 0,
+          "elapsed_ms": 14.374471999999999,
+          "failed_count": 8191,
+          "measured_node_ms": 8.827044000000011,
+          "node_count": 8191,
+          "root_failure_count": 4096,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 3840,
+        "truncated_upstream_records": 4032,
+        "upstream_root_count_max": 4096
+      },
+      "shape": "independent Divide-by-zero roots, incremental Add joins adding one root per step",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 58.527574,
+        "diagnostics_warm_max": 70.793757,
+        "diagnostics_warm_median": 66.183479,
+        "diagnostics_warm_min": 62.378506,
+        "diagnostics_warm_samples": [
+          66.183479,
+          64.90836499999999,
+          62.378506,
+          70.793757,
+          67.769231
+        ],
+        "evaluation_reported": 14.374471999999999,
+        "evaluation_wall": 15.892634999999999,
+        "fixture_build_and_validate": 4.994533,
+        "report_json_serialization": 11.571772
+      }
+    },
+    {
+      "analytic_invariants_checked": true,
+      "expected_failed_nodes": 16383,
+      "expected_root_failures": 8192,
+      "name": "prefix-8192",
+      "nodes": 16383,
+      "report": {
+        "affected_count_max": 8191,
+        "affected_count_min": 1,
+        "blocked_records": 8191,
+        "first_errors": [
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 0
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 1
+          },
+          {
+            "message": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+            "node_id": 2
+          }
+        ],
+        "max_affected_preview_length": 256,
+        "max_root_preview_length": 64,
+        "root_records": 8192,
+        "serialized_json_bytes": 21340820,
+        "summary": {
+          "blocked_count": 8191,
+          "cached_count": 0,
+          "cancelled": false,
+          "complete": true,
+          "completed_count": 16383,
+          "computed_count": 16383,
+          "connection_count": 16382,
+          "disabled_count": 0,
+          "elapsed_ms": 25.980324999999997,
+          "failed_count": 16383,
+          "measured_node_ms": 17.447872999999717,
+          "node_count": 16383,
+          "root_failure_count": 8192,
+          "successful_count": 0,
+          "unevaluated_count": 0
+        },
+        "truncated_affected_records": 7936,
+        "truncated_upstream_records": 8128,
+        "upstream_root_count_max": 8192
+      },
+      "shape": "independent Divide-by-zero roots, incremental Add joins adding one root per step",
+      "status": "MEASURED",
+      "timing_ms": {
+        "diagnostics_first_call": 286.315765,
+        "diagnostics_warm_max": 377.23828,
+        "diagnostics_warm_median": 295.697895,
+        "diagnostics_warm_min": 281.85765899999996,
+        "diagnostics_warm_samples": [
+          323.29456899999997,
+          377.23828,
+          295.697895,
+          295.175287,
+          281.85765899999996
+        ],
+        "evaluation_reported": 25.980324999999997,
+        "evaluation_wall": 30.741044,
+        "fixture_build_and_validate": 13.326372,
+        "report_json_serialization": 97.139909
+      }
+    }
+  ],
+  "optimized_full_raw": "after-full-matrix-round-1.json",
+  "all_runs_passed": true
+}

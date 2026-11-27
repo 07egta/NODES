@@ -1,0 +1,109 @@
+{
+  "source_sha": "147148edb7d1fe70a0cb9096b9fec4578e020ab6",
+  "source_tree": "19c51100ef2193028bc6181c9faeecc2e96d5bb9",
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.537,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 5.488,
+      "log": "check.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 1.021,
+      "log": "clippy.log"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 29.416,
+      "log": "tests.log",
+      "results": {
+        "suites": 43,
+        "passed": 481,
+        "failed": 0,
+        "ignored": 2
+      }
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 182.234,
+      "log": "release-bins.log"
+    }
+  ],
+  "local_environment_overrides": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "developer_script_self_tests": {
+    "update_gh2_inventory": 3,
+    "export_ci_checkpoint": 6,
+    "audit_dependencies": 8,
+    "all_passed": true,
+    "raw_log_preserved": false
+  },
+  "wording_followup": {
+    "source_change_scope": "Two UI explanation strings only, after the full 147148e run.",
+    "checks": [
+      "cargo fmt --all -- --check",
+      "cargo clippy --locked --offline --all-targets -- -D warnings"
+    ],
+    "checks_exit_code": 0,
+    "source_sha256": {
+      "src/app.rs": "970b8603cdb8f7af82813c6dbbb51e74bc15147fd7260cffe716e54acbbaff62",
+      "src/diagnostics_ui.rs": "70dc3254f3ecb527904f0235c75700db59e9f7fc35f47b30f828a4cbfb4b43e4"
+    },
+    "full_test_rerun": false,
+    "reason": "Wording-only edits do not change computation; the full run remains attributed to 147148e."
+  }
+}

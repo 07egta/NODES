@@ -1,0 +1,102 @@
+{
+  "source_head": "c44a897a22072c6694d1dbf2233ae9557955f49e",
+  "tested_merge_revision": "92e70be85c4b34311a27036a18d7a97f37f879c1",
+  "tree": "2285ea77c81898e6c43924bb09ab749355a8b612",
+  "run_id": 45857217255,
+  "artifact_id": 15137335621,
+  "archive_sha256": "fb3183caefcf6b2f814949ef5ccad4de2385fd2ad8b438ac68bbbd63534e5919",
+  "binaries": {
+    "Morphlet": {
+      "bytes": 19220352,
+      "sha256": "d5d67bfdbc8a1db684093ab51f7f68ad370b79d67b24cedeec487ec8dadcc99c"
+    },
+    "nodes-cli": {
+      "bytes": 5452504,
+      "sha256": "752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434"
+    }
+  },
+  "schema_version": 1,
+  "verified_at_utc": "2026-11-26T16:28:54.817072+00:00",
+  "merge_tree_equals_source_head": true,
+  "run_url": "https://github.com/07egta/NODES/actions/runs/45857217255",
+  "run_result": "success",
+  "linux_job_id": 140038666343,
+  "linux_result": "success",
+  "rust_tests": {
+    "passed": 437,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 35
+  },
+  "python_tests": {
+    "passed": 17,
+    "suites": [
+      3,
+      6,
+      8
+    ]
+  },
+  "gates": [
+    "fmt",
+    "check all targets",
+    "strict Clippy",
+    "all-target Rust tests",
+    "dependency audit",
+    "release --bins",
+    "Linux artifact upload"
+  ],
+  "windows_job_id": 140041049976,
+  "windows_result": "success",
+  "windows_rust_tests": {
+    "passed": 436,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 35
+  },
+  "windows_gates": [
+    "all-target Rust tests",
+    "release --bins",
+    "Windows artifact upload"
+  ],
+  "platform_test_difference": "One cfg(unix) FIFO process regression runs on Linux only.",
+  "ignored_tests": [
+    "benchmark_sparse_slider_edit",
+    "audit_stress"
+  ],
+  "numeric_editor_tests": {
+    "linux_passed": 4,
+    "windows_passed": 4,
+    "names": [
+      "passive_numeric_widgets_preserve_every_registered_default",
+      "typed_numbers_keep_precision_and_can_exceed_the_convenience_track_range",
+      "numeric_edits_enforce_metadata_bounds_finite_values_and_integers",
+      "focus_and_enter_without_editing_preserve_loaded_precision"
+    ]
+  },
+  "linux_artifact": {
+    "artifact_id": 15137335621,
+    "name": "NODES-linux-x64-92e70be85c4b34311a27036a18d7a97f37f879c1",
+    "size_in_bytes": 13312405,
+    "archive_sha256": "fb3183caefcf6b2f814949ef5ccad4de2385fd2ad8b438ac68bbbd63534e5919",
+    "url": "https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15137335621",
+    "expires_at_utc": "2026-12-10T16:20:52Z",
+    "local_archive_and_binary_hashes_verified": true
+  },
+  "windows_artifact": {
+    "artifact_id": 15135989980,
+    "name": "NODES-windows-x64-92e70be85c4b34311a27036a18d7a97f37f879c1",
+    "size_in_bytes": 13547742,
+    "archive_sha256": "d9eb0113f8e825bdeeb4ab4381329d95e3f7969a82726d15487fba62100289de",
+    "url": "https://github.com/07egta/NODES/actions/runs/45857217255/artifacts/15135989980",
+    "expires_at_utc": "2026-12-10T16:27:15Z",
+    "digest_source": "GitHub artifact API; Windows artifact was not downloaded or run locally."
+  },
+  "previous_source_evidence": "docs/development/CI_COMMITTED_VALIDATION.json",
+  "scope": "Committed source was tested through a PR checkout with an identical Git tree. Linux native GUI was exercised from the hash-verified artifact. Windows GUI and physical printing were not tested.",
+  "cli_binary_equivalence": {
+    "previous_source": "2f94df459533774f83593835ba1e22d4924a3c42",
+    "identical_bytes": true,
+    "sha256": "752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434",
+    "existing_executed_workflow": "docs/development/CLI_VASE_VALIDATION.json"
+  }
+}

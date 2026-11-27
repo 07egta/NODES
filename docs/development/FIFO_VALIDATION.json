@@ -1,0 +1,64 @@
+{
+  "source_head": "2f94df459533774f83593835ba1e22d4924a3c42",
+  "binary_provenance": {
+    "source_head": "2f94df459533774f83593835ba1e22d4924a3c42",
+    "tested_merge_revision": "19717e70917718af1374e387720b29b619c1c1ed",
+    "tree": "5f415bedfbb1a39f337214c928fa46dd62b4df8e",
+    "run_id": 45852634502,
+    "artifact_id": 15134610988,
+    "archive_sha256": "3689d711feab80a95e777630f306442bb9bcdcd57ffb73d72eae5c5e1d368a9c",
+    "binaries": {
+      "Morphlet": {
+        "bytes": 19214608,
+        "sha256": "010046c4274e761ed6d3a3889fa867e61f5eec683df8a64c0a7d8e78f18eaf21"
+      },
+      "nodes-cli": {
+        "bytes": 5452504,
+        "sha256": "752f8abac0b18bc5930108b961701bbeda2ae598c545e32b8f71bbeff99a4434"
+      }
+    }
+  },
+  "before": {
+    "source_head": "c19dca185380391ad1c875e412529e22cae05ba6",
+    "command": "nodes-cli validate <FIFO with no writer>",
+    "observed": "blocked; Python subprocess timeout killed and reaped the child",
+    "timeout_seconds": 2,
+    "elapsed_seconds": 2.0034605800001373,
+    "regression_reproduced": true
+  },
+  "after": [
+    {
+      "command": "validate",
+      "exit_code": 1,
+      "elapsed_seconds": 0.0016400419999627047,
+      "stdout": "{\"api_version\":1,\"cli_version\":1,\"command\":\"validate\",\"error\":{\"code\":\"invalid_project\",\"message\":\"project must be a regular file\",\"nodes\":[]},\"ok\":false}",
+      "stderr": "",
+      "original_destination_preserved": true
+    },
+    {
+      "command": "evaluate",
+      "exit_code": 1,
+      "elapsed_seconds": 0.0022865509999974165,
+      "stdout": "{\"api_version\":1,\"cli_version\":1,\"command\":\"evaluate\",\"error\":{\"code\":\"invalid_project\",\"message\":\"project must be a regular file\",\"nodes\":[]},\"ok\":false}",
+      "stderr": "",
+      "original_destination_preserved": true
+    },
+    {
+      "command": "--build-graph",
+      "exit_code": 1,
+      "elapsed_seconds": 0.001516510000328708,
+      "stdout": "",
+      "stderr": "request must be a regular file",
+      "original_destination_preserved": true
+    },
+    {
+      "command": "--inspect-ghx",
+      "exit_code": 1,
+      "elapsed_seconds": 0.001273277000109374,
+      "stdout": "",
+      "stderr": "GHX source must be a regular file",
+      "original_destination_preserved": true
+    }
+  ],
+  "race_scope": "ordinary non-file inputs; hostile metadata/open replacement races are not claimed to be eliminated"
+}

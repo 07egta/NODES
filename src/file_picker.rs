@@ -1,13 +1,15 @@
 //! A small filesystem picker that needs no desktop portal or native dialog.
 //! This module only reads directories and returns a chosen path; the caller writes.
 
-use eframe::egui::{self, Color32, RichText};
+use eframe::egui::{self, RichText};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Bound visible rows separately from the raw directory scan. Unrelated files
+// must not exhaust the display budget before the extension filter runs.
 const DIRECTORY_LIMIT: usize = 2_000;
-const ACCENT: Color32 = Color32::from_rgb(28, 133, 116);
+const DIRECTORY_SCAN_LIMIT: usize = 10_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FileTask {
@@ -15,23 +17,69 @@ pub enum FileTask {
     Save,
     ExportStl,
     ExportObj,
+    ExportGcode,
+    ExportThreeMf,
+    PickSlicer,
+    SavePart,
+    LoadPart,
+    /// Mesh file for the ファイル読み込み node: STL or OBJ.
+    ImportMesh,
 }
 
 impl FileTask {
+    /// Tasks that pick an existing file (the others name a file to write).
+    fn picks_existing(self) -> bool {
+        matches!(
+            self,
+            Self::Open | Self::LoadPart | Self::ImportMesh | Self::PickSlicer
+        )
+    }
     fn title(self) -> &'static str {
         match self {
             Self::Open => "作品を開く",
             Self::Save => "作品を保存",
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
+            Self::ExportGcode => "G-code に書き出す",
+            Self::ExportThreeMf => "3MF に書き出す",
+            Self::PickSlicer => "スライサーを選ぶ",
+            Self::SavePart => "部品を書き出す",
+            Self::LoadPart => "部品を読み込む",
+            Self::ImportMesh => "ファイルを読み込む",
         }
     }
 
     fn extension(self) -> &'static str {
         match self {
             Self::Open | Self::Save => "morph",
-            Self::ExportStl => "stl",
+            Self::ExportStl | Self::ImportMesh => "stl",
             Self::ExportObj => "obj",
+            Self::ExportGcode => "gcode",
+            Self::ExportThreeMf => "3mf",
+            Self::PickSlicer => "exe",
+            Self::SavePart | Self::LoadPart => "morphpart",
+        }
+    }
+
+    /// Whether a file in the listing belongs to this task.
+    fn accepts(self, path: &Path) -> bool {
+        match self {
+            Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
+            other => has_extension(path, other.extension()),
+        }
+    }
+
+    /// Extension text for the footer line.
+    fn filter_hint(self) -> &'static str {
+        match self {
+            Self::Open | Self::Save => ".morph",
+            Self::ExportStl => ".stl",
+            Self::ExportObj => ".obj",
+            Self::SavePart | Self::LoadPart => ".morphpart",
+            Self::ImportMesh => ".stl / .obj",
+            Self::ExportGcode => ".gcode",
+            Self::ExportThreeMf => ".3mf",
+            Self::PickSlicer => ".exe",
         }
     }
 
@@ -39,7 +87,13 @@ impl FileTask {
         match self {
             Self::Open => "開く",
             Self::Save => "保存",
-            Self::ExportStl | Self::ExportObj => "書き出す",
+            Self::LoadPart | Self::ImportMesh => "読み込む",
+            Self::PickSlicer => "選ぶ",
+            Self::ExportStl
+            | Self::ExportObj
+            | Self::ExportGcode
+            | Self::ExportThreeMf
+            | Self::SavePart => "書き出す",
         }
     }
 }
@@ -158,7 +212,11 @@ impl FilePicker {
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .button(RichText::new("上書きする").color(ACCENT).strong())
+                                .button(
+                                    RichText::new("上書きする")
+                                        .color(crate::theme::teal())
+                                        .strong(),
+                                )
                                 .clicked()
                             {
                                 event = Some(PickerEvent::Chosen(path));
@@ -216,7 +274,7 @@ impl FilePicker {
                                     ui.label(
                                         RichText::new("この場所に対応ファイルはありません").weak(),
                                     );
-                                    if self.task != FileTask::Open {
+                                    if !self.task.picks_existing() {
                                         ui.label(
                                             RichText::new(
                                                 "下の欄にファイル名を入力して保存できます。",
@@ -229,7 +287,8 @@ impl FilePicker {
                                 for entry in &self.entries {
                                     let selected = self.selected_file.as_ref() == Some(&entry.path);
                                     let label = if entry.is_dir {
-                                        RichText::new(format!("▸  {}", entry.name)).color(ACCENT)
+                                        RichText::new(format!("▸  {}", entry.name))
+                                            .color(crate::theme::teal())
                                     } else {
                                         RichText::new(format!("    {}", entry.name))
                                     };
@@ -271,7 +330,7 @@ impl FilePicker {
                 } else if self.truncated {
                     ui.label(
                         RichText::new(
-                            "項目が多いため先頭 2,000 件まで表示。場所欄へ直接入力できます。",
+                            "一覧を一部だけ表示しています（最大 2,000 件）。場所欄へ直接入力できます。",
                         )
                         .small()
                         .weak(),
@@ -279,8 +338,8 @@ impl FilePicker {
                 } else {
                     ui.label(
                         RichText::new(format!(
-                            "フォルダーはダブルクリックで開く  ·  .{} ファイル",
-                            self.task.extension()
+                            "フォルダーはダブルクリックで開く  ·  {} ファイル",
+                            self.task.filter_hint()
                         ))
                         .small()
                         .weak(),
@@ -315,7 +374,7 @@ impl FilePicker {
                                 egui::Button::new(
                                     RichText::new(self.task.action_label())
                                         .strong()
-                                        .color(ACCENT),
+                                        .color(crate::theme::teal()),
                                 ),
                             )
                             .clicked()
@@ -361,7 +420,7 @@ impl FilePicker {
     }
 
     fn refresh(&mut self) {
-        match read_directory(&self.directory, self.task.extension()) {
+        match read_directory(&self.directory, self.task) {
             Ok((entries, truncated)) => {
                 self.entries = entries;
                 self.truncated = truncated;
@@ -369,13 +428,14 @@ impl FilePicker {
             }
             Err(error) => {
                 self.entries.clear();
+                self.truncated = false;
                 self.error = Some(error);
             }
         }
     }
 
     fn navigate(&mut self, directory: PathBuf) {
-        match read_directory(&directory, self.task.extension()) {
+        match read_directory(&directory, self.task) {
             Ok((entries, truncated)) => {
                 self.directory = directory;
                 self.location = self.directory.to_string_lossy().into_owned();
@@ -384,7 +444,7 @@ impl FilePicker {
                 self.selected_file = None;
                 self.error = None;
                 self.overwrite = None;
-                if self.task == FileTask::Open {
+                if self.task.picks_existing() {
                     self.filename.clear();
                 }
             }
@@ -446,8 +506,8 @@ impl FilePicker {
         }
         let extension = self.task.extension();
         if !has_extension(&path, extension) {
-            if self.task == FileTask::Open && path.extension().is_some() {
-                self.error = Some("開ける作品は .morph ファイルです。".into());
+            if self.task.picks_existing() && path.extension().is_some() {
+                self.error = Some(format!("開けるファイルは .{extension} です。"));
                 return None;
             }
             path.set_extension(extension);
@@ -456,7 +516,7 @@ impl FilePicker {
             self.error = Some("ファイル名を指定してください。".into());
             return None;
         }
-        if self.task == FileTask::Open {
+        if self.task.picks_existing() {
             if !path.is_file() {
                 self.error =
                     Some("この作品ファイルが見つかりません。名前と場所を確認してください。".into());
@@ -555,12 +615,12 @@ fn shortcuts() -> Vec<(String, PathBuf)> {
     result
 }
 
-fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), String> {
+fn read_directory(path: &Path, task: FileTask) -> Result<(Vec<Entry>, bool), String> {
     let directory = fs::read_dir(path).map_err(|e| format!("フォルダーを開けませんでした: {e}"))?;
     let mut entries = Vec::new();
     let mut truncated = false;
     for (index, entry) in directory.enumerate() {
-        if index >= DIRECTORY_LIMIT {
+        if index >= DIRECTORY_SCAN_LIMIT {
             truncated = true;
             break;
         }
@@ -575,7 +635,7 @@ fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), St
         };
         let is_dir = file_type.is_dir() || (file_type.is_symlink() && path.is_dir());
         let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
-        if !is_dir && (!is_file || !has_extension(&path, extension)) {
+        if !is_dir && (!is_file || !task.accepts(&path)) {
             continue;
         }
         entries.push(Entry {
@@ -584,11 +644,125 @@ fn read_directory(path: &Path, extension: &str) -> Result<(Vec<Entry>, bool), St
             path,
             is_dir,
         });
+        // Periodically keep only the best visible entries. Peak storage is
+        // bounded by twice the display limit, even for dense directories.
+        if entries.len() >= 2 * DIRECTORY_LIMIT {
+            keep_best_entries(&mut entries);
+            truncated = true;
+        }
     }
-    entries.sort_by(|a, b| {
-        b.is_dir
-            .cmp(&a.is_dir)
-            .then_with(|| a.sort_key.cmp(&b.sort_key))
-    });
+    if entries.len() > DIRECTORY_LIMIT {
+        keep_best_entries(&mut entries);
+        truncated = true;
+    }
+    entries.sort_unstable_by(compare_entries);
     Ok((entries, truncated))
+}
+
+fn compare_entries(a: &Entry, b: &Entry) -> std::cmp::Ordering {
+    b.is_dir
+        .cmp(&a.is_dir)
+        .then_with(|| a.sort_key.cmp(&b.sort_key))
+        .then_with(|| a.name.cmp(&b.name))
+        .then_with(|| a.path.cmp(&b.path))
+}
+
+fn keep_best_entries(entries: &mut Vec<Entry>) {
+    if entries.len() > DIRECTORY_LIMIT {
+        entries.select_nth_unstable_by(DIRECTORY_LIMIT, compare_entries);
+        entries.truncate(DIRECTORY_LIMIT);
+    }
+}
+
+#[cfg(test)]
+mod directory_listing_tests {
+    use super::*;
+
+    fn entry(name: String, is_dir: bool) -> Entry {
+        Entry {
+            path: PathBuf::from(&name),
+            sort_key: name.to_lowercase(),
+            name,
+            is_dir,
+        }
+    }
+
+    #[test]
+    fn bounded_selection_matches_full_sort_in_either_input_order() {
+        let make_entries = || {
+            (0..4_501)
+                .map(|i| entry(format!("item{i:05}.morph"), i % 7 == 0))
+                .collect::<Vec<_>>()
+        };
+        let mut expected = make_entries();
+        expected.sort_unstable_by(compare_entries);
+        expected.truncate(DIRECTORY_LIMIT);
+        let expected: Vec<_> = expected.into_iter().map(|e| e.path).collect();
+
+        for reverse in [false, true] {
+            let mut input = make_entries();
+            if reverse {
+                input.reverse();
+            }
+            let mut retained = Vec::new();
+            for item in input {
+                retained.push(item);
+                if retained.len() >= 2 * DIRECTORY_LIMIT {
+                    keep_best_entries(&mut retained);
+                }
+            }
+            keep_best_entries(&mut retained);
+            retained.sort_unstable_by(compare_entries);
+            let paths: Vec<_> = retained.into_iter().map(|e| e.path).collect();
+            assert_eq!(paths, expected);
+        }
+    }
+
+    #[test]
+    fn sort_is_directory_first_and_breaks_case_ties() {
+        let mut entries = [
+            entry("a.morph".into(), false),
+            entry("A.morph".into(), false),
+            entry("zzz".into(), true),
+        ];
+        entries.sort_unstable_by(compare_entries);
+        assert_eq!(
+            entries.map(|e| e.name),
+            [
+                "zzz".to_string(),
+                "A.morph".to_string(),
+                "a.morph".to_string()
+            ]
+        );
+    }
+
+    struct TempDirectory(PathBuf);
+
+    impl Drop for TempDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn unrelated_files_do_not_consume_the_display_limit() {
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("nodes-picker-{}-{id}", std::process::id()));
+        fs::create_dir(&path).unwrap();
+        let directory = TempDirectory(path);
+        for i in 0..=DIRECTORY_LIMIT {
+            fs::File::create(directory.0.join(format!("ignored{i:05}.txt"))).unwrap();
+        }
+        fs::File::create(directory.0.join("project.MORPH")).unwrap();
+        fs::create_dir(directory.0.join("subdirectory")).unwrap();
+
+        let (entries, truncated) = read_directory(&directory.0, FileTask::Open).unwrap();
+        assert!(!truncated);
+        assert_eq!(entries.len(), 2);
+        assert!(entries[0].is_dir);
+        assert_eq!(entries[1].name, "project.MORPH");
+    }
 }

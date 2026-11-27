@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "name": "ノイズの花器（厚みつき）",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "range",
+        "name": "下から上へ (0〜1)",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "count": 7.0,
+          "end": 1.0,
+          "start": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "expression",
+        "name": "半径の式",
+        "position": [
+          262.0,
+          30.0
+        ],
+        "params": {
+          "w": 0.0,
+          "x": 1.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {
+          "x": 0
+        },
+        "preview": false,
+        "script": "30 + 10 * sin(x * pi * 1.5) - 6 * x"
+      },
+      {
+        "id": 2,
+        "kind": "graph_profile",
+        "name": "グラフで形を決める",
+        "position": [
+          504.0,
+          30.0
+        ],
+        "params": {
+          "height": 120.0,
+          "radii": 30.0,
+          "rows": 60.0,
+          "segments": 96.0,
+          "top": 0.0
+        },
+        "inputs": {
+          "radii": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "noise_deform",
+        "name": "ノイズ変形",
+        "position": [
+          20.0,
+          310.0
+        ],
+        "params": {
+          "amp": 1.5,
+          "mode": 0.0,
+          "seed": 7.0,
+          "size": 18.0
+        },
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          262.0,
+          310.0
+        ],
+        "params": {
+          "angle": 60.0
+        },
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "shell",
+        "name": "厚みをつける",
+        "position": [
+          504.0,
+          310.0
+        ],
+        "params": {
+          "thickness": 2.0
+        },
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "overhang_check",
+        "name": "張り出しチェック",
+        "position": [
+          746.0,
+          310.0
+        ],
+        "params": {
+          "angle": 45.0
+        },
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          746.0,
+          30.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 8
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 0.86
+}

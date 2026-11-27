@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "輪郭の近似オフセット",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "circle",
+        "name": "精密円",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "radius": 35,
+          "segments": 128
+        },
+        "inputs": {},
+        "preview": true
+      },
+      {
+        "id": 1,
+        "kind": "curve_offset_preview",
+        "name": "内側輪郭（近似）",
+        "position": [
+          285,
+          40
+        ],
+        "params": {
+          "distance": 3
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

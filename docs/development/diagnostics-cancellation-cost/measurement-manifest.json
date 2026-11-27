@@ -1,0 +1,167 @@
+{
+  "started_at_utc": "2026-11-27T00:30:04.996758+00:00",
+  "binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+  "binary_sha256": "47543affda15e551e515df6d885bb88827ed5814b1dbc864c1a5fe949668aa75",
+  "protocol": "Two processes per case; each evaluates once, then records one first-report call plus five repeated calls for all three paths. Path order rotates per round; each corresponding round is reversed exactly in the second process. Case order reverses too. Ten repeated samples per path/case; first calls excluded. All complete report bytes must match the independently verified oracle within each process.",
+  "quiet_window": "Parent authorized measurement after owned build/test processes stopped; shared host load is not guaranteed idle.",
+  "host": {
+    "system": "Linux",
+    "release": "6.18.57",
+    "machine": "x86_64",
+    "available_logical_cpus": 9,
+    "cpu_models": [
+      "AMD EPYC 9V74 80-Core Processor"
+    ],
+    "memory_at_start": {
+      "MemTotal": "10206472 kB",
+      "MemAvailable": "6181156 kB"
+    }
+  },
+  "resource_scope": "CPU and peak RSS describe the entire three-path process, including graph/evaluation, all three implementations, serialization and parsed oracle checks; no per-path memory claim.",
+  "processes": [
+    {
+      "name": "success-10000-round-1",
+      "case": "success-10000",
+      "process_round": 1,
+      "reverse": false,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "success-10000",
+        "--repetitions",
+        "5"
+      ],
+      "started_at_utc": "2026-11-27T00:30:05.001248+00:00",
+      "completed_at_utc": "2026-11-27T00:30:05.646995+00:00",
+      "wall_seconds": 0.6457671800008029,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.612166,
+      "system_cpu_seconds": 0.016455,
+      "maximum_rss_kib": 45504,
+      "raw_json": "success-10000-round-1.json",
+      "stderr_log": "success-10000-round-1.stderr.log",
+      "source_oracle_and_order_verified": true
+    },
+    {
+      "name": "prefix-1024-round-1",
+      "case": "prefix-1024",
+      "process_round": 1,
+      "reverse": false,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "prefix-1024",
+        "--repetitions",
+        "5"
+      ],
+      "started_at_utc": "2026-11-27T00:30:05.652562+00:00",
+      "completed_at_utc": "2026-11-27T00:30:05.877881+00:00",
+      "wall_seconds": 0.22534378399996058,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.212726,
+      "system_cpu_seconds": 0.011745,
+      "maximum_rss_kib": 34956,
+      "raw_json": "prefix-1024-round-1.json",
+      "stderr_log": "prefix-1024-round-1.stderr.log",
+      "source_oracle_and_order_verified": true
+    },
+    {
+      "name": "interleaved-512-round-1",
+      "case": "interleaved-512",
+      "process_round": 1,
+      "reverse": false,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "interleaved-512",
+        "--repetitions",
+        "5"
+      ],
+      "started_at_utc": "2026-11-27T00:30:05.883005+00:00",
+      "completed_at_utc": "2026-11-27T00:30:06.113009+00:00",
+      "wall_seconds": 0.23002894799992646,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.212672,
+      "system_cpu_seconds": 0.016274999999999998,
+      "maximum_rss_kib": 26568,
+      "raw_json": "interleaved-512-round-1.json",
+      "stderr_log": "interleaved-512-round-1.stderr.log",
+      "source_oracle_and_order_verified": true
+    },
+    {
+      "name": "interleaved-512-round-2",
+      "case": "interleaved-512",
+      "process_round": 2,
+      "reverse": true,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "interleaved-512",
+        "--repetitions",
+        "5",
+        "--reverse"
+      ],
+      "started_at_utc": "2026-11-27T00:30:06.117531+00:00",
+      "completed_at_utc": "2026-11-27T00:30:06.365231+00:00",
+      "wall_seconds": 0.247724661000575,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.235563,
+      "system_cpu_seconds": 0.011739,
+      "maximum_rss_kib": 26552,
+      "raw_json": "interleaved-512-round-2.json",
+      "stderr_log": "interleaved-512-round-2.stderr.log",
+      "source_oracle_and_order_verified": true
+    },
+    {
+      "name": "prefix-1024-round-2",
+      "case": "prefix-1024",
+      "process_round": 2,
+      "reverse": true,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "prefix-1024",
+        "--repetitions",
+        "5",
+        "--reverse"
+      ],
+      "started_at_utc": "2026-11-27T00:30:06.370013+00:00",
+      "completed_at_utc": "2026-11-27T00:30:06.592643+00:00",
+      "wall_seconds": 0.22265665699978854,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.210177,
+      "system_cpu_seconds": 0.011994999999999999,
+      "maximum_rss_kib": 34796,
+      "raw_json": "prefix-1024-round-2.json",
+      "stderr_log": "prefix-1024-round-2.stderr.log",
+      "source_oracle_and_order_verified": true
+    },
+    {
+      "name": "success-10000-round-2",
+      "case": "success-10000",
+      "process_round": 2,
+      "reverse": true,
+      "command": [
+        "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+        "--case",
+        "success-10000",
+        "--repetitions",
+        "5",
+        "--reverse"
+      ],
+      "started_at_utc": "2026-11-27T00:30:06.597087+00:00",
+      "completed_at_utc": "2026-11-27T00:30:06.951156+00:00",
+      "wall_seconds": 0.3540930600001957,
+      "exit_code": 0,
+      "user_cpu_seconds": 0.290238,
+      "system_cpu_seconds": 0.06305999999999999,
+      "maximum_rss_kib": 45400,
+      "raw_json": "success-10000-round-2.json",
+      "stderr_log": "success-10000-round-2.stderr.log",
+      "source_oracle_and_order_verified": true
+    }
+  ],
+  "completed_at_utc": "2026-11-27T00:30:06.951956+00:00",
+  "all_exit_codes_zero": true,
+  "all_source_oracle_and_order_checks_passed": true
+}

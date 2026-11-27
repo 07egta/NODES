@@ -1,185 +1,146 @@
-# Morphlet 0.1 — 実装構成と今後の拡張
+# NODES architecture
 
-この文書は、このリポジトリで実装した機能と設計判断を説明する。性能の目標値を実測値として扱わず、検証環境・結果は[VERIFICATION.md](VERIFICATION.md)に分ける。
+更新: 2026-11-27 JST。現在の実装を記す。目標機能は [ROADMAP](../ROADMAP.md)、検証範囲は [TEST_RESULTS](../TEST_RESULTS.md) に分ける。crate名と実行ファイル名は既存互換のため `morphlet` / `NODES`、画面上の製品名はNODES。
 
-## 1. プロジェクトの位置づけ
+## 構成
 
-Morphletは、Grasshopperのように「値と形状をノードで処理する」操作へ集中した独立デスクトップアプリである。Arclet CADの汎用CAD機能を増やす方針から、ノード編集・形状生成・保存・メッシュ出力をつなぐ方針へ切り替えた。
+Rustのライブラリがデータモデルと計算を提供し、同じpackageのeframe/eguiバイナリがUIを提供する。Rhino/Grasshopperのruntimeや商用SDKをロードしない。基本操作・計算・保存はオフラインで行える。
 
-旧ArcletのRust中心・デスクトップ優先・ライセンス制約・未検証の互換性を主張しない方針を参照した。参照した旧リポジトリはコミット`0c9567d1496c38d3b3cb132bcf5558fe367744fc`である。旧CADのUIや巨大なワークスペースを読み込む構成にはせず、このリポジトリにノードモデラの基盤をまとめた。RhinoやGrasshopperのバイナリを同梱・ロードしない。[旧開発方針](https://github.com/07egta/Arclet-CAD/blob/0c9567d1496c38d3b3cb132bcf5558fe367744fc/docs/policy.md)
+共通の [実装言語方針](LANGUAGE_POLICY.md) は「Rust主体、必要な補助部分だけ少量の他言語」。本体・標準ノード・ネイティブUI・幾何・保存・CLIの実装責務はRustに置く。開発用Python/PowerShell、ユーザー記述のRhai、将来必要なシェーダーや小さな接続処理は、本体の責務から区別して管理する。
 
-現在の計算形状は点、折れ線、三角形メッシュである。NURBS/B-repカーネルやGrasshopper互換ランタイムは実装していない。
-
-## 2. ファイルごとの責務
-
-| モジュール | 実際の責務 |
+| 責務 | 主なmodule |
 |---|---|
-| [`src/model.rs`](../src/model.rs) | 型、ノード仕様、グラフ、接続検証、トポロジカル順序、形状・ツリー型、上限 |
-| [`src/engine.rs`](../src/engine.rs) | 決定的なグラフ評価、差分キャッシュ、数列とツリー処理、形状生成・変形、計算量制限、協調キャンセル |
-| [`src/persistence.rs`](../src/persistence.rs) | バージョン付きJSON、検証付き読込み、保存置換、Undo/Redo、メッシュ検査、STL/OBJ書き出し |
-| [`src/templates.rs`](../src/templates.rs) | 実際のノードと接続から作る6種類の編集可能な作品例 |
-| [`src/app.rs`](../src/app.rs) | 画面状態、計算worker、リビジョン管理、検索、設定、保存・復旧・書き出しの操作 |
-| [`src/canvas.rs`](../src/canvas.rs) | ノード表示、配線、選択、ドラッグ、範囲選択、整列、キャンバス移動・ズーム |
-| [`src/viewport.rs`](../src/viewport.rs) | 3D投影、キャッシュ、照明、ピッキング、回転・移動・ズーム、表示上限 |
-| [`src/file_picker.rs`](../src/file_picker.rs) | eguiのアプリ内ファイル選択。開く・保存・STL/OBJ出力の選択を共通化 |
-| [`src/theme.rs`](../src/theme.rs) | 日本語フォント、色、余白、共通表示 |
-| [`src/main.rs`](../src/main.rs) | 起動、Glow描画設定、アイコン、コマンドラインの検証・作品例出力 |
+| 登録・型・グラフ・上限 | `model`、カテゴリごとのNodeSpec |
+| 共通アクセス規則 | `node_access`、`data_tree`、`data_tree_nodes` |
+| 評価・キャッシュ・時間計測 | `engine`、`latest_channel`、`cluster` |
+| 数学・式・従来ノード | `math_nodes`、`number_aggregates`、`number_interpolation`、`expr`、`gh_nodes` |
+| 精密曲線 | `curve_geometry`、`curve_nodes` |
+| 精密曲面・限定ソリッド | `surface_kernel`、`surface_curvature`、`surface_nodes` |
+| メッシュ・生成 | `mesh_fabrication`、`mesh_geometry_checks`、`generative` |
+| 保存・移行・入出力 | `persistence`、`compatibility`、`import`、`stl_export`、`ghx` |
+| 安全な外部編集 | `graph_api`、CLI |
+| 制限付きスクリプト | `script`（Rhai）、`expr` |
+| 編集画面 | `app`、`canvas`、`getting_started`、`ui_polish`、`theme`、`data_view`、`help` |
+| 描画・造形情報 | `viewport`、`raster`、`print_info` |
 
-公開ライブラリは`model`、`engine`、`persistence`、`templates`に分かれる。デスクトップUIは同じパッケージの別バイナリで、`morphlet::...`を通じてライブラリを使う。
+新しいカテゴリ処理を巨大なengineへまとめない。stable snake_caseのserialized ID、NodeSpec、共通アクセス、kernel、独立期待値テスト、graph/save/reloadテストを一単位とする。登録は現在compile-time enumであり、dynamic plugin registryは未実装。
 
-現在のUIは`eframe/egui 0.33.3`、描画バックエンドはGlow/OpenGLである。アプリ内にwgpuの独自3Dパイプラインや独自シェーダーはない。ファイル選択はOSのポータルダイアログへ依存させず、日本語UI内で完結させた。幾何計算と作品の保存にネットワークは使わない。
+## Graph / Type / Tree
 
-## 3. グラフとデータの意味
+`NodeId=u64`。入力はport keyからsource NodeIdへの対応で、現在は**各ノード1出力**。複数出力には保存形式とwireの移行が必要。型検査を接続時と評価時に行い、未知port、循環、重複ID、不正座標・非有限数などを拒否する。
 
-### ノードと接続
+`Value` はNumber、Point、Curve、Mesh、Surface、Solidを保持する。形状payloadはArc共有。VectorはPoint、Boolean/Domain等は数値表現のものがあり、専用型との互換性を意味しない。runtimeのNull値はまだ無い。`Slot<T>` のMissing/Nullの区別は将来の基盤であり、ValueのNull実装ではない。
 
-`NodeId`は`u64`。各ノードは種類、表示名、位置、数値パラメータ、入力キーから接続元IDへの対応、プレビュー設定を持つ。表示名の変更は配線に影響しない。現状の各ノードは出力を1つ持ち、1つの入力キーに接続できる接続元も1つである。
+`Tree = BTreeMap<Vec<u32>, Vec<Value>>` によりパス順を決定的にする。空の枝と枝そのものが無い状態を区別する。Flatten/Graft/Simplify、枝操作、制限構文のPath Mapper等は共通moduleを使う。
 
-ノード仕様には日本語ラベル、説明、検索キーワード、型、初期値、数値範囲、刻み、整数指定がある。接続時には型と循環を検証する。循環が生じる接続は直前の入力状態へ戻す。広い型である`Geometry`や`Any`を経由する場合は、評価時にも実際の値型を確認する。
+### 入力アクセス
 
-グラフはトポロジカル順で評価する非循環グラフである。ループ、フィードバック、時間発展、プラグインノード、任意コード実行は含まない。
+- Item: 対応要素ごとに評価。Longest、Shortest、Crossを選択できるノードをmetadataで明示する。
+- List: 枝内リスト全体。空のindexやcutリストも意味のある入力としてkernelへ渡す。
+- Tree: 全枝とパスをまとめて渡す。
+- FirstItem: 設定値は現在、その入力範囲の先頭のみを読む。一般の混合schedulerの代替ではない。
+- SingleItem: matched branchごとにちょうど1個を要求する。
+- Custom: Script/Cluster固有の規則。
 
-### 値とツリー
+新しいkernelは原則としてordinalの枝照合。元のevolve/allノードは既存graphの結果を変えないため、明示的なmatching設定が無い場合に従来のsame-path/broadcast規則を維持する。枝の選択方針はNODESの仕様であり、GH1/GH2全般の一致を保証しない。
 
-```rust
-pub enum Value {
-    Number(f64),
-    Point([f64; 3]),
-    Curve(Arc<Curve>),
-    Mesh(Arc<Mesh>),
-}
+## 評価と非同期UI
 
-pub struct Tree {
-    pub branches: BTreeMap<Vec<u32>, Vec<Value>>,
-}
-```
+検証付きトポロジカル走査はnodeへの直接参照を返す。初期rootと各child集合をIDで整列し、ready queueをFIFOで処理するため、保存順に依存しない決定的な順序になる。各kernelは協調キャンセルを確認し、キャンセルを通常の失敗結果としてcacheしない。
 
-`Curve`は点列と開閉状態、`Mesh`は倍精度の頂点列と`u32`インデックスによる三角形列である。`Arc`で形状を共有し、出力表示や未変更ノードへの受渡しで座標を複製し続けない。
+cache keyはkind、数値のIEEE bit値、入力元IDと評価revision、scriptやcluster等のsemantic state。名称・座標・previewの変更は計算を無効化しない。下流だけが再計算され、エラー結果もcacheする。保持重みとordered evictionを使い、削除されたnodeの結果を除去する。
 
-データツリーを「一意なpathとlistの組」とする考え方は[McNeelのGH2データツリー資料](https://www.rhino3d.com/docs/grasshopper2/terms/data-tree.html)を参照した。ただし、現実装の`Value`にはnullやメタデータはなく、Grasshopperの全データ意味論を再現するものではない。
+UIと計算workerはlatest-only mailboxを使用し、未受信snapshotを各方向1個に制限する。リビジョンが古い要求・結果を破棄し、編集中のUIを長いkernelから分離する。**現在はworker1本でkernelは逐次評価**。複数coreへの並列schedulerは未実装。
 
-実装した対応規則は次のとおり。
+NodeTimingは入力/cache key準備からkernelまたはcache取得、資源検査、出力格納までの壁時計時間。Cluster内部は外側へ含める。validation前の中止には偽のnode時間を作らず、途中中止はpartial timingだけ残す。表示は計測値であり、CPU使用率やframe時間ではない。
 
-- 同じpathの枝を対応させる。入力が1枝だけなら、相手側の枝へその枝を配る。
-- 枝内の長さが異なる場合は長い側に合わせ、短い側の最後の要素を繰り返す。
-- 必要な枝がない、または入力リストが空なら、その出力枝は空になる。
-- **フラット化**は全要素を`{0}`の枝へ集める。
-- **枝を分ける**は各要素のインデックスをpathへ付け足す。空枝は保持する。
-- **ロフト**は枝内の曲線リスト全体、**メッシュをまとめる**は枝内のメッシュリスト全体を処理する。
+### 計算待ちの3D表示
 
-GrasshopperのShortest/Cross Referenceや任意Path Mapperは未実装である。既存GH定義の結果を一致させる互換性は主張しない。
+プレビューは `None`（新しい結果を計算中）と `Some([])`（最新評価が空またはエラー）を区別する。前者では最後の完了scene・診断・投影cacheを保持して「更新中／前回の形状を表示」と明示し、カメラ操作を継続する。最新の空結果は必ずsceneを消す。非表示中に評価が完了した場合は表示済みrevisionを照合し、それ以前の形状を復活させない。
 
-## 4. UIを止めにくくする評価構成
+前回の形状から現在のグラフの選択を推測せず、pending中のpickは選択へ採用しない。Undo後に同じNodeIdが別ノードへ再利用された場合も誤選択しない。出力ファイルには最新評価が必須であり、保持した表示sceneをexportへ流用しない。preview用Tree containerのcloneと、本当に形状が変わった時のUI thread上のtopology診断は、別の未解消コストとして残る。
 
-### 1本のworkerとリビジョン
+## 数値核と編集の精度
 
-UIと幾何計算を分離し、バックグラウンドのworkerを1本使う。Rayon等による複数ノードの並列実行はまだ行わない。
+総和・平均は正負を分けた固定長整数累積（単位2^-1074）を使い、平均は整数除算後に1回だけnearest/evenへ丸める。補間は `a + t*b - t*a` の積を単位2^-2148で保持して最後に丸める。有限入力・範囲・overflowの扱いは呼出し側と区別し、Python Fraction oracleとbit単位で比較する。NURBSや任意の数学ノードをすべてexact arithmeticへ置換したわけではない。
 
-1. 計算に影響する編集で、アプリのリビジョンを増やす。
-2. 約35 msの送信間隔を設け、グラフのスナップショットをworkerへ渡す。
-3. workerは待機中の要求が複数あれば最新を採用する。
-4. `AtomicU64`の最新リビジョンと要求リビジョンを比べ、古くなった計算を協調的に中止する。
-5. 計算完了後もリビジョンが一致した結果だけをUIへ返す。
-6. UI側も受信結果を再確認し、現在のリビジョンの結果だけを採用する。
+編集・履歴・cacheは数値のbitを比較して+0と-0を区別する。InspectorとCanvasは共通の数値widgetを使用し、ノードIDとport keyから安定したIDを作る。表示幅に合わせて値自体を丸めず、長い文字列とinteraction領域だけをclipする。
 
-中止判定は評価中に一度真になったら保持される。キャンセルを通常ノードの失敗としてキャッシュしない。形状生成・変形・検証のループにも中止確認を入れている。
+## 幾何の表現と精度
 
-現在の結果が古い間は、プレビューと書き出し用の形状を返さず「更新中」と表示する。計算前の形が現在の値の結果に見える状態を避ける。workerから新しい結果が届いたら`request_repaint()`で画面更新を要求する。通常の静止状態で常時描き続ける構成にはしていない。[egui Contextの再描画API](https://docs.rs/egui/0.33.3/egui/struct.Context.html#method.request_repaint)
+Curveは表示点列と数学的基底を別に保持する。NURBSでは次数、完全なknot vector、制御点、重みを扱う。affine変換や対応した曲面生成は精密基底を保持し、非線形の点列変形で基底を失った場合は精密NURBSと名乗らない。長さ、最近接点、交差等の数値解は個別の公差・制限を持つ。最近接探索は端点に隣接するセルも局所細分化し、閉判定は導関数の大きさに依存しない幾何標本の範囲を使う。一般曲線の大域的最近接の証明ではない。
+
+Surfaceは解析primitiveまたはNURBSを保持し、表示用Meshへ明示的に離散化する。1階/2階微分、第一/第二基本形式から曲率を求める。法線はSu×Sv、第二基本形式はn・Sijなので外向き球のHは-1/r、Kは1/r²。極や退化接線、非C2内部knot近傍は明示的に扱う。面積は0長でないnative knot区間ごとにGL3/GL5の差を指標とした適応積分を行い、深さ・標本数・キャンセルに上限を設ける。基底と制御点は局所supportだけ計算する。未収束を黙って有限の正解として返さない。
+
+Solid/B-repは限定的で、一般のトリム曲面・位相修復・fillet・Booleanではない。箱専用演算と一般CAD機能を区別する。メッシュの連結はBooleanではない。永続SubD位相やcreaseも未実装。
+
+UIと幾何計算を分離し、バックグラウンドのworkerを1本使う。同じ階層のノードの並列評価は下記「並列評価」を参照する（Rayon等の依存は追加していない）。
+
+## メッシュ・印刷
+
+頂点はf64、三角形indexはu32。面積/符号付き体積、境界・非多様体辺・頂点fan・重複面・向き・退化面などを検査する。共有topology監査をviewport/export/CLIで使い、閉じた多様体でない形のvolume/weightは未判定にする。exportは1e-6 mm量子化による全体の座標weldを含む。これらだけで自己交差の不存在や造形成功を証明しない。
+
+修復では内殻を無条件に外向きへ反転しない。複数殻の包含は未判定と記録し、単一閉殻の向き補正では局所原点と補償和を用いる。凹多角形のOBJ/穴埋めは検証付き三角形化へ移行し、非平面・自己交差・曖昧な複数境界を推測で埋めない。
+
+STLはf32へ丸めた後の退化も検査する。OBJはf64がroundtripする最短文字列を使う。複数ファイルのexportは全てを一時ファイルへ書きflush/syncしてから順にrenameする。途中のrename失敗は既に完了したファイルと面数を正確に返すが、全ファイルを一括して原子的に置換するtransactionではない。OBJ/3MFもmesh出力であり、NURBS/B-rep交換ではない。材料質量は体積と密度からの概算で、slicerのinfill/support/実測重量とは異なる。
+
+### 並列評価
+
+`Evaluator::evaluate`はトポロジカル順を「階層」に分ける（ノードの階層は、最も深い入力元の階層＋1）。同じ階層のノードは互いに依存しない。階層ごとに次の3段階で処理する。
+
+1. 逐次: 無効ノードの処理、キャッシュキーの作成、キャッシュ命中の判定。
+2. 並列: 未命中のノードを`std::thread::scope`で計算する。スレッド数は`available_parallelism`と8の小さい方。未命中が1つ以下、またはグラフが8ノード未満なら1スレッドのまま。結果は添字の位置へ入れるため、スケジューリングで結果は変わらない。
+3. 逐次: リビジョン採番、重みの上限判定、キャッシュ保存、出力を階層内の順序で行う。
+
+キャンセルは各ノードの完了直後に確認し、キャンセル中に返った結果（キャンセルのエラーの可能性がある）は捨てる。キャンセル時は最初の未完了ノードより前の結果だけを保存する。`Evaluator::set_max_threads(1)`で完全な逐次評価にできる（テスト・計測用）。`evaluate`のキャンセル関数は`Sync`が必要になった。メッシュは`Arc`で共有しているため、キャッシュ命中や入力の受渡しで頂点配列は複製されない（`Tree`の複製は`Arc`の参照数を増やすだけ）。
+
+### 頑健性テスト
+
+`tests/robustness_tests.rs`は`NodeKind::all()`の全種類について、初期値・各数値範囲の最小/最大/中間、NaN・無限大・負数・巨大値、範囲内のランダムな組合せ（固定シードの自前乱数）、各入力へ代表的な上流ノードを接続した場合を評価する。パニックしないこと、結果が`Err`か有限値（メッシュの添字が範囲内）であることを確認する。式ノードとファイル読み込みノードには悪意のある文字列も与える。`#[ignore]`のベンチ`bench_examples_evaluation_time`は作品例ごとの評価時間を表示する。
 
 ### 差分キャッシュ
 
-キャッシュキーはノード種別、数値パラメータ、接続元IDとその評価リビジョンから作る。位置、表示名、プレビュー設定はキーに含めない。これらの表示上の変更では、アプリ側も新しい計算を要求しない。
+## 保存・互換性・外部能力
 
-未変更のノードは成功結果またはエラー結果を再利用する。上流の計算リビジョンが変わると、その結果を使う下流も再評価する。削除済みノードのキャッシュは保持しない。結果の重みを数え、キャンセルされた評価の残存キャッシュも上限内に収める。
+native v1 JSONは検証付きで読み、原子的な一時file置換で保存する。8MiB書込上限とflush/syncを使用する。未知のnative node/fieldは原fileを変更せず拒否する。編集可能なopaque未知nodeの保存は未実装。
 
-画面下部の「計算 / 再利用」は今回の評価で実際に計算したノード数とキャッシュを使ったノード数である。経過msはその評価の計測値で、Windows実機の起動時間やフレームレートを表すものではない。
+project/API request/GHX/partの入力はopen前に通常ファイルか確認し、open後のdescriptorでも確認する。FIFO等を通常入力として待ち続けないための対策であり、敵対的なファイル置換競合を完全に排除する保証ではない。読込byte上限も維持する。
 
-## 5. 幾何計算の範囲
+独立missionで食い違ったClosestPoint port名とtree-transform keyは明示移行し、競合を上書きしない。GHXは公開情報に基づく限定的な独立import/archiveであり、未知内容と接続を保持するが、binary GHや全component変換は未対応。
 
-現在は28種類のノードを実装している。
+JSON Graph APIはversion付き、transactional編集、型/循環/範囲検証を通る。Script、ImportMesh、Cluster、Expression、PathMapperをAPIの実行対象へ含めない。純粋なtree設定はnative graphと同じvalidatorを使う。任意のshell/file/network操作を提供しない。
 
-| 分野 | ノード |
+Rhaiは既存の制限付きscript nodeで、操作数200000、call depth16、script8KiB、文字列4096、時間2秒などの上限を持つ。module/time/custom-syntaxを無効にする。制限された組込関数の追加にも、割当・実行時間・キャンセル・能力の監査が必要。
+
+Rhaiホストと組込APIは `src/script.rs` のRust実装である。ユーザーのスクリプトは許可された拡張として維持し、Rust主体という理由で既存モデルから削除しない。標準ノードをRhaiへ移す方針ではない。
+
+## 上限
+
+| 対象 | 制限 |
 |---|---|
-| 数値 | 数値、足し算、掛け算、割り算 |
-| データ | 数列、フラット化、枝を分ける |
-| 点・曲線 | 点、円、正多角形、星形、長方形、らせん |
-| メッシュ生成 | 押し出し、ロフト、回転面、花器、球、箱 |
-| 変形 | 移動、回転、拡大縮小、ねじり、波打つ |
-| 配列 | 直線配列、円形配列 |
-| 集約・出力 | メッシュをまとめる、出力 |
+| Graph nodes | 16384 |
+| Items / branches | 16384、他の重量予算も適用 |
+| Path depth | 32 |
+| Mesh | 250000頂点 / 500000三角形 |
+| 結果・cacheの論理重量 | 3000000（bytesではない） |
+| native project | 8MiB |
+| untrusted API request | 1MiB / 8192 edits |
+| GHX | 8MiB、XML depth/element/wire数制限 |
 
-円やらせんは分割点からなる折れ線であり、曲率連続の解析曲線やNURBSではない。ロフトは同じ枝の2本以上の断面をつなぎ、断面点数と開閉状態の一致を必要とする。花器は底、内壁、外壁、上縁を生成する専用ノードで、指定肉厚は半径方向の差である。
+上限は快適な動作や全組合せでのメモリ量を保証する値ではない。計測値は別文書でsource SHAと環境に結び付ける。
 
-**メッシュをまとめる**は頂点・面をまとめる操作で、形状の和集合や内部面の除去ではない。自己交差、最短肉厚、製造可否の完全な検査も行わない。
+## 描画とUI
 
-### 資源上限
+eframe/egui 0.33.3、Glow/OpenGL。現在の3D previewにはsoftware depth bufferとtexture uploadを使う経路があり、独自GPU CAD rendererとは異なる。図形・raster・画面出力のcacheを分け、静止中の不要な再描画を抑える。
 
-上限は性能保証ではなく、入力が膨らんだときの制御用である。実際には複数の制限のうち先に到達したものが適用される。
+canvasにはzoom/pan、可視nodeの描画抑制、wireの索引、minimap、検索、整列、group/note、Undo/Redo等を置く。日本語/英語検索、適切なport説明とエラー修正を優先する。数千nodeの快適性はGUI実測が必要。
 
-| 対象 | 現在の上限・扱い |
-|---|---|
-| グラフ | 2,048ノード |
-| 1結果の要素・枝 | 8,192。pathの深さは32まで |
-| 1メッシュ | 250,000頂点、500,000三角形 |
-| 評価・キャッシュの重み | 3,000,000。形状の頂点・面インデックス等を数える指標で、byte数ではない |
-| 作品ファイル | 8 MiB |
-| 出力全体 | 2,000,000頂点、2,000,000三角形。通常は計算側上限が先に効く |
+Inspectorの入力行はnode IDとport keyに基づく明示UI scopeを持ち、その内部に通常のhorizontal行を置く。上に評価エラーが追加されても入力focusを保ち、残り縦領域を行の高さとして消費しない。ドラッグは1回の履歴にまとまるが、複数フレームの文字入力は各変更をUndoする。
 
-過大な配列などは生成前の見積りと生成後の検証で制限する。無効な座標、参照先のない頂点、型不一致などは日本語のエラーとして返す。
+数値widgetは共通bindingを使う。getterは保存値を変更せず、setterのみ本来のInputSpec範囲・有限値・整数制約を適用する。操作しやすいslider trackの範囲は手入力可能範囲と分け、実数stepは入力操作の速度として使う。表示を再解析して小数を失わないよう、編集表示は往復可能な文字列表現を用いる。
 
-## 6. 3Dプレビュー
+## ライセンスと拡張
 
-`viewport.rs`はeguiのpainterへ三角形を渡す。座標はカメラのright/up/eye基底へ投影する平行投影で、面の平均深度を使って奥から手前へソートする。法線を使う照明と頂点色で立体感を付け、隣接面の角度を見て角を残した平滑化を行う。
+projectのMIT OR Apache-2.0方針を維持する。GPL/LGPL/AGPL依存を新規採用しない。依存宣言と実際の配布本文・対象platformの照合は [DEPENDENCIES](DEPENDENCIES.md) で範囲と未調査を記す。既存の他ライセンス宣言を隠さない。
 
-キャッシュは次の3つを分けている。
-
-- **形状**：入力Arcの識別、点列・メッシュの大きさなどを使い、形状の展開・法線計算を再利用する。元のArcも保持し、解放されたアドレスの再利用で誤った一致が生じないようにする。
-- **選択**：選択ノードが変わっても法線を作り直さず、色のための選択状態だけを更新する。
-- **投影**：形状世代、カメラ、表示領域、表示設定、テーマが同じなら、投影と面ソートを再利用する。
-
-回転・移動・拡大はカメラだけを変更し、グラフの幾何計算は要求しない。モデル上のクリックから生成元ノードを選べる。完成形モードでは出力ノードが形状の生成元として返る。
-
-プレビューは最大45,000三角形、18,000線分、6,000点を描き、上限時は簡略表示を知らせる。表示の簡略化は、エンジンの形状や書き出しデータを書き換えない。
-
-深度バッファは使わないため、複雑な交差面や透明表示に限界がある。曲線・点は面の上へ描画し、ワイヤーは裏側の線も表示する。床影は視認性のための近似で、照明シミュレーションではない。次の描画段階では、これらの問題を具体的に確認したうえで深度バッファ付きの3D描画へ置き換える。
-
-## 7. 保存・履歴・復旧・エクスポート
-
-`.morph`は`schema_version: 1`を持つUTF-8 JSON。作品名、ノードID・種別・数値・接続・位置・表示設定、ノードキャンバスのpan/zoomを保存する。計算済みメッシュ、3Dカメラ、Undo履歴は保存しない。
-
-読込みは一時的な`Project`へ行い、構造・型・循環などの検証に成功した後だけUIの作品を置き換える。現版は未知のノードや形式を拒否する。未対応ノードをそのまま保持する前方互換機能は、まだ実装していない。
-
-保存は出力先と同じフォルダーの一時ファイルへ書き、flush/sync後にrenameで置き換える。元ファイルを先に削除しない。細かいOS差と出力形式は[IO_NOTES.md](IO_NOTES.md)を参照。
-
-Undo/Redoは最大64個の作品スナップショット。ドラッグの連続操作をまとめる判断はUI側が担当する。未保存の変更がある間は約20秒間隔で復旧ファイルの保存を試みる。Windowsの復旧先は`%LOCALAPPDATA%/Morphlet/recovery.morph`、Linuxは`$XDG_DATA_HOME/morphlet/recovery.morph`または`~/.local/share/morphlet/recovery.morph`である。1つの復旧ファイルなので、バージョン履歴の代わりではない。
-
-出力対象ノードのひとつでも計算エラーや未計算であれば、書き出し全体を中止する。接続されていない別の試作ノードのエラーは、正常な出力を妨げない。
-
-STLはバイナリ、OBJは頂点と三角形のテキストとして書き出す。点・曲線・数値はメッシュ出力の対象外。非有限座標、無効な頂点参照、退化面を拒否し、STLではf32へ丸めた後に面が潰れないことも確認する。辺の検査では境界辺、非多様体の辺、向きの不一致を集計するが、自己交差や造形成功を証明するものではない。
-
-## 8. 次の開発順序
-
-| 順序 | 取り組み | 完了を判断する条件 |
-|---|---|---|
-| 1 | Windows実機で起動・保存・日本語入力・GPU描画を確認 | ユーザーのWindows環境で作品例を編集し、保存・再読込み・書き出しを通せる |
-| 2 | 現行グラフの使いやすさを改善 | 初めての人が花器→ねじり→出力を作れ、失敗した入力を自分で修正できる |
-| 3 | 表示精度と大きなグラフの計測 | 交差面の描画誤りを解消し、具体的な作品・PCで操作遅延とメモリを記録する |
-| 4 | NURBSの別形状型とアダプター | 曲線評価、許容誤差、テセレーションをテストし、メッシュとの変換を明示する |
-| 5 | B-rep・ブーリアン・STEPを検討 | 採用ライセンスを確認し、失敗ケースを含む実形状で計算と出力を検証する |
-| 6 | 限定的なGHX変換 | 対応ノード・数値規則・未対応要素を一覧化し、読み込めた定義の結果を比較する |
-| 7 | 拡張ノード・AI補助 | 実際のノード仕様と型検証を通る編集を作り、保存とUndoで戻せる |
-
-NURBS/B-repを追加する際は、`Value`のメッシュを精密形状に見せかけず、形状型とテセレーション結果を分ける。GHXがXMLであることだけで互換性が成立するわけではない。Grasshopper側の型識別・データ対応規則・外部プラグイン依存を確認し、変換範囲を絞る。
-
-旧Nodiの公開リポジトリはUIやノード構成の参照対象だが、2024年11月8日にアーカイブされた旧版であり、現行Rust製デスクトップ基盤として採用していない。[Nodi公開リポジトリ](https://github.com/Nodi3d/nodi)
-
-## 9. 参照資料
-
-- [旧Arclet CADの開発方針（固定コミット）](https://github.com/07egta/Arclet-CAD/blob/0c9567d1496c38d3b3cb132bcf5558fe367744fc/docs/policy.md)
-- [McNeel: Grasshopper 2 Data Tree](https://www.rhino3d.com/docs/grasshopper2/terms/data-tree.html)
-- [McNeel: Task Capable Components](https://developer.rhino3d.com/en/guides/grasshopper/programming-task-capable-component/) — 入力収集・計算・出力反映を分ける設計の参考。
-- [McNeel: Simple Component](https://developer.rhino3d.com/guides/grasshopper/simple-component/) — コンポーネントの識別と保存時の扱い。
-- [egui 0.33.3: Context](https://docs.rs/egui/0.33.3/egui/struct.Context.html) — 再描画とUI連携。
-- [Nodi作者の公開リポジトリ](https://github.com/Nodi3d/nodi) — 独立ノードモデリングの参考。
-
-これらは設計・挙動を調べるための参照先であり、他製品のコードやUI資産をコピーしたという意味ではない。
+複数出力、Null、一般mixed-access、動的plugin API、並列評価、精密B-rep、CAD exchangeは今後の独立した設計/移行課題。正常な既存graphを壊す一括書換えを避け、比較fixtureを先に用意する。

@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "name": "中空花器・診断",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "range",
+        "name": "下から上へ (0〜1)",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "count": 7,
+          "end": 1,
+          "start": 0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "expression",
+        "name": "半径の式",
+        "position": [
+          262,
+          30
+        ],
+        "params": {
+          "w": 0,
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "x": 0
+        },
+        "preview": false,
+        "script": "30 + 10 * sin(x * pi * 1.5) - 6 * x"
+      },
+      {
+        "id": 2,
+        "kind": "graph_profile",
+        "name": "グラフで形を決める",
+        "position": [
+          504,
+          30
+        ],
+        "params": {
+          "height": 120,
+          "radii": 30,
+          "rows": 60,
+          "segments": 96,
+          "top": 0
+        },
+        "inputs": {
+          "radii": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "noise_deform",
+        "name": "ノイズ変形",
+        "position": [
+          20,
+          310
+        ],
+        "params": {
+          "amp": 1.5,
+          "mode": 0,
+          "seed": 7,
+          "size": 18
+        },
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          262,
+          310
+        ],
+        "params": {
+          "angle": 60
+        },
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "shell",
+        "name": "厚みをつける",
+        "position": [
+          504,
+          310
+        ],
+        "params": {
+          "thickness": 2
+        },
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "overhang_check",
+        "name": "張り出しチェック",
+        "position": [
+          746,
+          310
+        ],
+        "params": {
+          "angle": 45
+        },
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          746,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": true
+      },
+      {
+        "id": 8,
+        "kind": "mesh_audit",
+        "name": "健全性",
+        "position": [
+          1006,
+          130
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 5
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 9
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.86
+}

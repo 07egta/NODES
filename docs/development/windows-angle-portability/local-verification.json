@@ -1,0 +1,46 @@
+{
+  "source_parent": "aa6906574ba3a89919d80a8a778d71ac65cc3724",
+  "modified_files_sha256": {
+    "src/math_nodes.rs": "cf177c4cc8d4879b3e7cb84fcc1140d5c0d46b6a50d1ce5022f7129b98be521f",
+    "tests/vector_angle_regressions.rs": "564a6f63fb0e38bd8f4fb7eec792aee1a3ace36d38e9a8bb92a7ff0eb16b856a",
+    ".github/workflows/windows.yml": "89f3db552120d81b599ee01c867bccd339951957062ef86b82d4fb2198570a65"
+  },
+  "focused_tests": {
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0,
+    "log": "focused-tests.log",
+    "platform": "Linux"
+  },
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.521,
+      "log": "fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 6.362,
+      "log": "clippy.log"
+    }
+  ]
+}

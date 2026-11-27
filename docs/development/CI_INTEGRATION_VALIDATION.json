@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "source_revision": "b26d246341d359a6284a7b1036d1369a02e59a72",
+  "run_url": "https://github.com/07egta/NODES/actions/runs/45846736773",
+  "job_id": 140002253199,
+  "validation_scope": "CI working tree after formatter and Clippy repair; candidate files require review and a fresh committed-source quality gate",
+  "step_outcomes": {
+    "check": "success",
+    "checkout": "success",
+    "clippy_check": "success",
+    "clippy_fix": "success",
+    "dependencies": "success",
+    "exporter_self_test": "success",
+    "fmt_after_fix": "success",
+    "fmt_check": "success",
+    "fmt_fix": "success",
+    "gh2": "success",
+    "perf": "success",
+    "registry": "success",
+    "system": "success",
+    "test": "success",
+    "toolchain": "success"
+  },
+  "rust_tests": {
+    "passed": 431,
+    "failed": 0,
+    "ignored": 2,
+    "suites": 35
+  },
+  "files": [
+    {
+      "path": "docs/compatibility/gh2_official_inventory.json",
+      "kind": "generated_json",
+      "source_blob_sha": "378409a1187be11aac267df50daee49daa93e31d",
+      "sha256": "385aef4d26184e07b6e71a4a1bc937fd5b8bf062ef6bcf2868f85cbfe8b05f66",
+      "bytes": 937266
+    },
+    {
+      "path": "docs/compatibility/nodes_inventory.json",
+      "kind": "generated_json",
+      "source_blob_sha": "e099bb34f3073364be68dcfc3d9b554faad33883",
+      "sha256": "9c8afc5923274fe84094c9d22a9ee3dba8de7da42ba4abe60cf3146633d9369a",
+      "bytes": 597276
+    },
+    {
+      "path": "docs/development/dependency-manifests.json",
+      "kind": "generated_json",
+      "source_blob_sha": null,
+      "sha256": "3c4431cdd1531bad7e6d838f82ac527691bd0639b2e1710c2bebde15ed1b45e6",
+      "bytes": 429585
+    },
+    {
+      "path": "docs/development/performance.json",
+      "kind": "generated_json",
+      "source_blob_sha": "e449b6b38036c8c044c49dfd04f40581517cc751",
+      "sha256": "9cab6fc84f2e42c707ce176e82239e460844b6f75ba40ad7d841b2a2de226c65",
+      "bytes": 5499
+    },
+    {
+      "path": "examples/coverage_perf.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "75d0dd977ef8bb9d9ed77bba127093be713d4e1d",
+      "sha256": "a95422391a02f06e6923404e9b633091197a3c50086627154b270d398525d611",
+      "bytes": 19488
+    },
+    {
+      "path": "src/bin/nodes-cli.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "f84f068414e1ec0bb69875df740390c4ac12951f",
+      "sha256": "5cb9d3257a477b36d6357372e9d88e81b86363db2e3dec8558f797e26c6ba3f0",
+      "bytes": 15258
+    },
+    {
+      "path": "src/gh_nodes.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "2bd21b06d88e82eb3f622e1883f6b7bb9be9b2ef",
+      "sha256": "81e48cd73efdc9c6111dcdc7317acd6b2c32d74df26647d60da88412b1edb22e",
+      "bytes": 38521
+    },
+    {
+      "path": "src/ui_polish.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "7f8b4e2986ee67989b7e328d3156e27de8cf804d",
+      "sha256": "2586a2673b3eb20085edac72eeaf67b86784379c0c8eb3219a472a761f98b819",
+      "bytes": 18907
+    },
+    {
+      "path": "tests/cli_workflows.rs",
+      "kind": "tracked_rust",
+      "source_blob_sha": "8126185b7e3bf53bbdd23f6051953700d0906c73",
+      "sha256": "0ece76b5f9498a8cf1431b80db1e5e121c04f2385981c32bd0427f31c4a6fd67",
+      "bytes": 13437
+    }
+  ],
+  "verification": "All 299 numbered fragments and per-file SHA256/UTF8 lengths verified; original blob IDs matched the current source commit.",
+  "committed_source_gate": "The next Check run must validate the imported committed source."
+}

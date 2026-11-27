@@ -1,0 +1,901 @@
+{
+  "schema_version": 2,
+  "observed_at": "2026-11-27T00:32:29Z",
+  "repository": "07egta/NODES",
+  "pull_request_url": "https://github.com/07egta/NODES/pull/16",
+  "latest_source_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
+  "records": [
+    {
+      "observed_at": "2026-11-27T00:21:06Z",
+      "repository": "07egta/NODES",
+      "pull_request": {
+        "number": 16,
+        "url": "https://github.com/07egta/NODES/pull/16",
+        "head_ref": "feat/nodes-omega-geometry",
+        "head_sha": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+        "base_ref": "feat/rhino-modeling-and-latency",
+        "base_sha": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+        "merge_commit_sha": "bf88af4c964e03ad877e5a36ea0f50185664d4c4",
+        "merged": false
+      },
+      "source_identity": {
+        "head_tree_sha": "231ad326e4a6ef2f20af1b8f8c0c5afdab2861d5",
+        "merge_tree_sha": "231ad326e4a6ef2f20af1b8f8c0c5afdab2861d5",
+        "trees_equal": true,
+        "merge_parents": [
+          "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+          "0aa286a93a8b61f23ce691b1d15a025780ec1fc8"
+        ],
+        "checkout_commit_from_logs": "bf88af4c964e03ad877e5a36ea0f50185664d4c4"
+      },
+      "workflow": {
+        "run_id": 45914152032,
+        "url": "https://github.com/07egta/NODES/actions/runs/45914152032",
+        "path": ".github/workflows/windows.yml",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "updated_at": "2026-11-27T00:17:33Z"
+      },
+      "jobs": [
+        {
+          "id": 140229248601,
+          "name": "linux",
+          "url": "https://github.com/07egta/NODES/actions/runs/45914152032/job/140229248601",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-27T00:00:11Z",
+          "completed_at": "2026-11-27T00:04:04Z",
+          "steps": [
+            {
+              "name": "Install Rust and quality tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-27T00:00:18Z",
+              "completed_at": "2026-11-27T00:00:27Z"
+            },
+            {
+              "name": "Install desktop build libraries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-27T00:00:27Z",
+              "completed_at": "2026-11-27T00:00:56Z"
+            },
+            {
+              "name": "Restore Rust cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-27T00:00:56Z",
+              "completed_at": "2026-11-27T00:01:25Z"
+            },
+            {
+              "name": "Record compiler",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-27T00:01:25Z",
+              "completed_at": "2026-11-27T00:01:25Z"
+            },
+            {
+              "name": "Check formatting",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-27T00:01:25Z",
+              "completed_at": "2026-11-27T00:01:25Z"
+            },
+            {
+              "name": "Test inventory and checkpoint scripts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-27T00:01:25Z",
+              "completed_at": "2026-11-27T00:01:26Z"
+            },
+            {
+              "name": "Audit exact dependency declarations",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-27T00:01:26Z",
+              "completed_at": "2026-11-27T00:01:26Z"
+            },
+            {
+              "name": "Check all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-27T00:01:26Z",
+              "completed_at": "2026-11-27T00:01:30Z"
+            },
+            {
+              "name": "Check Clippy warnings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-27T00:01:30Z",
+              "completed_at": "2026-11-27T00:01:34Z"
+            },
+            {
+              "name": "Test all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-27T00:01:34Z",
+              "completed_at": "2026-11-27T00:02:47Z"
+            },
+            {
+              "name": "Build Linux desktop and console applications",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-27T00:02:47Z",
+              "completed_at": "2026-11-27T00:04:00Z"
+            },
+            {
+              "name": "Prepare Linux development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-27T00:04:00Z",
+              "completed_at": "2026-11-27T00:04:01Z"
+            },
+            {
+              "name": "Upload Linux development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-27T00:04:01Z",
+              "completed_at": "2026-11-27T00:04:02Z"
+            }
+          ],
+          "tests": {
+            "passed": 520,
+            "failed": 0,
+            "ignored": 3,
+            "measured": 0,
+            "filtered": 0,
+            "targets": 48,
+            "nonempty_targets": 44
+          },
+          "python_tests": {
+            "passed": 17,
+            "failed": 0,
+            "suites": [
+              3,
+              6,
+              8
+            ]
+          },
+          "oracles": [
+            {
+              "name": "sum",
+              "reproduced_cases": 128
+            },
+            {
+              "name": "interpolation",
+              "reproduced_cases": 128
+            }
+          ],
+          "compiler": [
+            "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+            "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+          ],
+          "cargo_finished": [
+            "Finished `dev` profile [optimized + debuginfo] target(s) in 3.80s",
+            "Finished `dev` profile [optimized + debuginfo] target(s) in 3.77s",
+            "Finished `test` profile [optimized + debuginfo] target(s) in 1m 10s",
+            "Finished `release` profile [optimized] target(s) in 1m 13s"
+          ],
+          "duration_seconds": 233,
+          "rust_cache": "hit; explicitly recorded by the cache restore step",
+          "checkout_commit_from_logs": "bf88af4c964e03ad877e5a36ea0f50185664d4c4"
+        },
+        {
+          "id": 140230514262,
+          "name": "windows",
+          "url": "https://github.com/07egta/NODES/actions/runs/45914152032/job/140230514262",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-27T00:04:07Z",
+          "completed_at": "2026-11-27T00:17:32Z",
+          "steps": [
+            {
+              "name": "Install Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-27T00:04:18Z",
+              "completed_at": "2026-11-27T00:04:30Z"
+            },
+            {
+              "name": "Restore Rust cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-27T00:04:30Z",
+              "completed_at": "2026-11-27T00:04:31Z"
+            },
+            {
+              "name": "Record compiler",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-27T00:04:31Z",
+              "completed_at": "2026-11-27T00:04:32Z"
+            },
+            {
+              "name": "Test all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-27T00:04:32Z",
+              "completed_at": "2026-11-27T00:12:53Z"
+            },
+            {
+              "name": "Build Windows desktop and console applications",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-27T00:12:53Z",
+              "completed_at": "2026-11-27T00:17:05Z"
+            },
+            {
+              "name": "Prepare development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-27T00:17:05Z",
+              "completed_at": "2026-11-27T00:17:06Z"
+            },
+            {
+              "name": "Upload Windows development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-27T00:17:06Z",
+              "completed_at": "2026-11-27T00:17:10Z"
+            }
+          ],
+          "tests": {
+            "passed": 518,
+            "failed": 0,
+            "ignored": 3,
+            "measured": 0,
+            "filtered": 0,
+            "targets": 48,
+            "nonempty_targets": 44
+          },
+          "duration_seconds": 805,
+          "compiler": [
+            "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+            "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+          ],
+          "cargo_finished": [
+            "Finished `test` profile [optimized + debuginfo] target(s) in 8m 17s",
+            "Finished `release` profile [optimized] target(s) in 4m 12s"
+          ],
+          "rust_cache": "miss; explicitly recorded by the cache restore step",
+          "checkout_commit_from_logs": "bf88af4c964e03ad877e5a36ea0f50185664d4c4"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 15161918291,
+          "name": "NODES-windows-x64-bf88af4c964e03ad877e5a36ea0f50185664d4c4",
+          "url": "https://github.com/07egta/NODES/actions/runs/45914152032/artifacts/15161918291",
+          "size_in_bytes": 14034515,
+          "digest": "sha256:c32c8239c0489d60098d928399e3362e6b3a35c751b9c68dd392e8a9816cff01",
+          "expires_at": "2026-12-11T00:17:06Z",
+          "source_head": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+          "local_archive_sha256": "c32c8239c0489d60098d928399e3362e6b3a35c751b9c68dd392e8a9816cff01",
+          "github_digest_matches": true,
+          "build_info": "NODES development build\r\nCommit: bf88af4c964e03ad877e5a36ea0f50185664d4c4\r\nTarget: x86_64-pc-windows-msvc\r\nCompiler: rustc 1.100.0 (0ef1bc386 2026-11-09)\r\nBuild: cargo build --release --locked --bins\r\nTests: cargo test --all-targets --locked (Windows and Linux)\r\nThis CI artifact has not been validated by GUI or 3D-print hardware testing.\r\nLicense audit scope and unresolved items: docs/DEPENDENCIES.md\r\n",
+          "binaries": {
+            "Morphlet.exe": {
+              "bytes": 18538496,
+              "sha256": "d69209ec2c648164cc27fcbe6b2141038b7dedc0b509a505fbb9f1a1709e1a4d",
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows GUI",
+              "executed": false
+            },
+            "nodes-cli.exe": {
+              "bytes": 5894656,
+              "sha256": "d3e585cc155402ed60471c8828b174f216254d55939cea7a9599cbe71bd23b1b",
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows Console",
+              "executed": false
+            }
+          },
+          "archive_paths_checked": true,
+          "content_file_count": 487,
+          "binaries_executed": false
+        },
+        {
+          "id": 15160604959,
+          "name": "NODES-linux-x64-bf88af4c964e03ad877e5a36ea0f50185664d4c4",
+          "url": "https://github.com/07egta/NODES/actions/runs/45914152032/artifacts/15160604959",
+          "size_in_bytes": 13795087,
+          "digest": "sha256:e994605d3f4639de11c31915b016921fcfb5f792c2415c6e4aa7d813864c68cc",
+          "expires_at": "2026-12-11T00:04:01Z",
+          "source_head": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+          "local_archive_sha256": "e994605d3f4639de11c31915b016921fcfb5f792c2415c6e4aa7d813864c68cc",
+          "github_digest_matches": true,
+          "build_info": "NODES development build\nCommit: bf88af4c964e03ad877e5a36ea0f50185664d4c4\nTarget: x86_64-unknown-linux-gnu\nGUI and physical 3D printing validation are separate from CI.\n",
+          "binaries": {
+            "Morphlet": {
+              "bytes": 19283944,
+              "sha256": "0e24b5ffce6059cd984565462fddabe639855f8159a7ffe6449c6a52856eb3d2",
+              "format": "ELF",
+              "executed": false
+            },
+            "nodes-cli": {
+              "bytes": 5490792,
+              "sha256": "8a3c50ba9257bfa8e01fa30694404e91cba99a135d2df6526cd08c86b8eccff1",
+              "format": "ELF",
+              "executed": false
+            }
+          },
+          "archive_paths_checked": true,
+          "content_file_count": 487,
+          "binaries_executed": false
+        }
+      ],
+      "limitations": [
+        "Validation applies to source 0aa286a and its identical PR merge tree. Later source checkpoints have separate records.",
+        "The three opt-in benchmarks were ignored by this CI test invocation.",
+        "Downloaded artifacts were inspected and hashed but not executed by this CI audit. Native GUI and physical printing validation are separate."
+      ],
+      "evidence_urls": [
+        "https://api.github.com/repos/07egta/NODES/pulls/16",
+        "https://api.github.com/repos/07egta/NODES/git/commits/0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+        "https://api.github.com/repos/07egta/NODES/git/commits/bf88af4c964e03ad877e5a36ea0f50185664d4c4",
+        "https://api.github.com/repos/07egta/NODES/actions/runs/45914152032",
+        "https://api.github.com/repos/07egta/NODES/actions/runs/45914152032/jobs?per_page=100",
+        "https://api.github.com/repos/07egta/NODES/actions/runs/45914152032/artifacts"
+      ],
+      "platform_test_difference": {
+        "unix_only_tests": [
+          "cli_workflows::fifo_projects_return_json_errors_without_waiting_for_a_writer",
+          "part_io_regressions::fifo_parts_are_rejected_without_waiting_for_a_writer"
+        ],
+        "note": "Two Unix-only FIFO tests are excluded on Windows; compare the observed platform totals with this scope."
+      },
+      "ignored_tests": [
+        "canvas::perf::benchmark_canvas_pan",
+        "benchmark_sparse_slider_edit",
+        "audit_stress"
+      ],
+      "deployment_checks": {
+        "windows_runtime": {
+          "artifact_id": 15161918291,
+          "inspection": "GNU objdump -p on the hash-verified release executables; neither executable was run",
+          "binaries_with_vcruntime140_import": [
+            "Morphlet.exe",
+            "nodes-cli.exe"
+          ],
+          "bundled_dlls": [],
+          "required_runtime_availability": "The target system must provide a compatible VCRUNTIME140.dll. The Microsoft Visual C++ v14 x64 Redistributable supplies the runtime; existing installations may already meet this requirement.",
+          "fresh_windows11_startup_verified": false,
+          "transitive_or_dynamically_loaded_dll_audit": false,
+          "user_guide": "docs/WINDOWS_RUNTIME.md",
+          "primary_sources": [
+            "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist",
+            "https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute"
+          ]
+        }
+      }
+    },
+    {
+      "observed_at": "2026-11-27T00:32:29Z",
+      "repository": "07egta/NODES",
+      "pull_request": {
+        "number": 16,
+        "url": "https://github.com/07egta/NODES/pull/16",
+        "head_ref": "feat/nodes-omega-geometry",
+        "head_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
+        "base_ref": "feat/rhino-modeling-and-latency",
+        "base_sha": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+        "merge_commit_sha": "9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+        "merged": false
+      },
+      "source_identity": {
+        "head_tree_sha": "d541b1b6e05378003f0ad87ffc384287e787252e",
+        "merge_tree_sha": "d541b1b6e05378003f0ad87ffc384287e787252e",
+        "trees_equal": true,
+        "merge_parents": [
+          "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+          "25f981b794e3e0f037cd664915ce144347b49f40"
+        ],
+        "head_parents": [
+          "0aa286a93a8b61f23ce691b1d15a025780ec1fc8"
+        ],
+        "checkout_commit_from_logs": "9e2507813f7ed929c74a3ed3beaea9a69fbf049c"
+      },
+      "workflow": {
+        "run_id": 45916077764,
+        "url": "https://github.com/07egta/NODES/actions/runs/45916077764",
+        "path": ".github/workflows/windows.yml",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "updated_at": "2026-11-27T00:30:11Z"
+      },
+      "jobs": [
+        {
+          "id": 140235510582,
+          "name": "linux",
+          "url": "https://github.com/07egta/NODES/actions/runs/45916077764/job/140235510582",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-27T00:19:51Z",
+          "completed_at": "2026-11-27T00:24:03Z",
+          "steps": [
+            {
+              "name": "Install Rust and quality tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-27T00:19:54Z",
+              "completed_at": "2026-11-27T00:20:04Z"
+            },
+            {
+              "name": "Install desktop build libraries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-27T00:20:04Z",
+              "completed_at": "2026-11-27T00:20:16Z"
+            },
+            {
+              "name": "Restore Rust cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-27T00:20:16Z",
+              "completed_at": "2026-11-27T00:20:43Z"
+            },
+            {
+              "name": "Record compiler",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-27T00:20:43Z",
+              "completed_at": "2026-11-27T00:20:43Z"
+            },
+            {
+              "name": "Check formatting",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-27T00:20:43Z",
+              "completed_at": "2026-11-27T00:20:43Z"
+            },
+            {
+              "name": "Test inventory and checkpoint scripts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-27T00:20:43Z",
+              "completed_at": "2026-11-27T00:20:44Z"
+            },
+            {
+              "name": "Audit exact dependency declarations",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-27T00:20:44Z",
+              "completed_at": "2026-11-27T00:20:44Z"
+            },
+            {
+              "name": "Check all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-27T00:20:44Z",
+              "completed_at": "2026-11-27T00:20:49Z"
+            },
+            {
+              "name": "Check Clippy warnings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-27T00:20:49Z",
+              "completed_at": "2026-11-27T00:20:54Z"
+            },
+            {
+              "name": "Test all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-27T00:20:54Z",
+              "completed_at": "2026-11-27T00:22:25Z"
+            },
+            {
+              "name": "Build Linux desktop and console applications",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-27T00:22:25Z",
+              "completed_at": "2026-11-27T00:23:56Z"
+            },
+            {
+              "name": "Prepare Linux development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-27T00:23:56Z",
+              "completed_at": "2026-11-27T00:23:57Z"
+            },
+            {
+              "name": "Upload Linux development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-27T00:23:57Z",
+              "completed_at": "2026-11-27T00:23:59Z"
+            }
+          ],
+          "tests": {
+            "passed": 523,
+            "failed": 0,
+            "ignored": 3,
+            "measured": 0,
+            "filtered": 0,
+            "targets": 48,
+            "nonempty_targets": 44
+          },
+          "python_tests": {
+            "passed": 17,
+            "failed": 0,
+            "suites": [
+              3,
+              6,
+              8
+            ]
+          },
+          "oracles": [
+            {
+              "name": "sum",
+              "reproduced_cases": 128
+            },
+            {
+              "name": "interpolation",
+              "reproduced_cases": 128
+            }
+          ],
+          "compiler": [
+            "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+            "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+          ],
+          "cargo_finished": [
+            "Finished `dev` profile [optimized + debuginfo] target(s) in 4.99s",
+            "Finished `dev` profile [optimized + debuginfo] target(s) in 4.84s",
+            "Finished `test` profile [optimized + debuginfo] target(s) in 1m 28s",
+            "Finished `release` profile [optimized] target(s) in 1m 31s"
+          ],
+          "duration_seconds": 252,
+          "checkout_commit_from_logs": "9e2507813f7ed929c74a3ed3beaea9a69fbf049c"
+        },
+        {
+          "id": 140236846326,
+          "name": "windows",
+          "url": "https://github.com/07egta/NODES/actions/runs/45916077764/job/140236846326",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-27T00:24:04Z",
+          "completed_at": "2026-11-27T00:30:10Z",
+          "steps": [
+            {
+              "name": "Install Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-27T00:24:14Z",
+              "completed_at": "2026-11-27T00:24:27Z"
+            },
+            {
+              "name": "Restore Rust cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-27T00:24:27Z",
+              "completed_at": "2026-11-27T00:24:53Z"
+            },
+            {
+              "name": "Record compiler",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-27T00:24:53Z",
+              "completed_at": "2026-11-27T00:24:55Z"
+            },
+            {
+              "name": "Test all targets",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-27T00:24:55Z",
+              "completed_at": "2026-11-27T00:27:44Z"
+            },
+            {
+              "name": "Build Windows desktop and console applications",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-27T00:27:44Z",
+              "completed_at": "2026-11-27T00:30:02Z"
+            },
+            {
+              "name": "Prepare development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-27T00:30:02Z",
+              "completed_at": "2026-11-27T00:30:03Z"
+            },
+            {
+              "name": "Upload Windows development artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-27T00:30:03Z",
+              "completed_at": "2026-11-27T00:30:06Z"
+            }
+          ],
+          "tests": {
+            "passed": 521,
+            "failed": 0,
+            "ignored": 3,
+            "measured": 0,
+            "filtered": 0,
+            "targets": 48,
+            "nonempty_targets": 44
+          },
+          "duration_seconds": 366,
+          "compiler": [
+            "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+            "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+          ],
+          "cargo_finished": [
+            "Finished `test` profile [optimized + debuginfo] target(s) in 2m 46s",
+            "Finished `release` profile [optimized] target(s) in 2m 17s"
+          ],
+          "checkout_commit_from_logs": "9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+          "rust_cache": "hit; explicitly recorded by the cache restore step"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 15163120765,
+          "name": "NODES-windows-x64-9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+          "url": "https://github.com/07egta/NODES/actions/runs/45916077764/artifacts/15163120765",
+          "size_in_bytes": 14623248,
+          "digest": "sha256:3637290463926c93d2652b335ab252ce7c475ca8d58a4f9e4412db368d9dce92",
+          "expires_at": "2026-12-11T00:30:03Z",
+          "source_head": "25f981b794e3e0f037cd664915ce144347b49f40",
+          "local_archive_sha256": "3637290463926c93d2652b335ab252ce7c475ca8d58a4f9e4412db368d9dce92",
+          "github_digest_matches": true,
+          "build_info": "NODES development build\r\nCommit: 9e2507813f7ed929c74a3ed3beaea9a69fbf049c\r\nTarget: x86_64-pc-windows-msvc\r\nCompiler: rustc 1.100.0 (0ef1bc386 2026-11-09)\r\nBuild: cargo build --release --locked --bins\r\nTests: cargo test --all-targets --locked (Windows and Linux)\r\nThis CI artifact has not been validated by GUI or 3D-print hardware testing.\r\nLicense audit scope and unresolved items: docs/DEPENDENCIES.md\r\n",
+          "binaries": {
+            "Morphlet.exe": {
+              "bytes": 18556416,
+              "sha256": "140915ee7fc0bd7dd514066488bd5a6ccd52e3a21dd15ec7997d063519d4eb83",
+              "executed": false,
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows GUI",
+              "direct_import_dlls": [
+                "ADVAPI32.dll",
+                "GDI32.dll",
+                "KERNEL32.dll",
+                "OPENGL32.dll",
+                "USER32.dll",
+                "VCRUNTIME140.dll",
+                "api-ms-win-core-synch-l1-2-0.dll",
+                "api-ms-win-crt-heap-l1-1-0.dll",
+                "api-ms-win-crt-locale-l1-1-0.dll",
+                "api-ms-win-crt-math-l1-1-0.dll",
+                "api-ms-win-crt-runtime-l1-1-0.dll",
+                "api-ms-win-crt-stdio-l1-1-0.dll",
+                "api-ms-win-crt-string-l1-1-0.dll",
+                "bcryptprimitives.dll",
+                "dwmapi.dll",
+                "gdi32.dll",
+                "imm32.dll",
+                "kernel32.dll",
+                "ntdll.dll",
+                "ole32.dll",
+                "shell32.dll",
+                "shlwapi.dll",
+                "user32.dll",
+                "uxtheme.dll"
+              ]
+            },
+            "nodes-cli.exe": {
+              "bytes": 5894656,
+              "sha256": "5230e4ae208a447f4f5f7952472d546e52ef83e0e09d32e80cf198185b541fe5",
+              "executed": false,
+              "format": "PE32+ x86_64",
+              "subsystem": "Windows Console",
+              "direct_import_dlls": [
+                "KERNEL32.dll",
+                "VCRUNTIME140.dll",
+                "api-ms-win-core-synch-l1-2-0.dll",
+                "api-ms-win-crt-heap-l1-1-0.dll",
+                "api-ms-win-crt-locale-l1-1-0.dll",
+                "api-ms-win-crt-math-l1-1-0.dll",
+                "api-ms-win-crt-runtime-l1-1-0.dll",
+                "api-ms-win-crt-stdio-l1-1-0.dll",
+                "api-ms-win-crt-string-l1-1-0.dll",
+                "bcryptprimitives.dll",
+                "ntdll.dll"
+              ]
+            }
+          },
+          "archive_paths_checked": true,
+          "content_file_count": 500,
+          "binaries_executed": false
+        },
+        {
+          "id": 15162711183,
+          "name": "NODES-linux-x64-9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+          "url": "https://github.com/07egta/NODES/actions/runs/45916077764/artifacts/15162711183",
+          "size_in_bytes": 14366800,
+          "digest": "sha256:fc568fa66d30d8b4922c86820c7aeac1ed1bce551a84556b7d80bc10e61c413f",
+          "expires_at": "2026-12-11T00:23:57Z",
+          "source_head": "25f981b794e3e0f037cd664915ce144347b49f40",
+          "local_archive_sha256": "fc568fa66d30d8b4922c86820c7aeac1ed1bce551a84556b7d80bc10e61c413f",
+          "github_digest_matches": true,
+          "build_info": "NODES development build\nCommit: 9e2507813f7ed929c74a3ed3beaea9a69fbf049c\nTarget: x86_64-unknown-linux-gnu\nGUI and physical 3D printing validation are separate from CI.\n",
+          "binaries": {
+            "Morphlet": {
+              "bytes": 19284912,
+              "sha256": "1f0c96a1582eab16621f75e9bf9b95fcae215ace6e0059fdb675e19be11dc5ce",
+              "format": "ELF",
+              "executed": false
+            },
+            "nodes-cli": {
+              "bytes": 5490792,
+              "sha256": "8a3c50ba9257bfa8e01fa30694404e91cba99a135d2df6526cd08c86b8eccff1",
+              "format": "ELF",
+              "executed": false
+            }
+          },
+          "archive_paths_checked": true,
+          "content_file_count": 500,
+          "binaries_executed": false
+        }
+      ],
+      "limitations": [
+        "Validation applies to source 25f981b and its identical PR merge tree. Subsequent pending-preview changes require a separate record.",
+        "The three opt-in benchmarks were ignored by this CI invocation.",
+        "Both downloaded development artifacts were inspected and hashed, but neither executable was run by this audit. Native GUI and physical printing validation are separate.",
+        "The Windows packages depend on VCRUNTIME140.dll and do not bundle it; first launch on a fresh Windows 11 system remains unverified."
+      ],
+      "evidence_urls": [
+        "https://api.github.com/repos/07egta/NODES/git/commits/25f981b794e3e0f037cd664915ce144347b49f40",
+        "https://api.github.com/repos/07egta/NODES/git/commits/9e2507813f7ed929c74a3ed3beaea9a69fbf049c",
+        "https://api.github.com/repos/07egta/NODES/actions/runs/45916077764",
+        "https://api.github.com/repos/07egta/NODES/actions/runs/45916077764/jobs?per_page=100"
+      ],
+      "ignored_tests": [
+        "canvas::perf::benchmark_canvas_pan",
+        "benchmark_sparse_slider_edit",
+        "audit_stress"
+      ],
+      "platform_test_difference": {
+        "unix_only_tests": [
+          "cli_workflows::fifo_projects_return_json_errors_without_waiting_for_a_writer",
+          "part_io_regressions::fifo_parts_are_rejected_without_waiting_for_a_writer"
+        ],
+        "note": "Two Unix-only FIFO tests are excluded on Windows; compare the observed platform totals with this scope."
+      },
+      "deployment_checks": {
+        "windows_runtime": {
+          "artifact_id": 15163120765,
+          "inspection": "GNU objdump -p on both hash-verified executables; neither executable was run",
+          "binaries_with_vcruntime140_import": [
+            "Morphlet.exe",
+            "nodes-cli.exe"
+          ],
+          "bundled_dlls": [],
+          "fresh_windows11_startup_verified": false,
+          "transitive_or_dynamically_loaded_dll_audit": false,
+          "user_guide": "docs/WINDOWS_RUNTIME.md",
+          "primary_sources": [
+            "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist",
+            "https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute"
+          ]
+        }
+      }
+    }
+  ],
+  "earlier_runs": [
+    {
+      "id": 45913568295,
+      "url": "https://github.com/07egta/NODES/actions/runs/45913568295",
+      "head_sha": "b8f2f14f05cca4c6739aaf198289113aa299bf59",
+      "conclusion": "failure",
+      "failure_detail": {
+        "job_id": 140227423850,
+        "failed_step": "Check Clippy warnings",
+        "error": "items_after_test_module",
+        "file": "src/stl_export.rs",
+        "resolution": "The batch_commit_tests module was moved to the file end in 0aa286a. The current head must pass its own CI; older failure does not describe the current head."
+      }
+    },
+    {
+      "id": 45913435232,
+      "url": "https://github.com/07egta/NODES/actions/runs/45913435232",
+      "head_sha": "9a4ae055632aa354ce14ab12e6a2b1bf6647cbf9",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45912506527,
+      "url": "https://github.com/07egta/NODES/actions/runs/45912506527",
+      "head_sha": "f65dd28ab97c9ded4ee9c37279ba147d60e66725",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45912327563,
+      "url": "https://github.com/07egta/NODES/actions/runs/45912327563",
+      "head_sha": "7022987090429027d5a629c748fda78905d2594c",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45912089597,
+      "url": "https://github.com/07egta/NODES/actions/runs/45912089597",
+      "head_sha": "55c72c425384221f0c77ea1eca33b83852d2f772",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45911864816,
+      "url": "https://github.com/07egta/NODES/actions/runs/45911864816",
+      "head_sha": "cd8caac98bc6449ee6b12e40de23e0d73430fd61",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45911662548,
+      "url": "https://github.com/07egta/NODES/actions/runs/45911662548",
+      "head_sha": "996d76defd61bc55ec6001ccb5dc2fdf67c98bd0",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45910950952,
+      "url": "https://github.com/07egta/NODES/actions/runs/45910950952",
+      "head_sha": "77a3e78871ef2c6d1d7c89e2d20331bfea844db9",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45910577841,
+      "url": "https://github.com/07egta/NODES/actions/runs/45910577841",
+      "head_sha": "829982f637de17b3c6cd868f06e1aa5e2ba950f1",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 45910097089,
+      "url": "https://github.com/07egta/NODES/actions/runs/45910097089",
+      "head_sha": "e7ecc7500ede295186b0cccf3d62f34da250ac9c",
+      "conclusion": "cancelled"
+    }
+  ],
+  "resume": {
+    "status": "completed_for_latest_record",
+    "source_sha": "25f981b794e3e0f037cd664915ce144347b49f40",
+    "run_id": 45916077764,
+    "next_action": "For the next published source, add a separate record with its head and merge tree, job logs and independently verified artifacts; preserve both completed records.",
+    "local_log_parser": "/tmp/nodes-ci-parse.py",
+    "local_artifact_inspector": "/tmp/nodes-ci-inspect-artifact.py"
+  },
+  "limitations": [
+    "Each record is scoped to its exact source and PR merge tree.",
+    "Cancelled older runs are not test failures.",
+    "A development artifact built with the release profile is not a stable product release or a guarantee of print success."
+  ],
+  "latest_successful_ci_source_sha": "25f981b794e3e0f037cd664915ce144347b49f40"
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "name": "精密立体：箱の共通部分",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "brep_box",
+        "name": "B-rep 箱",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 40,
+          "depth": 30,
+          "height": 20
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "brep_move",
+        "name": "B-rep 移動",
+        "position": [
+          270,
+          30
+        ],
+        "params": {
+          "x": 15,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "solid": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "brep_intersection",
+        "name": "B-rep 共通部分",
+        "position": [
+          520,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "solid": 0,
+          "other": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "brep_volume",
+        "name": "体積",
+        "position": [
+          20,
+          290
+        ],
+        "params": {},
+        "inputs": {
+          "solid": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "brep_mesh",
+        "name": "明示的メッシュ化",
+        "position": [
+          270,
+          290
+        ],
+        "params": {},
+        "inputs": {
+          "solid": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          520,
+          290
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 6
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.9
+}

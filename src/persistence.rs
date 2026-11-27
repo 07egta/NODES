@@ -5,6 +5,7 @@
 
 use crate::model::{Graph, Mesh, Tree, Value};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Read, Write};
@@ -21,6 +22,7 @@ const WELD_QUANTIZATION: f64 = 1.0e6;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Project {
     pub schema_version: u32,
     pub name: String,
@@ -47,12 +49,7 @@ impl Project {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != SCHEMA_VERSION {
-            return Err(format!(
-                "この作品は形式 v{} です。このアプリで読める形式は v{} です。",
-                self.schema_version, SCHEMA_VERSION
-            ));
-        }
+        check_schema_version(self.schema_version)?;
         if self.name.len() > 1024 || self.name.chars().any(|c| c == '\0') {
             return Err("作品名が長すぎるか、使えない文字が含まれています。".into());
         }
@@ -66,40 +63,103 @@ impl Project {
     }
 }
 
+fn check_schema_version(version: u32) -> Result<(), String> {
+    if version != SCHEMA_VERSION {
+        return Err(format!(
+            "この作品は形式 v{} です。このアプリで読める形式は v{} です。",
+            version, SCHEMA_VERSION
+        ));
+    }
+    Ok(())
+}
+
+fn parse_error(e: serde_json::Error) -> String {
+    let detail: String = e.to_string().chars().take(300).collect();
+    format!(
+        "作品の内容を読み取れませんでした（{} 行目）: {}",
+        e.line(),
+        detail
+    )
+}
+
 /// Read into a separate value. The caller only replaces its open project on success.
 pub fn load(path: &Path) -> Result<Project, String> {
+    let metadata = fs::metadata(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !metadata.is_file() {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let file = File::open(path).map_err(|e| format!("作品を開けませんでした: {e}"))?;
+    if !file
+        .metadata()
+        .map_err(|e| format!("作品を開けませんでした: {e}"))?
+        .is_file()
+    {
+        return Err("作品には通常のファイルを指定してください。".into());
+    }
     let mut bytes = Vec::new();
     file.take((MAX_PROJECT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .map_err(|e| format!("作品を読み込めませんでした: {e}"))?;
+    decode_project(&bytes)
+}
+
+/// Decode a bounded v1 project without silently discarding unknown fields.
+/// Future versions are reported before interpreting their graph; callers must
+/// leave the original file untouched on error.
+pub fn decode_project(bytes: &[u8]) -> Result<Project, String> {
     if bytes.len() > MAX_PROJECT_BYTES {
         return Err("作品ファイルが大きすぎます。上限は 8 MB です。".into());
     }
-    let project: Project = serde_json::from_slice(&bytes).map_err(|e| {
-        let detail: String = e.to_string().chars().take(300).collect();
-        format!(
-            "作品の内容を読み取れませんでした（{} 行目）: {}",
-            e.line(),
-            detail
-        )
-    })?;
+    #[derive(Deserialize)]
+    struct Header {
+        schema_version: u32,
+    }
+    // Read only the envelope first so future schemas get an explicit version error.
+    let header: Header = serde_json::from_slice(bytes).map_err(parse_error)?;
+    check_schema_version(header.schema_version)?;
+    let mut project: Project = serde_json::from_slice(bytes).map_err(parse_error)?;
+    crate::compatibility::normalize_legacy_inputs(&mut project.graph)?;
     project.validate()?;
     Ok(project)
 }
 
-pub fn save(path: &Path, project: &Project) -> Result<(), String> {
-    project.validate()?;
-    let mut bytes = serde_json::to_vec_pretty(project)
-        .map_err(|e| format!("作品を保存形式に変換できませんでした: {e}"))?;
-    bytes.push(b'\n');
-    if bytes.len() > MAX_PROJECT_BYTES {
-        return Err("作品ファイルが大きすぎます。上限は 8 MB です。".into());
-    }
-    atomic_write(path, |file| file.write_all(&bytes))
+/// Streaming limit: reject a large project while serializing into its temporary
+/// file, rather than building an unbounded pretty-printed byte vector in RAM.
+struct ProjectWriter<W> {
+    inner: W,
+    remaining: usize,
 }
 
-fn atomic_write(
+impl<W: Write> Write for ProjectWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() > self.remaining {
+            return Err(std::io::Error::other(
+                "作品ファイルが大きすぎます。上限は 8 MB です。",
+            ));
+        }
+        let written = self.inner.write(bytes)?;
+        self.remaining -= written;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+pub fn save(path: &Path, project: &Project) -> Result<(), String> {
+    project.validate()?;
+    atomic_write(path, |file| {
+        let mut bounded = ProjectWriter {
+            inner: file,
+            remaining: MAX_PROJECT_BYTES,
+        };
+        serde_json::to_writer_pretty(&mut bounded, project).map_err(std::io::Error::other)?;
+        bounded.write_all(b"\n")
+    })
+}
+
+pub(crate) fn atomic_write(
     path: &Path,
     write: impl FnOnce(&mut BufWriter<File>) -> std::io::Result<()>,
 ) -> Result<(), String> {
@@ -166,6 +226,29 @@ fn atomic_write(
     Ok(())
 }
 
+/// Compare parameter representations as well as their numeric values.
+///
+/// Graph/Project retain ordinary structural PartialEq. Editor and history checks
+/// supplement it with this comparison because +0 and -0 are equal numerically
+/// but produce different branch-cut results and evaluator cache identities.
+/// This also checks parameters inside saved cluster definitions, without
+/// allocating or serializing the graph. Use it alongside the structural checks.
+pub fn same_parameter_bits(a: &Graph, b: &Graph) -> bool {
+    a.nodes.len() == b.nodes.len()
+        && a.clusters.len() == b.clusters.len()
+        && a.nodes.iter().zip(&b.nodes).all(|(a, b)| {
+            a.params.len() == b.params.len()
+                && a.params
+                    .iter()
+                    .zip(&b.params)
+                    .all(|((ak, av), (bk, bv))| ak == bk && av.to_bits() == bv.to_bits())
+        })
+        && a.clusters
+            .iter()
+            .zip(&b.clusters)
+            .all(|(a, b)| same_parameter_bits(&a.graph, &b.graph))
+}
+
 /// Call checkpoint immediately before an actual document edit.
 #[derive(Default)]
 pub struct History {
@@ -175,8 +258,19 @@ pub struct History {
 
 impl History {
     pub fn checkpoint(&mut self, project: &Project) {
-        if self.undo.last() != Some(project) {
-            self.undo.push(project.clone());
+        self.store_checkpoint(Cow::Borrowed(project));
+    }
+
+    /// Accept a pre-edit snapshot that the editor no longer needs to retain.
+    pub fn checkpoint_owned(&mut self, project: Project) {
+        self.store_checkpoint(Cow::Owned(project));
+    }
+
+    fn store_checkpoint(&mut self, project: Cow<'_, Project>) {
+        if self.undo.last().is_none_or(|previous| {
+            previous != project.as_ref() || !same_parameter_bits(&previous.graph, &project.graph)
+        }) {
+            self.undo.push(project.into_owned());
             if self.undo.len() > HISTORY_LIMIT {
                 self.undo.remove(0);
             }
@@ -219,7 +313,11 @@ pub struct ExportReport {
     /// Edges incident to one triangle, after coordinate welding at 0.000001 mm.
     pub open_edges: usize,
     pub non_manifold_edges: usize,
+    /// Welded vertices whose incident faces do not form one manifold fan.
+    pub non_manifold_vertices: usize,
     pub inconsistent_edges: usize,
+    /// Repeated non-degenerate faces after welding, including opposite winding.
+    pub duplicate_faces: usize,
     pub degenerate_triangles: usize,
     pub mesh_count: usize,
     pub signed_volume_mm3: f64,
@@ -228,11 +326,16 @@ pub struct ExportReport {
 }
 
 impl ExportReport {
+    /// Closed, consistently oriented manifold topology after coordinate welding.
+    /// Does not establish absence of self-intersections, correct shell nesting,
+    /// material volume, wall thickness, or printability.
     pub fn is_closed(&self) -> bool {
         self.triangles > 0
             && self.open_edges == 0
             && self.non_manifold_edges == 0
+            && self.non_manifold_vertices == 0
             && self.inconsistent_edges == 0
+            && self.duplicate_faces == 0
             && self.degenerate_triangles == 0
     }
 }
@@ -271,7 +374,7 @@ pub fn mesh_stats(trees: &[Tree]) -> Result<ExportReport, String> {
         ..ExportReport::default()
     };
     let mut welded: HashMap<[i64; 3], usize> = HashMap::new();
-    let mut edges: HashMap<(usize, usize), (u32, i32)> = HashMap::new();
+    let mut faces = Vec::with_capacity(all_meshes.iter().map(|mesh| mesh.triangles.len()).sum());
     let mut minimum = [f64::INFINITY; 3];
     let mut maximum = [f64::NEG_INFINITY; 3];
     for mesh in all_meshes {
@@ -319,29 +422,18 @@ pub fn mesh_stats(trees: &[Tree]) -> Result<ExportReport, String> {
                 sub(a, volume_origin),
                 cross(sub(b, volume_origin), sub(c, volume_origin)),
             ) / 6.0;
-            for (from, to) in [(wa, wb), (wb, wc), (wc, wa)] {
-                let (key, direction) = if from < to {
-                    ((from, to), 1)
-                } else {
-                    ((to, from), -1)
-                };
-                let edge = edges.entry(key).or_insert((0, 0));
-                edge.0 = edge.0.saturating_add(1);
-                edge.1 += direction;
-            }
+            // The aggregate export budget is 2m vertices, well within u32.
+            // Analyse all meshes together: their welded vertices can touch even
+            // when every separately indexed source is individually manifold.
+            faces.push([wa as u32, wb as u32, wc as u32]);
         }
     }
-    for (count, direction) in edges.values() {
-        if *count == 1 {
-            report.open_edges += 1;
-        }
-        if *count > 2 {
-            report.non_manifold_edges += 1;
-        }
-        if *count == 2 && *direction != 0 {
-            report.inconsistent_edges += 1;
-        }
-    }
+    let topology = crate::mesh_fabrication::audit_topology(welded.len(), &faces, &|| false)?;
+    report.open_edges = topology.boundary_edges;
+    report.non_manifold_edges = topology.non_manifold_edges;
+    report.non_manifold_vertices = topology.non_manifold_vertices;
+    report.inconsistent_edges = topology.orientation_conflicts;
+    report.duplicate_faces = topology.duplicate_faces;
     if minimum.iter().all(|v| v.is_finite()) {
         report.bounds = Some([minimum, maximum]);
     }
@@ -395,7 +487,7 @@ pub fn export_stl(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
     }
     atomic_write(path, |file| {
         let mut header = [0u8; 80];
-        let label = b"Morphlet binary STL | units: millimeters | mesh geometry";
+        let label = b"NODES binary STL | units: millimeters | mesh geometry";
         header[..label.len()].copy_from_slice(label);
         file.write_all(&header)?;
         file.write_all(&(report.triangles as u32).to_le_bytes())?;
@@ -428,13 +520,15 @@ pub fn export_obj(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
     atomic_write(path, |file| {
         writeln!(
             file,
-            "# Morphlet OBJ\n# Units: millimeters\n# Triangulated mesh geometry"
+            "# NODES OBJ\n# Units: millimeters\n# Triangulated mesh geometry"
         )?;
         let mut offset = 1usize;
         for (object, mesh) in all_meshes.iter().enumerate() {
-            writeln!(file, "o Morphlet_{}", object + 1)?;
+            writeln!(file, "o NODES_{}", object + 1)?;
             for point in &mesh.vertices {
-                writeln!(file, "v {:.9} {:.9} {:.9}", point[0], point[1], point[2])?;
+                // Preserve the validated binary64 coordinates on text round-trip.
+                // Fixed decimals can flatten valid thin triangles after checking.
+                writeln!(file, "v {} {} {}", point[0], point[1], point[2])?;
             }
             for t in &mesh.triangles {
                 writeln!(

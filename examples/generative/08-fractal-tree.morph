@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "フラクタルツリー",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "fractal_tree",
+        "name": "再帰的な枝",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "length": 38,
+          "angle": 27,
+          "ratio": 0.72,
+          "depth": 8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

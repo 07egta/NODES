@@ -1,0 +1,41 @@
+2026-11-27T00:47:25.1528152Z running 4 tests
+2026-11-27T00:47:25.1534631Z test zero_invalid_and_cancelled_angle_inputs_still_fail ... ok
+2026-11-27T00:47:25.1535327Z test near_parallel_integer_vectors_retain_their_nonzero_angle ... ok
+2026-11-27T00:47:25.1544458Z test native_angle_nodes_preserve_grafted_paths_broadcasting_and_cache ... ok
+2026-11-27T00:47:25.3310462Z test independent_scaling_and_subnormal_directions_preserve_angles ... FAILED
+2026-11-27T00:47:25.3311124Z 
+2026-11-27T00:47:25.3311321Z failures:
+2026-11-27T00:47:25.3311550Z 
+2026-11-27T00:47:25.3311926Z ---- independent_scaling_and_subnormal_directions_preserve_angles stdout ----
+2026-11-27T00:47:25.3312514Z 
+2026-11-27T00:47:25.3313554Z thread 'independent_scaling_and_subnormal_directions_preserve_angles' (4496) panicked at tests\vector_angle_regressions.rs:79:5:
+2026-11-27T00:47:25.3314682Z assertion `left == right` failed
+2026-11-27T00:47:25.3315181Z   left: 0
+2026-11-27T00:47:25.3315506Z  right: 1
+2026-11-27T00:47:25.3315818Z stack backtrace:
+2026-11-27T00:47:25.3316216Z    0: std::panicking::panic_handler
+2026-11-27T00:47:25.3316833Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/std\src\panicking.rs:676
+2026-11-27T00:47:25.3317886Z    1: core::panicking::panic_fmt
+2026-11-27T00:47:25.3318370Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core\src\panicking.rs:80
+2026-11-27T00:47:25.3318886Z    2: core::panicking::assert_failed_inner
+2026-11-27T00:47:25.3319382Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core\src\panicking.rs:452
+2026-11-27T00:47:25.3320169Z    3: core::panicking::assert_failed<u64,u64>
+2026-11-27T00:47:25.3320672Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core\src\panicking.rs:407
+2026-11-27T00:47:25.3321306Z    4: vector_angle_regressions::independent_scaling_and_subnormal_directions_preserve_angles
+2026-11-27T00:47:25.3321813Z              at .\tests\vector_angle_regressions.rs:79
+2026-11-27T00:47:25.3322507Z    5: vector_angle_regressions::independent_scaling_and_subnormal_directions_preserve_angles::closure$0
+2026-11-27T00:47:25.3323258Z              at .\tests\vector_angle_regressions.rs:55
+2026-11-27T00:47:25.3324029Z    6: core::ops::function::FnOnce::call_once<vector_angle_regressions::independent_scaling_and_subnormal_directions_preserve_angles::closure_env$0,tuple$<> >
+2026-11-27T00:47:25.3324930Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core\src\ops\function.rs:250
+2026-11-27T00:47:25.3325440Z    7: core::ops::function::FnOnce::call_once
+2026-11-27T00:47:25.3325921Z              at /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core\src\ops\function.rs:250
+2026-11-27T00:47:25.3326694Z note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+2026-11-27T00:47:25.3327051Z 
+2026-11-27T00:47:25.3327055Z 
+2026-11-27T00:47:25.3327137Z failures:
+2026-11-27T00:47:25.3327436Z     independent_scaling_and_subnormal_directions_preserve_angles
+2026-11-27T00:47:25.3327723Z 
+2026-11-27T00:47:25.3327979Z test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+2026-11-27T00:47:25.3328358Z 
+2026-11-27T00:47:25.3358542Z [1m[91merror[0m: test failed, to rerun pass `--test vector_angle_regressions`
+2026-11-27T00:47:25.4356133Z ##[error]Process completed with exit code 1.

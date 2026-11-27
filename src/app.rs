@@ -1,21 +1,33 @@
 use crate::file_picker::{FilePicker, FileTask, PickerEvent};
+use crate::stl_export_ui::{self, StlExportUi, StlSources, UiRequest};
 use crate::{
     canvas::GraphCanvas,
+    data_view,
+    diagnostics_ui::DiagnosticsWindow,
+    gcode_ui::GcodeDialog,
+    help::HelpWindow,
+    melt, node_icons,
+    node_shelf::{self, ShelfAction},
     theme,
+    ui_polish::{self, Recent},
     viewport::{PreviewItem, Viewport},
 };
-use eframe::egui::{self, Align, Color32, FontId, Layout, RichText, Sense, Stroke};
-use morphlet::{
+use eframe::egui::{self, Align, Color32, FontId, Layout, Rect, RichText, Sense, Stroke};
+use nodes::{
+    annotations, cluster,
+    diagnostics::{self, DiagnosticReport},
     engine::{Evaluation, Evaluator},
-    model::{Graph, NodeKind, Tree, Value},
+    gcode,
+    latest_channel::{self, LatestReceiver, LatestSender},
+    model::{DataType, Graph, InputSpec, Node, NodeId, NodeKind, Tree},
     persistence::{self, History, Project},
     templates,
 };
-use std::path::PathBuf;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
-    mpsc,
 };
 use std::time::{Duration, Instant};
 
@@ -26,32 +38,47 @@ struct ComputeRequest {
 struct ComputeResult {
     revision: u64,
     evaluation: Evaluation,
+    diagnostics: DiagnosticReport,
 }
 struct Worker {
-    sender: mpsc::Sender<ComputeRequest>,
-    receiver: mpsc::Receiver<ComputeResult>,
+    sender: LatestSender<ComputeRequest>,
+    receiver: LatestReceiver<ComputeResult>,
     latest: Arc<AtomicU64>,
 }
 impl Worker {
     fn new(ctx: egui::Context) -> Self {
-        let (sender, requests) = mpsc::channel::<ComputeRequest>();
-        let (results, receiver) = mpsc::channel();
+        let (sender, requests) = latest_channel::channel::<ComputeRequest>();
+        let (results, receiver) = latest_channel::channel::<ComputeResult>();
         let latest = Arc::new(AtomicU64::new(0));
         let revision = latest.clone();
         std::thread::spawn(move || {
             let mut evaluator = Evaluator::default();
-            while let Ok(mut request) = requests.recv() {
-                while let Ok(newer) = requests.try_recv() {
-                    request = newer;
+            while let Ok(request) = requests.recv() {
+                if revision.load(Ordering::Relaxed) != request.revision {
+                    continue;
                 }
                 let result = evaluator.evaluate(&request.graph, &|| {
                     revision.load(Ordering::Relaxed) != request.revision
                 });
                 if !result.cancelled && revision.load(Ordering::Relaxed) == request.revision {
+                    // Derive diagnostics once from the matching graph snapshot, away
+                    // from the UI thread. Stop obsolete analysis so a newer edit can
+                    // reach the evaluator without waiting for the whole report.
+                    let Some(diagnostics) =
+                        diagnostics::diagnose_cancellable(&request.graph, &result, || {
+                            revision.load(Ordering::Relaxed) != request.revision
+                        })
+                    else {
+                        continue;
+                    };
+                    if revision.load(Ordering::Relaxed) != request.revision {
+                        continue;
+                    }
                     if results
                         .send(ComputeResult {
                             revision: request.revision,
                             evaluation: result,
+                            diagnostics,
                         })
                         .is_err()
                     {
@@ -68,6 +95,12 @@ impl Worker {
         }
     }
 }
+impl Drop for Worker {
+    fn drop(&mut self) {
+        // Cooperatively cancel active evaluation/diagnosis when the UI is destroyed.
+        self.latest.fetch_add(1, Ordering::Relaxed);
+    }
+}
 
 #[derive(Clone)]
 enum PendingAction {
@@ -77,13 +110,15 @@ enum PendingAction {
     Exit,
 }
 
-pub struct MorphletApp {
+pub struct NodesApp {
     project: Project,
     history: History,
     canvas: GraphCanvas,
     viewport: Viewport,
     worker: Worker,
     evaluation: Option<Evaluation>,
+    diagnostics: Option<DiagnosticReport>,
+    diagnostics_window: DiagnosticsWindow,
     revision: u64,
     result_revision: u64,
     pending_compute: bool,
@@ -93,19 +128,31 @@ pub struct MorphletApp {
     after_save: Option<PendingAction>,
     dirty: bool,
     search: String,
+    palette_query: String,
+    palette_ime: bool,
     category: String,
+    library_filter: u8,
+    favorites: BTreeSet<NodeKind>,
+    show_library: bool,
+    show_workspace: bool,
+    clipboard: Vec<Node>,
     palette_open: bool,
     palette_focus: bool,
     palette_position: [f32; 2],
     template_open: bool,
     help_open: bool,
-    export_open: bool,
-    export_stats: Option<Result<persistence::ExportReport, String>>,
+    /// Advanced: G-code (vase mode) from the その他の書き出し menu.
+    gcode: GcodeDialog,
+    /// The Gコード書き出し node whose file the picker is choosing.
+    gcode_node: Option<NodeId>,
+    stl_export: StlExportUi,
     toast: Option<(String, bool, Instant)>,
     confirm_action: Option<PendingAction>,
     allow_close: bool,
     preview_mode: u8,
-    gesture_before: Option<Project>,
+    /// Completed evaluation represented by the viewport, including an empty scene.
+    preview_revision: Option<u64>,
+    edits: EditTracker,
     last_autosave: Instant,
     recovery: Option<Project>,
     ui_scale: f32,
@@ -113,15 +160,38 @@ pub struct MorphletApp {
     started: Instant,
     screenshot_requested: bool,
     suppress_history: bool,
+    /// Cluster definition waiting for a `.morphpart` file name.
+    part_target: Option<u64>,
+    /// Offline node dictionary (F1 / ?).
+    help_window: HelpWindow,
+    /// 値を見る window for the selected node.
+    values_open: bool,
+    /// ファイル読み込み node that the next picked mesh file is loaded into.
+    import_target: Option<NodeId>,
+    /// Node whose output wire was dropped on empty canvas; the search connects to it.
+    wire_source: Option<NodeId>,
+    /// Nodes added recently, shown first in the search popup.
+    recent: Recent,
+    /// Highlighted row of the search popup (↑ ↓ move it, Enter adds it).
+    palette_cursor: usize,
+    /// ショートカット一覧 window (?).
+    shortcuts_open: bool,
+    /// Selected theme (saved in the settings file).
+    theme_mode: theme::Mode,
+    /// Node shelf: tabs, favourites, and the drag / Space state.
+    shelf: node_shelf::Shelf,
+    /// Favourites and recent nodes as last written to the settings file.
+    saved_lists: (Vec<NodeKind>, Vec<NodeKind>),
 }
 
-impl MorphletApp {
+impl NodesApp {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         open_file: Option<PathBuf>,
         screenshot: Option<PathBuf>,
     ) -> Self {
-        theme::configure(&cc.egui_ctx);
+        let theme_mode = ui_polish::load_theme();
+        theme::configure(&cc.egui_ctx, theme_mode);
         let mut project = templates::create(0);
         let mut file_path = None;
         let mut initial_error = None;
@@ -149,13 +219,24 @@ impl MorphletApp {
         } else {
             None
         };
+        let (mut favorites, saved_recent) = node_shelf::load_lists();
+        let loaded_favorites = ui_polish::load_favorites();
+        for kind in &loaded_favorites {
+            if !favorites.contains(kind) {
+                favorites.push(*kind);
+            }
+        }
+        let recent = node_shelf::recent_from_saved(&saved_recent);
         let mut app = Self {
+            edits: EditTracker::new(&project),
             project,
             history: History::default(),
             canvas,
             viewport: Viewport::default(),
             worker: Worker::new(cc.egui_ctx.clone()),
             evaluation: None,
+            diagnostics: None,
+            diagnostics_window: DiagnosticsWindow::default(),
             revision: 0,
             result_revision: u64::MAX,
             pending_compute: true,
@@ -165,19 +246,27 @@ impl MorphletApp {
             after_save: None,
             dirty: false,
             search: String::new(),
+            palette_query: String::new(),
+            palette_ime: false,
+            library_filter: 0,
+            favorites: favorites.iter().copied().collect(),
+            show_library: true,
+            show_workspace: true,
+            clipboard: Vec::new(),
             category: "すべて".into(),
             palette_open: false,
             palette_focus: false,
             palette_position: [0., 0.],
             template_open: false,
             help_open: false,
-            export_open: false,
-            export_stats: None,
+            gcode: GcodeDialog::default(),
+            gcode_node: None,
+            stl_export: StlExportUi::new(),
             toast: None,
             confirm_action: None,
             allow_close: false,
             preview_mode: 0,
-            gesture_before: None,
+            preview_revision: None,
             last_autosave: Instant::now(),
             recovery,
             ui_scale: 1.,
@@ -185,7 +274,19 @@ impl MorphletApp {
             started: Instant::now(),
             screenshot_requested: false,
             suppress_history: false,
+            part_target: None,
+            help_window: HelpWindow::default(),
+            values_open: false,
+            import_target: None,
+            wire_source: None,
+            recent,
+            palette_cursor: 0,
+            shortcuts_open: false,
+            theme_mode,
+            shelf: node_shelf::Shelf::new(favorites.clone()),
+            saved_lists: (favorites, saved_recent),
         };
+        app.canvas.hide_grid = ui_polish::read_setting("grid").is_some_and(|v| v == "off");
         if let Some(e) = initial_error {
             app.notify(e, true);
         }
@@ -201,13 +302,13 @@ impl MorphletApp {
         self.revision = self.revision.wrapping_add(1);
         self.worker.latest.store(self.revision, Ordering::Relaxed);
         self.pending_compute = true;
-        self.export_stats = None;
     }
     fn compute_tick(&mut self, ctx: &egui::Context) {
         while let Ok(result) = self.worker.receiver.try_recv() {
             if result.revision == self.revision {
                 self.result_revision = result.revision;
                 self.evaluation = Some(result.evaluation);
+                self.diagnostics = Some(result.diagnostics);
             }
         }
         if self.pending_compute && self.last_submit.elapsed() >= Duration::from_millis(35) {
@@ -234,6 +335,19 @@ impl MorphletApp {
             ctx.request_repaint_after(Duration::from_millis(40));
         }
     }
+    /// The G-code job a node produced, once the evaluation is up to date.
+    fn gcode_node_job(&self, id: NodeId) -> Result<Arc<nodes::gcode_job::GcodeJob>, String> {
+        if self.stale() {
+            return Err("形状を更新中です。更新が終わってから書き出してください。".into());
+        }
+        let e = self.evaluation.as_ref().ok_or("計算が完了していません。")?;
+        match e.outputs.get(&id) {
+            Some(Ok(tree)) => nodes::gcode_nodes::first_job(tree)
+                .ok_or_else(|| "Gコードがありません。上流のノードを確認してください。".to_string()),
+            Some(Err(error)) => Err(error.clone()),
+            None => Err("このノードの結果がまだありません。".into()),
+        }
+    }
     fn result_trees(&self) -> Result<Vec<Tree>, String> {
         if self.stale() {
             return Err("形状を更新中です。更新が終わってから書き出してください。".into());
@@ -243,12 +357,13 @@ impl MorphletApp {
         };
         collect_export_trees(&self.project.graph, e, &self.canvas.selected)
     }
-    fn previews(&self) -> Vec<PreviewItem> {
+    /// Pending has no new snapshot; a completed empty/error result is Some([]).
+    fn previews(&self) -> Option<Vec<PreviewItem>> {
         if self.stale() {
-            return vec![];
+            return None;
         }
         let Some(e) = &self.evaluation else {
-            return vec![];
+            return Some(vec![]);
         };
         let ids: Vec<_> = match self.preview_mode {
             1 => self.canvas.selected.iter().copied().collect(),
@@ -276,18 +391,41 @@ impl MorphletApp {
                 }
             }
         };
-        ids.into_iter()
-            .filter_map(|id| {
-                e.outputs
-                    .get(&id)
-                    .and_then(|r| r.as_ref().ok())
-                    .map(|tree| PreviewItem {
-                        node_id: id,
-                        tree: tree.clone(),
-                        selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
-                    })
-            })
-            .collect()
+        Some(
+            ids.into_iter()
+                .filter_map(|id| {
+                    e.outputs
+                        .get(&id)
+                        .and_then(|r| r.as_ref().ok())
+                        .map(|tree| PreviewItem {
+                            node_id: id,
+                            tree: tree.clone(),
+                            selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                        })
+                })
+                .collect(),
+        )
+    }
+    fn discard_outdated_preview(&mut self) {
+        // An evaluation may finish while the 3D panel is hidden. If another edit
+        // is pending when it reopens, never resurrect a scene older than that
+        // completed result (which may now be empty or an error).
+        if self
+            .preview_revision
+            .is_some_and(|revision| revision != self.result_revision)
+        {
+            self.viewport.clear();
+            self.preview_revision = None;
+        }
+    }
+    fn fit_preview(&mut self) {
+        if let Some(items) = self.previews() {
+            self.viewport.fit(&items);
+            self.preview_revision = Some(self.result_revision);
+        } else {
+            self.discard_outdated_preview();
+            self.viewport.fit_previous();
+        }
     }
     fn save(&mut self, save_as: bool) -> bool {
         if save_as || self.file_path.is_none() {
@@ -343,16 +481,20 @@ impl MorphletApp {
         };
         if let Some((project, path)) = new {
             self.project = project;
+            self.clipboard.clear();
+            self.wire_source = None;
+            self.palette_open = false;
             self.file_path = path;
             self.dirty = false;
             self.history = History::default();
-            self.gesture_before = None;
             self.suppress_history = true;
             self.canvas.selected.clear();
             self.canvas.connecting = None;
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
+            self.preview_revision = None;
             self.evaluation = None;
+            self.diagnostics = None;
             self.queue_compute();
             self.preview_mode = 0;
             if let Some(n) = self.project.graph.nodes.first() {
@@ -396,6 +538,7 @@ impl MorphletApp {
             match event {
                 PickerEvent::Cancelled => {
                     self.after_save = None;
+                    self.import_target = None;
                 }
                 PickerEvent::Chosen(path) => match task {
                     FileTask::Open => self.request(PendingAction::Open(path), ctx),
@@ -408,30 +551,132 @@ impl MorphletApp {
                             self.after_save = None;
                         }
                     }
-                    FileTask::ExportStl | FileTask::ExportObj => {
-                        let result = self.result_trees().and_then(|trees| {
-                            if task == FileTask::ExportStl {
-                                persistence::export_stl(&path, &trees)
-                            } else {
-                                persistence::export_obj(&path, &trees)
-                            }
-                        });
+                    FileTask::SavePart => {
+                        let result = self
+                            .part_target
+                            .take()
+                            .ok_or_else(|| "書き出す部品が選ばれていません。".to_string())
+                            .and_then(|id| cluster::save_part(&path, &self.project.graph, id));
                         match result {
-                            Ok(r) => {
-                                self.notify(
-                                    format!("{} 面の形状を書き出しました", r.triangles),
-                                    false,
-                                );
-                                self.export_open = false;
+                            Ok(()) => self.notify("部品を書き出しました", false),
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
+                    FileTask::LoadPart => {
+                        match cluster::load_part(&path, &mut self.project.graph) {
+                            Ok(def_id) => {
+                                let at = self.canvas.center_for_add(&self.project);
+                                match cluster::instantiate(&mut self.project.graph, def_id, at) {
+                                    Ok(id) => {
+                                        self.canvas.select_only(id);
+                                        self.notify("部品を読み込みました", false);
+                                    }
+                                    Err(e) => self.notify(e, true),
+                                }
                             }
                             Err(e) => self.notify(e, true),
                         }
+                    }
+                    FileTask::ImportMesh => {
+                        let target = self.import_target.take();
+                        self.set_import_file(&path, target, None);
+                    }
+                    FileTask::ExportGcode if self.gcode_node.is_some() => {
+                        let id = self.gcode_node.take();
+                        let result = id
+                            .ok_or_else(|| "書き出すノードが選ばれていません。".to_string())
+                            .and_then(|id| self.gcode_node_job(id))
+                            .and_then(|job| nodes::gcode_nodes::write_job(&path, &job));
+                        match result {
+                            Ok(s) => self.notify(
+                                format!(
+                                    "G-code を書き出しました（約 {:.0} 分・{:.1} m）",
+                                    s.seconds / 60.0,
+                                    s.filament_mm / 1000.0
+                                ),
+                                false,
+                            ),
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
+                    FileTask::ExportGcode => {
+                        let settings = self.gcode.settings().clone();
+                        let result = self
+                            .result_trees()
+                            .and_then(|trees| gcode::export(&path, &trees, &settings));
+                        match result {
+                            Ok(r) => self.notify(
+                                format!(
+                                    "G-code を書き出しました（約 {:.0} 分・{:.1} m）",
+                                    r.print_seconds / 60.0,
+                                    r.filament_mm / 1000.0
+                                ),
+                                false,
+                            ),
+                            Err(e) => self.notify(e, true),
+                        }
+                    }
+                    FileTask::ExportStl | FileTask::ExportObj | FileTask::ExportThreeMf => {
+                        let sources = self.stl_sources();
+                        self.stl_export.export_to(&sources, &path);
+                        self.flush_stl_notice();
+                    }
+                    FileTask::PickSlicer => {
+                        self.stl_export.set_slicer(path);
+                        self.flush_stl_notice();
                     }
                 },
             }
         }
     }
+    /// Points an ファイル読み込み node at a mesh file. Without a valid target, a new node is
+    /// added at `at` (or the canvas centre).
+    fn set_import_file(&mut self, path: &Path, target: Option<NodeId>, at: Option<[f32; 2]>) {
+        let Some(text) = path.to_str().map(str::to_owned) else {
+            self.notify(
+                "ファイル名を文字として読めませんでした。英数字の名前に変えてから選び直してください。",
+                true,
+            );
+            return;
+        };
+        if text.len() > nodes::script::MAX_SCRIPT_BYTES {
+            self.notify(
+                "ファイルのパスが長すぎます。フォルダーを近くへ移すか、名前を短くしてください。",
+                true,
+            );
+            return;
+        }
+        let valid_target = target.filter(|id| {
+            self.project
+                .graph
+                .node(*id)
+                .is_some_and(|n| n.kind == NodeKind::ImportMesh)
+        });
+        let id = match valid_target {
+            Some(id) => id,
+            None => {
+                let at = at.unwrap_or_else(|| self.canvas.center_for_add(&self.project));
+                match self.project.graph.add(NodeKind::ImportMesh, at) {
+                    Ok(id) => {
+                        self.canvas.select_only(id);
+                        id
+                    }
+                    Err(e) => {
+                        self.notify(e, true);
+                        return;
+                    }
+                }
+            }
+        };
+        if let Some(node) = self.project.graph.node_mut(id) {
+            node.script = text;
+        }
+        self.notify("「ファイル読み込み」にファイルを設定しました", false);
+    }
+
     fn add_node(&mut self, kind: NodeKind, position: Option<[f32; 2]>) {
+        // A wire dropped on the canvas takes precedence over the selection.
+        let wire = self.wire_source.take();
         let selected = self.canvas.selected.iter().next_back().copied();
         let at = position.unwrap_or_else(|| {
             selected
@@ -441,7 +686,33 @@ impl MorphletApp {
         });
         match self.project.graph.add(kind, at) {
             Ok(id) => {
-                if let Some(source) = selected {
+                if let Some(source) = wire {
+                    let output = self
+                        .project
+                        .graph
+                        .node(source)
+                        .map(|n| n.kind.spec().output);
+                    match output.and_then(|t| ui_polish::first_compatible_input(kind, t)) {
+                        Some(key) => {
+                            if let Err(e) = self.project.graph.connect(source, id, key) {
+                                // Keep a wire-drop operation transactional: never leave a half-added node.
+                                self.project.graph.remove(id);
+                                self.notify(e, true);
+                                self.palette_open = false;
+                                return;
+                            }
+                        }
+                        None => {
+                            self.project.graph.remove(id);
+                            self.notify(
+                                "接続できる入力がありません。別のノードを選んでください。",
+                                true,
+                            );
+                            self.palette_open = false;
+                            return;
+                        }
+                    }
+                } else if let Some(source) = selected {
                     let output = self
                         .project
                         .graph
@@ -455,12 +726,148 @@ impl MorphletApp {
                         let _ = self.project.graph.connect(source, id, port.key);
                     }
                 }
+                self.recent.push(kind);
                 self.canvas.select_only(id);
                 self.palette_open = false;
-                self.search.clear();
+                self.palette_query.clear();
                 self.notify(format!("「{}」を追加しました", kind.spec().label), false);
             }
             Err(e) => self.notify(e, true),
+        }
+    }
+    /// Node shelf strip above the canvas (see `node_shelf.rs`).
+    fn shelf_panel(&mut self, ctx: &egui::Context) {
+        let selected = if self.canvas.selected.len() == 1 {
+            self.canvas.selected.iter().next().copied()
+        } else {
+            None
+        };
+        let selected = selected.and_then(|id| {
+            self.project
+                .graph
+                .node(id)
+                .map(|n| (id, n.kind.spec().output))
+        });
+        let Some(action) =
+            self.shelf
+                .show(ctx, self.recent.kinds(), selected, self.canvas.last_rect)
+        else {
+            return;
+        };
+        match action {
+            ShelfAction::Add(kind) => match selected {
+                Some((source, output)) if node_shelf::first_input_accepts(kind, output) => {
+                    self.add_suggestion(source, kind)
+                }
+                _ => self.add_node(kind, None),
+            },
+            ShelfAction::Suggest(source, kind) => self.add_suggestion(source, kind),
+            ShelfAction::Place(kind, pos) => {
+                if let Some(at) = self.canvas.world_at(&self.project, pos) {
+                    self.add_node_at(kind, at);
+                }
+            }
+        }
+    }
+    /// Adds a node after `source` and connects it to the first input (shelf and suggestions).
+    fn add_suggestion(&mut self, source: NodeId, kind: NodeKind) {
+        match node_shelf::add_suggested(&mut self.project.graph, source, kind) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(
+                    format!("「{}」を追加して線をつなぎました", kind.spec().label),
+                    false,
+                );
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Adds a dropped node exactly where it was released, without connecting it.
+    fn add_node_at(&mut self, kind: NodeKind, at: [f32; 2]) {
+        match self.project.graph.add(kind, at) {
+            Ok(id) => {
+                self.recent.push(kind);
+                self.canvas.select_only(id);
+                self.notify(format!("「{}」を配置しました", kind.spec().label), false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    /// Where a keyboard-opened search puts its node: under the pointer on the canvas, else the centre.
+    fn palette_anchor(&self, ctx: &egui::Context) -> [f32; 2] {
+        node_shelf::pointer_in(ctx, self.canvas.last_rect)
+            .and_then(|p| self.canvas.world_at(&self.project, p))
+            .unwrap_or_else(|| self.canvas.center_for_add(&self.project))
+    }
+    /// Writes favourites and recent nodes to the settings file when they change.
+    fn persist_shelf_lists(&mut self) {
+        let now = (
+            self.shelf.favorites().to_vec(),
+            self.recent.kinds().to_vec(),
+        );
+        if now != self.saved_lists {
+            if now.0 != self.saved_lists.0 {
+                let set: BTreeSet<NodeKind> = now.0.iter().copied().collect();
+                if set != self.favorites {
+                    self.favorites = set;
+                    if let Err(e) = ui_polish::save_favorites(&self.favorites) {
+                        self.notify(e, true);
+                    }
+                }
+            }
+            if let Err(e) = node_shelf::save_lists(&now.0, &now.1) {
+                self.notify(e, true);
+            }
+            self.saved_lists = now;
+        }
+    }
+    fn group_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        let name = format!("部品 {}", self.project.graph.clusters.len() + 1);
+        let result = cluster::group_nodes(&mut self.project.graph, &ids, &name);
+        annotations::prune(&mut self.project.graph);
+        match result {
+            Ok(id) => {
+                self.canvas.select_only(id);
+                self.notify("選択したノードを 1 つの部品にまとめました", false);
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn part_action(&mut self, action: crate::script_ui::PartAction) {
+        use crate::script_ui::PartAction;
+        match action {
+            PartAction::Add(def_id) => {
+                let at = self.canvas.center_for_add(&self.project);
+                match cluster::instantiate(&mut self.project.graph, def_id, at) {
+                    Ok(id) => self.canvas.select_only(id),
+                    Err(e) => self.notify(e, true),
+                }
+            }
+            PartAction::Export(def_id) => {
+                let name = self
+                    .project
+                    .graph
+                    .clusters
+                    .iter()
+                    .find(|d| d.id == def_id)
+                    .map(|d| safe_name(&d.name))
+                    .unwrap_or_else(|| "部品".into());
+                self.part_target = Some(def_id);
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::SavePart,
+                    self.start_directory(),
+                    format!("{name}.morphpart"),
+                ));
+            }
+            PartAction::Import => {
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::LoadPart,
+                    self.start_directory(),
+                    String::new(),
+                ));
+            }
         }
     }
     fn delete_selected(&mut self) {
@@ -468,52 +875,165 @@ impl MorphletApp {
         for id in ids {
             self.project.graph.remove(id);
         }
+        annotations::prune(&mut self.project.graph);
         self.canvas.selected.clear();
         self.canvas.connecting = None;
     }
-    fn duplicate_selected(&mut self) {
-        let nodes: Vec<_> = self
-            .project
+    fn selected_nodes(&self) -> Vec<Node> {
+        self.project
             .graph
             .nodes
             .iter()
             .filter(|n| self.canvas.selected.contains(&n.id))
             .cloned()
-            .collect();
-        let mut map = std::collections::BTreeMap::new();
-        for old in &nodes {
-            match self
-                .project
-                .graph
-                .add(old.kind, [old.position[0] + 35., old.position[1] + 40.])
-            {
-                Ok(id) => {
-                    map.insert(old.id, id);
-                    if let Some(n) = self.project.graph.node_mut(id) {
-                        n.params = old.params.clone();
-                        n.name = format!("{} コピー", old.name);
-                        n.preview = old.preview;
-                    }
-                }
-                Err(e) => {
-                    self.notify(e, true);
-                    return;
-                }
+            .collect()
+    }
+    fn copy_selected(&mut self) {
+        let nodes = self.selected_nodes();
+        if !nodes.is_empty() {
+            self.clipboard = nodes;
+            self.notify(
+                format!("{} ノードをコピーしました", self.clipboard.len()),
+                false,
+            );
+        }
+    }
+    fn paste_selected(&mut self) {
+        if self.clipboard.is_empty() {
+            return;
+        }
+        let at = self.canvas.center_for_add(&self.project);
+        let min_x = self
+            .clipboard
+            .iter()
+            .map(|n| n.position[0])
+            .fold(f32::INFINITY, f32::min);
+        let min_y = self
+            .clipboard
+            .iter()
+            .map(|n| n.position[1])
+            .fold(f32::INFINITY, f32::min);
+        match insert_nodes(
+            &mut self.project.graph,
+            &self.clipboard,
+            [at[0] - min_x, at[1] - min_y],
+            false,
+        ) {
+            Ok(ids) => {
+                self.canvas.selected = ids;
+                self.notify(
+                    format!("{} ノードを貼り付けました", self.canvas.selected.len()),
+                    false,
+                );
+            }
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn duplicate_selected(&mut self) {
+        let nodes = self.selected_nodes();
+        if nodes.is_empty() {
+            return;
+        }
+        match insert_nodes(&mut self.project.graph, &nodes, [35., 40.], true) {
+            Ok(ids) => self.canvas.selected = ids,
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn open_palette(&mut self, at: [f32; 2], source: Option<NodeId>) {
+        self.wire_source = source;
+        self.palette_open = true;
+        self.palette_focus = true;
+        self.palette_position = at;
+        self.palette_query.clear();
+        self.palette_ime = false;
+        self.palette_cursor = 0;
+    }
+    fn toggle_favorite(&mut self, kind: NodeKind) {
+        if !self.favorites.remove(&kind) {
+            self.favorites.insert(kind);
+        }
+        if let Err(e) = ui_polish::save_favorites(&self.favorites) {
+            self.notify(e, true);
+        }
+        if self.shelf.is_favorite(kind) != self.favorites.contains(&kind) {
+            self.shelf.toggle(kind);
+        }
+    }
+    /// Toggle 無効 on the selection: if any selected node is on, turn all off; else on.
+    fn toggle_off_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        if ids.is_empty() {
+            self.notify("無効にするノードを選んでください", true);
+            return;
+        }
+        let turn_off = ids
+            .iter()
+            .any(|id| self.project.graph.node(*id).is_some_and(|n| !n.off));
+        for id in &ids {
+            if let Some(n) = self.project.graph.node_mut(*id) {
+                n.off = turn_off;
             }
         }
-        for old in &nodes {
-            if let Some(id) = map.get(&old.id) {
-                for (key, source) in &old.inputs {
-                    let from = *map.get(source).unwrap_or(source);
-                    let _ = self.project.graph.connect(from, *id, key);
-                }
-            }
+        self.notify(
+            if turn_off {
+                "選択したノードを無効にしました（出力なし）· Ctrl+E で戻せます"
+            } else {
+                "選択したノードを有効に戻しました"
+            },
+            false,
+        );
+    }
+    fn make_group(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        let name = format!("グループ {}", self.project.graph.groups.len() + 1);
+        match annotations::add_group(&mut self.project.graph, &ids, &name) {
+            Ok(_) => self.notify(
+                "グループを作りました。見出しを右クリックで名前・色を変更できます",
+                false,
+            ),
+            Err(e) => self.notify(e, true),
         }
-        self.canvas.selected = map.values().copied().collect();
+    }
+    fn add_note(&mut self, at: [f32; 2]) {
+        match annotations::add_note(&mut self.project.graph, "", at) {
+            Ok(index) => self.canvas.edit_note(index),
+            Err(e) => self.notify(e, true),
+        }
+    }
+    fn open_help(&mut self) {
+        match self
+            .canvas
+            .selected
+            .iter()
+            .next_back()
+            .and_then(|id| self.project.graph.node(*id))
+        {
+            Some(n) => self.help_window.open_for(n.kind),
+            None => self.help_window.open_index(),
+        }
+    }
+    fn toggle_snap(&mut self) {
+        self.canvas.snap = !self.canvas.snap;
+        let text = if self.canvas.snap {
+            "格子に吸着: ON（ノードは離したときに格子点へ揃います）"
+        } else {
+            "格子に吸着: OFF"
+        };
+        self.notify(text, false);
+    }
+    fn set_theme(&mut self, mode: theme::Mode, ctx: &egui::Context) {
+        if self.theme_mode == mode {
+            return;
+        }
+        self.theme_mode = mode;
+        theme::set_mode(mode);
+        theme::apply_style(ctx);
+        if let Err(e) = ui_polish::save_theme(mode) {
+            self.notify(e, true);
+        }
     }
     fn undo(&mut self) {
         if self.history.undo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -524,7 +1044,6 @@ impl MorphletApp {
     }
     fn redo(&mut self) {
         if self.history.redo(&mut self.project) {
-            self.gesture_before = None;
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
@@ -562,6 +1081,38 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::D)) {
                 self.duplicate_selected();
             }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::C)) {
+                self.copy_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::V)) {
+                self.paste_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
+                self.toggle_off_selected();
+            }
+            // Checked before Ctrl+G: a pattern without Shift also matches Ctrl+Shift+G.
+            if ctx.input_mut(|i| {
+                i.consume_key(
+                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                    egui::Key::G,
+                )
+            }) {
+                self.toggle_snap();
+            } else if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::G)) {
+                self.make_group();
+            }
+            if ctx.input(|i| i.key_pressed(egui::Key::Home)) {
+                self.canvas.fit_requested = true;
+            }
+            let question = ctx.input(|i| {
+                i.events
+                    .iter()
+                    .any(|e| matches!(e, egui::Event::Text(t) if t == "?" || t == "？"))
+            });
+            if question {
+                // "?" opens the node search (the shortcut list is under ヘルプ).
+                self.open_palette(self.palette_anchor(ctx), None);
+            }
             if ctx
                 .input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
             {
@@ -570,229 +1121,514 @@ impl MorphletApp {
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A)) {
                 self.canvas.selected = self.project.graph.nodes.iter().map(|n| n.id).collect();
             }
-            if ctx.input(|i| i.key_pressed(egui::Key::F)) {
-                let items = self.previews();
-                self.viewport.fit(&items);
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F)) {
+                self.canvas.fit_selection_requested = true;
+            } else if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+                self.fit_preview();
                 self.canvas.fit_requested = true;
             }
             if ctx.input(|i| i.key_pressed(egui::Key::Tab))
                 || ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::K))
             {
-                self.palette_open = true;
-                self.palette_focus = true;
-                self.palette_position = self.canvas.center_for_add(&self.project);
-                self.search.clear();
+                self.open_palette(self.palette_anchor(ctx), None);
+            }
+            // Space tapped over the canvas (Space + drag still pans; see node_shelf.rs).
+            if self.shelf.space_opens_search(ctx, self.canvas.last_rect) {
+                self.open_palette(self.palette_anchor(ctx), None);
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
-            self.help_open = !self.help_open;
+            if self.help_window.open {
+                self.help_window.open = false;
+            } else {
+                self.open_help();
+            }
         }
     }
     fn topbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("topbar")
-            .exact_height(66.)
+            .exact_height(44.)
             .frame(
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(28, 48, 48))
-                    .inner_margin(egui::Margin::symmetric(18, 12)),
+                    .fill(theme::toolbar_bg())
+                    .inner_margin(egui::Margin::symmetric(10, 6)),
             )
             .show(ctx, |ui| {
-                ui.visuals_mut().override_text_color = Some(Color32::from_rgb(232, 241, 232));
-                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(42, 66, 64);
-                ui.visuals_mut().widgets.inactive.fg_stroke = Stroke::new(1_f32, Color32::WHITE);
-                ui.horizontal_centered(|ui| {
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(30., 30.), Sense::hover());
-                    let p = ui.painter();
-                    p.line_segment(
-                        [
-                            r.left_bottom() - egui::vec2(0., 5.),
-                            r.center_top() + egui::vec2(-2., 4.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.line_segment(
-                        [
-                            r.center_top() + egui::vec2(-2., 4.),
-                            r.right_bottom() - egui::vec2(0., 5.),
-                        ],
-                        Stroke::new(3_f32, Color32::from_rgb(152, 215, 181)),
-                    );
-                    p.circle_filled(
-                        r.center() + egui::vec2(0., 4.),
-                        3.5,
-                        Color32::from_rgb(232, 201, 120),
-                    );
-                    ui.label(
-                        RichText::new("morphlet")
-                            .size(24.)
-                            .strong()
-                            .color(Color32::from_rgb(242, 247, 233)),
-                    );
-                    ui.add_space(13.);
-                    ui.label(
-                        RichText::new("GEOMETRY STUDIO")
-                            .size(9.)
-                            .color(Color32::from_rgb(159, 187, 172)),
-                    );
-                    ui.add_space(18.);
-                    ui.separator();
-                    ui.add_space(8.);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.project.name)
-                            .font(egui::TextStyle::Body)
-                            .desired_width(185.)
-                            .frame(false)
-                            .text_color(Color32::from_rgb(228, 235, 226)),
-                    )
-                    .on_hover_text("作品名を編集");
-                    if self.dirty {
+                let full = ui.available_rect_before_wrap();
+                let wide = full.width() >= 1100.;
+                let labels = full.width() >= 900.;
+                // Left: file. Centre: compute status. Right: view toggles.
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(full)
+                        .layout(Layout::left_to_right(Align::Center)),
+                    |ui| {
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(22., 22.), Sense::hover());
+                        let a = r.left_bottom() + egui::vec2(3., -4.);
+                        let b = r.center_top() + egui::vec2(0., 4.);
+                        let c = r.right_bottom() - egui::vec2(3., 4.);
+                        for pair in [[a, b], [b, c], [a, c]] {
+                            ui.painter()
+                                .line_segment(pair, Stroke::new(1.8_f32, theme::teal()));
+                        }
+                        for p in [a, b, c] {
+                            ui.painter().circle_filled(p, 2.6, theme::teal());
+                        }
                         ui.label(
-                            RichText::new("●")
-                                .size(9.)
-                                .color(Color32::from_rgb(228, 193, 115)),
+                            RichText::new("NODES")
+                                .strong()
+                                .size(18.)
+                                .color(theme::ink()),
                         );
-                    }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("書き出し ↗")
-                                        .color(Color32::from_rgb(20, 58, 45)),
+                        ui.separator();
+                        ui.menu_button("ファイル", |ui| {
+                            if ui.button("新規作品").clicked() {
+                                self.request(PendingAction::New, ctx);
+                                ui.close();
+                            }
+                            if ui.button("開く  Ctrl+O").clicked() {
+                                self.open_dialog(ctx);
+                                ui.close();
+                            }
+                            if ui.button("保存  Ctrl+S").clicked() {
+                                self.save(false);
+                                ui.close();
+                            }
+                            if ui.button("名前を付けて保存").clicked() {
+                                self.save(true);
+                                ui.close();
+                            }
+                            ui.separator();
+                            if ui.button("STL / OBJ 書き出し").clicked() {
+                                self.stl_export.open_dialog();
+                                ui.close();
+                            }
+                            if ui.button("G-code（花瓶モード・未検証）").clicked() {
+                                self.gcode.open();
+                                ui.close();
+                            }
+                        });
+                        ui.menu_button("編集", |ui| {
+                            if ui
+                                .add_enabled(
+                                    self.history.can_undo(),
+                                    egui::Button::new("元に戻す  Ctrl+Z"),
                                 )
-                                .fill(Color32::from_rgb(177, 222, 184)),
-                            )
-                            .on_hover_text("完成形状を STL / OBJ へ")
-                            .clicked()
+                                .clicked()
+                            {
+                                self.undo();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(
+                                    self.history.can_redo(),
+                                    egui::Button::new("やり直す  Ctrl+Y"),
+                                )
+                                .clicked()
+                            {
+                                self.redo();
+                                ui.close();
+                            }
+                            ui.separator();
+                            let selected = !self.canvas.selected.is_empty();
+                            if ui
+                                .add_enabled(selected, egui::Button::new("コピー  Ctrl+C"))
+                                .clicked()
+                            {
+                                self.copy_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(
+                                    !self.clipboard.is_empty(),
+                                    egui::Button::new("貼り付け  Ctrl+V"),
+                                )
+                                .clicked()
+                            {
+                                self.paste_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("複製  Ctrl+D"))
+                                .clicked()
+                            {
+                                self.duplicate_selected();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("グループ  Ctrl+G"))
+                                .clicked()
+                            {
+                                self.make_group();
+                                ui.close();
+                            }
+                            if ui
+                                .add_enabled(selected, egui::Button::new("削除  Delete"))
+                                .clicked()
+                            {
+                                self.delete_selected();
+                                ui.close();
+                            }
+                        });
+                        ui.menu_button("表示", |ui| {
+                            ui.checkbox(&mut self.show_library, "ノードライブラリ");
+                            ui.checkbox(&mut self.show_workspace, "3D と設定");
+                            if ui.button("診断と処理時間").clicked() {
+                                self.diagnostics_window.open = true;
+                                ui.close();
+                            }
+                            if ui.button("選択にズーム  Shift+F").clicked() {
+                                self.canvas.fit_selection_requested = true;
+                                ui.close();
+                            }
+                            if ui.button("全体表示  F").clicked() {
+                                self.canvas.fit_requested = true;
+                                self.fit_preview();
+                                ui.close();
+                            }
+                            ui.menu_button("テーマ", |ui| {
+                                for mode in theme::Mode::ALL {
+                                    if ui
+                                        .selectable_label(self.theme_mode == mode, mode.label())
+                                        .clicked()
+                                    {
+                                        self.set_theme(mode, ctx);
+                                        ui.close();
+                                    }
+                                }
+                            });
+                        });
+                        ui.menu_button("作例・ヘルプ", |ui| {
+                            if ui.button("作品例").clicked() {
+                                self.template_open = true;
+                                ui.close();
+                            }
+                            if ui.button("ノード辞典  F1").clicked() {
+                                self.help_window.open_index();
+                                ui.close();
+                            }
+                            if ui.button("使い方").clicked() {
+                                self.help_open = true;
+                                ui.close();
+                            }
+                            if ui.button("キー操作一覧").clicked() {
+                                self.shortcuts_open = true;
+                                ui.close();
+                            }
+                        });
+                        ui.separator();
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Plus,
+                            "ノード",
+                            "ノードを追加  Tab / Ctrl+K",
+                            false,
+                            labels,
+                        )
+                        .clicked()
                         {
-                            self.export_stats = Some(
-                                self.result_trees()
-                                    .and_then(|trees| persistence::mesh_stats(&trees)),
-                            );
-                            self.export_open = true;
+                            self.open_palette(self.canvas.center_for_add(&self.project), None);
                         }
-                        if ui.button("保存").on_hover_text("Ctrl+S").clicked() {
-                            self.save(false);
-                        }
-                        if ui.button("開く").on_hover_text("Ctrl+O").clicked() {
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Open,
+                            "開く",
+                            "開く  Ctrl+O",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
                             self.open_dialog(ctx);
                         }
-                        if ui.button("作品例").clicked() {
-                            self.template_open = true;
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Save,
+                            "保存",
+                            "保存  Ctrl+S",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.save(false);
                         }
-                        if ui.button("?").on_hover_text("使い方 · F1").clicked() {
-                            self.help_open = true;
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Export,
+                            "書き出し",
+                            "STL / OBJ 書き出し",
+                            false,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.stl_export.open_dialog();
                         }
-                    });
-                });
+                        let name_width = (full.width() * 0.5 - ui.cursor().left() + full.left()
+                            - 150.)
+                            .clamp(0., 170.);
+                        if name_width >= 80. {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.project.name)
+                                    .desired_width(name_width)
+                                    .frame(false),
+                            )
+                            .on_hover_text("作品名を編集");
+                            if self.dirty {
+                                ui.label(theme::small("未保存"));
+                            }
+                        }
+                    },
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(full)
+                        .layout(Layout::right_to_left(Align::Center)),
+                    |ui| {
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Fit,
+                            "全体",
+                            "全体表示  F",
+                            false,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.fit_requested = true;
+                            self.fit_preview();
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Diag,
+                            "診断",
+                            "エラー原因候補と処理時間",
+                            self.diagnostics_window.open,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.diagnostics_window.open = !self.diagnostics_window.open;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Map,
+                            "地図",
+                            "ミニマップの表示切替",
+                            !self.canvas.hide_minimap,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.hide_minimap = !self.canvas.hide_minimap;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Grid,
+                            "格子",
+                            "ドット格子の表示切替",
+                            !self.canvas.hide_grid,
+                            wide,
+                        )
+                        .clicked()
+                        {
+                            self.canvas.hide_grid = !self.canvas.hide_grid;
+                            let line = if self.canvas.hide_grid {
+                                "grid=off"
+                            } else {
+                                "grid=on"
+                            };
+                            if let Err(e) = ui_polish::save_setting_line(line) {
+                                self.notify(e, true);
+                            }
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Cube,
+                            "3D",
+                            "3D と設定パネル",
+                            self.show_workspace,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.show_workspace = !self.show_workspace;
+                        }
+                        if melt::tool_button(
+                            ui,
+                            melt::Tool::Library,
+                            "ライブラリ",
+                            "ノードライブラリ",
+                            self.show_library,
+                            labels,
+                        )
+                        .clicked()
+                        {
+                            self.show_library = !self.show_library;
+                        }
+                    },
+                );
+                if full.width() >= 820. {
+                    let centre =
+                        Rect::from_center_size(full.center(), egui::vec2(280., full.height()));
+                    ui.scope_builder(
+                        egui::UiBuilder::new()
+                            .max_rect(centre)
+                            .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+                        |ui| self.compute_status(ui),
+                    );
+                }
             });
     }
+    /// Short compute status for the middle of the top bar.
+    fn compute_status(&self, ui: &mut egui::Ui) {
+        if self.stale() {
+            ui.label(RichText::new("◌ 計算中…").size(12.).color(theme::muted()));
+        } else if let Some(e) = &self.evaluation {
+            let errors = e.outputs.values().filter(|r| r.is_err()).count();
+            if errors == 0 {
+                ui.label(
+                    RichText::new(format!("● 更新済み · {:.0} ms", e.elapsed_ms))
+                        .size(12.)
+                        .color(theme::teal()),
+                );
+            } else {
+                let response = ui.label(
+                    RichText::new(format!("● {errors} 個のノードにエラー"))
+                        .size(12.)
+                        .color(theme::error()),
+                );
+                if let Some(line) = self.error_line(e) {
+                    response.on_hover_text(line);
+                }
+            }
+        }
+    }
     fn library(&mut self, ctx: &egui::Context) {
+        let width = ctx.available_rect().width();
+        let maximum = (width * 0.33).clamp(140., 290.);
         egui::SidePanel::left("library")
-            .exact_width(196.)
-            .resizable(false)
+            .default_width(205_f32.min(maximum))
+            .min_width(140.)
+            .max_width(maximum)
+            .resizable(true)
             .frame(
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(249, 251, 247))
-                    .inner_margin(egui::Margin::symmetric(14, 14)),
+                    .fill(theme::panel_bg())
+                    .inner_margin(egui::Margin::symmetric(9, 10)),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("ライブラリ").strong().size(13.));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small(format!("{}", NodeKind::all().len())));
-                    });
+                    ui.label(theme::small(format!("{}", NodeKind::all().len())));
                 });
-                ui.add_space(7.);
-                let search = ui.add(
+                ui.add(
                     egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("円・ねじる・並べる…")
+                        .hint_text("何を作る？")
                         .desired_width(f32::INFINITY),
-                );
-                search.on_hover_text("日本語・英語で検索できます");
-                ui.add_space(10.);
+                )
+                .on_hover_text("日本語・英語で検索。例: 円を作る、Construct Point");
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut self.library_filter, 0, "全て");
+                    ui.selectable_value(&mut self.library_filter, 1, "★");
+                    ui.selectable_value(&mut self.library_filter, 2, "最近");
+                });
+                let mut categories: Vec<_> =
+                    NodeKind::all().iter().map(|k| k.spec().category).collect();
+                categories.sort_by_key(|c| (category_rank(c), *c));
+                categories.dedup();
                 egui::ComboBox::from_id_salt("category")
                     .selected_text(&self.category)
-                    .width(156.)
+                    .width((ui.available_width() - 12.).max(70.))
                     .show_ui(ui, |ui| {
-                        for category in [
-                            "すべて",
-                            "数値",
-                            "曲線",
-                            "立体",
-                            "変形",
-                            "配列",
-                            "データ",
-                            "出力",
-                        ] {
+                        ui.selectable_value(&mut self.category, "すべて".into(), "すべて");
+                        for category in categories {
                             ui.selectable_value(&mut self.category, category.into(), category);
                         }
                     });
-                ui.add_space(12.);
+                let mut base = ordered_kinds();
+                if self.library_filter == 1 {
+                    base.retain(|k| self.favorites.contains(k));
+                }
+                if self.library_filter == 2 {
+                    base.retain(|k| self.recent.kinds().contains(k));
+                }
+                base.retain(|k| self.category == "すべて" || self.category == k.spec().category);
+                let ordered = if self.search.trim().is_empty() && self.library_filter != 2 {
+                    base
+                } else {
+                    ui_polish::rank(&base, &self.search, &self.recent, None)
+                };
                 let mut add = None;
+                let mut favorite = None;
+                ui.label(theme::small(format!("{} 件", ordered.len())));
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
-                    .max_height((ui.available_height() - 130.).max(140.))
                     .show(ui, |ui| {
                         let mut last = "";
-                        let mut ordered: Vec<_> = NodeKind::all().to_vec();
-                        ordered.sort_by_key(|kind| category_rank(kind.spec().category));
-                        for kind in &ordered {
+                        for kind in ordered {
                             let spec = kind.spec();
-                            if self.category != "すべて" && self.category != spec.category {
-                                continue;
-                            }
-                            if !matches_search(*kind, &self.search) {
-                                continue;
-                            }
-                            if last != spec.category {
-                                ui.add_space(9.);
+                            if self.search.trim().is_empty()
+                                && self.library_filter != 2
+                                && last != spec.category
+                            {
+                                ui.add_space(5.);
                                 ui.label(theme::small(spec.category));
-                                ui.add_space(2.);
                                 last = spec.category;
                             }
-                            let color = theme::category_color(spec.category);
-                            let resp = ui.add_sized(
-                                [162., 30.],
-                                egui::Button::new(
-                                    RichText::new(format!("＋  {}", spec.label))
-                                        .size(12.)
-                                        .color(color),
-                                )
-                                .frame(false),
-                            );
-                            if resp
-                                .clone()
-                                .on_hover_text(format!(
-                                    "{}\n\n{}",
-                                    spec.description, "クリックで追加。選択中の形状に接続します。"
-                                ))
-                                .clicked()
-                            {
-                                add = Some(*kind);
-                            }
+                            ui.horizontal(|ui| {
+                                let starred = self.favorites.contains(&kind);
+                                if ui
+                                    .small_button(if starred { "★" } else { "☆" })
+                                    .on_hover_text(if starred {
+                                        "お気に入りから外す"
+                                    } else {
+                                        "お気に入りに追加"
+                                    })
+                                    .clicked()
+                                {
+                                    favorite = Some(kind);
+                                }
+                                let (r, _) =
+                                    ui.allocate_exact_size(egui::vec2(6., 17.), Sense::hover());
+                                ui.painter().rect_filled(
+                                    r,
+                                    2,
+                                    theme::category_color(spec.category),
+                                );
+                                if ui
+                                    .add(
+                                        egui::Button::new(ui_polish::one_line(spec.label, 10))
+                                            .frame(false),
+                                    )
+                                    .on_hover_text(format!("{}\n{}", spec.label, spec.description))
+                                    .clicked()
+                                {
+                                    add = Some(kind);
+                                }
+                            });
+                        }
+                        if let Some(action) =
+                            crate::script_ui::library_parts(ui, &self.project.graph)
+                        {
+                            self.part_action(action);
+                        }
+                        ui.separator();
+                        if ui.button("作品例").clicked() {
+                            self.template_open = true;
+                        }
+                        if ui.small_button("新規作品").clicked() {
+                            self.request(PendingAction::New, ctx);
                         }
                     });
-                if let Some(kind) = add {
-                    self.add_node(kind, None);
+                if let Some(kind) = favorite {
+                    self.toggle_favorite(kind);
                 }
-                ui.add_space(12.);
-                ui.separator();
-                ui.add_space(8.);
-                ui.label(
-                    RichText::new("小さな操作から、\n思いがけない形へ。")
-                        .size(12.)
-                        .color(theme::MUTED),
-                );
-                ui.add_space(8.);
-                if ui
-                    .add_sized([164., 31.], egui::Button::new("作品例からはじめる"))
-                    .clicked()
+                if let Some(kind) = add
+                    && !self.palette_open
                 {
-                    self.template_open = true;
-                }
-                if ui.small_button("空のキャンバスを開く").clicked() {
-                    self.request(PendingAction::New, ctx);
+                    self.add_node(kind, None);
                 }
             });
     }
@@ -801,7 +1637,7 @@ impl MorphletApp {
             .exact_height(30.)
             .frame(
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(237, 242, 234))
+                    .fill(theme::status_bg())
                     .inner_margin(egui::Margin::symmetric(14, 5)),
             )
             .show(ctx, |ui| {
@@ -812,25 +1648,46 @@ impl MorphletApp {
                     } else if let Some(e) = &self.evaluation {
                         let errors = e.outputs.values().filter(|r| r.is_err()).count();
                         if errors == 0 {
-                            ui.label(RichText::new("●").size(9.).color(theme::TEAL));
+                            ui.label(RichText::new("●").size(9.).color(theme::teal()));
                             ui.label(theme::small("更新済み"));
                         } else {
                             ui.label(
                                 RichText::new(format!("!  {} 個の入力を確認", errors))
                                     .size(11.)
-                                    .color(theme::ERROR),
+                                    .color(theme::error()),
                             );
+                            if let Some(line) = self.error_line(e) {
+                                let short = ui_polish::one_line(
+                                    &line,
+                                    if ui.available_width() > 700. { 42 } else { 12 },
+                                );
+                                ui.label(RichText::new(short).size(11.).color(theme::error()))
+                                    .on_hover_text(line);
+                            }
                         }
-                        ui.label(theme::small(format!(
-                            "  {:.1} ms  ·  計算 {} / 再利用 {}",
-                            e.elapsed_ms, e.computed, e.cached
-                        )));
+                        if ui.available_width() > 460. {
+                            ui.label(theme::small(format!(
+                                "{:.1} ms · 計算 {} / 再利用 {}",
+                                e.elapsed_ms, e.computed, e.cached
+                            )));
+                        } else {
+                            ui.label(theme::small(format!("{:.1} ms", e.elapsed_ms)));
+                        }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(theme::small("mm  /  °"));
-                        ui.separator();
-                        ui.label(theme::small("オフライン"));
-                        ui.separator();
+                        if ui
+                            .small_button("診断")
+                            .on_hover_text("上流のエラー原因候補と、時間のかかったノードを確認")
+                            .clicked()
+                        {
+                            self.diagnostics_window.open = true;
+                        }
+                        if ui.available_width() > 260. {
+                            ui.label(theme::small("mm / °"));
+                            ui.separator();
+                            ui.label(theme::small("オフライン"));
+                            ui.separator();
+                        }
                         ui.label(theme::small(format!(
                             "{} ノード",
                             self.project.graph.nodes.len()
@@ -839,6 +1696,37 @@ impl MorphletApp {
                 });
             });
     }
+    /// File line and the picker button for an ファイル読み込み node.
+    fn import_panel(&mut self, ui: &mut egui::Ui, id: NodeId, file: &str) {
+        ui.add_space(6.);
+        ui.label(RichText::new("ファイル").strong());
+        let shown = if file.is_empty() {
+            "未選択".to_string()
+        } else {
+            Path::new(file)
+                .file_name()
+                .map_or_else(|| file.to_string(), |n| n.to_string_lossy().into_owned())
+        };
+        ui.label(theme::small(shown))
+            .on_hover_text(if file.is_empty() {
+                "STL または OBJ を選んでください"
+            } else {
+                file
+            });
+        if ui
+            .button("ファイルを選ぶ")
+            .on_hover_text("STL または OBJ を選びます。ウィンドウへのドラッグでも読み込めます")
+            .clicked()
+        {
+            self.import_target = Some(id);
+            self.file_picker = Some(FilePicker::new(
+                FileTask::ImportMesh,
+                self.start_directory(),
+                String::new(),
+            ));
+        }
+    }
+
     fn inspector(&mut self, ui: &mut egui::Ui) {
         let Some(id) = self.canvas.selected.iter().next_back().copied() else {
             ui.add_space(15.);
@@ -857,101 +1745,239 @@ impl MorphletApp {
             ui.label(RichText::new(spec.label).strong().size(15.));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.label(theme::small(format!("#{id:02}")));
+                if ui.small_button("?").on_hover_text("ヘルプ · F1").clicked() {
+                    self.help_window.open_for(node.kind);
+                }
             });
         });
         ui.add_space(3.);
         ui.label(theme::small(spec.description));
+        if let Some(timing) = self
+            .evaluation
+            .as_ref()
+            .and_then(|e| e.node_timings.get(&id))
+        {
+            let state = if self.stale() {
+                "前回の評価"
+            } else if node.off {
+                "無効"
+            } else if timing.cached {
+                "キャッシュ"
+            } else {
+                "計算"
+            };
+            ui.label(theme::small(format!("{state} · {:.3} ms", timing.elapsed_ms)))
+                .on_hover_text("このノードの入力準備・計算またはキャッシュ取得・出力検査にかかった時間です。クラスターは内部の処理を含みます。");
+        }
+        if node.off {
+            ui.colored_label(
+                theme::error(),
+                "このノードは無効です（出力なし）。Ctrl+E または下の設定で戻せます。",
+            );
+        }
+        if let Some(Err(message)) = self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
+            egui::Frame::new()
+                .fill(theme::error_fill())
+                .corner_radius(6)
+                .inner_margin(8)
+                .show(ui, |ui| {
+                    ui.label(RichText::new(message).size(12.).color(theme::error()));
+                });
+        }
         ui.add_space(9.);
         let mut disconnect = None;
-        for input in spec.inputs {
+        let shown = cluster::real_input_count(&self.project.graph, &node);
+        for (index, input) in spec.inputs.iter().enumerate().take(shown) {
             let linked = node.inputs.get(input.key).copied();
-            ui.horizontal(|ui| {
-                ui.add_sized(
-                    [100., 23.],
-                    egui::Label::new(RichText::new(input.label).size(12.)),
-                );
-                if let Some(source) = linked {
-                    let name = self
-                        .project
-                        .graph
-                        .node(source)
-                        .map(|n| n.name.as_str())
-                        .unwrap_or("不明");
-                    ui.label(
-                        RichText::new(format!("← {name}"))
-                            .size(11.)
-                            .color(theme::TEAL),
-                    );
-                    if ui.small_button("切断").clicked() {
-                        disconnect = Some(input.key);
-                    }
-                } else if let Some(default) = input.default {
-                    if let Some(n) = self.project.graph.node_mut(id) {
-                        let value = n.params.entry(input.key.into()).or_insert(default);
-                        let (low, high) = friendly_range(input.key, input.min, input.max, *value);
-                        let slider = egui::Slider::new(value, low..=high)
-                            .step_by(input.step)
-                            .max_decimals(if input.integer { 0 } else { 3 });
-                        if ui.add(slider).changed() && input.integer {
-                            *value = value.round();
+            let label = cluster::input_label(&self.project.graph, &node, index, input);
+            let needs_link = cluster::input_needs_link(&self.project.graph, &node, index, input);
+            let optional = cluster::input_is_optional(&node, input);
+            // Stable widget IDs preserve text editing even when an error appears
+            // above this row while the user is still typing a multi-digit value.
+            ui.scope_builder(
+                egui::UiBuilder::new().id(("inspector_parameter", id, input.key)),
+                |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add_sized(
+                            [100., 23.],
+                            egui::Label::new(RichText::new(label).size(12.)),
+                        )
+                        .on_hover_text(format!(
+                            "{} · {}\n{}",
+                            input.kind.label(),
+                            nodes::node_access::for_input(node.kind, index)
+                                .map_or("Custom", |a| a.label()),
+                            nodes::node_access::for_input(node.kind, index)
+                                .map_or("", |a| a.description())
+                        ));
+                        if let Some(source) = linked {
+                            let name = self
+                                .project
+                                .graph
+                                .node(source)
+                                .map(|n| n.name.as_str())
+                                .unwrap_or("不明");
+                            ui.label(
+                                RichText::new(format!("← {name}"))
+                                    .size(11.)
+                                    .color(theme::TEAL),
+                            );
+                            if ui.small_button("切断").clicked() {
+                                disconnect = Some(input.key);
+                            }
+                        } else if let (Some(default), false) = (input.default, needs_link) {
+                            if let Some(n) = self.project.graph.node_mut(id) {
+                                let value = n.params.entry(input.key.into()).or_insert(default);
+                                parameter_editor(ui, value, input);
+                            }
+                        } else if optional {
+                            ui.label(theme::small("つながなくても動きます（任意）"));
+                        } else {
+                            ui.label(
+                                RichText::new(format!("{}を接続してください", input.kind.label()))
+                                    .size(11.)
+                                    .color(theme::error()),
+                            );
                         }
-                    }
-                } else {
-                    ui.label(
-                        RichText::new("形状を接続してください")
-                            .size(11.)
-                            .color(theme::ERROR),
-                    );
-                }
-            });
+                    });
+                },
+            );
         }
         if let Some(key) = disconnect {
             self.project.graph.disconnect(id, key);
         }
-        ui.add_space(9.);
-        egui::CollapsingHeader::new("データを見る")
-            .id_salt("data_inspector")
-            .show(ui, |ui| {
-                if self.stale() {
-                    ui.label(theme::small("更新を待っています…"));
-                    return;
-                }
-                match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
-                    Some(Ok(tree)) => {
-                        ui.label(theme::small(format!(
-                            "{} ブランチ / {} 要素",
-                            tree.branches.len(),
-                            tree.item_count()
-                        )));
-                        for (path, values) in tree.branches.iter().take(12) {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{{{}}}  ·  {} 個",
-                                    path.iter()
-                                        .map(|x| x.to_string())
-                                        .collect::<Vec<_>>()
-                                        .join(";"),
-                                    values.len()
-                                ))
-                                .size(11.)
-                                .color(theme::TEAL),
-                            );
-                            for value in values.iter().take(4) {
-                                ui.label(theme::small(value_summary(value)));
+        if nodes::data_tree_nodes::supports_transform(node.kind) {
+            egui::CollapsingHeader::new("データツリー設定")
+                .id_salt(("tree_settings", id))
+                .show(ui, |ui| {
+                    use nodes::data_tree::{MATCH_PARAM, PORT_PREFIX};
+                    if let Some(n) = self.project.graph.node_mut(id) {
+                        if nodes::data_tree_nodes::supports_matching(node.kind) {
+                            let mut choice =
+                                n.params.get(MATCH_PARAM).copied().unwrap_or(-1.) as i32;
+                            let previous = choice;
+                            let default_name =
+                                if nodes::node_access::uses_ordinal_matching(node.kind) {
+                                    "既定（枝順・Longest）"
+                                } else {
+                                    "旧互換（同じパス）"
+                                };
+                            let names = [default_name, "Longest", "Shortest", "Cross"];
+                            egui::ComboBox::from_id_salt(("matching", id))
+                                .selected_text(names[(choice + 1).clamp(0, 3) as usize])
+                                .show_ui(ui, |ui| {
+                                    for (i, name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice, i as i32 - 1, *name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice < 0 {
+                                    n.params.remove(MATCH_PARAM);
+                                } else {
+                                    n.params.insert(MATCH_PARAM.into(), choice as f64);
+                                }
                             }
-                            if values.len() > 4 {
-                                ui.label(theme::small(format!("… 残り {} 個", values.len() - 4)));
+                        }
+                        for (index, input) in spec.inputs.iter().enumerate().take(shown) {
+                            let key = format!("{PORT_PREFIX}{}", input.key);
+                            let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
+                            let previous = choice;
+                            let names = ["そのまま", "Flatten", "Graft", "Simplify"];
+                            ui.label(format!(
+                                "{} · {} · {}",
+                                input.label,
+                                input.kind.label(),
+                                nodes::data_tree_nodes::access_label(node.kind, index)
+                            ));
+                            egui::ComboBox::from_id_salt(("tree_port", id, input.key))
+                                .selected_text(names[choice.min(3)])
+                                .show_ui(ui, |ui| {
+                                    for (i, name) in names.iter().enumerate() {
+                                        ui.selectable_value(&mut choice, i, *name);
+                                    }
+                                });
+                            if choice != previous {
+                                if choice == 0 {
+                                    n.params.remove(&key);
+                                } else {
+                                    n.params.insert(key, choice as f64);
+                                }
                             }
                         }
                     }
+                });
+        }
+        if node.kind == NodeKind::PathMapper {
+            ui.label(theme::small("例: {A;B}->{B;A}（変数・非負整数のみ）"));
+            if let Some(n) = self.project.graph.node_mut(id) {
+                ui.add(egui::TextEdit::singleline(&mut n.script).char_limit(1024));
+            }
+        }
+        if node.kind == NodeKind::Script {
+            crate::script_ui::script_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::Expression {
+            crate::script_ui::expression_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::GraphMapper
+            && let Some(n) = self.project.graph.node_mut(id)
+        {
+            crate::math_mapper_ui::show(ui, n);
+        }
+        if node.kind == NodeKind::ImportMesh {
+            self.import_panel(ui, id, &node.script);
+        }
+        if nodes::gcode_nodes::uses_script(node.kind) {
+            crate::gcode_ui::script_editor(ui, &mut self.project.graph, id);
+        }
+        if node.kind == NodeKind::GcodeWrite {
+            let job = self.gcode_node_job(id).ok();
+            if crate::gcode_ui::write_panel(ui, job.as_deref()) {
+                self.gcode_node = Some(id);
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::ExportGcode,
+                    self.start_directory(),
+                    format!("{}.gcode", safe_name(&self.project.name)),
+                ));
+            }
+        }
+        if node.kind == NodeKind::Cluster
+            && let Some(action) = crate::script_ui::cluster_panel(ui, &mut self.project.graph, id)
+        {
+            self.part_action(action);
+        }
+        ui.add_space(9.);
+        let stale = self.stale();
+        let mut open_values = false;
+        let evaluation = self.evaluation.as_ref();
+        egui::CollapsingHeader::new("値を見る")
+            .id_salt("data_inspector")
+            .default_open(true)
+            .show(ui, |ui| {
+                if ui
+                    .small_button("別ウィンドウで開く")
+                    .on_hover_text("選択中のノードの値を、大きなウィンドウで表示します")
+                    .clicked()
+                {
+                    open_values = true;
+                }
+                if stale {
+                    ui.label(theme::small("更新を待っています…"));
+                    return;
+                }
+                match evaluation.and_then(|e| e.outputs.get(&id)) {
+                    Some(Ok(tree)) => data_view::show_tree(ui, tree, "inspector", 240.),
                     Some(Err(e)) => {
-                        ui.colored_label(theme::ERROR, e);
+                        ui.colored_label(theme::error(), e);
                     }
                     None => {
                         ui.label(theme::small("未計算"));
                     }
                 }
             });
+        if open_values {
+            self.values_open = true;
+        }
         egui::CollapsingHeader::new("ノードの設定")
             .id_salt("node_settings")
             .show(ui, |ui| {
@@ -961,6 +1987,7 @@ impl MorphletApp {
                         ui.text_edit_singleline(&mut n.name);
                     });
                     ui.checkbox(&mut n.preview, "「表示中」モードで表示");
+                    ui.checkbox(&mut n.off, "無効にする（出力なし） · Ctrl+E");
                 }
                 ui.horizontal(|ui| {
                     if ui.button("複製").clicked() {
@@ -969,28 +1996,47 @@ impl MorphletApp {
                     if ui.button("削除").clicked() {
                         self.delete_selected();
                     }
+                    if ui
+                        .button("グループ")
+                        .on_hover_text("選択中のノードを色つきの枠で囲みます · Ctrl+G")
+                        .clicked()
+                    {
+                        self.make_group();
+                    }
+                    if ui
+                        .button("まとめる")
+                        .on_hover_text("選択中のノードを 1 つの部品（まとめノード）にします")
+                        .clicked()
+                    {
+                        self.group_selected();
+                    }
                 });
             });
     }
     fn right_panel(&mut self, ctx: &egui::Context) {
+        let remaining = ctx.available_rect().width();
+        let maximum = (remaining - 220.).clamp(150., 850.);
         egui::SidePanel::right("workspace")
-            .default_width(485.)
-            .min_width(390.)
-            .max_width(850.)
+            .default_width((remaining * 0.42).clamp(150., maximum))
+            .min_width(150.)
+            .max_width(maximum)
             .resizable(true)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(251, 253, 249)))
+            .frame(egui::Frame::new().fill(theme::workspace_bg()))
             .show(ctx, |ui| {
-                let items = self.previews();
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(14, 10))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("3D プレビュー").strong().size(13.));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(theme::small("LIVE"));
+                                ui.label(theme::small(if self.stale() {
+                                    "更新中"
+                                } else {
+                                    "LIVE"
+                                }));
                             });
                         });
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.selectable_value(&mut self.preview_mode, 0, "完成形");
                             ui.selectable_value(&mut self.preview_mode, 1, "選択ノード");
                             ui.selectable_value(&mut self.preview_mode, 2, "表示中");
@@ -999,100 +2045,165 @@ impl MorphletApp {
                                 .on_hover_text("形を画面に収める · F")
                                 .clicked()
                             {
-                                self.viewport.fit(&items);
+                                self.fit_preview();
                             }
                         });
                     });
-                let h = (ui.available_height() * 0.51).max(220.);
+                // Read the mode after its controls so a completed snapshot uses
+                // the current selection/filter immediately.
+                let items = self.previews();
+                if items.is_none() {
+                    self.discard_outdated_preview();
+                }
+                let h = (ui.available_height() * 0.48).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                    if let Some(id) = self.viewport.show(ui, &items) {
+                    let picked = if let Some(items) = &items {
+                        let picked = self.viewport.show(ui, items);
+                        self.preview_revision = Some(self.result_revision);
+                        picked
+                    } else {
+                        self.viewport.show_previous(ui)
+                    };
+                    // Undo can reuse a previous shape's node ID for a different
+                    // node. Only a completed current preview may select nodes;
+                    // camera controls remain live while showing previous geometry.
+                    if items.is_some()
+                        && let Some(id) = picked.filter(|id| self.project.graph.node(*id).is_some())
+                    {
                         self.canvas.select_only(id);
                     }
-                    if self.stale() {
+                    if items.is_none() {
                         ui.painter().text(
                             rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            "形を更新しています…",
+                            if self.preview_revision.is_some() {
+                                "更新中\n前回の形状を表示"
+                            } else {
+                                "形を更新しています…"
+                            },
                             FontId::proportional(13.),
-                            theme::MUTED,
+                            theme::muted(),
                         );
                     }
                 });
                 ui.add_space(2.);
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(14, 7))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.checkbox(&mut self.viewport.wireframe, "ワイヤー");
-                            ui.checkbox(&mut self.viewport.show_grid, "グリッド");
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.small_button("上").clicked() {
-                                    self.viewport.set_view("top");
-                                }
-                                if ui.small_button("前").clicked() {
-                                    self.viewport.set_view("front");
-                                }
-                                if ui.small_button("斜め").clicked() {
-                                    self.viewport.set_view("iso");
-                                }
-                            });
-                        });
-                    });
-                ui.separator();
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        egui::Frame::new()
-                            .inner_margin(14)
-                            .show(ui, |ui| self.inspector(ui));
+                        egui::Frame::new().inner_margin(8).show(ui, |ui| {
+                            egui::CollapsingHeader::new("ビュー設定")
+                                .default_open(true)
+                                .show(ui, |ui| self.viewport.controls(ui));
+                            ui.separator();
+                            self.inspector(ui);
+                        });
                     });
             });
     }
     fn center_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(theme::CANVAS))
+            .frame(egui::Frame::new().fill(theme::canvas_bg()))
             .show(ctx, |ui| {
                 egui::Frame::new()
-                    .fill(Color32::from_rgb(253, 254, 250))
+                    .fill(theme::toolbar_bg())
                     .inner_margin(egui::Margin::symmetric(15, 10))
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("ノードキャンバス").size(13.).strong());
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .button("＋ 追加")
-                                    .on_hover_text("Tab またはダブルクリック")
-                                    .clicked()
-                                {
-                                    self.palette_open = true;
-                                    self.palette_focus = true;
-                                    self.palette_position =
-                                        self.canvas.center_for_add(&self.project);
-                                    self.search.clear();
-                                }
-                                if ui.small_button("整列").clicked() {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(RichText::new("キャンバス").size(13.).strong());
+                            if ui
+                                .small_button("＋")
+                                .on_hover_text("ノード追加 · Tab")
+                                .clicked()
+                            {
+                                self.open_palette(self.canvas.center_for_add(&self.project), None);
+                            }
+                            if ui
+                                .add_enabled(self.history.can_undo(), egui::Button::new("↩"))
+                                .on_hover_text("元に戻す · Ctrl+Z")
+                                .clicked()
+                            {
+                                self.undo();
+                            }
+                            if ui
+                                .add_enabled(self.history.can_redo(), egui::Button::new("↪"))
+                                .on_hover_text("やり直す · Ctrl+Y")
+                                .clicked()
+                            {
+                                self.redo();
+                            }
+                            if ui.small_button("全体").clicked() {
+                                self.canvas.fit_requested = true;
+                            }
+                            if ui
+                                .small_button("選択")
+                                .on_hover_text("選択にズーム · Shift+F")
+                                .clicked()
+                            {
+                                self.canvas.fit_selection_requested = true;
+                            }
+                            ui.menu_button("操作", |ui| {
+                                if ui.button("全体を自動整列").clicked() {
                                     self.canvas.auto_arrange(&mut self.project);
+                                    ui.close();
                                 }
-                                if ui.small_button("全体").clicked() {
-                                    self.canvas.fit_requested = true;
-                                }
+                                ui.separator();
+                                let n = self.canvas.selected.len();
                                 if ui
-                                    .add_enabled(self.history.can_redo(), egui::Button::new("↪"))
-                                    .on_hover_text("やり直す · Ctrl+Y")
+                                    .add_enabled(n >= 2, egui::Button::new("選択：左端を揃える"))
                                     .clicked()
                                 {
-                                    self.redo();
+                                    self.canvas.align_selected(&mut self.project, 0);
+                                    ui.close();
                                 }
                                 if ui
-                                    .add_enabled(self.history.can_undo(), egui::Button::new("↩"))
-                                    .on_hover_text("元に戻す · Ctrl+Z")
+                                    .add_enabled(n >= 2, egui::Button::new("選択：上端を揃える"))
                                     .clicked()
                                 {
-                                    self.undo();
+                                    self.canvas.align_selected(&mut self.project, 1);
+                                    ui.close();
+                                }
+                                if ui
+                                    .add_enabled(
+                                        n >= 3,
+                                        egui::Button::new("選択：横方向の均等間隔"),
+                                    )
+                                    .clicked()
+                                {
+                                    self.canvas.distribute_selected(&mut self.project, 0);
+                                    ui.close();
+                                }
+                                if ui
+                                    .add_enabled(
+                                        n >= 3,
+                                        egui::Button::new("選択：縦方向の均等間隔"),
+                                    )
+                                    .clicked()
+                                {
+                                    self.canvas.distribute_selected(&mut self.project, 1);
+                                    ui.close();
+                                }
+                                ui.separator();
+                                let mut minimap = !self.canvas.hide_minimap;
+                                if ui
+                                    .checkbox(&mut minimap, "ミニマップ（10ノード以上）")
+                                    .changed()
+                                {
+                                    self.canvas.hide_minimap = !minimap;
+                                }
+                                ui.checkbox(&mut self.canvas.snap, "格子に吸着");
+                                if ui.button("メモ").clicked() {
+                                    let at = self.canvas.center_for_add(&self.project);
+                                    self.add_note(at);
+                                    ui.close();
+                                }
+                                if ui.button("値を見る").clicked() {
+                                    self.values_open = !self.values_open;
+                                    ui.close();
                                 }
                             });
+                            ui.label(theme::small(format!("{:.0}%", self.project.zoom * 100.)));
                         });
                     });
                 let stale = self.stale();
@@ -1108,79 +2219,176 @@ impl MorphletApp {
                 if outcome.duplicate {
                     self.duplicate_selected();
                 }
+                if outcome.toggle_off {
+                    self.toggle_off_selected();
+                }
+                if outcome.group {
+                    self.make_group();
+                }
+                if outcome.view_values {
+                    self.values_open = true;
+                }
+                if outcome.open_templates {
+                    self.template_open = true;
+                }
+                if let Some(kind) = outcome.help {
+                    self.help_window.open_for(kind);
+                }
+                if outcome.help_index {
+                    self.help_window.open_index();
+                }
+                if let Some(at) = outcome.add_note_at {
+                    self.add_note(at);
+                }
                 if let Some(at) = outcome.add_at {
-                    self.palette_open = true;
-                    self.palette_focus = true;
-                    self.palette_position = at;
-                    self.search.clear();
+                    self.open_palette(at, None);
+                }
+                if let Some((from, at)) = outcome.drop_wire {
+                    // Released on empty canvas: search, then connect the chosen node to `from`.
+                    self.open_palette(at, Some(from));
                 }
             });
     }
+    /// Node search popup (Tab / Ctrl+K / double-click / a wire dropped on empty canvas).
+    /// Fuzzy ranking, recently used nodes first, ↑ ↓ to move and Enter to add.
     fn palette(&mut self, ctx: &egui::Context) {
         if !self.palette_open {
+            self.wire_source = None;
+            self.palette_ime = false;
             return;
         }
         let mut open = true;
         let mut add = None;
+        // Right-click on a row toggles its favourite (applied after the window closes).
+        let mut star: Option<NodeKind> = None;
+        let ordered = ordered_kinds();
+        let wire_source = self.wire_source.and_then(|id| self.project.graph.node(id));
+        let wire_type: Option<DataType> = wire_source.map(|n| n.kind.spec().output);
+        let wire_name: Option<String> = wire_source.map(|n| n.name.clone());
+        let mut ime_event = false;
+        ctx.input(|i| {
+            for event in &i.events {
+                if let egui::Event::Ime(event) = event {
+                    ime_event = true;
+                    match event {
+                        egui::ImeEvent::Preedit(text) => self.palette_ime = !text.is_empty(),
+                        egui::ImeEvent::Commit(_) | egui::ImeEvent::Disabled => {
+                            self.palette_ime = false
+                        }
+                        egui::ImeEvent::Enabled => {}
+                    }
+                }
+            }
+        });
+        let composing = ime_event || self.palette_ime;
+        let down = !composing
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown));
+        let up = !composing
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
+        let enter =
+            !composing && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+        let escape = !composing
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        let width = (ctx.content_rect().width() - 40.).clamp(180., 480.);
+        let max_height = (ctx.content_rect().height() * 0.52).clamp(80., 390.);
         egui::Window::new("ノードを追加")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(440.)
-            .anchor(egui::Align2::CENTER_CENTER, [0., -60.])
+            .default_width(width)
+            .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
             .show(ctx, |ui| {
-                let r = ui.add(
-                    egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("何をしたい？  円 / twist / 並べる")
-                        .desired_width(f32::INFINITY),
-                );
-                if self.palette_focus {
-                    r.request_focus();
-                    self.palette_focus = false;
+                ui.set_width(width);
+                let r = ui.add(egui::TextEdit::singleline(&mut self.palette_query)
+                    .hint_text("円 / twist / 点を並べたい")
+                    .desired_width(f32::INFINITY));
+                let first = self.palette_focus;
+                if first { r.request_focus(); self.palette_focus = false; }
+                if r.changed() { self.palette_cursor = 0; }
+                if let Some(name) = &wire_name {
+                    ui.label(theme::small(format!("{} · {} と接続できる候補のみ", name, wire_type.map(DataType::label).unwrap_or("データ"))));
                 }
-                ui.add_space(7.);
-                let matches: Vec<_> = NodeKind::all()
-                    .iter()
-                    .copied()
-                    .filter(|k| matches_search(*k, &self.search))
-                    .collect();
-                // IME Enter belongs to the input method; selecting a result is always explicit.
-                egui::ScrollArea::vertical()
-                    .max_height(360.)
-                    .show(ui, |ui| {
-                        for kind in &matches {
-                            let spec = kind.spec();
-                            if ui
-                                .add_sized(
-                                    [410., 34.],
-                                    egui::Button::new(
-                                        RichText::new(format!(
-                                            "{}     ·     {}",
-                                            spec.label, spec.category
-                                        ))
-                                        .color(theme::category_color(spec.category)),
-                                    )
-                                    .frame(false),
-                                )
-                                .on_hover_text(spec.description)
-                                .clicked()
-                            {
-                                add = Some(*kind);
+                let matches = ui_polish::rank(&ordered, &self.palette_query, &self.recent, wire_type);
+                let last = matches.len().saturating_sub(1);
+                if down && !r.changed() { self.palette_cursor = (self.palette_cursor + 1).min(last); }
+                if up && !r.changed() { self.palette_cursor = self.palette_cursor.saturating_sub(1); }
+                self.palette_cursor = self.palette_cursor.min(last);
+                if enter && !r.changed() { add = matches.get(self.palette_cursor).copied(); }
+                ui.label(theme::small(format!("{} 件 · ↑↓ / Enter", matches.len())));
+                let cursor = self.palette_cursor;
+                egui::ScrollArea::vertical().max_height(max_height).show(ui, |ui| {
+                    for (index, kind) in matches.iter().enumerate() {
+                        let spec = kind.spec();
+                        let favorite = self.favorites.contains(kind);
+                        let response = ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(26., 26.), Sense::hover());
+                            node_icons::paint(ui.painter(), r, *kind, spec.category, theme::category_color(spec.category));
+                            let star = if favorite { "★ " } else { "" };
+                            let row = ui.selectable_label(index == cursor, format!("{star}{}", spec.label))
+                                .on_hover_text(spec.description);
+                            theme::pill(ui, spec.category, theme::category_color(spec.category));
+                            ui.label(theme::small(ui_polish::signature(*kind)));
+                            row
+                        }).inner;
+                        response.context_menu(|ui| {
+                            let text = if favorite { "★ お気に入りから外す" } else { "★ お気に入りに追加" };
+                            if ui.button(text).clicked() {
+                                star = Some(*kind);
+                                ui.close();
                             }
-                        }
-                        if matches.is_empty() {
-                            ui.label(
-                                "見つかりません。「移動」「花器」「数列」などを試してください。",
-                            );
-                        }
-                    });
-                ui.label(theme::small("クリックで追加  ·  Esc で閉じる"));
+                        });
+                        if index == cursor && (first || up || down || r.changed()) { response.scroll_to_me(None); }
+                        if response.clicked() { add = Some(*kind); }
+                    }
+                    if matches.is_empty() {
+                        ui.label(if wire_type.is_some() { "接続できる候補がありません。検索語を変えるか Esc で中止してください。" }
+                            else { "見つかりません。例: 円を作る、面を作る、花瓶を作る" });
+                    }
+                });
             });
+        if let Some(kind) = star {
+            self.toggle_favorite(kind);
+        }
         if let Some(kind) = add {
             self.add_node(kind, Some(self.palette_position));
         } else {
-            self.palette_open = open && !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+            self.palette_open = open && !escape;
         }
+    }
+    /// ショートカット一覧 (?): every keyboard shortcut, in Japanese.
+    fn shortcuts_dialog(&mut self, ctx: &egui::Context) {
+        if !self.shortcuts_open {
+            return;
+        }
+        let mut open = true;
+        egui::Window::new("キーボードショートカット")
+            .open(&mut open)
+            .collapsible(false)
+            .default_width(520.)
+            .max_width((ctx.content_rect().width() - 64.0).clamp(280.0, 520.0))
+            .anchor(egui::Align2::CENTER_CENTER, [0., 0.])
+            .show(ctx, |ui| {
+                ui.label(theme::small(
+                    "? キーでいつでも開けます。文字を入力中は一部の操作が無効になります。",
+                ));
+                ui.add_space(8.);
+                egui::ScrollArea::vertical()
+                    .id_salt("keyboard_shortcuts_body")
+                    .max_height((ctx.content_rect().height() - 150.0).max(160.0))
+                    .show(ui, |ui| {
+                        egui::Grid::new("shortcut_grid")
+                            .num_columns(2)
+                            .spacing([28., 7.])
+                            .show(ui, |ui| {
+                                for (keys, what) in ui_polish::SHORTCUTS {
+                                    ui.label(RichText::new(*keys).size(12.).color(theme::teal()));
+                                    ui.label(RichText::new(*what).size(12.));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+            });
+        self.shortcuts_open = open;
     }
     fn template_dialog(&mut self, ctx: &egui::Context) {
         if !self.template_open {
@@ -1199,7 +2407,7 @@ impl MorphletApp {
                 ui.add_space(12.);
                 for (index, t) in templates::TEMPLATES.iter().enumerate() {
                     egui::Frame::new()
-                        .fill(Color32::from_rgb(240, 245, 237))
+                        .fill(theme::card_bg())
                         .corner_radius(8)
                         .inner_margin(14)
                         .show(ui, |ui| {
@@ -1224,69 +2432,99 @@ impl MorphletApp {
             self.request(PendingAction::Template(index), ctx);
         }
     }
-    fn export_dialog(&mut self, ctx: &egui::Context) {
-        if !self.export_open {
+    fn stl_sources(&self) -> StlSources {
+        StlSources {
+            output: self.result_trees(),
+            selected: self.selected_trees(),
+            revision: self.result_revision,
+            base_name: safe_name(&self.project.name),
+            start_dir: self.start_directory(),
+        }
+    }
+    /// Trees of the nodes selected on the canvas (選択ノード mode).
+    fn selected_trees(&self) -> Result<Vec<Tree>, String> {
+        if self.stale() {
+            return Err("形状を更新中です。更新が終わってから書き出してください。".into());
+        }
+        let Some(e) = &self.evaluation else {
+            return Err("形状の計算が完了していません。".into());
+        };
+        if self.canvas.selected.is_empty() {
+            return Err("書き出すノードを選んでください。".into());
+        }
+        let mut trees = Vec::new();
+        for id in &self.canvas.selected {
+            match e.outputs.get(id) {
+                Some(Ok(tree)) => trees.push(tree.clone()),
+                Some(Err(error)) => {
+                    return Err(format!("選んだノードを計算できません: {error}"));
+                }
+                None => return Err("選んだノードの計算結果がまだありません。".into()),
+            }
+        }
+        Ok(trees)
+    }
+    fn stl_request(&mut self, request: Option<UiRequest>) {
+        match request {
+            Some(UiRequest::Pick {
+                task,
+                directory,
+                file_name,
+            }) => {
+                self.file_picker = Some(FilePicker::new(task, directory, file_name));
+            }
+            Some(UiRequest::PickSlicer { directory }) => {
+                self.file_picker = Some(FilePicker::new(
+                    FileTask::PickSlicer,
+                    directory,
+                    String::new(),
+                ));
+            }
+            None => {}
+        }
+    }
+    fn flush_stl_notice(&mut self) {
+        if let Some((text, error)) = self.stl_export.take_notice() {
+            self.notify(text, error);
+        }
+    }
+    fn stl_quick_shortcut(&mut self, ctx: &egui::Context) {
+        if stl_export_ui::quick_export_pressed(ctx) {
+            let sources = self.stl_sources();
+            let request = self.stl_export.quick(&sources);
+            self.stl_request(request);
+            self.flush_stl_notice();
+        }
+    }
+    fn stl_export_dialog(&mut self, ctx: &egui::Context) {
+        if !self.stl_export.is_open() {
             return;
         }
-        let mut open = true;
-        let mut format = None;
-        egui::Window::new("形を書き出す").open(&mut open).collapsible(false).resizable(false).default_width(455.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.label("「出力」ノードの形状を、mm 単位で保存します。");ui.add_space(12.);
-            if self.stale(){ui.colored_label(theme::ERROR,"形状を更新中です。更新完了後に開き直してください。");return;}
-            match self.export_stats.as_ref(){
-                Some(Ok(stats))=>{
-                    egui::Grid::new("export_stats").num_columns(2).spacing([24.,10.]).show(ui,|ui|{
-                        ui.label("メッシュ");ui.label(stats.mesh_count.to_string());ui.end_row();
-                        ui.label("三角形");ui.label(stats.triangles.to_string());ui.end_row();
-                        ui.label("開いた辺");ui.label(stats.open_edges.to_string());ui.end_row();
-                        ui.label("非多様体の辺");ui.label(stats.non_manifold_edges.to_string());ui.end_row();
-                    });
-                    ui.add_space(10.);
-                    if stats.is_closed() {ui.colored_label(theme::TEAL,"閉じたメッシュです（辺のつながりを確認）。");}
-                    else{ui.colored_label(theme::ERROR,"開いた辺や面の向きに問題があります。書き出し後にスライサーで確認してください。");}
-                    ui.label(theme::small("自己交差や造形可否の判定は含みません。"));
-                    if stats.skipped_values > 0 { ui.label(theme::small(format!("数値・点・曲線の {} 要素は書き出しに含みません。", stats.skipped_values))); }
-                    if stats.degenerate_triangles > 0 { ui.colored_label(theme::ERROR, format!("面が潰れています（{} 面）。形状を修正してください。", stats.degenerate_triangles)); }
-                    ui.add_space(12.);
-                    ui.horizontal(|ui|{
-                        if ui.add_sized([195.,40.],egui::Button::new("STL · 3D プリント").fill(theme::TEAL_PALE)).clicked(){format=Some("stl");}
-                        if ui.add_sized([195.,40.],egui::Button::new("OBJ · 3D ソフト")).clicked(){format=Some("obj");}
-                    });
-                },Some(Err(e))=>{ui.colored_label(theme::ERROR,e);ui.label("立体を作り、「出力」ノードにつないでください。");},None=>{ui.label("形状を確認できませんでした。");}
-            }
-        });
-        self.export_open = open;
-        if let Some(format) = format {
+        let sources = self.stl_sources();
+        let request = self.stl_export.show(ctx, &sources);
+        self.stl_request(request);
+        self.flush_stl_notice();
+    }
+    fn gcode_dialog(&mut self, ctx: &egui::Context) {
+        if !self.gcode.is_open() {
+            return;
+        }
+        let trees = self.result_trees();
+        if self.gcode.show(ctx, &trees) {
             self.file_picker = Some(FilePicker::new(
-                if format == "stl" {
-                    FileTask::ExportStl
-                } else {
-                    FileTask::ExportObj
-                },
+                FileTask::ExportGcode,
                 self.start_directory(),
-                format!("{}.{}", safe_name(&self.project.name), format),
+                format!("{}.gcode", safe_name(&self.project.name)),
             ));
-            self.export_open = false;
         }
     }
     fn help_dialog(&mut self, ctx: &egui::Context) {
-        if !self.help_open {
-            return;
+        match crate::getting_started::show(ctx, &mut self.help_open, &mut self.ui_scale) {
+            Some(crate::getting_started::Action::Examples) => self.template_open = true,
+            Some(crate::getting_started::Action::Dictionary) => self.help_window.open_index(),
+            Some(crate::getting_started::Action::Shortcuts) => self.shortcuts_open = true,
+            None => {}
         }
-        let mut open = true;
-        egui::Window::new("Morphlet の使い方").open(&mut open).collapsible(false).default_width(570.).anchor(egui::Align2::CENTER_CENTER,[0.,0.]).show(ctx,|ui|{
-            ui.heading("つなぐ。変える。形になる。");ui.add_space(10.);
-            for (title,body) in [("1  作品例を開く","まずは「ねじれの花器」。ノードを選ぶと右下に設定が出ます。"),("2  数値を動かす","スライダーを動かすか、数値を直接入力。形がすぐに変わります。"),("3  処理を追加する","左で「移動」「円形配列」などを検索。選択した形状に自動でつながります。"),("4  線をつなぐ","右の丸から左の丸へドラッグ。または出力→入力の順にクリック。入力の丸を右クリックで切断。"),("5  保存して、つくる",".morph は編集できる作品ファイル。STL はスライサー用、OBJ は3Dソフト用です。")]{
-                ui.label(RichText::new(title).strong());ui.label(body);ui.add_space(8.);
-            }
-            ui.separator();
-            egui::Grid::new("shortcuts").num_columns(2).spacing([24.,6.]).show(ui,|ui|{
-                for (a,b) in [("Ctrl+S / Ctrl+O","保存 / 開く"),("Ctrl+Z / Ctrl+Y","元に戻す / やり直す"),("Ctrl+D / Delete","選択ノードを複製 / 削除"),("Tab / Ctrl+K","ノードを検索"),("Shift+クリック / 範囲ドラッグ","複数のノードを選ぶ"),("F","グラフと形状を画面に収める"),("3D: 左ドラッグ / Shift+ドラッグ","回転 / 移動"),("ホイール","拡大・縮小")]{ui.label(RichText::new(a).size(11.).color(theme::TEAL));ui.label(RichText::new(b).size(11.));ui.end_row();}
-            });
-            ui.add_space(12.);ui.separator();ui.label(theme::small("Morphlet 0.1 · 独立したノード式メッシュモデラ\nこの版は NURBS / STEP / GH・GHX / Grasshopperプラグインには対応していません。"));
-            ui.horizontal(|ui|{ui.label("表示サイズ");if ui.add(egui::Slider::new(&mut self.ui_scale,0.85..=1.35).step_by(0.05)).changed(){ctx.set_zoom_factor(self.ui_scale);}});
-        });
-        self.help_open = open;
     }
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
         let Some(action) = self.confirm_action.clone() else {
@@ -1329,6 +2567,7 @@ impl MorphletApp {
             ui.horizontal(|ui| {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
+                    self.clipboard.clear();
                     self.recovery = None;
                     self.dirty = true;
                     self.suppress_history = true;
@@ -1341,65 +2580,179 @@ impl MorphletApp {
             });
         });
     }
+    /// 「名前」: message for the selected node's error, else the first error.
+    fn error_line(&self, e: &Evaluation) -> Option<String> {
+        let selected = self.canvas.selected.iter().next_back().copied();
+        let pick = selected
+            .and_then(|id| {
+                e.outputs
+                    .get(&id)
+                    .and_then(|r| r.as_ref().err())
+                    .map(|m| (id, m))
+            })
+            .or_else(|| {
+                e.outputs
+                    .iter()
+                    .find_map(|(id, r)| r.as_ref().err().map(|m| (*id, m)))
+            })?;
+        let name = self
+            .project
+            .graph
+            .node(pick.0)
+            .map(|n| n.name.as_str())
+            .unwrap_or("?");
+        let message: String = pick.1.chars().take(90).collect();
+        Some(format!("「{name}」: {message}"))
+    }
+    fn values_window(&mut self, ctx: &egui::Context) {
+        if !self.values_open {
+            return;
+        }
+        let mut open = true;
+        let id = self.canvas.selected.iter().next_back().copied();
+        let title = id
+            .and_then(|id| self.project.graph.node(id))
+            .map(|n| format!("値を見る · {}", n.name))
+            .unwrap_or_else(|| "値を見る".into());
+        egui::Window::new("値を見る")
+            .id(egui::Id::new("values_window"))
+            .open(&mut open)
+            .resizable(true)
+            .default_size([420., 460.])
+            .show(ctx, |ui| {
+                ui.label(RichText::new(title).strong());
+                let Some(id) = id else {
+                    ui.label(theme::small(
+                        "キャンバスでノードを選ぶと、その出力が表示されます。",
+                    ));
+                    return;
+                };
+                if self.stale() {
+                    ui.label(theme::small("更新を待っています…"));
+                }
+                match self.evaluation.as_ref().and_then(|e| e.outputs.get(&id)) {
+                    Some(Ok(tree)) => {
+                        let h = (ui.available_height() - 30.).max(160.);
+                        data_view::show_tree(ui, tree, "window", h);
+                    }
+                    Some(Err(e)) => {
+                        ui.colored_label(theme::error(), e);
+                    }
+                    None => {
+                        ui.label(theme::small("未計算"));
+                    }
+                }
+                ui.label(theme::small(format!(
+                    "数値は省略表示です。詳しい値はホバー・右クリックで確認できます。最大 {} 行。",
+                    data_view::MAX_ROWS
+                )));
+            });
+        self.values_open = open;
+    }
     fn save_recovery(&mut self) {
         if !self.dirty || self.last_autosave.elapsed() < Duration::from_secs(20) {
             return;
         }
-        if let Some(path) = recovery_path() {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = persistence::save(&path, &self.project);
+        let result = recovery_path()
+            .ok_or_else(|| "自動保存先が見つかりません。".to_string())
+            .and_then(|path| {
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| format!("自動保存先を作成できませんでした: {e}"))?;
+                }
+                persistence::save(&path, &self.project)
+            });
+        if let Err(error) = result {
+            self.notify(
+                format!("自動保存に失敗しました。手動で保存してください: {error}"),
+                true,
+            );
         }
         self.last_autosave = Instant::now();
     }
 }
 
-impl eframe::App for MorphletApp {
+impl eframe::App for NodesApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.compute_tick(ctx);
-        let before = self.project.clone();
         self.suppress_history = false;
-        if ctx.input(|i| i.pointer.any_pressed()) && self.gesture_before.is_none() {
-            self.gesture_before = Some(before.clone());
-        }
+        self.edits
+            .begin(&self.project, ctx.input(|i| i.pointer.any_pressed()));
         if self.confirm_action.is_none()
             && self.recovery.is_none()
             && !self.palette_open
             && !self.template_open
             && !self.help_open
-            && !self.export_open
+            && !self.gcode.is_open()
             && self.file_picker.is_none()
         {
+            self.stl_quick_shortcut(ctx);
             self.keyboard(ctx);
         }
         self.topbar(ctx);
+        self.shelf_panel(ctx);
         self.statusbar(ctx);
-        self.library(ctx);
-        self.right_panel(ctx);
+        if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
+            self.library(ctx);
+        }
+        if self.show_workspace {
+            self.right_panel(ctx);
+        }
         self.center_panel(ctx);
         self.palette(ctx);
+        self.persist_shelf_lists();
+        self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
-        self.export_dialog(ctx);
+        self.gcode_dialog(ctx);
+        self.stl_export_dialog(ctx);
         self.help_dialog(ctx);
+        if let Some(kind) = self.help_window.show(ctx) {
+            self.add_node(kind, None);
+        }
+        self.values_window(ctx);
+        // Edits earlier in this frame queue their revision below. Do not allow
+        // navigation using a prior result during that brief interval either.
+        let stale = self.stale()
+            || (self.diagnostics_window.open
+                && !same_calculation(&self.edits.previous.graph, &self.project.graph));
+        if let Some(id) = self.diagnostics_window.show(
+            ctx,
+            self.diagnostics.as_ref(),
+            &self.project.graph,
+            stale,
+            self.revision,
+        ) {
+            self.canvas.select_only(id);
+            self.canvas.fit_selection_requested = true;
+            self.show_workspace = true;
+        }
         self.confirm_dialog(ctx);
         self.recovery_dialog(ctx);
-        self.file_dialog(ctx);
-        if !self.suppress_history && document_changed(&before, &self.project) {
-            self.dirty = true;
-            if self.gesture_before.is_none() {
-                self.history.checkpoint(&before);
-            }
-            if !same_calculation(&before.graph, &self.project.graph) {
-                self.queue_compute();
+        // Dropped files run before the change check below, so a node they add is
+        // checkpointed and computed in this frame.
+        for dropped in ctx.input(|i| i.raw.dropped_files.clone()) {
+            if let Some(path) = dropped.path {
+                if nodes::import::format_of(&path).is_some() {
+                    // The drop itself carries no position; the last pointer position is used.
+                    let at = ctx
+                        .input(|i| i.pointer.latest_pos())
+                        .and_then(|p| self.canvas.world_at(&self.project, p));
+                    self.set_import_file(&path, None, at);
+                } else {
+                    self.request(PendingAction::Open(path), ctx);
+                }
             }
         }
-        if !ctx.input(|i| i.pointer.any_down())
-            && let Some(start) = self.gesture_before.take()
-            && !self.suppress_history
-            && document_changed(&start, &self.project)
-        {
-            self.history.checkpoint(&start);
+        self.file_dialog(ctx);
+        let (edited, recalculate) = self.edits.finish(
+            &self.project,
+            ctx.input(|i| i.pointer.any_down()),
+            self.suppress_history,
+            &mut self.history,
+        );
+        self.dirty |= edited;
+        if recalculate {
+            self.queue_compute();
         }
         if let Some((text, error, start)) = &self.toast
             && start.elapsed() < Duration::from_secs(if *error { 9 } else { 4 })
@@ -1410,7 +2763,7 @@ impl eframe::App for MorphletApp {
                 .show(ctx, |ui| {
                     egui::Frame::new()
                         .fill(if *error {
-                            Color32::from_rgb(252, 231, 224)
+                            theme::error_fill()
                         } else {
                             Color32::from_rgb(32, 66, 53)
                         })
@@ -1419,18 +2772,13 @@ impl eframe::App for MorphletApp {
                         .show(ui, |ui| {
                             ui.set_max_width(650.);
                             ui.label(RichText::new(text).size(12.).color(if *error {
-                                theme::ERROR
+                                theme::error()
                             } else {
                                 Color32::WHITE
                             }));
                         });
                 });
             ctx.request_repaint_after(Duration::from_millis(200));
-        }
-        for dropped in ctx.input(|i| i.raw.dropped_files.clone()) {
-            if let Some(path) = dropped.path {
-                self.request(PendingAction::Open(path), ctx);
-            }
         }
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close && self.dirty {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -1467,6 +2815,60 @@ impl eframe::App for MorphletApp {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
+}
+
+/// Copies the chosen subgraph atomically. A duplicate retains upstream links;
+/// a paste only retains links inside the copied selection. Cluster definitions remain
+/// document-local, so a stale/missing definition causes validation to fail.
+fn insert_nodes(
+    graph: &mut Graph,
+    nodes: &[Node],
+    offset: [f32; 2],
+    retain_external: bool,
+) -> Result<BTreeSet<NodeId>, String> {
+    if nodes.len() > nodes::model::MAX_NODES.saturating_sub(graph.nodes.len()) {
+        return Err("ノード数の上限を超えるため追加できません。".into());
+    }
+    let mut candidate = graph.clone();
+    let mut mapping = BTreeMap::new();
+    for old in nodes {
+        let id = candidate.add(
+            old.kind,
+            [
+                (old.position[0] + offset[0]).clamp(-1e6, 1e6),
+                (old.position[1] + offset[1]).clamp(-1e6, 1e6),
+            ],
+        )?;
+        mapping.insert(old.id, id);
+        let n = candidate
+            .node_mut(id)
+            .ok_or("追加したノードが見つかりません。")?;
+        n.name = old.name.clone();
+        n.params = old.params.clone();
+        n.preview = old.preview;
+        n.script = old.script.clone();
+        n.cluster = old.cluster;
+        n.off = old.off;
+    }
+    for old in nodes {
+        let new = candidate
+            .node_mut(mapping[&old.id])
+            .ok_or("追加したノードが見つかりません。")?;
+        new.inputs = old
+            .inputs
+            .iter()
+            .filter_map(|(key, source)| {
+                mapping
+                    .get(source)
+                    .copied()
+                    .or_else(|| retain_external.then_some(*source))
+                    .map(|id| (key.clone(), id))
+            })
+            .collect();
+    }
+    candidate.validate()?;
+    *graph = candidate;
+    Ok(mapping.values().copied().collect())
 }
 
 fn collect_export_trees(
@@ -1507,41 +2909,121 @@ fn collect_export_trees(
         .collect()
 }
 
+/// A drag gets one undo entry. Merely painting, panning or pressing a button
+/// keeps the existing graph snapshot, including when a worker requests a repaint.
+struct EditTracker {
+    previous: Project,
+    gesture: Option<EditGesture>,
+}
+
+struct EditGesture {
+    pan: [f32; 2],
+    zoom: f32,
+    before: Option<Project>,
+}
+
+impl EditTracker {
+    fn new(project: &Project) -> Self {
+        Self {
+            previous: project.clone(),
+            gesture: None,
+        }
+    }
+
+    fn begin(&mut self, project: &Project, pressed: bool) {
+        self.previous.pan = project.pan;
+        self.previous.zoom = project.zoom;
+        if pressed && self.gesture.is_none() {
+            self.gesture = Some(EditGesture {
+                pan: project.pan,
+                zoom: project.zoom,
+                before: None,
+            });
+        }
+    }
+
+    fn finish(
+        &mut self,
+        project: &Project,
+        pointer_down: bool,
+        suppress: bool,
+        history: &mut History,
+    ) -> (bool, bool) {
+        let changed = document_changed(&self.previous, project);
+        let edited = changed && !suppress;
+        let recalculate = edited && !same_calculation(&self.previous.graph, &project.graph);
+        if suppress {
+            // Open, recovery and undo/redo establish a fresh baseline.
+            self.gesture = None;
+        }
+        if changed {
+            let mut before = std::mem::replace(&mut self.previous, project.clone());
+            if edited {
+                if let Some(gesture) = &mut self.gesture {
+                    if gesture.before.is_none() {
+                        before.pan = gesture.pan;
+                        before.zoom = gesture.zoom;
+                        gesture.before = Some(before);
+                    }
+                } else {
+                    history.checkpoint_owned(before);
+                }
+            }
+        }
+        if !pointer_down
+            && let Some(before) = self.gesture.take().and_then(|g| g.before)
+            && document_changed(&before, project)
+        {
+            history.checkpoint_owned(before);
+        }
+        (edited, recalculate)
+    }
+}
+
 fn document_changed(a: &Project, b: &Project) -> bool {
-    a.name != b.name || a.graph != b.graph
+    a.name != b.name || a.graph != b.graph || !persistence::same_parameter_bits(&a.graph, &b.graph)
 }
 fn same_calculation(a: &Graph, b: &Graph) -> bool {
     a.nodes.len() == b.nodes.len()
+        && a.clusters == b.clusters
+        && persistence::same_parameter_bits(a, b)
         && a.nodes.iter().zip(&b.nodes).all(|(x, y)| {
-            x.id == y.id && x.kind == y.kind && x.params == y.params && x.inputs == y.inputs
+            x.id == y.id
+                && x.kind == y.kind
+                && x.inputs == y.inputs
+                && x.script == y.script
+                && x.cluster == y.cluster
+                && x.off == y.off
         })
 }
+#[cfg(test)]
+#[path = "signed_zero_tests.rs"]
+mod signed_zero_tests;
+
+#[cfg(test)]
 fn matches_search(kind: NodeKind, query: &str) -> bool {
-    let q = query.trim().to_lowercase().replace('　', " ");
-    if q.is_empty() {
-        return true;
-    }
-    let s = kind.spec();
-    let hay = format!("{} {} {}", s.label, s.keywords, s.category).to_lowercase();
-    q.split_whitespace().all(|word| {
-        let alias = match word {
-            "まる" | "えん" => "円",
-            "はこ" => "箱",
-            "しかく" => "長方形",
-            "はなびん" | "かびん" => "花器",
-            "ならべる" => "配列",
-            "おしだし" => "押し出し",
-            "らせん" => "らせん",
-            _ => word,
-        };
-        hay.contains(alias)
-    })
+    ui_polish::query_score(kind, query).is_some()
+}
+/// Node kinds in library order: by category, then by the order in `NodeKind::all`.
+fn ordered_kinds() -> Vec<NodeKind> {
+    let mut ordered: Vec<_> = NodeKind::all().to_vec();
+    ordered.sort_by_key(|kind| category_rank(kind.spec().category));
+    ordered
 }
 fn category_rank(category: &str) -> usize {
-    ["立体", "曲線", "変形", "配列", "数値", "データ", "出力"]
-        .iter()
-        .position(|s| *s == category)
-        .unwrap_or(99)
+    [
+        "立体",
+        "精密曲面",
+        "曲線",
+        "変形",
+        "配列",
+        "数値",
+        "データ",
+        "出力",
+    ]
+    .iter()
+    .position(|s| *s == category)
+    .unwrap_or(99)
 }
 fn safe_name(name: &str) -> String {
     let result: String = name
@@ -1550,7 +3032,7 @@ fn safe_name(name: &str) -> String {
         .take(70)
         .collect();
     if result.trim().is_empty() {
-        "Morphlet".into()
+        "NODES".into()
     } else {
         result
     }
@@ -1558,7 +3040,7 @@ fn safe_name(name: &str) -> String {
 fn recovery_path() -> Option<PathBuf> {
     if cfg!(target_os = "windows") {
         std::env::var_os("LOCALAPPDATA")
-            .map(|p| PathBuf::from(p).join("Morphlet").join("recovery.morph"))
+            .map(|p| PathBuf::from(p).join("NODES").join("recovery.morph"))
     } else {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
@@ -1566,30 +3048,90 @@ fn recovery_path() -> Option<PathBuf> {
             .map(|p| p.join("morphlet/recovery.morph"))
     }
 }
-fn value_summary(value: &Value) -> String {
-    match value {
-        Value::Number(v) => format!("{v:.4}"),
-        Value::Point(p) => format!("点  ({:.2}, {:.2}, {:.2})", p[0], p[1], p[2]),
-        Value::Curve(c) => format!(
-            "曲線 · {} 点 · {}",
-            c.points.len(),
-            if c.closed { "閉じた" } else { "開いた" }
-        ),
-        Value::Mesh(m) => format!(
-            "メッシュ · {} 頂点 / {} 面",
-            m.vertices.len(),
-            m.triangles.len()
-        ),
+// Reading a parameter must not quantize it or change a loaded document. The
+// metadata step is interaction speed, not an origin-offset grid of valid values.
+fn parameter_binding<'a>(
+    value: &'a mut f64,
+    spec: InputSpec,
+) -> impl FnMut(Option<f64>) -> f64 + 'a {
+    let (min, max, integer) = (spec.min, spec.max, spec.integer);
+    move |edited| {
+        if let Some(edited) = edited.filter(|number| number.is_finite()) {
+            let edited = if integer { edited.round() } else { edited };
+            *value = edited.clamp(min, max);
+        }
+        *value
     }
 }
-fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
+
+fn parse_parameter_number(text: &str) -> Option<f64> {
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| if c == '−' { '-' } else { c })
+        .collect();
+    text.parse::<f64>().ok().filter(|number| number.is_finite())
+}
+
+pub(crate) fn parameter_slider<'a>(value: &'a mut f64, spec: &InputSpec) -> egui::Slider<'a> {
+    let (low, high) = friendly_range(spec.key, spec.min, spec.max, *value);
+    egui::Slider::from_get_set(low..=high, parameter_binding(value, *spec))
+        // The track uses a convenient range. Text entry uses the full metadata
+        // range enforced by the setter, including values beyond the track ends.
+        .clamping(egui::SliderClamping::Never)
+        .drag_value_speed(spec.step)
+        .max_decimals_opt(spec.integer.then_some(0))
+        // DragValue parses its displayed text on focus loss; a shortened decimal
+        // display would silently round a precise value even without an edit.
+        .custom_formatter(|number, _| number.to_string())
+        .custom_parser(parse_parameter_number)
+}
+
+pub(crate) fn parameter_drag_value<'a>(
+    value: &'a mut f64,
+    spec: &InputSpec,
+) -> egui::DragValue<'a> {
+    egui::DragValue::from_get_set(parameter_binding(value, *spec))
+        .speed(spec.step)
+        .range(spec.min..=spec.max)
+        .clamp_existing_to_range(false)
+        .max_decimals_opt(spec.integer.then_some(0))
+        .custom_formatter(|number, _| number.to_string())
+        .custom_parser(parse_parameter_number)
+}
+
+/// Keep the text field bound directly to the parameter. Slider's built-in value
+/// editor copies through ordinary f64 equality, which discards a +0 -> -0 edit.
+pub(crate) fn parameter_editor(
+    ui: &mut egui::Ui,
+    value: &mut f64,
+    spec: &InputSpec,
+) -> egui::Response {
+    let before = value.to_bits();
+    let mut response = ui
+        .horizontal(|ui| {
+            let track = ui.add(parameter_slider(value, spec).show_value(false));
+            let number = ui.add(parameter_drag_value(value, spec));
+            track.union(number)
+        })
+        .inner;
+    if value.to_bits() != before {
+        response.mark_changed();
+    }
+    response
+}
+
+pub(crate) fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     let (lo, hi) = match key {
-        "radius" | "inner_radius" => (min, 120.),
+        "radius" | "inner_radius" | "major" | "minor" => (min, 120.),
         "height" => (min, 240.),
         "width" | "depth" => (min, 180.),
         "thickness" => (min, 12.),
         "angle" => (min.max(-360.), 360.),
-        "value" | "a" | "b" => (min.max(-100.), 100.),
+        "value" | "a" | "b" | "base" | "amp" | "start" | "end" => (min.max(-100.), 100.),
+        "exponent" | "frequency" => (min.max(-10.), 10.),
+        "sx" | "sy" | "sz" => (min, 5.),
+        "divisions" => (min, 32.),
         "x" | "y" | "z" => (min.max(-200.), 200.),
         "count" => (min, 32.),
         "segments" => (min, 128.),
@@ -1597,6 +3139,14 @@ fn friendly_range(key: &str, min: f64, max: f64, value: f64) -> (f64, f64) {
     };
     (lo.min(value).max(min), hi.max(value).min(max))
 }
+
+#[cfg(test)]
+#[path = "numeric_editor_tests.rs"]
+mod numeric_editor_tests;
+
+#[cfg(test)]
+#[path = "viewport_cache_tests.rs"]
+mod viewport_cache_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1608,6 +3158,99 @@ mod tests {
         assert!(matches_search(NodeKind::LinearArray, "並べる"));
         assert!(!matches_search(NodeKind::Circle, "box"));
     }
+    #[test]
+    fn copy_paste_remaps_internal_edges_and_drops_external_links() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let c = graph.add(NodeKind::Multiply, [600., 0.]).unwrap();
+        graph.connect(a, b, "a").unwrap();
+        graph.connect(b, c, "a").unwrap();
+        let nodes = vec![
+            graph.node(b).unwrap().clone(),
+            graph.node(c).unwrap().clone(),
+        ];
+        let ids = insert_nodes(&mut graph, &nodes, [0., 300.], false).unwrap();
+        let pasted: Vec<_> = ids.iter().copied().collect();
+        assert!(graph.node(pasted[0]).unwrap().inputs.is_empty());
+        assert_eq!(graph.node(pasted[1]).unwrap().inputs["a"], pasted[0]);
+        let duplicates: Vec<_> = insert_nodes(&mut graph, &nodes, [0., 600.], true)
+            .unwrap()
+            .into_iter()
+            .collect();
+        assert_eq!(graph.node(duplicates[0]).unwrap().inputs["a"], a);
+        assert_eq!(
+            graph.node(duplicates[1]).unwrap().inputs["a"],
+            duplicates[0]
+        );
+        graph.validate().unwrap();
+    }
+
+    #[test]
+    fn failed_paste_is_atomic() {
+        let mut graph = Graph::default();
+        let id = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let mut node = graph.node(id).unwrap().clone();
+        node.params.insert("value".into(), f64::NAN);
+        let before = graph.clone();
+        assert!(insert_nodes(&mut graph, &[node], [0., 0.], false).is_err());
+        assert_eq!(graph, before);
+    }
+
+    #[test]
+    fn repaint_and_view_gestures_reuse_the_snapshot_and_drag_keeps_one_undo() {
+        let mut project = Project::new("追跡", Graph::default());
+        let id = project.graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let initial = project.clone();
+        let mut tracker = EditTracker::new(&project);
+        let mut history = History::default();
+        let nodes = tracker.previous.graph.nodes.as_ptr();
+
+        tracker.begin(&project, true);
+        project.pan = [45., 60.];
+        for _ in 0..60 {
+            tracker.begin(&project, false);
+            assert_eq!(
+                tracker.finish(&project, true, false, &mut history),
+                (false, false)
+            );
+            assert_eq!(tracker.previous.graph.nodes.as_ptr(), nodes);
+            assert!(tracker.gesture.as_ref().unwrap().before.is_none());
+        }
+        for n in 2..=4 {
+            tracker.begin(&project, false);
+            project
+                .graph
+                .node_mut(id)
+                .unwrap()
+                .params
+                .insert("value".into(), f64::from(n));
+            assert_eq!(
+                tracker.finish(&project, n != 4, false, &mut history),
+                (true, true)
+            );
+        }
+        let edited = project.clone();
+        assert!(history.undo(&mut project));
+        assert_eq!(project, initial);
+        assert!(!history.can_undo());
+        assert_eq!(
+            tracker.finish(&project, false, true, &mut history),
+            (false, false)
+        );
+        assert!(history.redo(&mut project));
+        assert_eq!(project, edited);
+        tracker.finish(&project, false, true, &mut history);
+        tracker.begin(&project, false);
+        project.name = "更新".into();
+        assert_eq!(
+            tracker.finish(&project, false, false, &mut history),
+            (true, false)
+        );
+        assert!(history.undo(&mut project));
+        assert_eq!(project, edited);
+    }
+
     #[test]
     fn layout_changes_do_not_trigger_geometry() {
         let a = templates::create(0);
@@ -1621,7 +3264,7 @@ mod tests {
     #[test]
     fn file_name_is_path_safe() {
         assert_eq!(safe_name("a/b:c*"), "abc");
-        assert_eq!(safe_name(""), "Morphlet");
+        assert_eq!(safe_name(""), "NODES");
     }
     #[test]
     fn export_never_silently_drops_a_failed_output() {

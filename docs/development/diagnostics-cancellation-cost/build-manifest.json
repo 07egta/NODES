@@ -1,0 +1,98 @@
+{
+  "experiment": "Cancellation instrumentation cost: unchanged diagnostic modules and three API paths",
+  "started_at_utc": "2026-11-27T00:29:17.005495+00:00",
+  "library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+  "worktree": "/workspace/scratch/74d3da15ab33/NODES-diagnostics-cancellation-cost",
+  "target_directory": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+  "target_policy": "Exclusively owned existing dependency target; cargo clean -p morphlet --release forces fresh project library and example while retaining third-party dependencies. Both diagnostic implementations then coexist in that single fresh library.",
+  "snapshots": [
+    {
+      "label": "before",
+      "revision": "f858186b6d8907ca1184054a25ff127d71564b15",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_before.rs",
+      "sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+      "bytes": 21010,
+      "fnv1a64": "ce9da1d576fb99ed"
+    },
+    {
+      "label": "after",
+      "revision": "3e3bb46185628e479888053fe4e4ff606047c244",
+      "git_path": "src/diagnostics.rs",
+      "snapshot": "diagnostics_after.rs",
+      "sha256": "865324a95c61991e84c6797ab15573935d17245cb95c6da7575343adb9c65a33",
+      "bytes": 26623,
+      "fnv1a64": "8602a796fe6070b0"
+    }
+  ],
+  "harness_sha256": "4249d1c8a30a7571d3badb2c62c97604eb3c6e792a9c4bb9ef8e58c4c60098a1",
+  "library_shim_sha256": "7da7995d9190634a68b8a79df185ff9ce1306b41b99758c2e39cc4b1f62f0c79",
+  "full_lib_rs_sha256": "e334fc0fed8f1f1bc7daa76c7e1b069fa45345cf393af94344a3ba227425ed6d",
+  "cargo_toml_sha256": "7981c5c016bee195cd0f909bfa42778db0302b66bf04ac4c5c7a50d7db685e5f",
+  "cargo_lock_sha256": "39580f7254769a1ad65c48d05472dee4db82709713e9ba1dd8d633290f03f6ca",
+  "worktree_status": "M src/lib.rs\n?? benchmark-snapshots/\n?? examples/diagnostics_cancellation_cost.rs",
+  "compiler": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cargo": "cargo 1.100.0 (3acc79c0c 2026-11-05)",
+  "build_environment": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "NODES_COST_LIBRARY_SHA": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+    "NODES_COST_BEFORE_SHA": "f858186b6d8907ca1184054a25ff127d71564b15",
+    "NODES_COST_AFTER_SHA": "3e3bb46185628e479888053fe4e4ff606047c244",
+    "NODES_COST_BEFORE_SHA256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+    "NODES_COST_AFTER_SHA256": "865324a95c61991e84c6797ab15573935d17245cb95c6da7575343adb9c65a33"
+  },
+  "rustflags": "",
+  "profile": {
+    "opt_level": 3,
+    "lto": "thin",
+    "codegen_units": 16,
+    "strip": true
+  },
+  "commands": [
+    {
+      "label": "package-clean",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clean",
+        "-p",
+        "morphlet",
+        "--release",
+        "--target-dir",
+        "/workspace/scratch/74d3da15ab33/diagnostics-bench-target"
+      ],
+      "started_at_utc": "2026-11-27T00:29:17.093513+00:00",
+      "completed_at_utc": "2026-11-27T00:29:17.316535+00:00",
+      "elapsed_seconds": 0.22304750400053308,
+      "exit_code": 0,
+      "log": "package-clean.log"
+    },
+    {
+      "label": "paired-build",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--example",
+        "diagnostics_cancellation_cost"
+      ],
+      "started_at_utc": "2026-11-27T00:29:17.316914+00:00",
+      "completed_at_utc": "2026-11-27T00:29:52.737143+00:00",
+      "elapsed_seconds": 35.42027217099985,
+      "exit_code": 0,
+      "log": "paired-build.log"
+    }
+  ],
+  "free_disk_bytes_before": 4945719296,
+  "completed_at_utc": "2026-11-27T00:29:52.800790+00:00",
+  "binary": "/workspace/scratch/74d3da15ab33/diagnostics-benchmark-binaries/diagnostics-cancellation-cost",
+  "binary_sha256": "47543affda15e551e515df6d885bb88827ed5814b1dbc864c1a5fe949668aa75",
+  "binary_size_bytes": 5414024,
+  "linked_library": "/workspace/scratch/74d3da15ab33/diagnostics-bench-target/release/build/morphlet/da594b737a3efa5a/out/libmorphlet-da594b737a3efa5a.rlib",
+  "linked_library_sha256": "fe610ebb09f38552a845dbf8784e4550b94778f0c299207beb3a52a952b6ca47",
+  "library_mtime_ns": 1795739370139488581,
+  "free_disk_bytes_after": 4934082560
+}

@@ -1,11 +1,12 @@
 //! Serializable, renderer-independent graph model. Geometry is evaluated separately.
+use crate::cluster::ClusterDef;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub type NodeId = u64;
-pub const MAX_NODES: usize = 2_048;
-pub const MAX_ITEMS: usize = 8_192;
+pub const MAX_NODES: usize = 16_384;
+pub const MAX_ITEMS: usize = 16_384;
 pub const MAX_VERTICES: usize = 250_000;
 pub const MAX_TRIANGLES: usize = 500_000;
 pub const MAX_TOTAL_WEIGHT: usize = 3_000_000;
@@ -18,6 +19,11 @@ pub enum DataType {
     Mesh,
     Geometry,
     Any,
+    Surface,
+    Solid,
+    DisplayGeometry,
+    /// A G-code job (printer, settings, toolpaths). See `gcode_job.rs`.
+    Gcode,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
@@ -28,6 +34,10 @@ impl DataType {
             Self::Mesh => "メッシュ",
             Self::Geometry => "形状",
             Self::Any => "データ",
+            Self::Surface => "数学曲面",
+            Self::Solid => "B-rep 立体",
+            Self::DisplayGeometry => "表示形状",
+            Self::Gcode => "Gコード",
         }
     }
     pub fn accepts(self, source: Self) -> bool {
@@ -36,6 +46,26 @@ impl DataType {
             || self == source
             || (self == Self::Geometry && matches!(source, Self::Point | Self::Curve | Self::Mesh))
             || (source == Self::Geometry && matches!(self, Self::Point | Self::Curve | Self::Mesh))
+            || (self == Self::DisplayGeometry
+                && matches!(
+                    source,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
+            || (source == Self::DisplayGeometry
+                && matches!(
+                    self,
+                    Self::Geometry
+                        | Self::Point
+                        | Self::Curve
+                        | Self::Mesh
+                        | Self::Surface
+                        | Self::Solid
+                ))
     }
 }
 
@@ -59,7 +89,7 @@ pub struct NodeSpec {
     pub inputs: &'static [InputSpec],
     pub output: DataType,
 }
-const fn n(
+pub(crate) const fn n(
     key: &'static str,
     label: &'static str,
     default: f64,
@@ -78,7 +108,13 @@ const fn n(
         integer: false,
     }
 }
-const fn i(key: &'static str, label: &'static str, default: f64, min: f64, max: f64) -> InputSpec {
+pub(crate) const fn i(
+    key: &'static str,
+    label: &'static str,
+    default: f64,
+    min: f64,
+    max: f64,
+) -> InputSpec {
     InputSpec {
         key,
         label,
@@ -90,7 +126,7 @@ const fn i(key: &'static str, label: &'static str, default: f64, min: f64, max: 
         integer: true,
     }
 }
-const fn g(key: &'static str, label: &'static str, kind: DataType) -> InputSpec {
+pub(crate) const fn g(key: &'static str, label: &'static str, kind: DataType) -> InputSpec {
     InputSpec {
         key,
         label,
@@ -110,7 +146,15 @@ pub enum NodeKind {
     Add,
     Multiply,
     Divide,
+    Subtract,
+    Power,
+    Abs,
+    Min,
+    Max,
+    Modulo,
+    Sine,
     Series,
+    Range,
     Point,
     Circle,
     Polygon,
@@ -123,9 +167,15 @@ pub enum NodeKind {
     Vase,
     Sphere,
     Box,
+    Cylinder,
+    Cone,
+    Torus,
+    Plane,
     Move,
     Rotate,
     Scale,
+    ScaleXyz,
+    Mirror,
     Twist,
     Wave,
     LinearArray,
@@ -134,15 +184,346 @@ pub enum NodeKind {
     Flatten,
     Graft,
     Output,
+    /// User script (see `script.rs`). Added after `Output` to ease merging.
+    Script,
+    /// Instance of a cluster definition stored in `Graph::clusters` (see `cluster.rs`).
+    Cluster,
+    // List, number, pattern and print-checking nodes (see `gh_nodes.rs`). Appended at the
+    // end so the serde names and the order of the older kinds stay as they were.
+    ListItem,
+    ListLength,
+    ReverseList,
+    SortList,
+    CullPattern,
+    ShiftList,
+    ConcatList,
+    SubList,
+    Bounds,
+    Remap,
+    /// Typed formula of x, y, z, w; its text is kept in `Node::script`.
+    Expression,
+    Random,
+    Populate,
+    Noise,
+    NoiseDeform,
+    GraphProfile,
+    Shell,
+    OverhangCheck,
+    Distance,
+    PointComponent,
+    /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
+    ImportMesh,
+    SimplifyTree,
+    TrimTree,
+    PruneTree,
+    MergeTree,
+    EntwineTree,
+    FlipMatrix,
+    UnflattenTree,
+    PathMapper,
+    PartitionList,
+    TreeBranch,
+    TreeItem,
+    TreeStatistics,
+    CullNth,
+    CullIndex,
+    DuplicateData,
+    RepeatData,
+    MassAddition,
+    MassMultiplication,
+    ReplaceItems,
+    InsertItems,
+    MemberIndex,
+    RandomReduce,
+    Jitter,
+    // Mathematics mission: appended to preserve existing serialized node identities.
+    Negate,
+    Round,
+    Floor,
+    Ceiling,
+    Exponential,
+    Sinh,
+    Cosh,
+    Tanh,
+    Degrees,
+    Radians,
+    Asin,
+    Acos,
+    Atan,
+    SinRadians,
+    CosRadians,
+    TanRadians,
+    Atan2,
+    Root,
+    Logarithm,
+    Factorial,
+    Clamp,
+    Summation,
+    Product,
+    Average,
+    Median,
+    Variance,
+    StdDeviation,
+    GhRange,
+    ConstructDomain,
+    DomainEndpoint,
+    DomainLength,
+    EvaluateDomain,
+    DivideDomain,
+    DomainIntersection,
+    DomainUnion,
+    GraphMapper,
+    BoolAnd,
+    BoolOr,
+    BoolXor,
+    BoolNot,
+    Equals,
+    LargerThan,
+    SmallerThan,
+    SetContains,
+    SetUnion,
+    SetIntersection,
+    SetDifference,
+    CreateSet,
+    DuplicateDetection,
+    ConstructVector,
+    VectorComponent,
+    UnitX,
+    UnitY,
+    UnitZ,
+    VectorLength,
+    Unitize,
+    ReverseVector,
+    DotProduct,
+    CrossProduct,
+    VectorAngle,
+    VectorAddition,
+    VectorSubtraction,
+    VectorProjection,
+    VectorBetweenPoints,
+    RotateVector,
+    ClosestPoint,
+    PlaneProject,
+    PlaneCoordinates,
+    PlanePoint,
+    PointInPlane,
+    PlaneNormal3Pt,
+    RandomNormal,
+    VectorMultiply,
+    VectorDivide,
+    VectorAmplitude,
+    Lerp,
+    SmoothStep,
+    BezierValue,
+    NormalPdf,
+    MatrixTranspose,
+    MatrixMultiply,
+    MatrixInverse,
+    LinearSolve,
+    FourierMagnitude,
+    PlaneIntersectionPoint,
+    PlaneIntersectionDirection,
+    PlaneRotateAxis,
+    PlaneAlignAxis,
+    WorldPlaneAxis,
+    ChangeBasis,
+    // Procedural design (append-only serialized kinds).
+    RectGrid,
+    TriangularGrid,
+    HexGrid,
+    RadialGrid,
+    HexPanels,
+    TriPanels,
+    Voronoi2d,
+    ConvexHull2d,
+    MultiAttractor,
+    CurveAttractor,
+    GridArray,
+    PointArray,
+    Rotate3d,
+    Shear,
+    Taper,
+    FractalTree,
+    CylinderWrap,
+    Delaunay2d,
+    PopulateMesh,
+    CurveArray,
+    NoiseField,
+    LifeGrid,
+    // Mesh and fabrication nodes; append-only serialized identifiers.
+    MeshArea,
+    MeshVolume,
+    MeshCenter,
+    MeshDimensions,
+    MeshMass,
+    MeshAudit,
+    MeshVertices,
+    MeshFaces,
+    MeshNormals,
+    MeshEdges,
+    MeshBoundary,
+    MeshClosest,
+    MeshFlip,
+    MeshWeldExact,
+    MeshUnweld,
+    MeshUnify,
+    MeshSmooth,
+    MeshSubdivide,
+    MeshCatmullClark,
+    MeshOnBed,
+    MeshDeleteFace,
+    MeshConstruct,
+    MeshSelfContact,
+    MeshThicknessSample,
+    MeshCompact,
+    MeshNonManifold,
+    // Mathematical curve nodes: appended to preserve legacy serde names.
+    CurveLine,
+    CurveLineSdl,
+    CurvePolyline,
+    CurveCircleCnr,
+    CurveCircleThree,
+    CurveArc,
+    CurveArcThree,
+    CurveEllipse,
+    CurveSpiral,
+    CurveBezier,
+    CurveNurbs,
+    CurveWeightedNurbs,
+    CurveInterpolate,
+    CurveLength,
+    CurveEvaluate,
+    CurveEvaluateLength,
+    CurveClosestParameter,
+    CurveClosestPoint,
+    CurveStart,
+    CurveEnd,
+    CurveMiddle,
+    CurveTangent,
+    CurveCurvature,
+    CurveDomain,
+    CurveClosed,
+    CurveDivide,
+    CurveDivideLength,
+    CurveSubcurve,
+    CurveShatter,
+    CurveReverse,
+    CurveControls,
+    CurveWeights,
+    CurveKnots,
+    CurveDegree,
+    CurveInsertKnot,
+    CurveOffsetPreview,
+    CurveFrameX,
+    CurveFrameY,
+    CurveLineLine,
+    CurveLinePlane,
+    // Mathematical geometry, appended for stable old node ordering and names.
+    PlaneSurface,
+    NurbsPanel,
+    BilinearSurface,
+    CylinderSurface,
+    FrustumSurface,
+    SphereSurface,
+    TorusSurface,
+    EvaluateSurface,
+    SurfaceDirection,
+    SurfaceNormalLine,
+    SurfaceArea,
+    SurfaceClosestPoint,
+    SurfaceIsoCurve,
+    DivideSurface,
+    SurfaceMesh,
+    BrepBox,
+    BrepVolume,
+    BrepArea,
+    BrepIntersection,
+    BrepMove,
+    BrepFaces,
+    BrepEdges,
+    BrepVertices,
+    BrepMesh,
+    NurbsVase,
+    RuledSurface,
+    SurfaceExtrude,
+    BrepUnion,
+    BrepDifference,
+    BrepOffset,
+    SurfaceGaussianCurvature,
+    SurfaceMeanCurvature,
+    SurfacePrincipalCurvatures,
+    // Curve, tube, mesh-repair, transform and gyroid nodes (see `nodes_shape.rs`). Appended
+    // after the kinds above; the serde names are the snake_case names of these variants.
+    ArcCurve,
+    Polyline,
+    SmoothCurve,
+    OffsetCurve,
+    PointOnCurve,
+    DivideCurve,
+    Pipe,
+    Sweep,
+    SmoothMesh,
+    Subdivide,
+    WeldMesh,
+    UnifyNormals,
+    MeshInfo,
+    // Same meaning as `Taper` but base/top scale ports; renamed to avoid a serde-name clash.
+    TaperScale,
+    Bend,
+    // 3D grid; `GridArray` (generative) is the 2D one.
+    GridArray3d,
+    Gyroid,
+    RevolvePoints,
+    // G-code nodes (see `gcode_nodes.rs`); appended, serde names are snake_case.
+    GcodePrinter,
+    GcodeSlice,
+    GcodeContour,
+    GcodeSpiral,
+    GcodeSort,
+    GcodeSplit,
+    GcodeExtrusion,
+    GcodeSpeed,
+    GcodeTemp,
+    GcodeRetract,
+    GcodeZHop,
+    GcodeNonplanar,
+    GcodeTexture,
+    GcodeClay,
+    GcodeStart,
+    GcodeEnd,
+    GcodeJoin,
+    GcodeWrite,
+    GcodePreview,
+    GcodeEstimate,
+    GcodeSafety,
 }
 impl NodeKind {
+    /// Preserve the input keys used by the independent generative-design mission.
+    /// ClosestPoint is one operation in the unified registry; canonical keys are
+    /// candidates/queries. Unknown keys remain unknown and are still rejected.
+    pub fn canonical_input_key(self, key: &str) -> &str {
+        match (self, key) {
+            (Self::ClosestPoint, "points") => "candidates",
+            (Self::ClosestPoint, "targets") => "queries",
+            _ => key,
+        }
+    }
+
     pub fn all() -> &'static [Self] {
         &[
             Self::Number,
             Self::Add,
             Self::Multiply,
             Self::Divide,
+            Self::Subtract,
+            Self::Power,
+            Self::Abs,
+            Self::Min,
+            Self::Max,
+            Self::Modulo,
+            Self::Sine,
             Self::Series,
+            Self::Range,
             Self::Point,
             Self::Circle,
             Self::Polygon,
@@ -155,9 +536,15 @@ impl NodeKind {
             Self::Vase,
             Self::Sphere,
             Self::Box,
+            Self::Cylinder,
+            Self::Cone,
+            Self::Torus,
+            Self::Plane,
             Self::Move,
             Self::Rotate,
             Self::Scale,
+            Self::ScaleXyz,
+            Self::Mirror,
             Self::Twist,
             Self::Wave,
             Self::LinearArray,
@@ -166,6 +553,302 @@ impl NodeKind {
             Self::Flatten,
             Self::Graft,
             Self::Output,
+            Self::Script,
+            // `Cluster` is intentionally not listed: it is created from a definition.
+            Self::ListItem,
+            Self::ListLength,
+            Self::ReverseList,
+            Self::SortList,
+            Self::CullPattern,
+            Self::ShiftList,
+            Self::ConcatList,
+            Self::SubList,
+            Self::Bounds,
+            Self::Remap,
+            Self::Expression,
+            Self::Random,
+            Self::Populate,
+            Self::Noise,
+            Self::NoiseDeform,
+            Self::GraphProfile,
+            Self::Shell,
+            Self::OverhangCheck,
+            Self::Distance,
+            Self::PointComponent,
+            Self::ImportMesh,
+            Self::SimplifyTree,
+            Self::TrimTree,
+            Self::PruneTree,
+            Self::MergeTree,
+            Self::EntwineTree,
+            Self::FlipMatrix,
+            Self::UnflattenTree,
+            Self::PathMapper,
+            Self::PartitionList,
+            Self::TreeBranch,
+            Self::TreeItem,
+            Self::TreeStatistics,
+            Self::CullNth,
+            Self::CullIndex,
+            Self::DuplicateData,
+            Self::RepeatData,
+            Self::MassAddition,
+            Self::MassMultiplication,
+            Self::ReplaceItems,
+            Self::InsertItems,
+            Self::MemberIndex,
+            Self::RandomReduce,
+            Self::Jitter,
+            Self::Negate,
+            Self::Round,
+            Self::Floor,
+            Self::Ceiling,
+            Self::Exponential,
+            Self::Sinh,
+            Self::Cosh,
+            Self::Tanh,
+            Self::Degrees,
+            Self::Radians,
+            Self::Asin,
+            Self::Acos,
+            Self::Atan,
+            Self::SinRadians,
+            Self::CosRadians,
+            Self::TanRadians,
+            Self::Atan2,
+            Self::Root,
+            Self::Logarithm,
+            Self::Factorial,
+            Self::Clamp,
+            Self::Summation,
+            Self::Product,
+            Self::Average,
+            Self::Median,
+            Self::Variance,
+            Self::StdDeviation,
+            Self::GhRange,
+            Self::ConstructDomain,
+            Self::DomainEndpoint,
+            Self::DomainLength,
+            Self::EvaluateDomain,
+            Self::DivideDomain,
+            Self::DomainIntersection,
+            Self::DomainUnion,
+            Self::GraphMapper,
+            Self::BoolAnd,
+            Self::BoolOr,
+            Self::BoolXor,
+            Self::BoolNot,
+            Self::Equals,
+            Self::LargerThan,
+            Self::SmallerThan,
+            Self::SetContains,
+            Self::SetUnion,
+            Self::SetIntersection,
+            Self::SetDifference,
+            Self::CreateSet,
+            Self::DuplicateDetection,
+            Self::ConstructVector,
+            Self::VectorComponent,
+            Self::UnitX,
+            Self::UnitY,
+            Self::UnitZ,
+            Self::VectorLength,
+            Self::Unitize,
+            Self::ReverseVector,
+            Self::DotProduct,
+            Self::CrossProduct,
+            Self::VectorAngle,
+            Self::VectorAddition,
+            Self::VectorSubtraction,
+            Self::VectorProjection,
+            Self::VectorBetweenPoints,
+            Self::RotateVector,
+            Self::ClosestPoint,
+            Self::PlaneProject,
+            Self::PlaneCoordinates,
+            Self::PlanePoint,
+            Self::PointInPlane,
+            Self::PlaneNormal3Pt,
+            Self::RandomNormal,
+            Self::VectorMultiply,
+            Self::VectorDivide,
+            Self::VectorAmplitude,
+            Self::Lerp,
+            Self::SmoothStep,
+            Self::BezierValue,
+            Self::NormalPdf,
+            Self::MatrixTranspose,
+            Self::MatrixMultiply,
+            Self::MatrixInverse,
+            Self::LinearSolve,
+            Self::FourierMagnitude,
+            Self::PlaneIntersectionPoint,
+            Self::PlaneIntersectionDirection,
+            Self::PlaneRotateAxis,
+            Self::PlaneAlignAxis,
+            Self::WorldPlaneAxis,
+            Self::ChangeBasis,
+            Self::RectGrid,
+            Self::TriangularGrid,
+            Self::HexGrid,
+            Self::RadialGrid,
+            Self::HexPanels,
+            Self::TriPanels,
+            Self::Voronoi2d,
+            Self::ConvexHull2d,
+            Self::MultiAttractor,
+            Self::CurveAttractor,
+            Self::GridArray,
+            Self::PointArray,
+            Self::Rotate3d,
+            Self::Shear,
+            Self::Taper,
+            Self::FractalTree,
+            Self::CylinderWrap,
+            Self::Delaunay2d,
+            Self::PopulateMesh,
+            Self::CurveArray,
+            Self::NoiseField,
+            Self::LifeGrid,
+            Self::MeshArea,
+            Self::MeshVolume,
+            Self::MeshCenter,
+            Self::MeshDimensions,
+            Self::MeshMass,
+            Self::MeshAudit,
+            Self::MeshVertices,
+            Self::MeshFaces,
+            Self::MeshNormals,
+            Self::MeshEdges,
+            Self::MeshBoundary,
+            Self::MeshClosest,
+            Self::MeshFlip,
+            Self::MeshWeldExact,
+            Self::MeshUnweld,
+            Self::MeshUnify,
+            Self::MeshSmooth,
+            Self::MeshSubdivide,
+            Self::MeshCatmullClark,
+            Self::MeshOnBed,
+            Self::MeshDeleteFace,
+            Self::MeshConstruct,
+            Self::MeshSelfContact,
+            Self::MeshThicknessSample,
+            Self::MeshCompact,
+            Self::MeshNonManifold,
+            Self::CurveLine,
+            Self::CurveLineSdl,
+            Self::CurvePolyline,
+            Self::CurveCircleCnr,
+            Self::CurveCircleThree,
+            Self::CurveArc,
+            Self::CurveArcThree,
+            Self::CurveEllipse,
+            Self::CurveSpiral,
+            Self::CurveBezier,
+            Self::CurveNurbs,
+            Self::CurveWeightedNurbs,
+            Self::CurveInterpolate,
+            Self::CurveLength,
+            Self::CurveEvaluate,
+            Self::CurveEvaluateLength,
+            Self::CurveClosestParameter,
+            Self::CurveClosestPoint,
+            Self::CurveStart,
+            Self::CurveEnd,
+            Self::CurveMiddle,
+            Self::CurveTangent,
+            Self::CurveCurvature,
+            Self::CurveDomain,
+            Self::CurveClosed,
+            Self::CurveDivide,
+            Self::CurveDivideLength,
+            Self::CurveSubcurve,
+            Self::CurveShatter,
+            Self::CurveReverse,
+            Self::CurveControls,
+            Self::CurveWeights,
+            Self::CurveKnots,
+            Self::CurveDegree,
+            Self::CurveInsertKnot,
+            Self::CurveOffsetPreview,
+            Self::CurveFrameX,
+            Self::CurveFrameY,
+            Self::CurveLineLine,
+            Self::CurveLinePlane,
+            Self::PlaneSurface,
+            Self::NurbsPanel,
+            Self::BilinearSurface,
+            Self::CylinderSurface,
+            Self::FrustumSurface,
+            Self::SphereSurface,
+            Self::TorusSurface,
+            Self::EvaluateSurface,
+            Self::SurfaceDirection,
+            Self::SurfaceNormalLine,
+            Self::SurfaceArea,
+            Self::SurfaceClosestPoint,
+            Self::SurfaceIsoCurve,
+            Self::DivideSurface,
+            Self::SurfaceMesh,
+            Self::BrepBox,
+            Self::BrepVolume,
+            Self::BrepArea,
+            Self::BrepIntersection,
+            Self::BrepMove,
+            Self::BrepFaces,
+            Self::BrepEdges,
+            Self::BrepVertices,
+            Self::BrepMesh,
+            Self::NurbsVase,
+            Self::RuledSurface,
+            Self::SurfaceExtrude,
+            Self::BrepUnion,
+            Self::BrepDifference,
+            Self::BrepOffset,
+            Self::SurfaceGaussianCurvature,
+            Self::SurfaceMeanCurvature,
+            Self::SurfacePrincipalCurvatures,
+            Self::ArcCurve,
+            Self::Polyline,
+            Self::SmoothCurve,
+            Self::OffsetCurve,
+            Self::PointOnCurve,
+            Self::DivideCurve,
+            Self::Pipe,
+            Self::Sweep,
+            Self::SmoothMesh,
+            Self::Subdivide,
+            Self::WeldMesh,
+            Self::UnifyNormals,
+            Self::MeshInfo,
+            Self::TaperScale,
+            Self::Bend,
+            Self::GridArray3d,
+            Self::Gyroid,
+            Self::RevolvePoints,
+            Self::GcodePrinter,
+            Self::GcodeSlice,
+            Self::GcodeContour,
+            Self::GcodeSpiral,
+            Self::GcodeSort,
+            Self::GcodeSplit,
+            Self::GcodeExtrusion,
+            Self::GcodeSpeed,
+            Self::GcodeTemp,
+            Self::GcodeRetract,
+            Self::GcodeZHop,
+            Self::GcodeNonplanar,
+            Self::GcodeTexture,
+            Self::GcodeClay,
+            Self::GcodeStart,
+            Self::GcodeEnd,
+            Self::GcodeJoin,
+            Self::GcodeWrite,
+            Self::GcodePreview,
+            Self::GcodeEstimate,
+            Self::GcodeSafety,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -223,6 +906,103 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Subtract => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "引き算",
+                    category: "数値",
+                    description: "A − B を計算します。リストは順に対応し、短い側の最後の値を繰り返します。",
+                    keywords: "subtract minus difference 差 減算 引く マイナス",
+                    inputs: &[
+                        n("a", "A", 10., -1e6, 1e6, 0.1),
+                        n("b", "B", 3., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Power => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "べき乗",
+                    category: "数値",
+                    description: "底を指数で累乗します。0 の負の指数、負の数の小数乗、結果が大きすぎる場合はエラーを表示します。",
+                    keywords: "power pow exponent square 累乗 べき乗 二乗 指数 冪",
+                    inputs: &[
+                        n("base", "底", 2., -1e6, 1e6, 0.1),
+                        n("exponent", "指数", 2., -64., 64., 0.5),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Abs => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "絶対値",
+                    category: "数値",
+                    description: "値の符号を取り除き、0 以上の値にします。",
+                    keywords: "abs absolute magnitude 絶対値 符号 正の数",
+                    inputs: &[n("value", "値", -1., -1e6, 1e6, 0.1)],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Min => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "最小",
+                    category: "数値",
+                    description: "A と B の小さい方を返します。",
+                    keywords: "min minimum smaller lower 最小 小さい方 下限 クランプ",
+                    inputs: &[
+                        n("a", "A", 0., -1e6, 1e6, 0.1),
+                        n("b", "B", 10., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Max => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "最大",
+                    category: "数値",
+                    description: "A と B の大きい方を返します。",
+                    keywords: "max maximum larger upper 最大 大きい方 上限 クランプ",
+                    inputs: &[
+                        n("a", "A", 0., -1e6, 1e6, 0.1),
+                        n("b", "B", 10., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Modulo => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "剰余",
+                    category: "数値",
+                    description: "A を B で割った余りを 0 以上 |B| 未満で返します。B が 0 のときはエラーを表示します。",
+                    keywords: "modulo mod remainder wrap 剰余 余り 割った余り 繰り返し",
+                    inputs: &[
+                        n("a", "A", 10., -1e6, 1e6, 0.1),
+                        n("b", "B", 3., -1e6, 1e6, 0.1),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Sine => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "三角関数",
+                    category: "数値",
+                    description: "振幅 × sin(2π × 周波数 × 入力 + 位相) を計算します。位相は度。範囲や数列をつなぐと波の値のリストになります。",
+                    keywords: "sine sin cosine trig wave oscillate 三角関数 サイン 正弦 波 周期",
+                    inputs: &[
+                        n("x", "入力", 0.25, -1e6, 1e6, 0.05),
+                        n("amp", "振幅", 1., -1e6, 1e6, 0.5),
+                        n("frequency", "周波数", 1., -1000., 1000., 0.1),
+                        n("phase", "位相", 0., -3600., 3600., 5.),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
             Self::Series => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "数列",
@@ -233,6 +1013,21 @@ impl NodeKind {
                         n("start", "開始", 0., -1e5, 1e5, 1.),
                         n("step", "間隔", 10., -1e4, 1e4, 0.1),
                         i("count", "個数", 8., 0., 512.),
+                    ],
+                    output: DataType::Number,
+                };
+                &SPEC
+            }
+            Self::Range => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "範囲",
+                    category: "データ",
+                    description: "開始値から終了値までを等間隔に分けた数値リストを作ります。個数が 1 のときは開始値だけを返します。",
+                    keywords: "range domain linspace interval divide 範囲 区間 等分 リスト 分割",
+                    inputs: &[
+                        n("start", "開始", 0., -1e5, 1e5, 1.),
+                        n("end", "終了", 100., -1e5, 1e5, 1.),
+                        i("count", "個数", 11., 1., 512.),
                     ],
                     output: DataType::Number,
                 };
@@ -257,7 +1052,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "円",
                     category: "曲線",
-                    description: "XY 平面に閉じた円の点列を作ります。分割数で滑らかさを調整。",
+                    description: "XY 平面に正確な有理円を作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "circle ring 丸 輪",
                     inputs: &[
                         n("radius", "半径", 30., 0.1, 1000., 0.5),
@@ -314,7 +1109,7 @@ impl NodeKind {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "らせん",
                     category: "曲線",
-                    description: "Z 軸を中心に上昇するらせん状の点列を作ります。",
+                    description: "Z 軸を中心に上昇する解析的ならせんを作ります。分割数は表示とメッシュ変換だけに使います。",
                     keywords: "helix spiral 螺旋 バネ スパイラル",
                     inputs: &[
                         n("radius", "半径", 25., 0.1, 1000., 0.5),
@@ -419,6 +1214,67 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Cylinder => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "円柱",
+                    category: "立体",
+                    description: "底面 Z=0 から上へ伸びる、底と蓋のある閉じた円柱を作ります。",
+                    keywords: "cylinder tube column pillar 円柱 円筒 柱 シリンダー",
+                    inputs: &[
+                        n("radius", "半径", 20., 0.1, 1000., 0.5),
+                        n("height", "高さ", 40., 0.1, 2000., 1.),
+                        i("segments", "周の分割", 48., 3., 256.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Cone => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "円錐 / 角錐",
+                    category: "立体",
+                    description: "底面 Z=0、頂点が上の閉じた円錐を作ります。分割数 3 で三角錐、4 で四角錐になります。",
+                    keywords: "cone pyramid tetrahedron 円錐 角錐 三角錐 四角錐 コーン ピラミッド",
+                    inputs: &[
+                        n("radius", "半径", 20., 0.1, 1000., 0.5),
+                        n("height", "高さ", 40., 0.1, 2000., 1.),
+                        i("segments", "周の分割 (3:三角錐 4:四角錐)", 48., 3., 256.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Torus => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "トーラス",
+                    category: "立体",
+                    description: "Z 軸まわりの輪を断面の円で作る、閉じたドーナツ形を作ります。副半径は主半径より小さくしてください。",
+                    keywords: "torus donut ring doughnut 輪 ドーナツ トーラス 環",
+                    inputs: &[
+                        n("major", "主半径", 30., 0.2, 1000., 0.5),
+                        n("minor", "副半径", 8., 0.1, 500., 0.5),
+                        i("segments", "輪の分割", 64., 3., 192.),
+                        i("tube", "断面の分割", 24., 3., 96.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
+            Self::Plane => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "平面",
+                    category: "立体",
+                    description: "XY の中心を原点とする、Z=0 の格子状の平面メッシュを作ります。閉じていない面なので、そのままでは書き出し検査で開いた辺が出ます。",
+                    keywords: "plane grid sheet surface 平面 格子 板 グリッド 面",
+                    inputs: &[
+                        n("width", "幅", 100., 0.1, 2000., 1.),
+                        n("depth", "奥行", 100., 0.1, 2000., 1.),
+                        i("divisions", "分割数", 8., 1., 128.),
+                    ],
+                    output: DataType::Mesh,
+                };
+                &SPEC
+            }
             Self::Move => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "移動",
@@ -459,6 +1315,37 @@ impl NodeKind {
                     inputs: &[
                         g("geometry", "形状", DataType::Geometry),
                         n("factor", "倍率", 1.2, 0.01, 100., 0.05),
+                    ],
+                    output: DataType::Geometry,
+                };
+                &SPEC
+            }
+            Self::ScaleXyz => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "非一様スケール",
+                    category: "変形",
+                    description: "原点を基準に、X・Y・Z をそれぞれ別の倍率で伸縮します。倍率は 0.01〜100。",
+                    keywords: "scale non-uniform nonuniform stretch xyz 非一様 軸別 縦横 引き伸ばし 伸縮 倍率",
+                    inputs: &[
+                        g("geometry", "形状", DataType::Geometry),
+                        n("sx", "X 倍率", 1., 0.01, 100., 0.05),
+                        n("sy", "Y 倍率", 1., 0.01, 100., 0.05),
+                        n("sz", "Z 倍率", 1., 0.01, 100., 0.05),
+                    ],
+                    output: DataType::Geometry,
+                };
+                &SPEC
+            }
+            Self::Mirror => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "ミラー",
+                    category: "変形",
+                    description: "原点を通り、指定した軸に垂直な平面で反転します。元も残すと元の形と反転した形を 1 つにまとめます（メッシュの場合）。軸: 0=X、1=Y、2=Z。",
+                    keywords: "mirror reflect symmetry flip 鏡 反転 対称 左右 ミラー",
+                    inputs: &[
+                        g("geometry", "形状", DataType::Geometry),
+                        i("axis", "軸 (0:X 1:Y 2:Z)", 0., 0., 2.),
+                        i("keep", "元も残す", 1., 0., 1.),
                     ],
                     output: DataType::Geometry,
                 };
@@ -565,11 +1452,53 @@ impl NodeKind {
                     category: "出力",
                     description: "完成した形状を表示・書き出しの対象にします。",
                     keywords: "output preview export 出力 完成 表示 STL",
-                    inputs: &[g("geometry", "形状", DataType::Geometry)],
-                    output: DataType::Geometry,
+                    inputs: &[g("geometry", "形状", DataType::DisplayGeometry)],
+                    output: DataType::DisplayGeometry,
                 };
                 &SPEC
             }
+            Self::Script => &crate::script::SCRIPT_SPEC,
+            Self::Cluster => &crate::cluster::CLUSTER_SPEC,
+            other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
+            other if crate::surface_nodes::KINDS.contains(&other) => {
+                crate::surface_nodes::spec(other)
+            }
+            other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            Self::MeshArea
+            | Self::MeshVolume
+            | Self::MeshCenter
+            | Self::MeshDimensions
+            | Self::MeshMass
+            | Self::MeshAudit
+            | Self::MeshVertices
+            | Self::MeshFaces
+            | Self::MeshNormals
+            | Self::MeshEdges
+            | Self::MeshBoundary
+            | Self::MeshClosest
+            | Self::MeshFlip
+            | Self::MeshWeldExact
+            | Self::MeshUnweld
+            | Self::MeshUnify
+            | Self::MeshSmooth
+            | Self::MeshSubdivide
+            | Self::MeshCatmullClark
+            | Self::MeshOnBed
+            | Self::MeshDeleteFace
+            | Self::MeshConstruct
+            | Self::MeshSelfContact
+            | Self::MeshThicknessSample
+            | Self::MeshCompact
+            | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            other => crate::data_tree_nodes::spec(other)
+                .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| {
+                    crate::generative::is_kind(other).then(|| crate::generative::spec(other))
+                })
+                .or_else(|| {
+                    crate::nodes_shape::is_kind(other).then(|| crate::nodes_shape::spec(other))
+                })
+                .unwrap_or_else(|| crate::gh_nodes::spec(other)),
         }
     }
 }
@@ -584,12 +1513,29 @@ pub struct Node {
     pub params: BTreeMap<String, f64>,
     pub inputs: BTreeMap<String, NodeId>,
     pub preview: bool,
+    /// Script source of a `Script` node. Empty (and not saved) for other nodes.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub script: String,
+    /// Definition id (`Graph::clusters`) of a `Cluster` node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<u64>,
+    /// Disabled (bypassed) node: outputs an empty tree. Not written when `false`.
+    #[serde(default, skip_serializing_if = "crate::annotations::is_false")]
+    pub off: bool,
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub next_id: NodeId,
+    /// Cluster definitions stored inside the work (empty in old files).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub clusters: Vec<ClusterDef>,
+    /// Coloured groups and free notes on the canvas (see `annotations.rs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<crate::annotations::Group>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<crate::annotations::Note>,
 }
 impl Graph {
     pub fn add(&mut self, kind: NodeKind, position: [f32; 2]) -> Result<NodeId, String> {
@@ -619,6 +1565,15 @@ impl Graph {
                 .collect(),
             inputs: BTreeMap::new(),
             preview: true,
+            script: if kind == NodeKind::Expression {
+                crate::expr::DEFAULT_EXPRESSION.into()
+            } else if kind == NodeKind::PathMapper {
+                "{A;B}->{B;A}".into()
+            } else {
+                String::new()
+            },
+            cluster: None,
+            off: false,
         });
         self.next_id = next;
         Ok(id)
@@ -643,6 +1598,7 @@ impl Graph {
             .spec()
             .output;
         let node = self.node(to).ok_or("接続先が見つかりません。")?;
+        let input = node.kind.canonical_input_key(input);
         let target = node
             .kind
             .spec()
@@ -679,23 +1635,40 @@ impl Graph {
     }
     pub fn disconnect(&mut self, to: NodeId, input: &str) {
         if let Some(n) = self.node_mut(to) {
+            let input = n.kind.canonical_input_key(input);
             n.inputs.remove(input);
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        self.topological_order().map(|_| ())
+        self.topological_order()?;
+        crate::annotations::validate(self)?;
+        crate::cluster::validate_graph(self)
     }
     pub fn topological_order(&self) -> Result<Vec<NodeId>, String> {
+        self.topological_nodes()
+            .map(|nodes| nodes.into_iter().map(|node| node.id).collect())
+    }
+
+    /// Validated topological order with direct node references. Evaluators must use this
+    /// instead of repeatedly scanning `Graph::nodes` by id. The transient index does not
+    /// alter the serialized graph or need invalidation after an edit.
+    pub(crate) fn topological_nodes(&self) -> Result<Vec<&Node>, String> {
         if self.nodes.len() > MAX_NODES {
             return Err(format!("ノード数が上限 {MAX_NODES} を超えています。"));
         }
-        let mut indegree = BTreeMap::new();
-        let mut after: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
-        let ids: BTreeMap<_, _> = self.nodes.iter().map(|n| (n.id, n)).collect();
-        if ids.len() != self.nodes.len() {
+        let mut nodes: Vec<_> = self.nodes.iter().collect();
+        nodes.sort_unstable_by_key(|node| node.id);
+        if nodes.windows(2).any(|pair| pair[0].id == pair[1].id) {
             return Err("ノード ID が重複しています。".into());
         }
-        for node in &self.nodes {
+        // Dense new projects and sparse/reordered v1 files use the same compact
+        // scratch storage. Never allocate up to a serialized node ID.
+        let dense_ids = nodes
+            .last()
+            .is_some_and(|node| node.id == (nodes.len() - 1) as NodeId);
+        let mut indegree = vec![0; nodes.len()];
+        let mut children = vec![Vec::new(); nodes.len()];
+        for (index, &node) in nodes.iter().enumerate() {
             if node.id >= self.next_id {
                 return Err("次のノード ID が無効です。".into());
             }
@@ -704,54 +1677,55 @@ impl Graph {
             }
             let specs = node.kind.spec().inputs;
             for (key, value) in &node.params {
+                if crate::data_tree_nodes::validate_parameter(node.kind, key, *value)? {
+                    continue;
+                }
                 if !value.is_finite() || !specs.iter().any(|s| s.key == key && s.default.is_some())
                 {
                     return Err(format!("「{}」のパラメータが無効です。", node.name));
                 }
             }
-            let mut parents = BTreeSet::new();
             for (key, source) in &node.inputs {
                 let spec = specs
                     .iter()
                     .find(|s| s.key == key)
                     .ok_or("不明な入力への接続があります。")?;
-                let other = ids
-                    .get(source)
-                    .ok_or("存在しないノードへの接続があります。")?;
+                let parent = if dense_ids {
+                    usize::try_from(*source).ok().filter(|&i| i < nodes.len())
+                } else {
+                    nodes.binary_search_by_key(source, |node| node.id).ok()
+                }
+                .ok_or("存在しないノードへの接続があります。")?;
+                let other = nodes[parent];
                 if !spec.kind.accepts(other.kind.spec().output) {
                     return Err(format!(
                         "「{}」の「{}」は接続の型が違います。",
                         node.name, spec.label
                     ));
                 }
-                parents.insert(*source);
-            }
-            indegree.insert(node.id, parents.len());
-            for p in parents {
-                after.entry(p).or_default().push(node.id);
+                // Count wires, so the same source feeding two ports is released twice.
+                // Visiting children by node ID also provides their stable enqueue order.
+                children[parent].push(index);
+                indegree[index] += 1;
             }
         }
-        let mut queue: VecDeque<_> = indegree
-            .iter()
-            .filter(|(_, v)| **v == 0)
-            .map(|(id, _)| *id)
-            .collect();
-        let mut order = Vec::new();
-        while let Some(id) = queue.pop_front() {
-            order.push(id);
-            for child in after.get(&id).into_iter().flatten() {
-                if let Some(d) = indegree.get_mut(child) {
-                    *d = d.saturating_sub(1);
-                    if *d == 0 {
-                        queue.push_back(*child);
-                    }
+
+        let mut order = Vec::with_capacity(nodes.len());
+        order.extend((0..nodes.len()).filter(|&i| indegree[i] == 0));
+        let mut cursor = 0;
+        while cursor < order.len() {
+            for &child in &children[order[cursor]] {
+                indegree[child] -= 1;
+                if indegree[child] == 0 {
+                    order.push(child);
                 }
             }
+            cursor += 1;
         }
         if order.len() != self.nodes.len() {
             return Err("この接続は循環します。途中のノードへ戻る線はつなげません。".into());
         }
-        Ok(order)
+        Ok(order.into_iter().map(|i| nodes[i]).collect())
     }
 }
 fn valid_position(p: [f32; 2]) -> bool {
@@ -768,6 +1742,8 @@ pub struct Mesh {
 pub struct Curve {
     pub points: Vec<[f64; 3]>,
     pub closed: bool,
+    /// Exact runtime geometry; points are a separate display/legacy meshing cache.
+    pub geometry: Option<crate::curve_geometry::CurveGeometry>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -775,6 +1751,9 @@ pub enum Value {
     Point([f64; 3]),
     Curve(Arc<Curve>),
     Mesh(Arc<Mesh>),
+    Surface(Arc<crate::surface_kernel::SurfaceValue>),
+    Solid(Arc<crate::surface_kernel::ClosedSolid>),
+    Gcode(Arc<crate::gcode_job::GcodeJob>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
@@ -783,16 +1762,26 @@ impl Value {
             Self::Point(_) => DataType::Point,
             Self::Curve(_) => DataType::Curve,
             Self::Mesh(_) => DataType::Mesh,
+            Self::Surface(_) => DataType::Surface,
+            Self::Solid(_) => DataType::Solid,
+            Self::Gcode(_) => DataType::Gcode,
         }
     }
     pub fn weight(&self) -> usize {
         match self {
             Self::Number(_) | Self::Point(_) => 1,
-            Self::Curve(c) => c.points.len().max(1),
+            Self::Curve(c) => c
+                .points
+                .len()
+                .max(1)
+                .saturating_add(c.geometry.as_ref().map_or(0, |g| g.weight())),
             Self::Mesh(m) => m
                 .vertices
                 .len()
                 .saturating_add(m.triangles.len().saturating_mul(3)),
+            Self::Surface(s) => s.weight(),
+            Self::Solid(s) => s.weight(),
+            Self::Gcode(j) => j.weight(),
         }
     }
     pub fn number(&self) -> Result<f64, String> {
@@ -829,6 +1818,36 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sparse_reordered_nodes_with_repeated_parents_keep_stable_order() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let left = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        let right = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        let tip = graph.add(NodeKind::Add, [0., 0.]).unwrap();
+        graph.connect(a, left, "a").unwrap();
+        graph.connect(a, left, "b").unwrap();
+        graph.connect(b, right, "b").unwrap();
+        graph.connect(a, right, "a").unwrap();
+        graph.connect(left, tip, "a").unwrap();
+        graph.connect(right, tip, "b").unwrap();
+        let big_id = NodeId::MAX - 1;
+        graph.node_mut(tip).unwrap().id = big_id;
+        graph.next_id = NodeId::MAX;
+        graph.nodes.reverse();
+        assert_eq!(
+            graph.topological_order().unwrap(),
+            [a, b, left, right, big_id]
+        );
+        graph
+            .node_mut(right)
+            .unwrap()
+            .inputs
+            .insert("b".into(), big_id);
+        assert!(graph.topological_order().unwrap_err().contains("循環"));
+    }
+
     #[test]
     fn failed_wire_keeps_previous_connection() {
         let mut g = Graph::default();

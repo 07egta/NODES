@@ -1,0 +1,32 @@
+{
+  "checked_at_utc": "2026-11-27T00:32:39.908982+00:00",
+  "source_snapshots_match_public_git_revisions": true,
+  "harness_and_shim_match_build_hashes": true,
+  "preserved_binary_matches_build_and_measurement_hashes": true,
+  "all_build_and_process_exit_codes_zero": true,
+  "measurement_processes": 6,
+  "api_paths_per_case": 3,
+  "cases": 3,
+  "repeated_samples_per_path_per_case": 10,
+  "repeated_calls_total": 90,
+  "initial_calls_total_excluded_from_medians": 18,
+  "all_stderr_logs_empty": true,
+  "all_full_report_equality_and_analytic_oracle_checks_passed": true,
+  "corresponding_round_orders_are_reversed": true,
+  "raw_samples_medians_ranges_signed_changes_recomputed": true,
+  "report_relative_links_checked": true,
+  "all_samples_retained_no_extra_runs": true,
+  "independent_audit": {
+    "reviewer": "/root/diagnostics_core",
+    "scope": "Read-only source/build/harness/runner audit plus independent raw sample, first-call exclusion, median/range and signed-change recalculation; source git bytes, SHA256/FNV, executable/library/harness/shim/Cargo hashes and real round-order checks.",
+    "result": "PASS",
+    "additional_measurement_or_build": false
+  },
+  "scope_limits": [
+    "Diagnosis/report construction only; excludes real evaluation, JSON verification and report destruction.",
+    "Repeated same-snapshot calls are not the entire Worker path with one diagnostic per new revision.",
+    "Shared-host idleness is not guaranteed; no statistical-significance claim.",
+    "Whole-process CPU and peak RSS combine all API paths and are not per-path memory.",
+    "No cancellation-latency, GUI-responsiveness, CAD-evaluation-speedup or zero-overhead claim."
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "analytic_bitset_payload_if_high_id_case": {
+    "after_word_payload_bytes": 131056,
+    "after_words_per_set": 1,
+    "before_word_payload_bytes": 33550336,
+    "before_words_per_set": 256,
+    "distinct_two_root_join_sets": 16382,
+    "scope": "Analytic u64 root-membership word payload for the high-ID fixture only; excludes Arc, maps, groups, graph, evaluation, messages and report. Not a measured RSS value."
+  },
+  "architecture": "x86_64",
+  "arguments": [
+    "--mode",
+    "measure",
+    "--case",
+    "high-id-two-roots",
+    "--variant",
+    "before"
+  ],
+  "case": "high-id-two-roots",
+  "debug_assertions": false,
+  "expected_roots": 2,
+  "fixture_build_and_validate_ms": 61.889882,
+  "measurement_scope": "Measure mode runs one real graph evaluation then one diagnosis by one variant in a fresh process. Timing excludes fixture/evaluation/typed oracle checks/destruction. No full report JSON is allocated in measurement mode. wait4 peak RSS is the entire process, including graph/evaluation and one variant, not diagnosis-only live memory. Verification mode is a separate process excluded from comparisons.",
+  "mode": "measure",
+  "nodes": 16384,
+  "os": "linux",
+  "provenance": {
+    "after_diagnostics_sha256": "f9dd3eeaf30217fa72da252b213e44061eb19254aacdbc5562622392a87fffca",
+    "after_embedded_snapshot_bytes": 21010,
+    "after_embedded_snapshot_fnv1a64": "ce9da1d576fb99ed",
+    "after_report_type": "morphlet::ordinal_after::DiagnosticReport",
+    "after_revision": "24e92ebd46bfd59cc5ba532c5c9a79df86e16379",
+    "before_diagnostics_sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+    "before_embedded_snapshot_bytes": 19342,
+    "before_embedded_snapshot_fnv1a64": "1b946498bfb0f532",
+    "before_report_type": "morphlet::ordinal_before::DiagnosticReport",
+    "before_revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+    "distinct_linked_diagnosis_function_addresses": true,
+    "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3"
+  },
+  "real_evaluation_reported_ms": 112.630117,
+  "real_evaluation_wall_ms": 118.84477100000001,
+  "result": {
+    "diagnosis_calls": 1,
+    "diagnosis_first_ms": 161.36154,
+    "full_report_serialized": false,
+    "oracle": {
+      "analytic_oracle_passed": true,
+      "blocked_records": 16382,
+      "first_root_error": "枝 {0}: ゼロでは割れません。B を 0 以外にしてください。",
+      "hotspot_records": 16384,
+      "root_records": 2,
+      "summary": {
+        "blocked_count": 16382,
+        "cached_count": 0,
+        "cancelled": false,
+        "complete": true,
+        "completed_count": 16384,
+        "computed_count": 16384,
+        "connection_count": 32764,
+        "disabled_count": 0,
+        "elapsed_ms": 112.630117,
+        "failed_count": 16384,
+        "measured_node_ms": 99.92866500000088,
+        "node_count": 16384,
+        "root_failure_count": 2,
+        "successful_count": 0,
+        "unevaluated_count": 0
+      }
+    },
+    "variant": "before"
+  },
+  "status": "MEASURED",
+  "unix_time_seconds": 1795737572,
+  "workload": "Compact failing-root ordinal comparison with per-variant fresh-process RSS",
+  "workload_schema_version": 1
+}

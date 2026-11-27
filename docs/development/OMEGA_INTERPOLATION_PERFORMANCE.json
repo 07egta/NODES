@@ -1,0 +1,725 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-11-26T23:59:08.089044+00:00",
+  "status": "EXACT_ALL_VALID_WEIGHTED_EXTREME_BATCH_INVALID",
+  "source": {
+    "path": "src/number_interpolation.rs",
+    "sha256": "9d752ec8fbd820392cdda0d7742acab7a551c1f4238d735df032dd4857c4da8d",
+    "checkout_head_at_measurement": "b8f2f14f05cca4c6739aaf198289113aa299bf59",
+    "state": "Measured the frozen module by path from the working tree. Its SHA-256 was subsequently verified against saved_checkpoint_revision.",
+    "saved_checkpoint_revision": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8"
+  },
+  "environment": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "architecture": "x86_64",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "visible_logical_cpus": 9,
+    "process_affinity": [
+      0
+    ],
+    "compiler_verbose": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5\n",
+    "optimization": "rustc -O",
+    "debug_info": "-C debuginfo=0",
+    "debug_assertions_in_identical_rustc_O_cfg": false,
+    "target_cpu": "rustc default; no target-cpu=native",
+    "allocation": "The exact kernel uses fixed stack arrays. Harness fixture/output buffers are allocated outside timers."
+  },
+  "method": {
+    "samples_per_measurement": 9,
+    "warmup_calls_per_measurement": 16384,
+    "calls_per_timed_sample": 16384,
+    "logical_batch_sizes": [
+      1,
+      16384
+    ],
+    "single_input_timing": "One nonconstant input repeated 16,384 times per sample; per-call median is a warm batch mean, not individually timed latency.",
+    "large_batch_timing": "16,384 fixture values evaluated once per sample. Ordinary/extrapolation inputs vary; extreme inputs repeat 16 curated cases.",
+    "timed_scope": "Indirect function dispatch, black_box on inputs/output, arithmetic and writes to a preallocated output buffer.",
+    "excluded_scope": "Fixtures, oracles, validation, compilation, printing, graph scheduling, scripts, GUI and downstream error conversion.",
+    "clock": "std::time::Instant wall time in integer nanoseconds",
+    "statistics": "Median is sorted sample 5 of 9. One-process, fixed-order, descriptive microbenchmark; no confidence interval or application-wide inference.",
+    "order": "For each workload and size, weighted first and exact second. No new FMA candidate or optimization was introduced.",
+    "concurrency": "Other build/measurement work was paused for the short run. Shared-host noise was not otherwise controlled."
+  },
+  "methods": {
+    "weighted_a1ffa400": {
+      "source_revision": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+      "source_path": "src/math_nodes.rs",
+      "formula": "if t==0 {a} else if t==1 {b} else {(1-t)*a+t*b}",
+      "contract": "Historical separately rounded weighted products/addition, with endpoint preservation."
+    },
+    "exact_fixed_point": {
+      "source_path": "src/number_interpolation.rs",
+      "formula": "Round exact a+t*b-t*a once after fixed-point accumulation.",
+      "contract": "Nearest/even; preserve endpoint/identical-bit constants; negative nonzero underflow is -0; exact cancellation is +0; rounded overflow is signed infinity."
+    }
+  },
+  "fixtures": {
+    "ordinary_0_to_1": {
+      "generation": "ai=i%97-48; bi=i%13-6; ti=i%257; a=ai; b=ai+bi/4; t=ti/256",
+      "oracle": "Integer numerator (1024*ai+bi*ti)/1024. Its small integer numerator and power-of-two division are exactly representable.",
+      "single_index": 124,
+      "single_input": {
+        "a": -21.0,
+        "b": -20.75,
+        "t": 0.484375
+      },
+      "note": "The large batch includes endpoint and equal-endpoint inputs; the selected single input is nonconstant."
+    },
+    "finite_extrapolation": {
+      "generation": "ai=i%97-48; bi=i%89-44; tn=-(16+i%29) for even i, +(16+i%29) for odd i; a=ai/1024; b=bi/512; t=tn/8",
+      "oracle": "Integer numerator (8*ai+tn*(2*bi-ai))/8192, exactly representable.",
+      "single_index": 123,
+      "parameter_range": "Outside [0,1], magnitude 2 through 5.5."
+    },
+    "extreme_finite_inputs": {
+      "generation": "Repeat the 16 exact-bit fixtures below.",
+      "oracle": "Python Fraction(a)+Fraction(t)*Fraction(b)-Fraction(t)*Fraction(a), converted once to binary64; apply endpoint/identical-bit rules and +0 cancellation. OverflowError maps to signed infinity.",
+      "single_index": 0,
+      "input_and_expected_bits": [
+        {
+          "a": "3ff0000000000000",
+          "b": "bca8000000000000",
+          "t": "7feffffffffffffe",
+          "expected": "ffefffffffffffff"
+        },
+        {
+          "a": "3ff0000000000000",
+          "b": "bca8000000000000",
+          "t": "7fefffffffffffff",
+          "expected": "fff0000000000000"
+        },
+        {
+          "a": "3ff0000000000000",
+          "b": "bca8000000000000",
+          "t": "ffeffffffffffffe",
+          "expected": "7fefffffffffffff"
+        },
+        {
+          "a": "3ff0000000000000",
+          "b": "bca8000000000000",
+          "t": "ffefffffffffffff",
+          "expected": "7ff0000000000000"
+        },
+        {
+          "a": "7fefffffffffffff",
+          "b": "ffefffffffffffff",
+          "t": "3fdfffffffffffff",
+          "expected": "7c9fffffffffffff"
+        },
+        {
+          "a": "7fefffffffffffff",
+          "b": "7fefffffffffffff",
+          "t": "7fefffffffffffff",
+          "expected": "7fefffffffffffff"
+        },
+        {
+          "a": "7fefffffffffffff",
+          "b": "ffefffffffffffff",
+          "t": "3fe0000000000000",
+          "expected": "0000000000000000"
+        },
+        {
+          "a": "0000000000000000",
+          "b": "8000000000000001",
+          "t": "3fe0000000000000",
+          "expected": "8000000000000000"
+        },
+        {
+          "a": "0000000000000000",
+          "b": "0000000000000003",
+          "t": "3fe0000000000000",
+          "expected": "0000000000000002"
+        },
+        {
+          "a": "0000000000000000",
+          "b": "8000000000000001",
+          "t": "0000000000000001",
+          "expected": "8000000000000000"
+        },
+        {
+          "a": "bff0000000000000",
+          "b": "3ca0000000000000",
+          "t": "3fefffffffffffff",
+          "expected": "b950000000000000"
+        },
+        {
+          "a": "4350000000000000",
+          "b": "3ff0000000000000",
+          "t": "3ff0000000000001",
+          "expected": "c008000000000000"
+        },
+        {
+          "a": "3ff0000000000000",
+          "b": "3ff0000000000001",
+          "t": "7fefffffffffffff",
+          "expected": "7cafffffffffffff"
+        },
+        {
+          "a": "0010000000000000",
+          "b": "0010000000000001",
+          "t": "7fefffffffffffff",
+          "expected": "3ccfffffffffffff"
+        },
+        {
+          "a": "0000000000000001",
+          "b": "8000000000000001",
+          "t": "7fefffffffffffff",
+          "expected": "bcdfffffffffffff"
+        },
+        {
+          "a": "7fefffffffffffff",
+          "b": "ffefffffffffffff",
+          "t": "4000000000000000",
+          "expected": "fff0000000000000"
+        }
+      ],
+      "overflow_scope": "All inputs are finite. Some expected outputs are infinity, valid for this kernel contract. Production callers reject nonfinite outputs; error-conversion cost is not measured."
+    }
+  },
+  "fixture_selection_note": "A preliminary ordinary single-input index selected a=b and therefore timed the constant shortcut. The final index is 124, with distinct a=-21,b=-20.75,t=0.484375. Only this final complete run is used for the cost report.",
+  "results": [
+    {
+      "workload": "ordinary_0_to_1",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        34841,
+        35542,
+        35492,
+        35492,
+        35493,
+        35492,
+        35482,
+        54620,
+        35482
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 2.166259765625,
+      "median_us_per_logical_batch": 0.002166259765625,
+      "status": "VALID"
+    },
+    {
+      "workload": "ordinary_0_to_1",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        2194685,
+        2092345,
+        2595805,
+        2204479,
+        2114046,
+        2106776,
+        2303034,
+        2392195,
+        2080828
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 133.95294189453125,
+      "median_us_per_logical_batch": 0.13395294189453125,
+      "status": "VALID"
+    },
+    {
+      "workload": "ordinary_0_to_1",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        34751,
+        49673,
+        49633,
+        49593,
+        49572,
+        66208,
+        49593,
+        60118,
+        49573
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 3.02691650390625,
+      "median_us_per_logical_batch": 49.593,
+      "status": "VALID"
+    },
+    {
+      "workload": "ordinary_0_to_1",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        2533252,
+        2003665,
+        1962795,
+        1931458,
+        1947983,
+        1930477,
+        1948433,
+        1947301,
+        2415410
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 118.92291259765625,
+      "median_us_per_logical_batch": 1948.433,
+      "status": "VALID"
+    },
+    {
+      "workload": "finite_extrapolation",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        44455,
+        50544,
+        48792,
+        87889,
+        48792,
+        48792,
+        48772,
+        48791,
+        48782
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 2.97802734375,
+      "median_us_per_logical_batch": 0.00297802734375,
+      "status": "VALID"
+    },
+    {
+      "workload": "finite_extrapolation",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        2093276,
+        2145743,
+        2094968,
+        2105003,
+        2105323,
+        2470931,
+        2712285,
+        2488657,
+        2120586
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 129.4302978515625,
+      "median_us_per_logical_batch": 0.1294302978515625,
+      "status": "VALID"
+    },
+    {
+      "workload": "finite_extrapolation",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        33530,
+        62632,
+        44366,
+        44356,
+        44385,
+        44355,
+        94148,
+        44796,
+        44365
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 2.7078857421875,
+      "median_us_per_logical_batch": 44.366,
+      "status": "VALID"
+    },
+    {
+      "workload": "finite_extrapolation",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        2097402,
+        2503128,
+        2576676,
+        2537058,
+        2095189,
+        2119074,
+        2082851,
+        2114157,
+        2080958
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 129.03790283203125,
+      "median_us_per_logical_batch": 2114.157,
+      "status": "VALID"
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        44436,
+        48831,
+        48791,
+        48772,
+        48792,
+        48771,
+        48792,
+        48772,
+        48792
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 2.97796630859375,
+      "median_us_per_logical_batch": 0.00297796630859375,
+      "status": "VALID"
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 1,
+      "repetitions_per_sample": 16384,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        2040108,
+        2085795,
+        2076081,
+        2051655,
+        2080096,
+        2031566,
+        2050924,
+        2027189,
+        2050343
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 0,
+      "median_ns_per_call": 125.178466796875,
+      "median_us_per_logical_batch": 0.125178466796875,
+      "status": "VALID"
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "method": "weighted_a1ffa400",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        57575,
+        57715,
+        57605,
+        57355,
+        57775,
+        57464,
+        68881,
+        76983,
+        59187
+      ],
+      "mismatched_results_per_sample": [
+        6144,
+        6144,
+        6144,
+        6144,
+        6144,
+        6144,
+        6144,
+        6144,
+        6144
+      ],
+      "first_mismatch": {
+        "index": 4,
+        "actual_bits": "7c90000000000000",
+        "expected_bits": "7c9fffffffffffff"
+      },
+      "expected_infinite_outputs_per_logical_batch": 3072,
+      "median_ns_per_call": 3.52264404296875,
+      "median_us_per_logical_batch": 57.715,
+      "status": "INVALID_RESULT"
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "method": "exact_fixed_point",
+      "logical_batch_size": 16384,
+      "repetitions_per_sample": 1,
+      "calls_per_sample": 16384,
+      "warmup_calls": 16384,
+      "sample_count": 9,
+      "duration_ns_per_sample": [
+        1967612,
+        1867714,
+        1881685,
+        1868946,
+        1891630,
+        1863259,
+        1888054,
+        1850729,
+        1931439
+      ],
+      "mismatched_results_per_sample": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "first_mismatch": null,
+      "expected_infinite_outputs_per_logical_batch": 3072,
+      "median_ns_per_call": 114.84893798828125,
+      "median_us_per_logical_batch": 1881.685,
+      "status": "VALID"
+    }
+  ],
+  "comparisons": [
+    {
+      "workload": "ordinary_0_to_1",
+      "logical_batch_size": 1,
+      "weighted_status": "VALID",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 2.166259765625,
+      "exact_median_ns_per_call": 133.95294189453125,
+      "weighted_median_us_per_logical_batch": 0.002166259765625,
+      "exact_median_us_per_logical_batch": 0.13395294189453125,
+      "exact_over_weighted_cost_ratio": 61.836047560013526,
+      "comparison_interpretation": "Both meet the fixture oracle; ratio describes added exact-arithmetic cost, not speed improvement."
+    },
+    {
+      "workload": "ordinary_0_to_1",
+      "logical_batch_size": 16384,
+      "weighted_status": "VALID",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 3.02691650390625,
+      "exact_median_ns_per_call": 118.92291259765625,
+      "weighted_median_us_per_logical_batch": 49.593,
+      "exact_median_us_per_logical_batch": 1948.433,
+      "exact_over_weighted_cost_ratio": 39.28846813058294,
+      "comparison_interpretation": "Both meet the fixture oracle; ratio describes added exact-arithmetic cost, not speed improvement."
+    },
+    {
+      "workload": "finite_extrapolation",
+      "logical_batch_size": 1,
+      "weighted_status": "VALID",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 2.97802734375,
+      "exact_median_ns_per_call": 129.4302978515625,
+      "weighted_median_us_per_logical_batch": 0.00297802734375,
+      "exact_median_us_per_logical_batch": 0.1294302978515625,
+      "exact_over_weighted_cost_ratio": 43.46175602557796,
+      "comparison_interpretation": "Both meet the fixture oracle; ratio describes added exact-arithmetic cost, not speed improvement."
+    },
+    {
+      "workload": "finite_extrapolation",
+      "logical_batch_size": 16384,
+      "weighted_status": "VALID",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 2.7078857421875,
+      "exact_median_ns_per_call": 129.03790283203125,
+      "weighted_median_us_per_logical_batch": 44.366,
+      "exact_median_us_per_logical_batch": 2114.157,
+      "exact_over_weighted_cost_ratio": 47.6526394085561,
+      "comparison_interpretation": "Both meet the fixture oracle; ratio describes added exact-arithmetic cost, not speed improvement."
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "logical_batch_size": 1,
+      "weighted_status": "VALID",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 2.97796630859375,
+      "exact_median_ns_per_call": 125.178466796875,
+      "weighted_median_us_per_logical_batch": 0.00297796630859375,
+      "exact_median_us_per_logical_batch": 0.125178466796875,
+      "exact_over_weighted_cost_ratio": 42.034883482609494,
+      "comparison_interpretation": "Both meet the fixture oracle; ratio describes added exact-arithmetic cost, not speed improvement."
+    },
+    {
+      "workload": "extreme_finite_inputs",
+      "logical_batch_size": 16384,
+      "weighted_status": "INVALID_RESULT",
+      "exact_status": "VALID",
+      "weighted_median_ns_per_call": 3.52264404296875,
+      "exact_median_ns_per_call": 114.84893798828125,
+      "weighted_median_us_per_logical_batch": 57.715,
+      "exact_median_us_per_logical_batch": 1881.685,
+      "exact_over_weighted_cost_ratio": null,
+      "comparison_interpretation": "Weighted output fails validation; retain its timing separately and report no ratio."
+    }
+  ],
+  "findings": [
+    "Exact arithmetic passed every recorded check. Nonconstant ordinary/extrapolation/extreme single-input medians were approximately 134/129/125 ns per call.",
+    "For 16,384 values, exact median time was 1.948 ms for ordinary interpolation, 2.114 ms for extrapolation and 1.882 ms for the extreme mixture.",
+    "Historical weighted arithmetic costs about 2-4 ns per call in this harness. Exact arithmetic has a measurable cost and is selected for correctness, not speed.",
+    "The weighted extreme batch failed exact output-bit checks. Its timing remains visible but is excluded from ratios.",
+    "Warm batch means do not measure individual request latency, graph evaluation, Rhai execution or frame time.",
+    "At the stated 16,384-item limit these three local kernel batches cost about 2 ms on this host. This does not include graph evaluation, UI rendering or downstream errors and is not a measured graph/UI latency guarantee."
+  ],
+  "reproduction": {
+    "compiled_harness_source_sha256": "2cdaa191905cd1801a725cf58660cfe2558bc086d6bfc1dd16c7e10291ae4c05",
+    "template_sha256": "0c77c6213650f6bf4f500af76506377c05a8def5b72ff9e947ab3f57e1a82729",
+    "harness_source": "use std::hint::black_box;\nuse std::time::Instant;\n#[path = \"__NODES_REPOSITORY__/src/number_interpolation.rs\"]\nmod number_interpolation;\nconst N: usize = 16_384;\nconst SAMPLES: usize = 9;\n#[derive(Clone, Copy)]\nstruct Case { a: f64, b: f64, t: f64, expected: u64 }\nfn weighted(a:f64,b:f64,t:f64)->f64 {\n    if t==0. { a } else if t==1. { b } else { (1.-t)*a+t*b }\n}\nconst EXTREME: [[u64;4];16] = [\n    [0x3ff0000000000000, 0xbca8000000000000, 0x7feffffffffffffe, 0xffefffffffffffff],\n    [0x3ff0000000000000, 0xbca8000000000000, 0x7fefffffffffffff, 0xfff0000000000000],\n    [0x3ff0000000000000, 0xbca8000000000000, 0xffeffffffffffffe, 0x7fefffffffffffff],\n    [0x3ff0000000000000, 0xbca8000000000000, 0xffefffffffffffff, 0x7ff0000000000000],\n    [0x7fefffffffffffff, 0xffefffffffffffff, 0x3fdfffffffffffff, 0x7c9fffffffffffff],\n    [0x7fefffffffffffff, 0x7fefffffffffffff, 0x7fefffffffffffff, 0x7fefffffffffffff],\n    [0x7fefffffffffffff, 0xffefffffffffffff, 0x3fe0000000000000, 0x0000000000000000],\n    [0x0000000000000000, 0x8000000000000001, 0x3fe0000000000000, 0x8000000000000000],\n    [0x0000000000000000, 0x0000000000000003, 0x3fe0000000000000, 0x0000000000000002],\n    [0x0000000000000000, 0x8000000000000001, 0x0000000000000001, 0x8000000000000000],\n    [0xbff0000000000000, 0x3ca0000000000000, 0x3fefffffffffffff, 0xb950000000000000],\n    [0x4350000000000000, 0x3ff0000000000000, 0x3ff0000000000001, 0xc008000000000000],\n    [0x3ff0000000000000, 0x3ff0000000000001, 0x7fefffffffffffff, 0x7cafffffffffffff],\n    [0x0010000000000000, 0x0010000000000001, 0x7fefffffffffffff, 0x3ccfffffffffffff],\n    [0x0000000000000001, 0x8000000000000001, 0x7fefffffffffffff, 0xbcdfffffffffffff],\n    [0x7fefffffffffffff, 0xffefffffffffffff, 0x4000000000000000, 0xfff0000000000000]\n];\nfn fixtures(name: &str) -> Vec<Case> {\n    (0..N).map(|i| match name {\n        \"ordinary_0_to_1\" => {\n            let ai=(i%97) as i64-48;\n            let bi=(i%13) as i64-6;\n            let ti=(i%257) as i64;\n            Case { a:ai as f64,b:ai as f64+bi as f64/4.,t:ti as f64/256.,expected:((1024*ai+bi*ti) as f64/1024.).to_bits() }\n        }\n        \"finite_extrapolation\" => {\n            let ai=(i%97) as i64-48;\n            let bi=(i%89) as i64-44;\n            let tn=if i%2==0 { -(16+(i%29) as i64) } else { 16+(i%29) as i64 };\n            Case { a:ai as f64/1024.,b:bi as f64/512.,t:tn as f64/8.,expected:((8*ai+tn*(2*bi-ai)) as f64/8192.).to_bits() }\n        }\n        \"extreme_finite_inputs\" => {\n            let [a,b,t,expected]=EXTREME[i%EXTREME.len()];\n            Case { a:f64::from_bits(a),b:f64::from_bits(b),t:f64::from_bits(t),expected }\n        }\n        _=>unreachable!(),\n    }).collect()\n}\nfn measure(name:&str,method:&str,function:fn(f64,f64,f64)->f64,cases:&[Case]) {\n    let repetitions=N/cases.len();\n    let function=black_box(function);\n    let mut output=vec![0.;cases.len()];\n    let mut run=|| {\n        for _ in 0..repetitions {\n            for (out,c) in output.iter_mut().zip(cases) {\n                *out=black_box(function(black_box(c.a),black_box(c.b),black_box(c.t)));\n            }\n        }\n    };\n    run();\n    let mut durations=Vec::with_capacity(SAMPLES);\n    let mut failures=Vec::with_capacity(SAMPLES);\n    let mut first_error=None;\n    for _ in 0..SAMPLES {\n        let start=Instant::now();\n        for _ in 0..repetitions {\n            for (out,c) in output.iter_mut().zip(cases) {\n                *out=black_box(function(black_box(c.a),black_box(c.b),black_box(c.t)));\n            }\n        }\n        durations.push(start.elapsed().as_nanos());\n        let mut mismatches=0;\n        for (index,(out,c)) in output.iter().zip(cases).enumerate() {\n            if out.to_bits()!=c.expected {\n                mismatches+=1;\n                first_error.get_or_insert((index,out.to_bits(),c.expected));\n            }\n        }\n        failures.push(mismatches);\n    }\n    let expected_overflow=cases.iter().filter(|c|f64::from_bits(c.expected).is_infinite()).count();\n    let detail=first_error.map_or(\"null\".to_owned(),|(i,a,e)|format!(\"{{\\\"index\\\":{i},\\\"actual_bits\\\":\\\"{a:016x}\\\",\\\"expected_bits\\\":\\\"{e:016x}\\\"}}\"));\n    println!(\"{{\\\"workload\\\":\\\"{name}\\\",\\\"method\\\":\\\"{method}\\\",\\\"logical_batch_size\\\":{},\\\"repetitions_per_sample\\\":{repetitions},\\\"calls_per_sample\\\":{N},\\\"warmup_calls\\\":{N},\\\"sample_count\\\":{SAMPLES},\\\"duration_ns_per_sample\\\":{durations:?},\\\"mismatched_results_per_sample\\\":{failures:?},\\\"first_mismatch\\\":{detail},\\\"expected_infinite_outputs_per_logical_batch\\\":{expected_overflow}}}\",cases.len());\n}\nfn main() {\n    for name in [\"ordinary_0_to_1\",\"finite_extrapolation\",\"extreme_finite_inputs\"] {\n        let cases=fixtures(name);\n        let single=[cases[if name==\"extreme_finite_inputs\" {0} else if name==\"ordinary_0_to_1\" {124} else {123}]];\n        for input in [&single[..],&cases[..]] {\n            measure(name,\"weighted_a1ffa400\",weighted,input);\n            measure(name,\"exact_fixed_point\",number_interpolation::lerp,input);\n        }\n    }\n}\n",
+    "recorded_compile_command": [
+      "rustc",
+      "--edition",
+      "2024",
+      "-O",
+      "-C",
+      "debuginfo=0",
+      "benchmark.rs",
+      "-o",
+      "benchmark"
+    ],
+    "steps": [
+      "Verify src/number_interpolation.rs against source.sha256. Create a private temporary directory.",
+      "Save harness_source as benchmark.rs after replacing __NODES_REPOSITORY__ with the absolute checkout path. Expected extreme bits are embedded; executing the harness needs only Rust std.",
+      "Run rustc --edition 2024 -O -C debuginfo=0 benchmark.rs -o benchmark. No Cargo target is added or built.",
+      "Pin to the same permitted CPU and run benchmark; on this Linux host taskset -c 0 ./benchmark is equivalent.",
+      "Parse the 12 JSON lines. Sort each nine duration_ns_per_sample values and take index 4. Divide by calls_per_sample for ns/call; multiply by logical_batch_size/1000 for microseconds per logical batch.",
+      "Retain mismatch counts and bit patterns. Report timing ratios only when both methods satisfy the same independent numerical oracle."
+    ]
+  }
+}

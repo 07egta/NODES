@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "name": "有機的な彫刻",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "sphere",
+        "name": "球の基礎",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "radius": 36,
+          "segments": 64,
+          "rings": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "noise_deform",
+        "name": "有機的な凹凸",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "amp": 6,
+          "size": 23,
+          "seed": 8,
+          "mode": 1
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "shear",
+        "name": "流れるシルエット",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "xz": 0.32,
+          "yz": 0.18
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

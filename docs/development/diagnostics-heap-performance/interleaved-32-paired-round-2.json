@@ -1,0 +1,179 @@
+{
+  "architecture": "x86_64",
+  "arguments": [
+    "--case",
+    "interleaved-32",
+    "--repetitions",
+    "5",
+    "--first",
+    "after"
+  ],
+  "cases": [
+    {
+      "after": {
+        "first_call_ms": 1.342684,
+        "first_report_serialization_ms": 0.736352,
+        "repeated": {
+          "max_ms": 1.10859,
+          "median_ms": 1.0796670000000002,
+          "min_ms": 1.017816,
+          "samples_ms": [
+            1.106847,
+            1.10859,
+            1.050454,
+            1.017816,
+            1.0796670000000002
+          ]
+        }
+      },
+      "before": {
+        "first_call_ms": 4.429662,
+        "first_report_serialization_ms": 0.516119,
+        "repeated": {
+          "max_ms": 4.981564,
+          "median_ms": 4.138605,
+          "min_ms": 4.057876,
+          "samples_ms": [
+            4.138605,
+            4.981564,
+            4.155169,
+            4.057876,
+            4.089191
+          ]
+        }
+      },
+      "core_roots": 32,
+      "expected_blocked": 558,
+      "expected_roots": 287,
+      "fixture_build_and_validate_ms": 0.88424,
+      "name": "interleaved-32",
+      "nodes": 845,
+      "oracle": {
+        "all_calls_equal_complete_serialized_report": true,
+        "checked_fields": "All node/root/blocked counts; all sorted capped relationship IDs and exact counts; all truncation flags; real error messages; complete timing coverage; successful chain value",
+        "full_report_json_bytes": 505449,
+        "independently_verified_implementations": [
+          "after",
+          "before"
+        ],
+        "maximum_affected_count": 532,
+        "maximum_upstream_root_count": 33,
+        "method": "Analytic prefix intervals or balanced-tree root intervals plus explicit ID permutation; no diagnostic traversal reused",
+        "truncated_affected_records": 32,
+        "truncated_upstream_records": 0
+      },
+      "real_evaluation_reported_ms": 1.420688,
+      "real_evaluation_wall_ms": 1.4998850000000001,
+      "rounds": [
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 1.342684,
+              "implementation": "after"
+            },
+            {
+              "diagnostics_ms": 4.429662,
+              "implementation": "before"
+            }
+          ],
+          "phase": "first",
+          "round": 0
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 4.138605,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 1.106847,
+              "implementation": "after"
+            }
+          ],
+          "phase": "repeated",
+          "round": 1
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 1.10859,
+              "implementation": "after"
+            },
+            {
+              "diagnostics_ms": 4.981564,
+              "implementation": "before"
+            }
+          ],
+          "phase": "repeated",
+          "round": 2
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 4.155169,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 1.050454,
+              "implementation": "after"
+            }
+          ],
+          "phase": "repeated",
+          "round": 3
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 1.017816,
+              "implementation": "after"
+            },
+            {
+              "diagnostics_ms": 4.057876,
+              "implementation": "before"
+            }
+          ],
+          "phase": "repeated",
+          "round": 4
+        },
+        {
+          "measurements": [
+            {
+              "diagnostics_ms": 4.089191,
+              "implementation": "before"
+            },
+            {
+              "diagnostics_ms": 1.0796670000000002,
+              "implementation": "after"
+            }
+          ],
+          "phase": "repeated",
+          "round": 5
+        }
+      ],
+      "status": "MEASURED"
+    }
+  ],
+  "debug_assertions": false,
+  "measurement_scope": "One real evaluation per case; alternate unchanged before/after diagnosis calls on the same graph/result. Diagnostic timers exclude graph/oracle construction, evaluation, serialization, checks, and report destruction. Repeated is not cached evaluation. OS/allocator state is not reset. No CAD evaluation or UI performance claim.",
+  "os": "linux",
+  "provenance": {
+    "after_diagnostics_sha256": "f78f992097b84075b0851474a326ac95e57a15abe5c27657594541025d7e9898",
+    "after_embedded_snapshot_bytes": 19342,
+    "after_embedded_snapshot_fnv1a64": "1b946498bfb0f532",
+    "after_report_type": "morphlet::heap_after::DiagnosticReport",
+    "after_revision": "9a2cccc6482f7a2b7da872b6e3b1dc32ef6ae856",
+    "before_diagnostics_sha256": "d844ea73131327e51351edd38567f17e1c57d89c64666afdc7bf82a2912ac290",
+    "before_embedded_snapshot_bytes": 17955,
+    "before_embedded_snapshot_fnv1a64": "01a2f1cd3e358ce8",
+    "before_report_type": "morphlet::heap_before::DiagnosticReport",
+    "before_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3",
+    "distinct_linked_diagnosis_function_addresses": true,
+    "stable_library_revision": "7c1a0956adb8edcc29945717a6eb32e0d6335be3"
+  },
+  "repeated_pairs": 5,
+  "status": "MEASURED",
+  "total_workload_ms": 50.793026,
+  "unix_time_seconds": 1795737232,
+  "workload": "Paired byte-exact diagnostic modules: sorted previews versus hybrid heap previews",
+  "workload_schema_version": 1
+}

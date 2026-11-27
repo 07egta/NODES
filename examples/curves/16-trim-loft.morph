@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "name": "円弧断面の部分曲線ロフト",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "circle",
+        "name": "円",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "radius": 30,
+          "segments": 64
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "range",
+        "name": "断面高さ",
+        "position": [
+          285,
+          40
+        ],
+        "params": {
+          "start": 0,
+          "end": 60,
+          "count": 4
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "move",
+        "name": "円の断面",
+        "position": [
+          550,
+          40
+        ],
+        "params": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "geometry": 0,
+          "z": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "curve_subcurve",
+        "name": "半円断面",
+        "position": [
+          815,
+          40
+        ],
+        "params": {
+          "start": 0,
+          "end": 0.5,
+          "segments": 64
+        },
+        "inputs": {
+          "curve": 2
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "loft",
+        "name": "メッシュロフト",
+        "position": [
+          20,
+          225
+        ],
+        "params": {
+          "cap": 0
+        },
+        "inputs": {
+          "curves": 3
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

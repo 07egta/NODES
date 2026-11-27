@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "name": "ボロノイランプ（線のスタディ）",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "populate",
+        "name": "シード付きの点",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "count": 70,
+          "width": 175,
+          "depth": 90,
+          "height": 0,
+          "seed": 29
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "voronoi2d",
+        "name": "ボロノイセル",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "width": 175,
+          "height": 90
+        },
+        "inputs": {
+          "points": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "cylinder_wrap",
+        "name": "円筒の曲線",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "radius": 27.852115041081685,
+          "width": 175
+        },
+        "inputs": {
+          "curve": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.65
+}

@@ -1,6 +1,12 @@
 # 開発への参加
 
-Morphletは、日本語を中心に使える独立したノード型モデリングアプリです。小さな修正や改善の提案を歓迎します。
+NODESは、日本語を中心に使える独立したノード型モデリングアプリです。小さな修正や改善の提案を歓迎します。crate名と既存GUI実行ファイル名は互換性のため `morphlet` / `NODES` を維持しています。
+
+## 実装言語
+
+本体はRustで実装します。GUI、ノード評価、Data Tree、幾何処理、保存、CLIの新規実装・改善もRustで進めてください。他言語は必要な補助用途に限定し、既存の開発用Python/PowerShellと制限付きRhaiユーザースクリプトは維持します。
+
+新しい例外では、用途・Rustで実装しない理由・接続箇所・実行依存と配布への影響をPRに記載してください。共通ルールは [実装言語方針](docs/LANGUAGE_POLICY.md)、エージェント向けの指示は [AGENTS.md](AGENTS.md) を参照してください。
 
 ## 変更前に
 
@@ -10,13 +16,16 @@ Morphletは、日本語を中心に使える独立したノード型モデリン
 
 ## 確認
 
-Rust stableを使い、リポジトリのルートで次を実行してください。
+[CI workflow](.github/workflows/windows.yml) と同じRustバージョンを使い、リポジトリのルートで次を実行してください。
 
 ```powershell
+cargo fmt --all -- --check
+cargo check --all-targets --locked
+cargo clippy --all-targets --locked -- -D warnings
 cargo test --all-targets --locked
-cargo build --release --locked --bin Morphlet
+cargo build --release --locked --bins
 ```
 
 プルリクエストには、変更内容と実行した確認を簡潔に記載してください。画面や操作に関わる変更では、確認方法や画面例があるとレビューしやすくなります。
 
-Windowsの自動チェック用に [GitHub Actionsの設定例](docs/github-actions/windows.yml) を用意しています。現在は上記の2コマンドで手元の変更を確認できます。
+現在のLinux/Windows自動チェックは [.github/workflows/windows.yml](.github/workflows/windows.yml) で実行します。文書だけの変更ではリンクと差分を確認し、実行していないビルドやテストを成功扱いしないでください。`Cargo.toml`、`Cargo.lock`、ビルド設定、実行コードを変える場合は、影響する品質ゲートも実行してください。

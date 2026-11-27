@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "name": "引力点のパターン",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "populate",
+        "name": "ランダムな点",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "count": 60.0,
+          "depth": 160.0,
+          "height": 0.0,
+          "seed": 3.0,
+          "width": 160.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "point",
+        "name": "引力点",
+        "position": [
+          20.0,
+          310.0
+        ],
+        "params": {
+          "x": 30.0,
+          "y": -20.0,
+          "z": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "distance",
+        "name": "距離",
+        "position": [
+          262.0,
+          310.0
+        ],
+        "params": {},
+        "inputs": {
+          "a": 0,
+          "b": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "remap",
+        "name": "近いほど高く",
+        "position": [
+          504.0,
+          310.0
+        ],
+        "params": {
+          "clamp": 0.0,
+          "source_max": 1.0,
+          "source_min": 0.0,
+          "target_max": 4.0,
+          "target_min": 24.0,
+          "use_source": 0.0
+        },
+        "inputs": {
+          "values": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "cylinder",
+        "name": "円柱",
+        "position": [
+          746.0,
+          310.0
+        ],
+        "params": {
+          "height": 40.0,
+          "radius": 4.0,
+          "segments": 24.0
+        },
+        "inputs": {
+          "height": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "point_component",
+        "name": "点の X",
+        "position": [
+          262.0,
+          30.0
+        ],
+        "params": {
+          "axis": 0.0
+        },
+        "inputs": {
+          "point": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "point_component",
+        "name": "点の Y",
+        "position": [
+          504.0,
+          30.0
+        ],
+        "params": {
+          "axis": 1.0
+        },
+        "inputs": {
+          "point": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "move",
+        "name": "移動",
+        "position": [
+          988.0,
+          310.0
+        ],
+        "params": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "inputs": {
+          "geometry": 4,
+          "x": 5,
+          "y": 6
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          988.0,
+          30.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 7
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 9
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 0.86
+}

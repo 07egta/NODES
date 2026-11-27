@@ -40,7 +40,58 @@ pub const TEMPLATES: &[Template] = &[
         description: "数列で大きさと高さを変えた円をつなぎ、面を作ります。",
         tag: "データを使う",
     },
+    Template {
+        name: "サイン波の塔",
+        description: "範囲と三角関数でずらした円柱を積み重ね、波打つ塔にします。",
+        tag: "数式で形を作る",
+    },
+    Template {
+        name: "べき乗の山脈",
+        description: "べき乗で高さを変えた円錐を並べ、ミラーで反対側にも写します。",
+        tag: "数式と対称",
+    },
+    Template {
+        name: "ノイズの花器（厚みつき）",
+        description: "式で決めた半径のグラフから器を作り、ノイズとねじりを加えて、印刷できる厚みをつけます。",
+        tag: "3D プリント",
+    },
+    Template {
+        name: "引力点のパターン",
+        description: "ばらまいた点と引力点の距離を再マップして、近いほど高い柱を並べます。",
+        tag: "パターン",
+    },
+    Template {
+        name: "パイプのらせんランプ",
+        description: "らせんの曲線に沿って円い管を通します。半径・巻き数・管の太さを変えて、光を通す形へ。",
+        tag: "曲線から立体へ",
+    },
+    Template {
+        name: "ジャイロイドの小物入れ",
+        description: "網目状のジャイロイドを箱の中に作ります。単位の大きさと壁の太さで、すき間の大きさを調整。",
+        tag: "格子・網目",
+    },
+    Template {
+        name: "シンプル花瓶→らせんGコード",
+        description: "花瓶の形を 1 本のらせんで印刷する G-code にします（Bambu A1 mini 向け・実機では未検証）。STL はこれまでどおり出力ノードから。",
+        tag: "Gコード",
+    },
+    Template {
+        name: "波模様の粘土の器",
+        description: "粘土プリンタ（TRONXY Moore 1）向け。壁を波打たせ、層ごとにずらしてうろこ模様にします（実機では未検証）。",
+        tag: "Gコード",
+    },
 ];
+
+fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
+    if let Some(node) = graph.node_mut(id) {
+        node.script = text.to_string();
+    }
+}
+fn rename(graph: &mut Graph, id: NodeId, name: &str) {
+    if let Some(node) = graph.node_mut(id) {
+        node.name = name.to_string();
+    }
+}
 
 pub fn create(index: usize) -> Project {
     match build(index) {
@@ -185,7 +236,7 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(array, wave, "geometry")?;
             finish(&mut graph, wave, [290.0, 385.0])?;
         }
-        _ => {
+        5 => {
             let radii = add(
                 &mut graph,
                 NodeKind::Series,
@@ -218,12 +269,392 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(moved, loft, "curves")?;
             finish(&mut graph, loft, [504.0, 340.0])?;
         }
+        6 => {
+            let t = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 0.0), ("end", 1.0), ("count", 10.0)],
+            )?;
+            if let Some(n) = graph.node_mut(t) {
+                n.name = "波の位置".into();
+            }
+            let heights = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 310.0],
+                &[("start", 0.0), ("end", 90.0), ("count", 10.0)],
+            )?;
+            if let Some(n) = graph.node_mut(heights) {
+                n.name = "段の高さ".into();
+            }
+            let sine = add(
+                &mut graph,
+                NodeKind::Sine,
+                [262.0, 30.0],
+                &[("amp", 12.0), ("frequency", 1.0), ("phase", 0.0)],
+            )?;
+            graph.connect(t, sine, "x")?;
+            let cylinder = add(
+                &mut graph,
+                NodeKind::Cylinder,
+                [262.0, 310.0],
+                &[("radius", 6.0), ("height", 9.0), ("segments", 40.0)],
+            )?;
+            let stretched = add(
+                &mut graph,
+                NodeKind::ScaleXyz,
+                [504.0, 310.0],
+                &[("sx", 1.6), ("sy", 0.8), ("sz", 1.0)],
+            )?;
+            graph.connect(cylinder, stretched, "geometry")?;
+            let moved = add(&mut graph, NodeKind::Move, [504.0, 30.0], &[])?;
+            graph.connect(stretched, moved, "geometry")?;
+            graph.connect(sine, moved, "x")?;
+            graph.connect(heights, moved, "z")?;
+            finish(&mut graph, moved, [746.0, 30.0])?;
+        }
+        8 => {
+            let t = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 0.0), ("end", 1.0), ("count", 7.0)],
+            )?;
+            rename(&mut graph, t, "下から上へ (0〜1)");
+            let radii = add(&mut graph, NodeKind::Expression, [262.0, 30.0], &[])?;
+            set_script(&mut graph, radii, "30 + 10 * sin(x * pi * 1.5) - 6 * x");
+            rename(&mut graph, radii, "半径の式");
+            graph.connect(t, radii, "x")?;
+            let body = add(
+                &mut graph,
+                NodeKind::GraphProfile,
+                [504.0, 30.0],
+                &[
+                    ("height", 120.0),
+                    ("rows", 60.0),
+                    ("segments", 96.0),
+                    ("top", 0.0),
+                ],
+            )?;
+            graph.connect(radii, body, "radii")?;
+            let noise = add(
+                &mut graph,
+                NodeKind::NoiseDeform,
+                [20.0, 310.0],
+                &[("amp", 1.5), ("size", 18.0), ("seed", 7.0), ("mode", 0.0)],
+            )?;
+            graph.connect(body, noise, "geometry")?;
+            let twist = add(
+                &mut graph,
+                NodeKind::Twist,
+                [262.0, 310.0],
+                &[("angle", 60.0)],
+            )?;
+            graph.connect(noise, twist, "geometry")?;
+            let shell = add(
+                &mut graph,
+                NodeKind::Shell,
+                [504.0, 310.0],
+                &[("thickness", 2.0)],
+            )?;
+            graph.connect(twist, shell, "geometry")?;
+            let check = add(
+                &mut graph,
+                NodeKind::OverhangCheck,
+                [746.0, 310.0],
+                &[("angle", 45.0)],
+            )?;
+            graph.connect(shell, check, "geometry")?;
+            finish(&mut graph, shell, [746.0, 30.0])?;
+        }
+        9 => {
+            let points = add(
+                &mut graph,
+                NodeKind::Populate,
+                [20.0, 30.0],
+                &[
+                    ("count", 60.0),
+                    ("width", 160.0),
+                    ("depth", 160.0),
+                    ("height", 0.0),
+                    ("seed", 3.0),
+                ],
+            )?;
+            let attractor = add(
+                &mut graph,
+                NodeKind::Point,
+                [20.0, 310.0],
+                &[("x", 30.0), ("y", -20.0), ("z", 0.0)],
+            )?;
+            rename(&mut graph, attractor, "引力点");
+            let distance = add(&mut graph, NodeKind::Distance, [262.0, 310.0], &[])?;
+            graph.connect(points, distance, "a")?;
+            graph.connect(attractor, distance, "b")?;
+            let heights = add(
+                &mut graph,
+                NodeKind::Remap,
+                [504.0, 310.0],
+                &[("target_min", 24.0), ("target_max", 4.0)],
+            )?;
+            rename(&mut graph, heights, "近いほど高く");
+            graph.connect(distance, heights, "values")?;
+            let column = add(
+                &mut graph,
+                NodeKind::Cylinder,
+                [746.0, 310.0],
+                &[("radius", 4.0), ("segments", 24.0)],
+            )?;
+            graph.connect(heights, column, "height")?;
+            let x = add(
+                &mut graph,
+                NodeKind::PointComponent,
+                [262.0, 30.0],
+                &[("axis", 0.0)],
+            )?;
+            rename(&mut graph, x, "点の X");
+            graph.connect(points, x, "point")?;
+            let y = add(
+                &mut graph,
+                NodeKind::PointComponent,
+                [504.0, 30.0],
+                &[("axis", 1.0)],
+            )?;
+            rename(&mut graph, y, "点の Y");
+            graph.connect(points, y, "point")?;
+            let moved = add(&mut graph, NodeKind::Move, [988.0, 310.0], &[])?;
+            graph.connect(column, moved, "geometry")?;
+            graph.connect(x, moved, "x")?;
+            graph.connect(y, moved, "y")?;
+            finish(&mut graph, moved, [988.0, 30.0])?;
+        }
+        10 => {
+            let path = add(
+                &mut graph,
+                NodeKind::Helix,
+                [20.0, 30.0],
+                &[
+                    ("radius", 30.0),
+                    ("height", 160.0),
+                    ("turns", 4.0),
+                    ("segments", 256.0),
+                ],
+            )?;
+            let tube = add(
+                &mut graph,
+                NodeKind::Pipe,
+                [262.0, 30.0],
+                &[("radius", 3.0), ("sides", 16.0), ("caps", 1.0)],
+            )?;
+            graph.connect(path, tube, "curve")?;
+            finish(&mut graph, tube, [504.0, 30.0])?;
+        }
+        11 => {
+            let lattice = add(
+                &mut graph,
+                NodeKind::Gyroid,
+                [20.0, 30.0],
+                &[
+                    ("width", 60.0),
+                    ("depth", 60.0),
+                    ("height", 40.0),
+                    ("cell", 15.0),
+                    ("thickness", 0.35),
+                    ("resolution", 40.0),
+                ],
+            )?;
+            let smooth = add(
+                &mut graph,
+                NodeKind::SmoothMesh,
+                [262.0, 30.0],
+                &[("strength", 0.5), ("iterations", 2.0), ("method", 1.0)],
+            )?;
+            graph.connect(lattice, smooth, "geometry")?;
+            let info = add(&mut graph, NodeKind::MeshInfo, [262.0, 310.0], &[])?;
+            graph.connect(smooth, info, "geometry")?;
+            finish(&mut graph, smooth, [504.0, 30.0])?;
+        }
+        12 => {
+            let vase = add(
+                &mut graph,
+                NodeKind::Vase,
+                [20.0, 30.0],
+                &[
+                    ("radius", 30.0),
+                    ("height", 90.0),
+                    ("thickness", 2.4),
+                    ("lobes", 6.0),
+                    ("amplitude", 0.12),
+                    ("segments", 72.0),
+                    ("layers", 40.0),
+                ],
+            )?;
+            let printer = add(
+                &mut graph,
+                NodeKind::GcodePrinter,
+                [20.0, 310.0],
+                &[("preset", 0.0)],
+            )?;
+            let temp = add(
+                &mut graph,
+                NodeKind::GcodeTemp,
+                [262.0, 310.0],
+                &[("nozzle", 215.0), ("bed", 55.0), ("fan", 100.0)],
+            )?;
+            graph.connect(printer, temp, "job")?;
+            let slice = add(
+                &mut graph,
+                NodeKind::GcodeSlice,
+                [504.0, 170.0],
+                &[("layer_height", 0.2)],
+            )?;
+            graph.connect(vase, slice, "mesh")?;
+            graph.connect(temp, slice, "job")?;
+            let spiral = add(
+                &mut graph,
+                NodeKind::GcodeSpiral,
+                [746.0, 170.0],
+                &[("bottom_layers", 4.0)],
+            )?;
+            graph.connect(slice, spiral, "job")?;
+            let safety = add(&mut graph, NodeKind::GcodeSafety, [988.0, 170.0], &[])?;
+            graph.connect(spiral, safety, "job")?;
+            let preview = add(&mut graph, NodeKind::GcodePreview, [1230.0, 170.0], &[])?;
+            graph.connect(safety, preview, "job")?;
+            let write = add(&mut graph, NodeKind::GcodeWrite, [1472.0, 170.0], &[])?;
+            graph.connect(preview, write, "job")?;
+            if let Some(node) = graph.node_mut(preview) {
+                node.preview = true;
+            }
+            let output = graph.add(NodeKind::Output, [262.0, 30.0])?;
+            graph.connect(vase, output, "geometry")?;
+            if let Some(node) = graph.node_mut(output) {
+                node.preview = false;
+            }
+        }
+        13 => {
+            let bowl = add(
+                &mut graph,
+                NodeKind::Vase,
+                [20.0, 30.0],
+                &[
+                    ("radius", 42.0),
+                    ("height", 80.0),
+                    ("thickness", 5.0),
+                    ("lobes", 0.0),
+                    ("amplitude", 0.0),
+                    ("segments", 72.0),
+                    ("layers", 32.0),
+                ],
+            )?;
+            let printer = add(
+                &mut graph,
+                NodeKind::GcodePrinter,
+                [20.0, 310.0],
+                &[("preset", 3.0)],
+            )?;
+            let clay = add(&mut graph, NodeKind::GcodeClay, [262.0, 310.0], &[])?;
+            graph.connect(printer, clay, "job")?;
+            let slice = add(
+                &mut graph,
+                NodeKind::GcodeSlice,
+                [504.0, 170.0],
+                &[("layer_height", 1.0)],
+            )?;
+            graph.connect(bowl, slice, "mesh")?;
+            graph.connect(clay, slice, "job")?;
+            let contour = add(
+                &mut graph,
+                NodeKind::GcodeContour,
+                [746.0, 170.0],
+                &[("walls", 1.0), ("bottom_layers", 2.0), ("spacing", 1.5)],
+            )?;
+            graph.connect(slice, contour, "job")?;
+            let texture = add(
+                &mut graph,
+                NodeKind::GcodeTexture,
+                [988.0, 170.0],
+                &[
+                    ("amplitude", 1.2),
+                    ("wavelength", 18.0),
+                    ("z_wavelength", 40.0),
+                    ("twist", 4.0),
+                ],
+            )?;
+            graph.connect(contour, texture, "job")?;
+            let sort = add(&mut graph, NodeKind::GcodeSort, [1230.0, 170.0], &[])?;
+            graph.connect(texture, sort, "job")?;
+            let safety = add(&mut graph, NodeKind::GcodeSafety, [1472.0, 170.0], &[])?;
+            graph.connect(sort, safety, "job")?;
+            let preview = add(&mut graph, NodeKind::GcodePreview, [1714.0, 170.0], &[])?;
+            graph.connect(safety, preview, "job")?;
+            let write = add(&mut graph, NodeKind::GcodeWrite, [1956.0, 170.0], &[])?;
+            graph.connect(preview, write, "job")?;
+            if let Some(node) = graph.node_mut(preview) {
+                node.preview = true;
+            }
+            let output = graph.add(NodeKind::Output, [262.0, 30.0])?;
+            graph.connect(bowl, output, "geometry")?;
+            if let Some(node) = graph.node_mut(output) {
+                node.preview = false;
+            }
+        }
+        _ => {
+            let base = add(
+                &mut graph,
+                NodeKind::Range,
+                [20.0, 30.0],
+                &[("start", 1.0), ("end", 5.0), ("count", 5.0)],
+            )?;
+            if let Some(n) = graph.node_mut(base) {
+                n.name = "1 から 5".into();
+            }
+            let squared = add(
+                &mut graph,
+                NodeKind::Power,
+                [262.0, 30.0],
+                &[("exponent", 2.0)],
+            )?;
+            graph.connect(base, squared, "base")?;
+            let heights = add(&mut graph, NodeKind::Multiply, [504.0, 30.0], &[("b", 3.0)])?;
+            graph.connect(squared, heights, "a")?;
+            if let Some(n) = graph.node_mut(heights) {
+                n.name = "高さ（3 倍）".into();
+            }
+            let cone = add(
+                &mut graph,
+                NodeKind::Cone,
+                [262.0, 310.0],
+                &[("radius", 8.0), ("segments", 4.0)],
+            )?;
+            graph.connect(heights, cone, "height")?;
+            let spacing = add(
+                &mut graph,
+                NodeKind::Series,
+                [20.0, 310.0],
+                &[("start", 0.0), ("step", 22.0), ("count", 5.0)],
+            )?;
+            if let Some(n) = graph.node_mut(spacing) {
+                n.name = "並べる間隔".into();
+            }
+            let moved = add(&mut graph, NodeKind::Move, [504.0, 310.0], &[("y", 20.0)])?;
+            graph.connect(cone, moved, "geometry")?;
+            graph.connect(spacing, moved, "x")?;
+            let mirrored = add(
+                &mut graph,
+                NodeKind::Mirror,
+                [746.0, 310.0],
+                &[("axis", 1.0), ("keep", 1.0)],
+            )?;
+            graph.connect(moved, mirrored, "geometry")?;
+            finish(&mut graph, mirrored, [746.0, 30.0])?;
+        }
     }
     graph.validate()?;
     let mut project = Project::new(TEMPLATES[index].name, graph);
     project.pan = [24.0, 80.0];
     // Two-column examples stay readable in a laptop-sized graph panel. The
     // canvas fits these bounds to its actual size on the first visible frame.
-    project.zoom = if index == 5 { 0.86 } else { 1.1 };
+    project.zoom = if index >= 5 { 0.86 } else { 1.1 };
     Ok(project)
 }
