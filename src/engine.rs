@@ -500,6 +500,13 @@ pub(crate) fn evaluate_node(
         let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
         return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
     }
+    // ケージ編集: the edit list is in `script` (see `nurbs_nodes::run_cage_edit`).
+    if node.kind == NodeKind::SubdCageEdit {
+        return checked_tree(
+            crate::nurbs_nodes::run_cage_edit(node, &inputs, cancel)?,
+            cancel,
+        );
+    }
     // Gコード nodes work on whole trees of G-code jobs (see `gcode_nodes.rs`).
     if crate::gcode_nodes::is_kind(node.kind) {
         return checked_tree(crate::gcode_nodes::run(node, &inputs, cancel)?, cancel);

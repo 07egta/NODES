@@ -145,6 +145,7 @@ pub struct NodesApp {
     gcode: GcodeDialog,
     /// The Gコード書き出し node whose file the picker is choosing.
     gcode_node: Option<NodeId>,
+    cage_edit: crate::cage_edit::CageEdit,
     /// STEP export node and graph revision captured when its picker opens.
     step_export: Option<(NodeId, u64)>,
     stl_export: StlExportUi,
@@ -263,6 +264,7 @@ impl NodesApp {
             help_open: false,
             gcode: GcodeDialog::default(),
             gcode_node: None,
+            cage_edit: Default::default(),
             step_export: None,
             stl_export: StlExportUi::new(),
             toast: None,
@@ -1969,6 +1971,10 @@ impl NodesApp {
         if matches!(node.kind, NodeKind::ImportMesh | NodeKind::ExactStepImport) {
             self.import_panel(ui, &node);
         }
+        if node.kind == NodeKind::SubdCageEdit {
+            self.cage_edit
+                .panel(ui, &mut self.project.graph, id, self.evaluation.as_ref());
+        }
         if node.kind == NodeKind::ExactStepExport {
             let ready = !node.off
                 && !self.stale()
@@ -2121,6 +2127,9 @@ impl NodesApp {
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                    self.viewport.cage_overlay = self
+                        .cage_edit
+                        .overlay(&self.project.graph, self.evaluation.as_ref());
                     let picked = if let Some(items) = &items {
                         let picked = self.viewport.show(ui, items);
                         self.preview_revision = Some(self.result_revision);
@@ -2128,6 +2137,14 @@ impl NodesApp {
                     } else {
                         self.viewport.show_previous(ui)
                     };
+                    let events = std::mem::take(&mut self.viewport.cage_events);
+                    if !events.is_empty() {
+                        self.cage_edit.handle(
+                            events,
+                            &mut self.project.graph,
+                            self.evaluation.as_ref(),
+                        );
+                    }
                     // Undo can reuse a previous shape's node ID for a different
                     // node. Only a completed current preview may select nodes;
                     // camera controls remain live while showing previous geometry.

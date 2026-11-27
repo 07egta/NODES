@@ -90,6 +90,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         Loft => FirstItem,
         MeshConstruct => List,
         ExactNetworkSurface if index <= 1 => List,
+        SubdCageEdit => Tree,
         ExactStepExport => Tree,
         CurveWeightedNurbs if index <= 2 => List,
         CurveShatter if index <= 1 => List,
