@@ -523,7 +523,7 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(safety, preview, "job")?;
             let write = add(&mut graph, NodeKind::GcodeWrite, [1472.0, 170.0], &[])?;
             graph.connect(preview, write, "job")?;
-            if let Some(node) = graph.node_mut(write) {
+            if let Some(node) = graph.node_mut(preview) {
                 node.preview = true;
             }
             let output = graph.add(NodeKind::Output, [262.0, 30.0])?;
@@ -590,8 +590,13 @@ fn build(index: usize) -> Result<Project, String> {
             graph.connect(safety, preview, "job")?;
             let write = add(&mut graph, NodeKind::GcodeWrite, [1956.0, 170.0], &[])?;
             graph.connect(preview, write, "job")?;
-            if let Some(node) = graph.node_mut(write) {
+            if let Some(node) = graph.node_mut(preview) {
                 node.preview = true;
+            }
+            let output = graph.add(NodeKind::Output, [262.0, 30.0])?;
+            graph.connect(bowl, output, "geometry")?;
+            if let Some(node) = graph.node_mut(output) {
+                node.preview = false;
             }
         }
         _ => {
