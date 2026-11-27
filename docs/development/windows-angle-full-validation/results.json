@@ -1,0 +1,76 @@
+{
+  "mode": "main",
+  "source_head": "ca6147a0b639b9429900313147d4e288972373e5",
+  "candidate_tree_before_evidence": "55903180e8609378657c00095833c295b9e4caf9",
+  "portable_angle_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+  "incoming_sha": null,
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "profile": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/NODES/target",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "steps": [
+    {
+      "name": "tests",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 38.537,
+      "log": "tests.log",
+      "results": {
+        "suites": 44,
+        "passed": 487,
+        "failed": 0,
+        "ignored": 2
+      }
+    },
+    {
+      "name": "debug-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.123,
+      "log": "debug-bins.log"
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 93.308,
+      "log": "release-bins.log"
+    }
+  ],
+  "captured_at": "2026-11-27T09:59:48+09:00",
+  "source_files_rechecked": 142,
+  "proposal_only": false,
+  "binaries": {
+    "Morphlet": {
+      "size_bytes": 19390304,
+      "sha256": "cc3193987f02367cec02b7ab423a21ce0e92e86040c8aeed9f29fe86c46ee210"
+    },
+    "nodes-cli": {
+      "size_bytes": 5587856,
+      "sha256": "67a4d5a7423ef69cd56a22bf9dc161c9fab0f470ef8546352155f9bea4d3c5c4"
+    }
+  }
+}

@@ -1,9 +1,94 @@
 # WIP: PR #16 と診断 PR #18 の統合候補 — 2026-11-27 JST
 
+## 最新の固定入力と位置づけ
+
+`wip/omega-pr16-integration-20261127` は隔離した提案ブランチ。
+main、PR #16、PR #18への統合や、新しいPRの作成は行っていない。
+本追記の対象は、初回候補 `771b4760bf983fb35afa65a2cbf495772172e6d5` に
+PR #16 の `46ab578af63193c7dc3d37ce1926e1bc75216486` と
+PR #18 の `ca6147a0b639b9429900313147d4e288972373e5` を加えた候補である。
+履歴はこの3つの入力を親として保持する。PR #15 由来の変更も引き続き含む。
+
+先行候補の **567件**と新候補の **572件**を区別する。
+初回の実画面操作2→1→0とUndo/Redo、release 91.868秒は `771b476` の証拠。
+その結果を、今回変わったビューポート／ファイル選択UIのネイティブ試験と読み替えない。
+取り込んだPR16のCI・GPU以外のビューポート性能記録も、親ソースについての記録である。
+
+## 更新によって発見した結合不整合
+
+`git merge-tree --write-tree 771b4760bf983fb35afa65a2cbf495772172e6d5 46ab578af63193c7dc3d37ce1926e1bc75216486`
+はテキスト競合なく tree `92b7c199cf532499a10cffc5b08e23586a90022a` を生成した。
+しかし all-target check は **E0063、exit 101**で失敗した。
+新しい `viewport_cache_tests.rs` の2つの `ComputeResult` 初期化に、PR18が導入した
+`diagnostics` がなかった。これは自動マージの成功では分からない不整合だった。
+
+fixtureに実際の `diagnostics::diagnose` の結果を設定し、実アプリと同じ評価・診断の
+組を使うように修正した。古いrevisionの結果を投入するテストは、形状のArcだけでなく
+現在の診断レポート全体が変わらないことも確認する。失敗した原ログと、その時点の
+ソースハッシュを [更新時の証拠](pr16-refresh-validation/README.md) に残した。
+
+同時に、PR18のWindows CIが実際に見つけた極小角度の問題を直した `ca6147` を移植。
+元のbits=1 assertionは維持する。詳細は [移植性記録](WINDOWS_ANGLE_PORTABILITY.md)。
+`math_nodes.rs` のPR18との差分はPR16の補間・合計／平均への委譲2箇所だけで、
+`vector_angle_regressions.rs` はPR18とバイト一致する。独立担当が確認した。
+PR16の集約・補間・Data Tree・scriptの4ファイルも固定入力46abと一致する。
+
+## 新候補の実測した検証
+
+Linux / Rust 1.100.0、独立したtarget、debug/test情報0、incremental無効、jobs2。
+実装を凍結した候補treeは `af7316c51d7a78fd9abcc7841ee711b64d10f538`。
+これは文書追記前のindex treeであり、最終の証拠付きcommit treeとは区別する。
+
+| 対象 | 結果 |
+|---|---|
+| `cargo fmt --all -- --check` | 成功 |
+| all-target `cargo check --locked --offline` | 成功 |
+| all-target `cargo clippy --locked --offline -- -D warnings` | 成功 |
+| all-target `cargo test --locked --offline` | **572 passed / 0 failed / 4 ignored、57スイート** |
+| debug desktop / CLI | 成功 |
+| release desktop / CLI | 成功、95.754秒。依存再利用のビルド時間で、起動性能ではない |
+| 実release CLIの診断fixture3件 | 期待する終了コード・原因数・影響数が一致、入力SHA256不変 |
+| 164件の実装・テスト・例・Cargoファイル | 検証前後のSHA256一致 |
+
+ignoredは `benchmark_canvas_pan`、`benchmark_sparse_slider_edit`、`audit_stress`、
+新しい `benchmark_pending_preview` の4つ。すべて手動性能／ストレス測定であり、
+失敗した機能テストをignoreにしたものではない。親の成功件数を合計していない。
+
+[コマンド、原ログ、バイナリ指紋、release CLI、ソース指紋](pr16-refresh-validation/README.md)
+をこの提案と一緒に保存する。実行バイナリ本体はGitへ追加していない。
+新候補のWindows CI、Windows GUI、新しいネイティブUI操作は未実施。
+
+## PR18単独の修正後の再検証
+
+別worktreeの **ca6147** でも実際に全体検証を実行し、
+**487 passed / 0 failed / 2 ignored、44スイート**、debug/release成功を確認した。
+releaseは93.308秒、実release CLIの3fixtureは期待する構造・終了コードで入力不変。
+142ソースファイルを再照合した。直前に実行したfmt・strict all-target Clippy・
+5件の局所角度テストの原ログは `windows-angle-portability/` に保存されている。
+[単独PR18の追加原ログ](windows-angle-full-validation/README.md) は、進行中のCIを
+文書だけのpushで中止しないため、この提案ブランチに保存する。
+
+旧aa690のWindows失敗は [run45917517285](https://github.com/07egta/NODES/actions/runs/45917517285)。
+修正ca6147の [run45919617590](https://github.com/07egta/NODES/actions/runs/45919617590) は
+10:00 JST時点では進行中。ローカルLinux成功をWindows成功とは扱わない。
+
+## 再開時に残る確認
+
+1. 上記固定入力から候補を読み、両方の診断／ビューポート境界を維持する。
+2. ca6147のCIの最終結果と、候補自身のWindows検証を区別する。
+3. PR20と重複するdiagnoseのJSON／終了コード契約を、無条件マージの前に一本化する。
+4. 新ビューポート、ファイル選択の実画面を確認し、親のベンチマークを候補の値に転記しない。
+5. 次のPR16更新へ無制限に追従せず、まずこの固定候補を独立してレビューする。
+
+---
+
+# 初回候補771b476の履歴 — 以下は25f981bとの統合記録
+
 このブランチは **統合候補の隔離検証用**。PR #16、PR #18、main に対するマージを
 実行したものではなく、新しい競合PRも作成していない。
 `wip/omega-pr16-integration-20261127` に再開可能な形で保存する。
-PR #18 本体の検証済み head `aa6906574ba3a89919d80a8a778d71ac65cc3724` は変更しない。
+初回検証時の PR #18 は `aa6906574ba3a89919d80a8a778d71ac65cc3724` だった。
+後続のWindows修正と新しい候補は、本書冒頭の追記に分けて記録する。
 
 ## 比較・統合した入力
 

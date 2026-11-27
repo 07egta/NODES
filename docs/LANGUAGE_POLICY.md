@@ -37,6 +37,7 @@
 | `scripts/export_ci_checkpoint.py` | CI検証結果・復旧用情報の出力。補助ツールとして維持 |
 | `scripts/update_gh2_inventory.py` | 公開資料から対応調査用の一覧を生成。補助ツールとして維持 |
 | `scripts/validate_cli_vase.py` | CLIの外部実行と独立した出力検証。補助ツールとして維持 |
+| `scripts/validate_omega_gui_exports.py` | GUIで出力した固定2件のSTLを、Rust本体の検査実装を共有せずPython標準ライブラリだけで読み取り照合する開発用補助。任意形状の印刷適性を保証するものではなく、本体の実行依存や追加パッケージを導入しない |
 | `scripts/generate_sum_oracle.py` | Python標準ライブラリの `Fraction` で合計・平均の期待値を独立生成し、開発時・CIでJSON fixtureを照合。本体の実行依存にしない |
 | `scripts/generate_interpolation_oracle.py` | Python標準ライブラリの `Fraction` で補間の期待値を独立生成し、開発時・CIでJSON fixtureを照合。本体の実行依存にしない |
 | `scripts/build-windows.ps1` | CargoによるWindowsビルドと配布準備の補助 |

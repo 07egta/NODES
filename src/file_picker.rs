@@ -1,13 +1,12 @@
 //! A small filesystem picker that needs no desktop portal or native dialog.
 //! This module only reads directories and returns a chosen path; the caller writes.
 
-use eframe::egui::{self, Color32, RichText};
+use eframe::egui::{self, RichText};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const DIRECTORY_LIMIT: usize = 2_000;
-const ACCENT: Color32 = Color32::from_rgb(28, 133, 116);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FileTask {
@@ -210,7 +209,11 @@ impl FilePicker {
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .button(RichText::new("上書きする").color(ACCENT).strong())
+                                .button(
+                                    RichText::new("上書きする")
+                                        .color(crate::theme::teal())
+                                        .strong(),
+                                )
                                 .clicked()
                             {
                                 event = Some(PickerEvent::Chosen(path));
@@ -281,7 +284,8 @@ impl FilePicker {
                                 for entry in &self.entries {
                                     let selected = self.selected_file.as_ref() == Some(&entry.path);
                                     let label = if entry.is_dir {
-                                        RichText::new(format!("▸  {}", entry.name)).color(ACCENT)
+                                        RichText::new(format!("▸  {}", entry.name))
+                                            .color(crate::theme::teal())
                                     } else {
                                         RichText::new(format!("    {}", entry.name))
                                     };
@@ -367,7 +371,7 @@ impl FilePicker {
                                 egui::Button::new(
                                     RichText::new(self.task.action_label())
                                         .strong()
-                                        .color(ACCENT),
+                                        .color(crate::theme::teal()),
                                 ),
                             )
                             .clicked()

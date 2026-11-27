@@ -1,0 +1,42 @@
+{
+  "proposal_only": true,
+  "base_sha": "771b4760bf983fb35afa65a2cbf495772172e6d5",
+  "incoming_sha": "46ab578af63193c7dc3d37ce1926e1bc75216486",
+  "candidate_tree_before_evidence": "92b7c199cf532499a10cffc5b08e23586a90022a",
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "profile": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/target-pr16-preview",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.686,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 101,
+      "elapsed_s": 1.784,
+      "log": "check.log"
+    }
+  ]
+}

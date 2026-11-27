@@ -13,14 +13,14 @@ Rustのライブラリがデータモデルと計算を提供し、同じpackage
 | 登録・型・グラフ・上限 | `model`、カテゴリごとのNodeSpec |
 | 共通アクセス規則 | `node_access`、`data_tree`、`data_tree_nodes` |
 | 評価・キャッシュ・時間計測 | `engine`、`latest_channel`、`cluster` |
-| 数学・式・従来ノード | `math_nodes`、`expr`、`gh_nodes` |
+| 数学・式・従来ノード | `math_nodes`、`number_aggregates`、`number_interpolation`、`expr`、`gh_nodes` |
 | 精密曲線 | `curve_geometry`、`curve_nodes` |
 | 精密曲面・限定ソリッド | `surface_kernel`、`surface_curvature`、`surface_nodes` |
 | メッシュ・生成 | `mesh_fabrication`、`mesh_geometry_checks`、`generative` |
 | 保存・移行・入出力 | `persistence`、`compatibility`、`import`、`stl_export`、`ghx` |
 | 安全な外部編集 | `graph_api`、CLI |
 | 制限付きスクリプト | `script`（Rhai）、`expr` |
-| 編集画面 | `app`、`canvas`、`ui_polish`、`theme`、`data_view`、`help` |
+| 編集画面 | `app`、`canvas`、`getting_started`、`ui_polish`、`theme`、`data_view`、`help` |
 | 描画・造形情報 | `viewport`、`raster`、`print_info` |
 
 新しいカテゴリ処理を巨大なengineへまとめない。stable snake_caseのserialized ID、NodeSpec、共通アクセス、kernel、独立期待値テスト、graph/save/reloadテストを一単位とする。登録は現在compile-time enumであり、dynamic plugin registryは未実装。
@@ -54,27 +54,39 @@ UIと計算workerはlatest-only mailboxを使用し、未受信snapshotを各方
 
 NodeTimingは入力/cache key準備からkernelまたはcache取得、資源検査、出力格納までの壁時計時間。Cluster内部は外側へ含める。validation前の中止には偽のnode時間を作らず、途中中止はpartial timingだけ残す。表示は計測値であり、CPU使用率やframe時間ではない。
 
+### 計算待ちの3D表示
+
+プレビューは `None`（新しい結果を計算中）と `Some([])`（最新評価が空またはエラー）を区別する。前者では最後の完了scene・診断・投影cacheを保持して「更新中／前回の形状を表示」と明示し、カメラ操作を継続する。最新の空結果は必ずsceneを消す。非表示中に評価が完了した場合は表示済みrevisionを照合し、それ以前の形状を復活させない。
+
+前回の形状から現在のグラフの選択を推測せず、pending中のpickは選択へ採用しない。Undo後に同じNodeIdが別ノードへ再利用された場合も誤選択しない。出力ファイルには最新評価が必須であり、保持した表示sceneをexportへ流用しない。preview用Tree containerのcloneと、本当に形状が変わった時のUI thread上のtopology診断は、別の未解消コストとして残る。
+
+## 数値核と編集の精度
+
+総和・平均は正負を分けた固定長整数累積（単位2^-1074）を使い、平均は整数除算後に1回だけnearest/evenへ丸める。補間は `a + t*b - t*a` の積を単位2^-2148で保持して最後に丸める。有限入力・範囲・overflowの扱いは呼出し側と区別し、Python Fraction oracleとbit単位で比較する。NURBSや任意の数学ノードをすべてexact arithmeticへ置換したわけではない。
+
+編集・履歴・cacheは数値のbitを比較して+0と-0を区別する。InspectorとCanvasは共通の数値widgetを使用し、ノードIDとport keyから安定したIDを作る。表示幅に合わせて値自体を丸めず、長い文字列とinteraction領域だけをclipする。
+
 ## 幾何の表現と精度
 
-Curveは表示点列と数学的基底を別に保持する。NURBSでは次数、完全なknot vector、制御点、重みを扱う。affine変換や対応した曲面生成は精密基底を保持し、非線形の点列変形で基底を失った場合は精密NURBSと名乗らない。長さ、最近接点、交差等の数値解は個別の公差・制限を持つ。
+Curveは表示点列と数学的基底を別に保持する。NURBSでは次数、完全なknot vector、制御点、重みを扱う。affine変換や対応した曲面生成は精密基底を保持し、非線形の点列変形で基底を失った場合は精密NURBSと名乗らない。長さ、最近接点、交差等の数値解は個別の公差・制限を持つ。最近接探索は端点に隣接するセルも局所細分化し、閉判定は導関数の大きさに依存しない幾何標本の範囲を使う。一般曲線の大域的最近接の証明ではない。
 
-Surfaceは解析primitiveまたはNURBSを保持し、表示用Meshへ明示的に離散化する。1階/2階微分、第一/第二基本形式から曲率を求める。法線はSu×Sv、第二基本形式はn・Sijなので外向き球のHは-1/r、Kは1/r²。極や退化接線、非C2内部knot近傍は明示的に扱う。
+Surfaceは解析primitiveまたはNURBSを保持し、表示用Meshへ明示的に離散化する。1階/2階微分、第一/第二基本形式から曲率を求める。法線はSu×Sv、第二基本形式はn・Sijなので外向き球のHは-1/r、Kは1/r²。極や退化接線、非C2内部knot近傍は明示的に扱う。面積は0長でないnative knot区間ごとにGL3/GL5の差を指標とした適応積分を行い、深さ・標本数・キャンセルに上限を設ける。基底と制御点は局所supportだけ計算する。未収束を黙って有限の正解として返さない。
 
 Solid/B-repは限定的で、一般のトリム曲面・位相修復・fillet・Booleanではない。箱専用演算と一般CAD機能を区別する。メッシュの連結はBooleanではない。永続SubD位相やcreaseも未実装。
 
 ## メッシュ・印刷
 
-頂点はf64、三角形indexはu32。面積/符号付き体積、境界・非多様体辺・向き・退化面などを検査する。これらだけで自己交差の不存在や造形成功を証明しない。
+頂点はf64、三角形indexはu32。面積/符号付き体積、境界・非多様体辺・頂点fan・重複面・向き・退化面などを検査する。共有topology監査をviewport/export/CLIで使い、閉じた多様体でない形のvolume/weightは未判定にする。exportは1e-6 mm量子化による全体の座標weldを含む。これらだけで自己交差の不存在や造形成功を証明しない。
 
 修復では内殻を無条件に外向きへ反転しない。複数殻の包含は未判定と記録し、単一閉殻の向き補正では局所原点と補償和を用いる。凹多角形のOBJ/穴埋めは検証付き三角形化へ移行し、非平面・自己交差・曖昧な複数境界を推測で埋めない。
 
-STLはf32へ丸めた後の退化も検査する。OBJ/3MFもmesh出力であり、NURBS/B-rep交換ではない。材料質量は体積と密度からの概算で、slicerのinfill/support/実測重量とは異なる。
+STLはf32へ丸めた後の退化も検査する。OBJはf64がroundtripする最短文字列を使う。複数ファイルのexportは全てを一時ファイルへ書きflush/syncしてから順にrenameする。途中のrename失敗は既に完了したファイルと面数を正確に返すが、全ファイルを一括して原子的に置換するtransactionではない。OBJ/3MFもmesh出力であり、NURBS/B-rep交換ではない。材料質量は体積と密度からの概算で、slicerのinfill/support/実測重量とは異なる。
 
 ## 保存・互換性・外部能力
 
 native v1 JSONは検証付きで読み、原子的な一時file置換で保存する。8MiB書込上限とflush/syncを使用する。未知のnative node/fieldは原fileを変更せず拒否する。編集可能なopaque未知nodeの保存は未実装。
 
-project/API request/GHXの入力はopen前に通常ファイルか確認し、open後のdescriptorでも確認する。FIFO等を通常入力として待ち続けないための対策であり、敵対的なファイル置換競合を完全に排除する保証ではない。読込byte上限も維持する。
+project/API request/GHX/partの入力はopen前に通常ファイルか確認し、open後のdescriptorでも確認する。FIFO等を通常入力として待ち続けないための対策であり、敵対的なファイル置換競合を完全に排除する保証ではない。読込byte上限も維持する。
 
 独立missionで食い違ったClosestPoint port名とtree-transform keyは明示移行し、競合を上書きしない。GHXは公開情報に基づく限定的な独立import/archiveであり、未知内容と接続を保持するが、binary GHや全component変換は未対応。
 

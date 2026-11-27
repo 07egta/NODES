@@ -1,0 +1,15 @@
+    Checking morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES-pr16-preview)
+error[E0063]: missing field `diagnostics` in initializer of `app::ComputeResult`
+   --> src/viewport_cache_tests.rs:118:19
+    |
+118 |             .send(ComputeResult {
+    |                   ^^^^^^^^^^^^^ missing `diagnostics`
+
+error[E0063]: missing field `diagnostics` in initializer of `app::ComputeResult`
+   --> src/viewport_cache_tests.rs:239:15
+    |
+239 |         .send(ComputeResult {
+    |               ^^^^^^^^^^^^^ missing `diagnostics`
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `morphlet` (bin "Morphlet" test) due to 2 previous errors

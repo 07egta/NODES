@@ -72,6 +72,8 @@ pub struct Viewport {
     first_fit: bool,
     fit_requested: bool,
     texture: Option<egui::TextureHandle>,
+    #[cfg(test)]
+    cache_work: CacheWork,
 }
 
 impl Default for Viewport {
@@ -99,8 +101,28 @@ impl Default for Viewport {
             first_fit: true,
             fit_requested: false,
             texture: None,
+            #[cfg(test)]
+            cache_work: CacheWork::default(),
         }
     }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct CacheWork {
+    pub scene_builds: usize,
+    pub diagnostic_attempts: usize,
+    pub completed_diagnostics: usize,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct CacheState {
+    pub work: CacheWork,
+    pub triangles: usize,
+    pub selected_triangles: usize,
+    pub has_bounds: bool,
+    pub camera: [f64; 6],
 }
 
 #[derive(Clone, Copy)]
@@ -296,15 +318,56 @@ impl Camera {
 }
 
 impl Viewport {
+    #[cfg(test)]
+    pub(crate) fn test_cache_state(&self) -> CacheState {
+        CacheState {
+            work: self.cache_work,
+            triangles: self.scene.triangles.len(),
+            selected_triangles: self.scene.triangles.iter().filter(|t| t.selected).count(),
+            has_bounds: self.scene.bounds.is_some(),
+            camera: [
+                self.yaw,
+                self.pitch,
+                self.span,
+                self.target[0],
+                self.target[1],
+                self.target[2],
+            ],
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_pick_point(&self) -> Option<Pos2> {
+        self.projected.as_ref()?.triangles.iter().find_map(|t| {
+            let a = t.p[1] - t.p[0];
+            let b = t.p[2] - t.p[0];
+            ((a.x * b.y - a.y * b.x).abs() > 4.).then(|| t.p[0] + (a + b) / 3.)
+        })
+    }
+
     /// Fill the remaining UI area and return the picked geometry's source node.
     pub fn show(&mut self, ui: &mut egui::Ui, items: &[PreviewItem]) -> Option<u64> {
+        self.show_snapshot(ui, Some(items))
+    }
+
+    /// Keep the completed scene while another evaluation is pending. Camera
+    /// controls and picking remain live; the caller labels this as a previous result.
+    pub fn show_previous(&mut self, ui: &mut egui::Ui) -> Option<u64> {
+        self.show_snapshot(ui, None)
+    }
+
+    fn show_snapshot(&mut self, ui: &mut egui::Ui, items: Option<&[PreviewItem]>) -> Option<u64> {
+        // Accept a completed snapshot even if a temporarily tiny viewport cannot
+        // paint it; the caller can then safely record which revision is installed.
+        if let Some(items) = items {
+            self.ensure_scene(items);
+        }
         let rect = ui.available_rect_before_wrap();
         if rect.width() < 2.0 || rect.height() < 2.0 {
             return None;
         }
         let response = ui.allocate_rect(rect, Sense::click_and_drag());
         self.last_size = rect.size();
-        self.ensure_scene(items);
         if self.first_fit && self.scene.bounds.is_some() {
             self.fit_cached();
             self.first_fit = false;
@@ -498,8 +561,17 @@ impl Viewport {
 
     pub fn fit(&mut self, items: &[PreviewItem]) {
         self.ensure_scene(items);
+        self.fit_previous();
+    }
+
+    pub fn fit_previous(&mut self) {
         self.fit_cached();
         self.first_fit = self.scene.bounds.is_none();
+    }
+
+    /// Invalidate a result superseded while the viewport was not being shown.
+    pub fn clear(&mut self) {
+        self.ensure_scene(&[]);
     }
 
     pub fn set_view(&mut self, view: &str) {
@@ -851,6 +923,10 @@ impl Viewport {
             return;
         }
 
+        #[cfg(test)]
+        {
+            self.cache_work.scene_builds += 1;
+        }
         let mut scene = Scene::default();
         let mut value_count = 0;
         'items: for item in items {
@@ -901,6 +977,11 @@ impl Viewport {
         }
         let trees: Vec<Tree> = items.iter().map(|item| item.tree.clone()).collect();
         scene.report = persistence::mesh_stats(&trees).ok();
+        #[cfg(test)]
+        {
+            self.cache_work.diagnostic_attempts += 1;
+            self.cache_work.completed_diagnostics += usize::from(scene.report.is_some());
+        }
         self.scene = scene;
         self.geometry_hash = Some(hash);
         self.selection_hash = Some(selection_hash);

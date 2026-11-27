@@ -1,65 +1,172 @@
 {
-  "updated_at": "2026-11-27T09:14:56+09:00",
-  "source_commit": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
-  "binary_sha256": "f9990b360dff6ed5ed978146a9b65c7d6f1193ca9682a73f62b3ea60de3b017c",
+  "schema": 2,
+  "updated_at": "2026-11-27T09:27:26+09:00",
   "platform": "Linux X11 virtual desktop; not Windows/Intel Arc",
   "desktop_resolution": [
     1364,
     1024
   ],
   "initial_environment_issue": "The desktop had no window manager, so native numeric keyboard events lacked focus. Started installed xfwm4 without changing preferences; repeated the workflow with real focus. No product code was changed for this environment issue.",
-  "steps": [
+  "records": [
     {
-      "action": "Inspector Number +0 to -0 and Atan2(y,-1)",
-      "observed": "Number displayed -0; output -3.1416; project dirty"
+      "source_commit": "0aa286a93a8b61f23ce691b1d15a025780ec1fc8",
+      "binary_sha256": "f9990b360dff6ed5ed978146a9b65c7d6f1193ca9682a73f62b3ea60de3b017c",
+      "steps": [
+        {
+          "action": "Inspector Number +0 to -0 and Atan2(y,-1)",
+          "observed": "Number displayed -0; output -3.1416; project dirty"
+        },
+        {
+          "action": "Ctrl+Z then Ctrl+Y",
+          "observed": "Number +0/output +3.1416, then -0/output -3.1416"
+        },
+        {
+          "action": "Ctrl+S; close; restart same release binary with saved project",
+          "observed": "Saved -0 and output -3.1416 survived; no unsaved marker"
+        },
+        {
+          "action": "Independently read saved JSON and run nodes-cli evaluate",
+          "observed": "Number bits 8000000000000000; exact output -3.141592653589793"
+        },
+        {
+          "action": "Open two boxes that touch at one vertex",
+          "observed": "Viewport dimensions40x40x40mm,24triangles,1non-manifold vertex; volume/weight undetermined"
+        },
+        {
+          "action": "Open export dialog and select split files",
+          "observed": "2bodies/24triangles; matching1non-manifold vertex diagnostic; actual split file export still pending"
+        }
+      ],
+      "screenshots": {
+        "omega-contact-viewport.jpg": {
+          "bytes": 145072,
+          "sha256": "b4302e094354163f22f884963940550217be51e1298754bbdfa7a1ba8d237487"
+        },
+        "omega-export-before.jpg": {
+          "bytes": 191971,
+          "sha256": "22b9ad48bfa3f675c0e36825e0ca3e910c76bfdd862865cf2aa78132aeab0223"
+        },
+        "omega-help-before.jpg": {
+          "bytes": 149117,
+          "sha256": "341363b6e2e8ee5b83a17b79135faeb206a7389ccbbe2a1389d92a62381623f1"
+        },
+        "omega-signed-zero-entered.jpg": {
+          "bytes": 127986,
+          "sha256": "3d0db86e1c8a982567db364d4667492eb88057c0066187c3f01c36264e447ca2"
+        },
+        "omega-signed-zero-reopened.jpg": {
+          "bytes": 127692,
+          "sha256": "889dbd2b7ed6792c269f41e4cf240e929b669888e7e4b4113d22678589eda359"
+        }
+      }
     },
     {
-      "action": "Ctrl+Z then Ctrl+Y",
-      "observed": "Number +0/output +3.1416, then -0/output -3.1416"
-    },
-    {
-      "action": "Ctrl+S; close; restart same release binary with saved project",
-      "observed": "Saved -0 and output -3.1416 survived; no unsaved marker"
-    },
-    {
-      "action": "Independently read saved JSON and run nodes-cli evaluate",
-      "observed": "Number bits 8000000000000000; exact output -3.141592653589793"
-    },
-    {
-      "action": "Open two boxes that touch at one vertex",
-      "observed": "Viewport dimensions40x40x40mm,24triangles,1non-manifold vertex; volume/weight undetermined"
-    },
-    {
-      "action": "Open export dialog and select split files",
-      "observed": "2bodies/24triangles; matching1non-manifold vertex diagnostic; actual split file export still pending"
+      "source_commit": "25f981b794e3e0f037cd664915ce144347b49f40",
+      "binary_sha256": "b06ee291445a6c5a7faa8ff4b9055257a4dd9c7f56cf91adf51459dc31a19f44",
+      "observed_at": "2026-11-27T09:27:26+09:00",
+      "steps": [
+        {
+          "action": "Click Number canvas value; type 0 then -0; inspect separate output window",
+          "observed": "0 produces +3.1416; -0 produces -3.1416 through Atan2(y,-1)"
+        },
+        {
+          "action": "Ctrl+Z, Ctrl+Y, Ctrl+S after canvas entry",
+          "observed": "Undo returns +0/+3.1416; Redo returns -0/-3.1416; save clears dirty marker"
+        },
+        {
+          "action": "Open revised getting-started help and scroll to bottom",
+          "observed": "Japanese text readable; NURBS/mesh scope and GH/STEP/IGES/3DM limitations visible; action buttons and display scale reachable"
+        },
+        {
+          "action": "Open contact fixture; split files; scroll through revised export dialog",
+          "observed": "2 bodies,24 triangles,one non-manifold vertex; volume undetermined; accessible primary export action and lower slicer controls"
+        },
+        {
+          "action": "Choose output folder and omega-contact.stl; perform binary split export",
+          "observed": "Toast reported 24 faces in 2 files; actual files independently parsed below"
+        }
+      ],
+      "screenshots": {
+        "omega-canvas-direct-entry.jpg": {
+          "bytes": 134428,
+          "sha256": "f585f58c58d7033c8997342d051a8e9f13b6e08c00b338577d1df97e186004e7"
+        },
+        "omega-help-after.jpg": {
+          "bytes": 158851,
+          "sha256": "f9ec9ac15231f9be4b276ef39228294043fac6687f063c6552d2d50d2c9656f9"
+        },
+        "omega-export-after.jpg": {
+          "bytes": 163184,
+          "sha256": "d54d2d9583a7050e43f620bda99d9e4437023529a70921590ca01639d3a34d91"
+        },
+        "omega-export-action.jpg": {
+          "bytes": 164554,
+          "sha256": "43ae79aa705025fd3cbe8381ddabd3b8394b6d00e409bdbd4747b260551d6e9a"
+        },
+        "omega-export-success.jpg": {
+          "bytes": 165156,
+          "sha256": "6772e082ae11e46b0791295f92cfba0dc0f67221f3da53177e620b174485c09b"
+        }
+      },
+      "independent_export_validation": {
+        "files": [
+          {
+            "path": "omega-contact_01.stl",
+            "bytes": 684,
+            "triangles": 12,
+            "unique_positions": 8,
+            "edges": 18,
+            "bounds_mm": [
+              [
+                -20.0,
+                -20.0,
+                0.0
+              ],
+              [
+                0.0,
+                0.0,
+                20.0
+              ]
+            ],
+            "signed_volume_mm3": 8000.0,
+            "surface_area_mm2": 2400.0,
+            "closed_oriented_edges": true,
+            "sha256": "4fa205b1daf95d5932cf62f4609a05060872899bdaed2775e129223f439f9164"
+          },
+          {
+            "path": "omega-contact_02.stl",
+            "bytes": 684,
+            "triangles": 12,
+            "unique_positions": 8,
+            "edges": 18,
+            "bounds_mm": [
+              [
+                0.0,
+                0.0,
+                20.0
+              ],
+              [
+                20.0,
+                20.0,
+                40.0
+              ]
+            ],
+            "signed_volume_mm3": 8000.0,
+            "surface_area_mm2": 2400.0,
+            "closed_oriented_edges": true,
+            "sha256": "17c830571ff0dad8231cc5200fa7992a43ccb82cb1099210c61ea1563336e030"
+          }
+        ],
+        "passed": 2,
+        "failed": 0,
+        "limits": "Fixture-only geometric checks; no physical printing, general self-intersection or minimum-wall-thickness proof."
+      },
+      "interaction_note": "Native pointer clicks were sent through the desktop input API; bound X11 synthetic clicks did not reliably focus egui values. This was not counted as a product failure."
     }
   ],
-  "screenshots": {
-    "omega-contact-viewport.jpg": {
-      "bytes": 145072,
-      "sha256": "b4302e094354163f22f884963940550217be51e1298754bbdfa7a1ba8d237487"
-    },
-    "omega-export-before.jpg": {
-      "bytes": 191971,
-      "sha256": "22b9ad48bfa3f675c0e36825e0ca3e910c76bfdd862865cf2aa78132aeab0223"
-    },
-    "omega-help-before.jpg": {
-      "bytes": 149117,
-      "sha256": "341363b6e2e8ee5b83a17b79135faeb206a7389ccbbe2a1389d92a62381623f1"
-    },
-    "omega-signed-zero-entered.jpg": {
-      "bytes": 127986,
-      "sha256": "3d0db86e1c8a982567db364d4667492eb88057c0066187c3f01c36264e447ca2"
-    },
-    "omega-signed-zero-reopened.jpg": {
-      "bytes": 127692,
-      "sha256": "889dbd2b7ed6792c269f41e4cf240e929b669888e7e4b4113d22678589eda359"
-    }
-  },
   "remaining": [
-    "Native canvas direct typing after new UI build",
-    "Responsive help/export at smaller logical sizes and both themes",
-    "Actual split export and independent STL parse",
+    "Light theme and small logical-size/high-DPI retest of this source",
+    "Native post-preview-cache-change retest",
     "Windows native GUI, Intel Arc, physical printing"
   ]
 }

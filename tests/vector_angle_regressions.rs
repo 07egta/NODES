@@ -96,6 +96,25 @@ fn independent_scaling_and_subnormal_directions_preserve_angles() {
 }
 
 #[test]
+fn tiny_axis_angles_preserve_bits_across_the_normal_boundary() {
+    let first_normal = f64::MIN_POSITIVE.to_bits();
+    for bits in [1, 2, 3, first_normal - 1, first_normal, first_normal + 1] {
+        let t = f64::from_bits(bits);
+        // The exact angle is atan(t). Here t is an exactly represented value,
+        // and its cubic correction is far below half an ULP, so the rounded
+        // angle has these same bits. No platform atan2 is used as the oracle.
+        for axis in 0..3 {
+            let mut a = [0.0; 3];
+            a[axis] = 1.0;
+            let mut b = a;
+            b[(axis + 1) % 3] = t;
+            assert_eq!(angle(a, b).unwrap().to_bits(), bits, "axis={axis}");
+            assert_eq!(angle(b, a).unwrap().to_bits(), bits, "axis={axis}");
+        }
+    }
+}
+
+#[test]
 fn zero_invalid_and_cancelled_angle_inputs_still_fail() {
     let valid = [1., 0., 0.];
     for invalid in [

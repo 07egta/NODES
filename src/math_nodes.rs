@@ -1313,6 +1313,17 @@ fn preserve_zero_sign(result: f64, original: f64) -> f64 {
         result
     }
 }
+fn angle_cross_norm(v: [f64; 3]) -> f64 {
+    // angle_direction bounds the cross product well below overflow. Normalize
+    // its largest component before squaring; the square sum is then in [1, 3].
+    // Unlike platform hypot, this also keeps a one-component norm exact.
+    let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
+    if m == 0.0 {
+        return 0.0;
+    }
+    let [x, y, z] = v.map(|component| component / m);
+    m * (x * x + y * y + z * z).sqrt()
+}
 fn angle_direction(v: [f64; 3]) -> Result<[f64; 3], String> {
     let m = v.iter().fold(0.0_f64, |a, b| a.max(b.abs()));
     if m == 0.0 || !m.is_finite() {
@@ -1322,7 +1333,7 @@ fn angle_direction(v: [f64; 3]) -> Result<[f64; 3], String> {
     // subnormal component normal without overflowing the largest component.
     // The second exact power-of-two scale puts the largest in [2^256, 2^257).
     // Retaining this headroom prevents rounding away tiny direction differences
-    // while products, compensated sums and hypot results remain finite.
+    // while products, compensated sums and cross-product norms remain finite.
     const LIFT: f64 = f64::from_bits((1023_u64 + 512) << 52);
     let lifted_max = m * LIFT;
     let exponent = ((lifted_max.to_bits() >> 52) & 0x7ff) as i32 - 1023;
@@ -2052,7 +2063,19 @@ pub fn run_item(
         CrossProduct => return point(compensated_cross(v()?, w()?)),
         VectorAngle => {
             let (u, v) = (angle_direction(v()?)?, angle_direction(w()?)?);
-            norm(compensated_cross(u, v)).atan2(compensated_dot(u, v))
+            let sine = angle_cross_norm(compensated_cross(u, v));
+            let cosine = compensated_dot(u, v);
+            if cosine > 0.0 {
+                let ratio = sine / cosine;
+                // For t <= 2^-27, 0 <= t - atan(t) <= t^3/3: the relative
+                // correction is at most 2^-54/3. Direct division preserves tiny
+                // angles that platform atan2 may round to zero. This remains an
+                // approximation, not universal correctly rounded angle arithmetic.
+                if ratio <= f64::from_bits((1023_u64 - 27) << 52) {
+                    return scalar(ratio);
+                }
+            }
+            sine.atan2(cosine)
         }
         VectorAddition => return point(plus(v()?, w()?)),
         VectorSubtraction => return point(sub(v()?, w()?)),

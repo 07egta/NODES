@@ -1,0 +1,124 @@
+{
+  "mode": "integration",
+  "source_head": "771b4760bf983fb35afa65a2cbf495772172e6d5",
+  "candidate_tree_before_evidence": "af7316c51d7a78fd9abcc7841ee711b64d10f538",
+  "portable_angle_sha": "ca6147a0b639b9429900313147d4e288972373e5",
+  "incoming_sha": "46ab578af63193c7dc3d37ce1926e1bc75216486",
+  "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+  "profile": {
+    "CARGO_TARGET_DIR": "/workspace/scratch/74d3da15ab33/target-pr16-preview",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "steps": [
+    {
+      "name": "fmt",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.644,
+      "log": "fmt.log"
+    },
+    {
+      "name": "check",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 7.477,
+      "log": "check.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 6.372,
+      "log": "clippy.log"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 70.221,
+      "log": "tests.log",
+      "results": {
+        "suites": 57,
+        "passed": 572,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    {
+      "name": "debug-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.129,
+      "log": "debug-bins.log"
+    },
+    {
+      "name": "release-bins",
+      "command": [
+        "/home/agent/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--bins"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 95.754,
+      "log": "release-bins.log"
+    }
+  ],
+  "captured_at": "2026-11-27T10:00:23+09:00",
+  "source_files_rechecked": 164,
+  "proposal_only": true,
+  "binaries": {
+    "Morphlet": {
+      "size_bytes": 19430232,
+      "sha256": "ff98668ba0970a9f331d343dd56cf1c0c6d74c59e1aa6cc1f0e223d7f94d4b72"
+    },
+    "nodes-cli": {
+      "size_bytes": 5572296,
+      "sha256": "a598e64ee4b3e70464aadceb445d936726d562ec59e4c91ac8422ae6e4612aa2"
+    }
+  },
+  "incoming_modeling_base_sha": "a1ffa40071c0c3508b890065bd12220c5abb80d9",
+  "declared_parents": [
+    "771b4760bf983fb35afa65a2cbf495772172e6d5",
+    "46ab578af63193c7dc3d37ce1926e1bc75216486",
+    "ca6147a0b639b9429900313147d4e288972373e5"
+  ]
+}
