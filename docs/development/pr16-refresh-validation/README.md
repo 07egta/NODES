@@ -47,9 +47,11 @@ fixtures. The JSON responses, expected summary fields, exit codes and
 identical input hashes are saved. Their transient timing fields do not
 support comparative performance claims.
 
-Windows CI, Windows GUI and a new native GUI pass on this refreshed
-viewport/file-picker source have not been performed. The earlier native
-2→1→0 plus Undo/Redo check is attributed to candidate771b476 in its own
-section. Imported PR16 benchmark/CI records remain parent-specific.
+Windows CI and Windows GUI have not been performed on this combined candidate.
+A later bounded native check on source4ad872 repeated diagnosis2→1→0 and
+Undo/Redo, and checked dark file-picker selection/cancellation; see
+`native-gui.json`. It does not test native pending geometry or GPU latency.
+The initial candidate771b476 observations remain separately attributed.
+Imported PR16 benchmark/CI records remain parent-specific.
 
 SHA256SUMS covers every file in this directory except itself.

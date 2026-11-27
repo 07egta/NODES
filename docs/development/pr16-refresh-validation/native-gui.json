@@ -1,0 +1,61 @@
+{
+  "observed_at_jst": "2026-11-27T10:05:35+09:00",
+  "source_commit": "4ad872028b3f3b8106d7a6ff1a8d8c406a57c446",
+  "source_tree": "7ad871597937f61918bfc3196dcc108ba013f262",
+  "runtime_source_manifest": "source-sha256.json",
+  "runtime_source_files_rechecked_after_gui": 164,
+  "platform": "Linux/Xfce native desktop",
+  "binary": {
+    "path": "target-pr16-preview/debug/Morphlet",
+    "profile": "debug with CARGO_PROFILE_DEV_DEBUG=0",
+    "size_bytes": 27433312,
+    "sha256": "9c7a33bb229e94094ab08cd4d549fbdd7e99348da55bf820704557cb2a2f83a0"
+  },
+  "fixture": "tests/fixtures/diagnostics/two-roots.morph",
+  "fixture_sha256_before_and_after": "26399a164b47d84c6e232a6b0c0707f9a4039c327db84554026f6f8797047735",
+  "window_content_points": [
+    1364,
+    920
+  ],
+  "theme": "dark",
+  "observations": [
+    {
+      "action": "Open diagnostics from the status button",
+      "expected_and_observed": "Two root candidates, four total failing nodes and one disabled node."
+    },
+    {
+      "action": "Jump to #00 and drag B from 0 to 50",
+      "expected_and_observed": "Correct #00 inspector; one remaining root, three total failures; computed3/reused2/disabled1."
+    },
+    {
+      "action": "Jump to #01 and drag B from 0 to 50",
+      "expected_and_observed": "Correct #01 inspector; no calculation errors; computed3/reused2/disabled1."
+    },
+    {
+      "action": "Ctrl+Z then Ctrl+Y",
+      "expected_and_observed": "Undo restores #01 B=0 and one root; Redo restores B=50 and zero roots."
+    },
+    {
+      "action": "Close diagnostics, Ctrl+O, select numeric-details.morph once",
+      "expected_and_observed": "Dark picker filename and selected item are legible; selected item and enabled Open button show the theme accent; filename field matches selection."
+    },
+    {
+      "action": "Cancel file picker",
+      "expected_and_observed": "Original unsaved project remains; both B values are50, selected #01 preserved."
+    }
+  ],
+  "saved_project": false,
+  "screenshots_observed_each_action": true,
+  "screenshots_committed": false,
+  "cleanup": "Only this investigator's test process was interrupted from its bound terminal; the other developer's distinct app window remained open.",
+  "not_tested": [
+    "Windows GUI",
+    "Japanese IME",
+    "new project opening or saving from this picker",
+    "native pending-geometry scene retention or pick hit-testing",
+    "contrast-ratio measurement",
+    "GPU frame-rate or startup measurements",
+    "physical fabrication"
+  ],
+  "related_automated_scope": "The new viewport cache, hidden completion and stale pick/report boundaries are exercised by the full572-test run, not inferred from this scalar-only GUI fixture."
+}
