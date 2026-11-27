@@ -1,5 +1,9 @@
 # OMEGA 開発引き継ぎ — 2026-11-27 JST
 
+> 追加のWindows CI確認で極小角度の回帰1件が失敗した。修正と根拠は
+> [Windows角度の移植性記録](WINDOWS_ANGLE_PORTABILITY.md)を優先して読む。
+> 以下の486件は `3e3bb46` のLinux検証。後続の角度修正やWindows成功を意味しない。
+
 ## 再開する場所
 
 - PR: [#18](https://github.com/07egta/NODES/pull/18)、Draft。

@@ -547,3 +547,19 @@ and app shortcuts do not alter the Worker/diagnostic sections. Its rewritten use
 guide does require deliberate migration of these diagnostic and precise-number
 instructions. PR #20's public command/schema conflict remains unresolved. See the
 updated [handoff](OMEGA_HANDOFF_20261127.md) before combining branches.
+
+## Functional checkpoint 11: act on an actual Windows CI failure
+
+The `aa69065` evidence checkpoint completed Linux CI but failed one Windows test
+at the least-positive-angle boundary: final bits 0 instead of expected bits 1.
+The independent integer/axis expectation was retained. A VectorAngle-specific
+scaled square-root norm and a bounded positive tiny-ratio path remove the two
+platform math calls from that extreme case. A new axis oracle covers subnormal
+and smallest-normal neighbors without using platform atan2 as its reference.
+
+The [portability record](WINDOWS_ANGLE_PORTABILITY.md) preserves the actual failure,
+official precision contracts, approximation bound and limits. The original
+Windows intermediates were not measured; neither a specific CRT function nor
+FTZ is asserted as the proven cause. CI uses the compact debug/test information
+settings already used locally. Full tests, assertions and release settings remain.
+The corrected Windows gate must be observed separately from the old Linux pass.

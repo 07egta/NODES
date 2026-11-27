@@ -1,0 +1,13 @@
+   Compiling morphlet v0.1.0 (/workspace/scratch/74d3da15ab33/NODES)
+    Finished `test` profile [optimized] target(s) in 29.79s
+     Running tests/vector_angle_regressions.rs (target/debug/build/morphlet/d2d771f03f92c7d0/out/vector_angle_regressions-d2d771f03f92c7d0)
+
+running 5 tests
+test independent_scaling_and_subnormal_directions_preserve_angles ... ok
+test near_parallel_integer_vectors_retain_their_nonzero_angle ... ok
+test tiny_axis_angles_preserve_bits_across_the_normal_boundary ... ok
+test zero_invalid_and_cancelled_angle_inputs_still_fail ... ok
+test native_angle_nodes_preserve_grafted_paths_broadcasting_and_cache ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
