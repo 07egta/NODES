@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
+mod cage_edit;
 mod canvas;
 mod data_view;
 mod diagnostics_ui;
