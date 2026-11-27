@@ -7,7 +7,7 @@
 
 ## NODES 本体
 
-NODES は、このプロジェクトのために新しく記述した独立した実装です。Arclet CAD の方針・既存構造を参考にしていますが、Arclet CAD / SolidCraft のソースコードをこの配布物へコピーしていません。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
+NODES は、このプロジェクトのために新しく記述した独立した実装です。ただし 2026-11-27 から、厳密 NURBS / B-rep / T-spline のために SolidCraft（MIT OR Apache-2.0）の `geom` と `kernel` crate、および SolidCraft が修正して同梱する truck（Apache-2.0）を `crates/sc-*` と `vendor/` に取り込んでいます（下の「SolidCraft 由来のコード」と [SOLIDCRAFT_CHANGES.md](SOLIDCRAFT_CHANGES.md)）。Rhino / Grasshopper のコード・アイコン・画像を同梱していません。
 
 NODES 本体のソースコードは **MIT または Apache-2.0** から選択できます。本文は [LICENSE-MIT](../LICENSE-MIT) と [LICENSE-APACHE](../LICENSE-APACHE) です。本体のライセンスは、下記の第三者コードやフォントの著作権・ライセンスを変更しません。
 
@@ -40,6 +40,70 @@ Cargo の情報形式: [公式 cargo metadata ドキュメント](https://doc.ru
 | thin-vec 0.2.21 / const-random 0.1.20 / const-random-macro 0.1.18 | MIT OR Apache-2.0 |
 | tiny-keccak 2.0.2 | CC0-1.0 |
 | smartstring 1.0.1 | **MPL-2.0+**（ファイル単位の弱いコピーレフト。配布に含めるなら本文とソース入手先の表示が必要） |
+
+## SolidCraft 由来のコード（2026-11-27 追加）
+
+| 場所 | 出典 | ライセンス | 本文 |
+|---|---|---|---|
+| `crates/sc-geom`（package `solidcraft-geom`） | SolidCraft `crates/geom`（https://github.com/tangency-labs/solidcraft、owner の melt3D fork 経由） | MIT OR Apache-2.0、© SolidCraft contributors, © 07egta | `crates/sc-geom/LICENSE-MIT`, `LICENSE-APACHE` |
+| `crates/sc-kernel`（package `solidcraft-kernel`） | SolidCraft `crates/kernel` | MIT OR Apache-2.0、同上 | `crates/sc-kernel/LICENSE-MIT`, `LICENSE-APACHE` |
+| `vendor/truck-geometry` 0.5.0, `truck-meshalgo` 0.4.0, `truck-shapeops` 0.4.0, `truck-stepio` 0.3.0, `matext4cgmath` 0.1.0 | truck（https://github.com/ricosjp/truck）を SolidCraft が修正したもの。変更点は `vendor/README.md` | Apache-2.0、© RICOS Co. Ltd. | 各フォルダの `LICENSE` |
+
+変更記録: [SOLIDCRAFT_CHANGES.md](SOLIDCRAFT_CHANGES.md)。GPL / LGPL / AGPL のコードは含めず、参照もしていません。
+
+### この取り込みで Cargo.lock に増えた crates.io パッケージ
+
+宣言は `cargo metadata`（2026-11-27）による。本文の同梱（`licenses/crates/`）はまだ行っておらず、次回の依存監査で補う。
+
+| パッケージ | ライセンス宣言 |
+|---|---|
+| allocator-api2 0.2.22 | MIT OR Apache-2.0 |
+| android_system_properties 0.1.6 | MIT OR Apache-2.0 |
+| approx 0.4.0 | Apache-2.0 |
+| array-macro 2.1.8 | MIT OR Apache-2.0 |
+| branches 0.3.0 | MIT |
+| cgmath 0.18.0 | Apache-2.0 |
+| chrono 0.4.45 | MIT OR Apache-2.0 |
+| convert_case 0.4.0 | MIT |
+| crossbeam-deque 0.8.8 | MIT OR Apache-2.0 |
+| crossbeam-epoch 0.9.21 | MIT OR Apache-2.0 |
+| derive_more 0.99.20 | MIT |
+| either 1.19.0 | MIT OR Apache-2.0 |
+| getrandom 0.2.17 | MIT OR Apache-2.0 |
+| iana-time-zone 0.1.65 | MIT OR Apache-2.0 |
+| iana-time-zone-haiku 0.1.2 | MIT OR Apache-2.0 |
+| itertools 0.13.0 | MIT OR Apache-2.0 |
+| katexit 0.1.5 | MIT OR Apache-2.0 |
+| matext4cgmath 0.1.0 | Apache-2.0 |
+| num-complex 0.4.6 | MIT OR Apache-2.0 |
+| ppv-lite86 0.2.21 | MIT OR Apache-2.0 |
+| proc-macro-error 1.0.4 | MIT OR Apache-2.0 |
+| proc-macro-error-attr 1.0.4 | MIT OR Apache-2.0 |
+| rand 0.8.8 | MIT OR Apache-2.0 |
+| rand_chacha 0.3.1 | MIT OR Apache-2.0 |
+| rand_core 0.6.4 | MIT OR Apache-2.0 |
+| rayon 1.12.0 | MIT OR Apache-2.0 |
+| rayon-core 1.13.0 | MIT OR Apache-2.0 |
+| rclite 0.2.8 | MIT OR Apache-2.0 |
+| robust 1.2.0 | MIT OR Apache-2.0 |
+| spade 2.15.1 | MIT OR Apache-2.0 |
+| syn 1.0.109 | MIT OR Apache-2.0 |
+| truck-base 0.5.0 | Apache-2.0 |
+| truck-derivers 0.1.0 | Apache-2.0 |
+| truck-geometry 0.5.0 | Apache-2.0 |
+| truck-geotrait 0.4.0 | Apache-2.0 |
+| truck-meshalgo 0.4.0 | Apache-2.0 |
+| truck-modeling 0.6.0 | Apache-2.0 |
+| truck-polymesh 0.6.0 | Apache-2.0 |
+| truck-shapeops 0.4.0 | Apache-2.0 |
+| truck-stepio 0.3.0 | Apache-2.0 |
+| truck-topology 0.6.0 | Apache-2.0 |
+| wasi 0.11.1+wasi-snapshot-preview1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
+| windows-core 0.62.2 | MIT OR Apache-2.0 |
+| windows-implement 0.60.2 | MIT OR Apache-2.0 |
+| windows-interface 0.59.3 | MIT OR Apache-2.0 |
+| windows-result 0.4.1 | MIT OR Apache-2.0 |
+| windows-strings 0.5.1 | MIT OR Apache-2.0 |
 
 ## フォント
 

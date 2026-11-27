@@ -88,7 +88,7 @@ pub fn key_extra(graph: &Graph, node: &Node) -> String {
     match node.kind {
         NodeKind::Script | NodeKind::Expression | NodeKind::PathMapper => node.script.clone(),
         // Path, modified time and size: editing the file on disk recomputes the node.
-        NodeKind::ImportMesh => crate::import::source_key(&node.script),
+        NodeKind::ImportMesh | NodeKind::ExactStepImport => crate::import::source_key(&node.script),
         NodeKind::Cluster => node
             .cluster
             .map(|id| signature(&graph.clusters, id))
@@ -111,7 +111,7 @@ fn definition_signature(def: &ClusterDef) -> String {
     out.push('\n');
     // The definition JSON contains paths, not external resource state.
     for node in &def.graph.nodes {
-        if node.kind == NodeKind::ImportMesh && !node.off {
+        if matches!(node.kind, NodeKind::ImportMesh | NodeKind::ExactStepImport) && !node.off {
             let source = crate::import::source_key(&node.script);
             out.push_str(&serde_json::to_string(&source).unwrap_or_default());
             out.push('\n');
