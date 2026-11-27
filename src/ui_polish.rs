@@ -115,7 +115,7 @@ pub fn is_subsequence(needle: &str, hay: &str) -> bool {
 
 /// Score of one query token against the label, keywords and category of a node.
 /// Exact substring hits outrank typo-tolerant hits. Zero means no match.
-fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 {
+fn token_score(token: &str, label: &str, keywords: &str, category: &str, gh: &str) -> i32 {
     if label == token {
         return 160;
     }
@@ -124,6 +124,9 @@ fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 
     }
     if keywords.contains(token) {
         return 80;
+    }
+    if !gh.is_empty() && gh.contains(token) {
+        return 85;
     }
     if category.contains(token) {
         return 25;
@@ -137,6 +140,101 @@ fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 
         }
     }
     0
+}
+
+/// Grasshopper component names for the common nodes, so people who know them can search
+/// in English ("Construct Point", "Polar Array"). Empty when there is no direct equivalent.
+pub fn gh_name(kind: NodeKind) -> &'static str {
+    use NodeKind::*;
+    match kind {
+        Number => "Number Slider",
+        Add => "Addition",
+        Subtract => "Subtraction",
+        Multiply => "Multiplication",
+        Divide => "Division",
+        Power => "Power",
+        Abs => "Absolute",
+        Min => "Minimum",
+        Max => "Maximum",
+        Modulo => "Modulus",
+        Sine => "Sine",
+        Series => "Series",
+        Range => "Range",
+        Point => "Construct Point",
+        PointComponent => "Deconstruct Point",
+        Circle => "Circle",
+        Polygon => "Polygon",
+        Rectangle => "Rectangle",
+        Helix => "Helix",
+        Extrude => "Extrude",
+        Loft => "Loft",
+        Revolve => "Revolution",
+        Sphere => "Sphere",
+        Box => "Center Box",
+        Cylinder => "Cylinder",
+        Cone => "Cone",
+        Plane => "XY Plane",
+        Move => "Move",
+        Rotate => "Rotate",
+        Scale => "Scale",
+        Mirror => "Mirror",
+        LinearArray => "Linear Array",
+        RadialArray => "Polar Array",
+        Merge => "Merge",
+        Flatten => "Flatten Tree",
+        Graft => "Graft Tree",
+        ListItem => "List Item",
+        ListLength => "List Length",
+        ReverseList => "Reverse List",
+        SortList => "Sort List",
+        CullPattern => "Cull Pattern",
+        ShiftList => "Shift List",
+        ConcatList => "Merge List",
+        SubList => "Sub List",
+        PartitionList => "Partition List",
+        Bounds => "Bounds",
+        Remap => "Remap Numbers",
+        Expression => "Expression",
+        Random => "Random",
+        Populate => "Populate 2D",
+        Distance => "Distance",
+        Jitter => "Jitter",
+        Negate => "Negative",
+        Round => "Round",
+        Floor => "Floor",
+        Ceiling => "Ceiling",
+        Factorial => "Factorial",
+        Clamp => "Bounds Clamp",
+        Average => "Average",
+        ConstructDomain => "Construct Domain",
+        CullNth => "Cull Nth",
+        CullIndex => "Cull Index",
+        DuplicateData => "Duplicate Data",
+        ReplaceItems => "Replace Items",
+        InsertItems => "Insert Items",
+        SimplifyTree => "Simplify Tree",
+        TrimTree => "Trim Tree",
+        PruneTree => "Prune Tree",
+        _ => "",
+    }
+}
+
+/// "数値・点 → 曲線": the input types a node takes and the type it gives.
+pub fn signature(kind: NodeKind) -> String {
+    let spec = kind.spec();
+    let mut inputs: Vec<&str> = Vec::new();
+    for input in spec.inputs {
+        let label = input.kind.label();
+        if !inputs.contains(&label) {
+            inputs.push(label);
+        }
+    }
+    let from = if inputs.is_empty() {
+        "なし".to_owned()
+    } else {
+        inputs.join("・")
+    };
+    format!("{from} → {}", spec.output.label())
 }
 
 /// Total match score of a query for one node, or `None` if any token fails to match.
@@ -163,9 +261,10 @@ pub fn query_score(kind: NodeKind, query: &str) -> Option<i32> {
     let label = normalize(spec.label);
     let keywords = normalize(spec.keywords);
     let category = normalize(spec.category);
+    let gh = normalize(gh_name(kind));
     let mut total = 0;
     for token in &tokens {
-        let score = token_score(token, &label, &keywords, &category);
+        let score = token_score(token, &label, &keywords, &category, &gh);
         if score == 0 {
             return None;
         }
@@ -542,6 +641,21 @@ mod tests {
         assert_eq!(snap(11.0, 24.0), 0.0);
         assert_eq!(snap(-13.0, 24.0), -24.0);
         assert_eq!(snap(13.0, 0.0), 13.0);
+    }
+
+    #[test]
+    fn grasshopper_english_names_find_nodes() {
+        assert!(query_score(NodeKind::RadialArray, "polar array").is_some());
+        assert!(query_score(NodeKind::Point, "construct point").is_some());
+    }
+
+    #[test]
+    fn signature_lists_inputs_and_output_once() {
+        let text = signature(NodeKind::Circle);
+        assert!(text.contains('→'));
+        assert!(text.ends_with(NodeKind::Circle.spec().output.label()));
+        let numbers = text.matches("数値").count();
+        assert!(numbers <= 2);
     }
 
     #[test]

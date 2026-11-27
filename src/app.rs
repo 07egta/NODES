@@ -1075,7 +1075,8 @@ impl NodesApp {
                     .any(|e| matches!(e, egui::Event::Text(t) if t == "?" || t == "？"))
             });
             if question {
-                self.shortcuts_open = !self.shortcuts_open;
+                // "?" opens the node search (the shortcut list is under ヘルプ).
+                self.open_palette(self.palette_anchor(ctx), None);
             }
             if ctx
                 .input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
@@ -2254,8 +2255,11 @@ impl NodesApp {
                             let (r, _) = ui.allocate_exact_size(egui::vec2(26., 26.), Sense::hover());
                             node_icons::paint(ui.painter(), r, *kind, spec.category, theme::category_color(spec.category));
                             let star = if favorite { "★ " } else { "" };
-                            ui.selectable_label(index == cursor, format!("{star}{}  ·  {}", spec.label, spec.category))
-                                .on_hover_text(spec.description)
+                            let row = ui.selectable_label(index == cursor, format!("{star}{}", spec.label))
+                                .on_hover_text(spec.description);
+                            theme::pill(ui, spec.category, theme::category_color(spec.category));
+                            ui.label(theme::small(ui_polish::signature(*kind)));
+                            row
                         }).inner;
                         response.context_menu(|ui| {
                             let text = if favorite { "★ お気に入りから外す" } else { "★ お気に入りに追加" };

@@ -1165,7 +1165,7 @@ impl GraphCanvas {
         let hint = if self.connecting.is_some() {
             "入力の丸をクリックして接続  ·  Esc で中止  ·  空いた所で離すと検索して追加"
         } else {
-            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でショートカット一覧"
+            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でノード検索"
         };
         painter.rect_filled(
             Rect::from_min_max(
