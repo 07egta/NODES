@@ -1,11 +1,14 @@
 //! Nodes for exact NURBS / B-rep / T-spline (SubD) modelling on the SolidCraft kernel
 //! (through `kernel_bridge` and `subd`). Grasshopper/Rhino names are search keywords; labels
 //! are Japanese. Inputs are few, with defaults that give a useful result straight away.
-use crate::engine::{as_mesh, cancelled, num};
+use crate::engine::{Evaluation, as_mesh, cancelled, node_inputs, num};
 use crate::kernel_bridge::{self as kb, Bool, BrepValue};
 use crate::model::{DataType as D, Node, NodeKind as K, NodeSpec, Tree, Value, g, i, n};
 use crate::subd::Cage;
 use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::Arc;
 
 pub const KINDS: &[K] = &[
@@ -54,11 +57,6 @@ pub fn is_list_kind(kind: K) -> bool {
         K::ExactLoft | K::ExactLoftSurface | K::ExactNetworkSurface
     )
 }
-/// Kinds that read or write the file named in the node's `script` text.
-pub fn uses_file(kind: K) -> bool {
-    matches!(kind, K::ExactStepExport | K::ExactStepImport)
-}
-
 const B: crate::model::InputSpec = g("brep", "B-rep", D::Brep);
 const B2: crate::model::InputSpec = g("other", "もう一方の B-rep", D::Brep);
 const C: crate::model::InputSpec = g("curve", "曲線", D::Curve);
@@ -285,14 +283,14 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::ExactStepExport => spec!(
             "STEP 書き出し",
-            "入力の B-rep を STEP (AP242) ファイルに書き出し、バイト数を出力します。保存先はノードのファイル設定で指定します。",
+            "入力の B-rep を STEP (AP242) に変換し、バイト数を出力します。保存先は「STEP を保存」から選べます。",
             "step stp export 書き出し cad",
             Number,
             [g("breps", "B-rep（リスト）", D::Brep)]
         ),
         K::ExactStepImport => spec!(
             "STEP 読み込み",
-            "STEP ファイルの立体を B-rep として読み込みます。ファイルはノードのファイル設定で指定します。",
+            "選んだ .step または .stp ファイルの立体を B-rep として読み込みます。",
             "step stp import 読み込み cad",
             Brep,
             []
@@ -541,53 +539,74 @@ pub fn run_list(
     }
 }
 
-/// STEP import/export: the path is the node's `script` text.
-pub fn run_file(node: &Node, inputs: &[Tree], stop: &dyn Fn() -> bool) -> Result<Tree, String> {
-    let path = node.script.trim();
+pub(crate) fn step_text(inputs: &[Tree], stop: &dyn Fn() -> bool) -> Result<String, String> {
+    let bodies: Vec<&BrepValue> = inputs
+        .iter()
+        .flat_map(|t| t.branches.values())
+        .flatten()
+        .filter_map(|value| match value {
+            Value::Brep(brep) => Some(brep.as_ref()),
+            _ => None,
+        })
+        .collect();
+    kb::step_export(&bodies, stop)
+}
+
+fn check_step_extension(path: &Path) -> Result<(), String> {
+    if path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("step") || ext.eq_ignore_ascii_case("stp"))
+    {
+        Ok(())
+    } else {
+        Err("拡張子が .step / .stp のファイルを指定してください。".into())
+    }
+}
+
+/// Saves a STEP export node using its evaluated upstream data. The caller confirms
+/// any overwrite before invoking this entry point.
+pub fn write_step(path: &Path, node: &Node, evaluation: &Evaluation) -> Result<usize, String> {
+    if node.kind != K::ExactStepExport || node.off {
+        return Err("STEP 書き出しノードを有効にしてください。".into());
+    }
+    check_step_extension(path)?;
+    let stop = || false;
+    let inputs = node_inputs(node, &evaluation.outputs, &stop)?;
+    let text = step_text(&inputs, &stop)?;
+    crate::persistence::atomic_write(path, |file| file.write_all(text.as_bytes()))?;
+    Ok(text.len())
+}
+
+pub(crate) fn read_step(path: &str, stop: &dyn Fn() -> bool) -> Result<Tree, String> {
+    cancelled(stop)?;
+    let path = path.trim();
     if path.is_empty() {
-        return Err("ファイルが指定されていません。ノードのファイル設定で .step / .stp のパスを指定してください。".into());
+        return Err("「ファイルを選ぶ」から .step / .stp ファイルを指定してください。".into());
     }
-    let lower = path.to_lowercase();
-    if !(lower.ends_with(".step") || lower.ends_with(".stp")) {
-        return Err("拡張子が .step / .stp のファイルを指定してください。".into());
+    let path = Path::new(path);
+    check_step_extension(path)?;
+    let meta = std::fs::metadata(path)
+        .map_err(|e| format!("STEP ファイルを開けません（{e}）。パスを確認してください。"))?;
+    if !meta.is_file() {
+        return Err("フォルダーではなくファイルを選んでください。".into());
     }
-    match node.kind {
-        K::ExactStepExport => {
-            let bodies: Vec<&BrepValue> = inputs
-                .iter()
-                .flat_map(|t| t.branches.values())
-                .flatten()
-                .filter_map(|v| match v {
-                    Value::Brep(b) => Some(b.as_ref()),
-                    _ => None,
-                })
-                .collect();
-            let text = kb::step_export(&bodies, stop)?;
-            std::fs::write(path, text.as_bytes()).map_err(|e| {
-                format!("STEP を保存できませんでした（{e}）。保存先のフォルダを確認してください。")
-            })?;
-            Ok(Tree::single(Value::Number(text.len() as f64)))
-        }
-        K::ExactStepImport => {
-            let meta = std::fs::metadata(path).map_err(|e| {
-                format!("STEP ファイルを開けません（{e}）。パスを確認してください。")
-            })?;
-            if meta.len() as usize > kb::limits::MAX_STEP_BYTES {
-                return Err("STEP ファイルが大きすぎます。".into());
-            }
-            let text = std::fs::read_to_string(path)
-                .map_err(|e| format!("STEP ファイルを読めません（{e}）。"))?;
-            let bodies = kb::step_import(&text, stop)?;
-            Ok(Tree {
-                branches: BTreeMap::from([(
-                    vec![0],
-                    bodies
-                        .into_iter()
-                        .map(|b| Value::Brep(Arc::new(b)))
-                        .collect(),
-                )]),
-            })
-        }
-        _ => Err("ファイルを使わないノードです。".into()),
+    let max_bytes = kb::limits::MAX_STEP_BYTES as u64;
+    if meta.len() > max_bytes {
+        return Err("STEP ファイルが大きすぎます。".into());
     }
+    let mut text = String::new();
+    File::open(path)
+        .and_then(|file| file.take(max_bytes + 1).read_to_string(&mut text))
+        .map_err(|e| format!("STEP ファイルを読めません（{e}）。"))?;
+    let bodies = kb::step_import(&text, stop)?;
+    Ok(Tree {
+        branches: BTreeMap::from([(
+            vec![0],
+            bodies
+                .into_iter()
+                .map(|body| Value::Brep(Arc::new(body)))
+                .collect(),
+        )]),
+    })
 }

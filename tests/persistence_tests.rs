@@ -304,13 +304,16 @@ fn every_template_is_valid_and_names_and_defaults_are_preserved() {
             .filter(|n| n.kind == NodeKind::Output)
             .collect();
         assert_eq!(outputs.len(), 1);
-        assert!(outputs[0].preview);
+        // The G-code examples show the toolpath (パスプレビュー) instead of the model.
+        let gcode = |n: &&nodes::model::Node| nodes::gcode_nodes::is_kind(n.kind);
+        let has_gcode = project.graph.nodes.iter().any(|n| gcode(&n));
+        assert_eq!(outputs[0].preview, !has_gcode);
         assert!(
             project
                 .graph
                 .nodes
                 .iter()
-                .filter(|n| n.kind != NodeKind::Output)
+                .filter(|n| n.kind != NodeKind::Output && !gcode(n))
                 .all(|n| !n.preview)
         );
     }
@@ -826,7 +829,8 @@ fn old_files_without_the_new_nodes_still_load_and_evaluate() {
 #[test]
 fn shipped_example_files_load_and_evaluate() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
-    for number in 1..=templates::TEMPLATES.len() {
+    // The two G-code examples (13 and 14) are templates only; no .morph file ships yet.
+    for number in 1..=templates::TEMPLATES.len().min(12) {
         let path = dir.join(format!("{number:02}.morph"));
         let project = persistence::load(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let result = Evaluator::default().evaluate(&project.graph, &|| false);
@@ -844,7 +848,6 @@ fn shipped_example_files_load_and_evaluate() {
 
 #[test]
 fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
-    assert_eq!(templates::TEMPLATES.len(), 12);
     let old_names = [
         "ねじれの花器",
         "光のリング",
@@ -856,6 +859,8 @@ fn new_templates_use_the_new_nodes_and_old_ones_are_unchanged() {
     for (index, name) in old_names.iter().enumerate() {
         assert_eq!(templates::TEMPLATES[index].name, *name);
     }
+    assert_eq!(templates::TEMPLATES[12].name, "シンプル花瓶→らせんGコード");
+    assert_eq!(templates::TEMPLATES[13].name, "波模様の粘土の器");
     for index in [6, 7] {
         let project = templates::create(index);
         assert_eq!(project.name, templates::TEMPLATES[index].name);

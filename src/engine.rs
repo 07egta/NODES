@@ -395,11 +395,11 @@ fn levels<'a>(order: &[&'a Node]) -> Vec<Vec<&'a Node>> {
     out
 }
 
-pub(crate) fn evaluate_node(
+pub(crate) fn node_inputs(
     node: &Node,
     outputs: &BTreeMap<NodeId, Result<Tree, String>>,
     cancel: &dyn Fn() -> bool,
-) -> Result<Tree, String> {
+) -> Result<Vec<Tree>, String> {
     let specs = node.kind.spec().inputs;
     let mut inputs = Vec::with_capacity(specs.len());
     for spec in specs {
@@ -463,6 +463,15 @@ pub(crate) fn evaluate_node(
         }
         inputs.push(tree);
     }
+    Ok(inputs)
+}
+
+pub(crate) fn evaluate_node(
+    node: &Node,
+    outputs: &BTreeMap<NodeId, Result<Tree, String>>,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Tree, String> {
+    let inputs = node_inputs(node, outputs, cancel)?;
     if crate::data_tree_nodes::is_tree_kind(node.kind) {
         return checked_tree(
             crate::data_tree_nodes::run_tree(node, &inputs, cancel)?,
@@ -484,9 +493,16 @@ pub(crate) fn evaluate_node(
             cancel,
         );
     }
-    // STEP 読み込み・書き出し: the path is in `script` (see `nurbs_nodes::run_file`).
-    if crate::nurbs_nodes::uses_file(node.kind) {
-        return checked_tree(crate::nurbs_nodes::run_file(node, &inputs, cancel)?, cancel);
+    if node.kind == NodeKind::ExactStepImport {
+        return checked_tree(crate::nurbs_nodes::read_step(&node.script, cancel)?, cancel);
+    }
+    if node.kind == NodeKind::ExactStepExport {
+        let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
+        return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
+    }
+    // Gコード nodes work on whole trees of G-code jobs (see `gcode_nodes.rs`).
+    if crate::gcode_nodes::is_kind(node.kind) {
+        return checked_tree(crate::gcode_nodes::run(node, &inputs, cancel)?, cancel);
     }
     // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
     if node.kind == NodeKind::ImportMesh {
@@ -1289,6 +1305,7 @@ pub(crate) fn map_shape(
             "精密曲面・B-rep・ケージは専用ノードで変換するか、明示的にメッシュ化してください。"
                 .into(),
         ),
+        Value::Gcode(_) => Err("点・曲線・メッシュのいずれかを接続してください。".into()),
     }
 }
 pub(crate) fn map_affine_shape(

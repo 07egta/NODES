@@ -22,7 +22,7 @@ type Glyph = &'static [Part];
 
 const GENERIC: Glyph = &[Part::Ring([0.5, 0.5, 0.34]), Part::Dot([0.5, 0.5])];
 
-const BOX: Glyph = &[
+pub(crate) const BOX: Glyph = &[
     Part::Line(&[
         [0.5, 0.12],
         [0.85, 0.3],
@@ -39,7 +39,7 @@ const MOVE: Glyph = &[
     Part::Line(&[[0.65, 0.3], [0.88, 0.5], [0.65, 0.7]]),
 ];
 
-const EXPORT: Glyph = &[
+pub(crate) const EXPORT: Glyph = &[
     Part::Line(&[[0.15, 0.5], [0.15, 0.85], [0.85, 0.85], [0.85, 0.5]]),
     Part::Line(&[[0.5, 0.12], [0.5, 0.65]]),
     Part::Line(&[[0.35, 0.27], [0.5, 0.12], [0.65, 0.27]]),
@@ -647,23 +647,39 @@ pub fn paint(painter: &egui::Painter, rect: Rect, kind: NodeKind, category: &str
     draw(painter, rect, glyph, color);
 }
 
-fn draw(painter: &egui::Painter, rect: Rect, glyph: Glyph, color: Color32) {
-    let inner = rect.shrink(rect.width() * 0.16);
+/// Melt 3D icon proportions: a 64-unit box with 2.55 outlines, round caps and joins,
+/// and a margin of 6 units. Icons carry no text.
+const BOX_UNITS: f32 = 64.0;
+const OUTLINE_UNITS: f32 = 2.55;
+const MARGIN_UNITS: f32 = 6.0;
+
+/// Outline width in pixels for an icon drawn in a square of `box_px`.
+pub(crate) fn outline_width(box_px: f32) -> f32 {
+    (box_px * OUTLINE_UNITS / BOX_UNITS).max(1.2)
+}
+
+pub(crate) fn draw(painter: &egui::Painter, rect: Rect, glyph: Glyph, color: Color32) {
+    let inner = rect.shrink(rect.width() * MARGIN_UNITS / BOX_UNITS);
     let at = |p: [f32; 2]| {
         Pos2::new(
             inner.left() + p[0] * inner.width(),
             inner.top() + p[1] * inner.height(),
         )
     };
-    let stroke = Stroke::new((rect.width() * 0.06).max(1.2), color);
+    let width = outline_width(rect.width());
+    let stroke = Stroke::new(width, color);
     let unit = inner.width();
     for part in glyph {
         match *part {
             Part::Line(points) => {
                 painter.line(points.iter().map(|p| at(*p)).collect(), stroke);
+                // Round caps and joins.
+                for p in points {
+                    painter.circle_filled(at(*p), width / 2.0, color);
+                }
             }
             Part::Dot(p) => {
-                painter.circle_filled(at(p), unit * 0.07, color);
+                painter.circle_filled(at(p), (unit * 0.075).max(width * 0.8), color);
             }
             Part::Ring(c) => {
                 painter.circle_stroke(at([c[0], c[1]]), c[2] * unit, stroke);
@@ -675,6 +691,12 @@ fn draw(painter: &egui::Painter, rect: Rect, glyph: Glyph, color: Color32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn outline_follows_the_64_unit_style_guide() {
+        assert!((outline_width(64.0) - 2.55).abs() < 1e-4);
+        assert!(outline_width(10.0) >= 1.2);
+    }
 
     #[test]
     fn each_kind_appears_once_and_every_point_stays_in_the_square() {

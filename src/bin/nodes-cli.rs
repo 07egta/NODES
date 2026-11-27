@@ -147,6 +147,7 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Solid(_) => "solid",
         Value::Brep(_) => "brep",
         Value::Cage(_) => "cage",
+        Value::Gcode(_) => "gcode",
     }
 }
 
@@ -169,6 +170,9 @@ fn preview(value: &Value) -> Json {
         }),
         Value::Cage(c) => json!({
             "kind": "cage", "control_points": c.vertices().len(), "faces": c.faces().len()
+        }),
+        Value::Gcode(job) => json!({
+            "kind": "gcode", "path_count": job.paths.len(), "layers": job.layer_count()
         }),
     }
 }

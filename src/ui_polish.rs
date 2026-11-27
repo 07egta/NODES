@@ -2,6 +2,7 @@
 //! the saved theme choice and the shortcut cheat-sheet. No egui drawing happens here,
 //! so the ranking and persistence rules can be unit tested on their own.
 
+use crate::theme;
 use nodes::model::{DataType, NodeKind};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -114,7 +115,7 @@ pub fn is_subsequence(needle: &str, hay: &str) -> bool {
 
 /// Score of one query token against the label, keywords and category of a node.
 /// Exact substring hits outrank typo-tolerant hits. Zero means no match.
-fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 {
+fn token_score(token: &str, label: &str, keywords: &str, category: &str, gh: &str) -> i32 {
     if label == token {
         return 160;
     }
@@ -123,6 +124,9 @@ fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 
     }
     if keywords.contains(token) {
         return 80;
+    }
+    if !gh.is_empty() && gh.contains(token) {
+        return 85;
     }
     if category.contains(token) {
         return 25;
@@ -136,6 +140,101 @@ fn token_score(token: &str, label: &str, keywords: &str, category: &str) -> i32 
         }
     }
     0
+}
+
+/// Grasshopper component names for the common nodes, so people who know them can search
+/// in English ("Construct Point", "Polar Array"). Empty when there is no direct equivalent.
+pub fn gh_name(kind: NodeKind) -> &'static str {
+    use NodeKind::*;
+    match kind {
+        Number => "Number Slider",
+        Add => "Addition",
+        Subtract => "Subtraction",
+        Multiply => "Multiplication",
+        Divide => "Division",
+        Power => "Power",
+        Abs => "Absolute",
+        Min => "Minimum",
+        Max => "Maximum",
+        Modulo => "Modulus",
+        Sine => "Sine",
+        Series => "Series",
+        Range => "Range",
+        Point => "Construct Point",
+        PointComponent => "Deconstruct Point",
+        Circle => "Circle",
+        Polygon => "Polygon",
+        Rectangle => "Rectangle",
+        Helix => "Helix",
+        Extrude => "Extrude",
+        Loft => "Loft",
+        Revolve => "Revolution",
+        Sphere => "Sphere",
+        Box => "Center Box",
+        Cylinder => "Cylinder",
+        Cone => "Cone",
+        Plane => "XY Plane",
+        Move => "Move",
+        Rotate => "Rotate",
+        Scale => "Scale",
+        Mirror => "Mirror",
+        LinearArray => "Linear Array",
+        RadialArray => "Polar Array",
+        Merge => "Merge",
+        Flatten => "Flatten Tree",
+        Graft => "Graft Tree",
+        ListItem => "List Item",
+        ListLength => "List Length",
+        ReverseList => "Reverse List",
+        SortList => "Sort List",
+        CullPattern => "Cull Pattern",
+        ShiftList => "Shift List",
+        ConcatList => "Merge List",
+        SubList => "Sub List",
+        PartitionList => "Partition List",
+        Bounds => "Bounds",
+        Remap => "Remap Numbers",
+        Expression => "Expression",
+        Random => "Random",
+        Populate => "Populate 2D",
+        Distance => "Distance",
+        Jitter => "Jitter",
+        Negate => "Negative",
+        Round => "Round",
+        Floor => "Floor",
+        Ceiling => "Ceiling",
+        Factorial => "Factorial",
+        Clamp => "Bounds Clamp",
+        Average => "Average",
+        ConstructDomain => "Construct Domain",
+        CullNth => "Cull Nth",
+        CullIndex => "Cull Index",
+        DuplicateData => "Duplicate Data",
+        ReplaceItems => "Replace Items",
+        InsertItems => "Insert Items",
+        SimplifyTree => "Simplify Tree",
+        TrimTree => "Trim Tree",
+        PruneTree => "Prune Tree",
+        _ => "",
+    }
+}
+
+/// "数値・点 → 曲線": the input types a node takes and the type it gives.
+pub fn signature(kind: NodeKind) -> String {
+    let spec = kind.spec();
+    let mut inputs: Vec<&str> = Vec::new();
+    for input in spec.inputs {
+        let label = input.kind.label();
+        if !inputs.contains(&label) {
+            inputs.push(label);
+        }
+    }
+    let from = if inputs.is_empty() {
+        "なし".to_owned()
+    } else {
+        inputs.join("・")
+    };
+    format!("{from} → {}", spec.output.label())
 }
 
 /// Total match score of a query for one node, or `None` if any token fails to match.
@@ -162,9 +261,10 @@ pub fn query_score(kind: NodeKind, query: &str) -> Option<i32> {
     let label = normalize(spec.label);
     let keywords = normalize(spec.keywords);
     let category = normalize(spec.category);
+    let gh = normalize(gh_name(kind));
     let mut total = 0;
     for token in &tokens {
-        let score = token_score(token, &label, &keywords, &category);
+        let score = token_score(token, &label, &keywords, &category, &gh);
         if score == 0 {
             return None;
         }
@@ -258,16 +358,17 @@ pub fn snap(value: f32, grid: f32) -> f32 {
 }
 
 /// Parses the saved theme line. Unknown text gives `None`.
-pub fn parse_dark(text: &str) -> Option<bool> {
-    match text.trim() {
-        "theme=dark" => Some(true),
-        "theme=light" => Some(false),
-        _ => None,
+pub fn parse_theme(text: &str) -> Option<theme::Mode> {
+    let text = text.trim();
+    if text.starts_with("theme=") {
+        theme::Mode::parse(text)
+    } else {
+        None
     }
 }
 
-pub fn format_dark(dark: bool) -> &'static str {
-    if dark { "theme=dark" } else { "theme=light" }
+pub fn format_theme(mode: theme::Mode) -> String {
+    format!("theme={}", mode.key())
 }
 
 /// Settings file beside the autosave file (same folder rules as `recovery.morph`).
@@ -283,16 +384,17 @@ pub fn settings_path() -> Option<PathBuf> {
     }
 }
 
-/// Saved theme; dark when nothing is saved yet.
-pub fn load_dark() -> bool {
+/// Saved theme; Melt when nothing is saved yet. An older saved `theme=dark` or
+/// `theme=light` keeps working, so nobody's choice changes under them.
+pub fn load_theme() -> theme::Mode {
     // The settings file holds other lines too (node lists), so only the theme line is read.
     read_setting("theme")
-        .and_then(|value| parse_dark(&format!("theme={value}")))
-        .unwrap_or(true)
+        .and_then(|value| parse_theme(&format!("theme={value}")))
+        .unwrap_or(theme::Mode::Melt)
 }
 
-pub fn save_dark(dark: bool) -> Result<(), String> {
-    save_setting_line(format_dark(dark))
+pub fn save_theme(mode: theme::Mode) -> Result<(), String> {
+    save_setting_line(&format_theme(mode))
 }
 
 /// Value of the `key=value` line in the settings file (the text after `key=`).
@@ -542,9 +644,27 @@ mod tests {
     }
 
     #[test]
+    fn grasshopper_english_names_find_nodes() {
+        assert!(query_score(NodeKind::RadialArray, "polar array").is_some());
+        assert!(query_score(NodeKind::Point, "construct point").is_some());
+    }
+
+    #[test]
+    fn signature_lists_inputs_and_output_once() {
+        let text = signature(NodeKind::Circle);
+        assert!(text.contains('→'));
+        assert!(text.ends_with(NodeKind::Circle.spec().output.label()));
+        let numbers = text.matches("数値").count();
+        assert!(numbers <= 2);
+    }
+
+    #[test]
     fn saved_theme_round_trips() {
-        assert_eq!(parse_dark(format_dark(true)), Some(true));
-        assert_eq!(parse_dark(format_dark(false)), Some(false));
-        assert_eq!(parse_dark("garbage"), None);
+        for mode in theme::Mode::ALL {
+            assert_eq!(parse_theme(&format_theme(mode)), Some(mode));
+        }
+        assert_eq!(parse_theme("theme=dark"), Some(theme::Mode::Dark));
+        assert_eq!(parse_theme("garbage"), None);
+        assert_eq!(parse_theme("theme=pink"), None);
     }
 }

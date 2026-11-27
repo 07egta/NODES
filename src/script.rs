@@ -243,7 +243,11 @@ fn execute(source: &str, inputs: &ScriptInputs, stop: Arc<AtomicBool>) -> Result
             if values.iter().any(|v| {
                 matches!(
                     v,
-                    Value::Surface(_) | Value::Solid(_) | Value::Brep(_) | Value::Cage(_)
+                    Value::Surface(_)
+                        | Value::Solid(_)
+                        | Value::Brep(_)
+                        | Value::Cage(_)
+                        | Value::Gcode(_)
                 )
             }) {
                 return Err("精密曲面と B-rep はスクリプトで未対応です。先に明示的にメッシュ化してください。".into());
@@ -664,7 +668,9 @@ fn value_to_dynamic(value: &Value) -> Dynamic {
         Value::Number(v) => Dynamic::from(*v),
         Value::Point(p) => Dynamic::from(SPoint(*p)),
         Value::Mesh(m) => Dynamic::from(SMesh(m.clone())),
-        Value::Surface(_) | Value::Solid(_) | Value::Brep(_) | Value::Cage(_) => Dynamic::UNIT, // rejected before conversion
+        Value::Surface(_) | Value::Solid(_) | Value::Brep(_) | Value::Cage(_) | Value::Gcode(_) => {
+            Dynamic::UNIT
+        } // rejected before conversion
         // A curve is given to scripts as a list of points (open/closed is not kept).
         Value::Curve(c) => {
             Dynamic::from_array(c.points.iter().map(|p| Dynamic::from(SPoint(*p))).collect())

@@ -290,6 +290,7 @@ fn type_hint(kind: DataType) -> &'static str {
         DataType::DisplayGeometry => "表示可能な形状（出力）",
         DataType::Brep => "厳密な B-rep（NURBS 面の立体・面）",
         DataType::Cage => "SubD / T-spline の制御ケージ",
+        DataType::Gcode => "Gコード（機種・設定・経路）",
     }
 }
 

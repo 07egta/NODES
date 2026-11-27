@@ -320,7 +320,7 @@ fn single_mesh(trees: &[Tree]) -> Result<&Mesh, String> {
     }
 }
 
-fn bounds(points: &[[f64; 3]]) -> Result<([f64; 3], [f64; 3]), String> {
+pub(crate) fn bounds(points: &[[f64; 3]]) -> Result<([f64; 3], [f64; 3]), String> {
     let mut low = [f64::INFINITY; 3];
     let mut high = [f64::NEG_INFINITY; 3];
     for p in points {
@@ -336,7 +336,7 @@ fn bounds(points: &[[f64; 3]]) -> Result<([f64; 3], [f64; 3]), String> {
     }
 }
 
-fn planned_layers(height: f64, layer: f64) -> Result<usize, String> {
+pub(crate) fn planned_layers(height: f64, layer: f64) -> Result<usize, String> {
     let mut count = 0usize;
     while (count as f64 + 0.5) * layer < height {
         count += 1;
@@ -372,7 +372,11 @@ fn corner(verts: &[[f64; 3]], index: u32) -> Option<[f64; 3]> {
 /// Cross-section of the mesh at height `z`, as closed loops in XY.
 /// A crossing point is keyed by its mesh edge, so neighbouring triangles agree
 /// exactly and the loops chain without a tolerance.
-fn slice_plane(verts: &[[f64; 3]], triangles: &[[u32; 3]], z: f64) -> Vec<Vec<[f64; 2]>> {
+pub(crate) fn slice_plane(
+    verts: &[[f64; 3]],
+    triangles: &[[u32; 3]],
+    z: f64,
+) -> Vec<Vec<[f64; 2]>> {
     let mut segments: Vec<Segment> = Vec::new();
     'triangles: for tri in triangles {
         let (Some(p0), Some(p1), Some(p2)) = (
@@ -465,7 +469,7 @@ fn chain_loops(segments: &[Segment]) -> Vec<Vec<[f64; 2]>> {
     loops
 }
 
-fn signed_area(points: &[[f64; 2]]) -> f64 {
+pub(crate) fn signed_area(points: &[[f64; 2]]) -> f64 {
     let twice: f64 = points
         .iter()
         .zip(points.iter().cycle().skip(1))
@@ -486,7 +490,7 @@ fn largest(loops: &[Vec<[f64; 2]>]) -> Option<&[[f64; 2]]> {
 }
 
 /// Resample a closed loop at equal arc length, counter-clockwise, about `spacing` apart.
-fn resample_ring(points: &[[f64; 2]], spacing: f64) -> Option<Vec<[f64; 2]>> {
+pub(crate) fn resample_ring(points: &[[f64; 2]], spacing: f64) -> Option<Vec<[f64; 2]>> {
     let mut source: Vec<[f64; 2]> = points.to_vec();
     if signed_area(&source) < 0.0 {
         source.reverse();
@@ -530,7 +534,7 @@ fn resample_ring(points: &[[f64; 2]], spacing: f64) -> Option<Vec<[f64; 2]>> {
 
 /// Start the ring at the point nearest to `target` (the previous layer's start),
 /// so consecutive loops join without a visible seam or a long travel.
-fn rotate_to_nearest(ring: &mut [[f64; 2]], target: [f64; 2]) {
+pub(crate) fn rotate_to_nearest(ring: &mut [[f64; 2]], target: [f64; 2]) {
     let mut best = 0usize;
     let mut best_distance = f64::INFINITY;
     for (index, p) in ring.iter().enumerate() {
@@ -544,7 +548,7 @@ fn rotate_to_nearest(ring: &mut [[f64; 2]], target: [f64; 2]) {
 }
 
 /// Zigzag scan lines inside all loops (even-odd rule), inset half a line width from the walls.
-fn infill(loops: &[Vec<[f64; 2]>], spacing: f64) -> Vec<([f64; 2], [f64; 2])> {
+pub(crate) fn infill(loops: &[Vec<[f64; 2]>], spacing: f64) -> Vec<([f64; 2], [f64; 2])> {
     let mut segments = Vec::new();
     let mut low = f64::INFINITY;
     let mut high = f64::NEG_INFINITY;

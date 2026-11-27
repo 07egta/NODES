@@ -8,6 +8,7 @@ mod gcode_ui;
 mod getting_started;
 mod help;
 mod math_mapper_ui;
+mod melt;
 mod node_icons;
 mod node_shelf;
 mod script_ui;
@@ -183,10 +184,12 @@ fn export_demos(dir: &Path) -> Result<(), String> {
             .filter_map(|n| e.outputs.get(&n.id).and_then(|v| v.as_ref().ok()).cloned())
             .collect();
         if trees.iter().any(|t| {
-            t.branches
-                .values()
-                .flatten()
-                .any(|v| matches!(v, nodes::model::Value::Mesh(_)))
+            t.branches.values().flatten().any(|v| {
+                matches!(
+                    v,
+                    nodes::model::Value::Mesh(_) | nodes::model::Value::Brep(_)
+                )
+            })
         }) {
             let r = persistence::export_stl(&dir.join(format!("{:02}.stl", index + 1)), &trees)?;
             println!(

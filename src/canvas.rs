@@ -1,4 +1,5 @@
 use crate::data_view::{self, DataShape};
+use crate::melt;
 use crate::theme;
 use crate::ui_polish;
 use eframe::egui::epaint::{RectShape, TessellationOptions, Tessellator};
@@ -30,6 +31,8 @@ pub struct GraphCanvas {
     pub snap: bool,
     /// Hide the navigation overlay when editing dense graphs.
     pub hide_minimap: bool,
+    /// Hide the faint dot grid.
+    pub hide_grid: bool,
     dragging: Option<NodeId>,
     /// A wire was pulled out of an output port and the mouse button is still held.
     wire_drag: bool,
@@ -182,6 +185,8 @@ pub struct CanvasOutcome {
     pub add_note_at: Option<[f32; 2]>,
     /// A wire was dropped on empty canvas: the source node and the world position.
     pub drop_wire: Option<(NodeId, [f32; 2])>,
+    /// 「サンプルを開く」 on the empty canvas.
+    pub open_templates: bool,
 }
 
 /// Screen rectangle of a group: the union of its live members plus a label band.
@@ -465,7 +470,7 @@ impl GraphCanvas {
         painter.rect_filled(rect, 0, theme::canvas_bg());
         let zoom = p.zoom;
         let spacing = GRID * zoom;
-        if spacing >= 8. {
+        if !self.hide_grid && spacing >= 8. {
             let sx = rect.left() + p.pan[0].rem_euclid(spacing);
             let sy = rect.top() + p.pan[1].rem_euclid(spacing);
             let mut x = sx;
@@ -581,7 +586,9 @@ impl GraphCanvas {
                         continue;
                     }
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
-                    let color = if selected {
+                    let color = if theme::is_melt() {
+                        melt::wire_color(src.kind.spec().output, selected)
+                    } else if selected {
                         theme::teal()
                     } else {
                         theme::wire_idle()
@@ -616,7 +623,8 @@ impl GraphCanvas {
             let nr = *nr;
             let selected = self.selected.contains(&n.id);
             let col = theme::category_color(n.kind.spec().category);
-            let overview = p.zoom < 0.38 && self.connecting.is_none();
+            let lod = melt::lod(p.zoom, self.connecting.is_some());
+            let overview = lod == melt::Lod::Shape;
             let error = evaluation
                 .filter(|_| !stale && !n.off)
                 .and_then(|e| e.outputs.get(&n.id))
@@ -767,6 +775,28 @@ impl GraphCanvas {
                     ui.close();
                 }
             });
+            if let Some(message) = error {
+                let badge = melt::error_badge(&painter, nr, p.zoom);
+                let id = n.id;
+                ui.interact(badge, Id::new(("error_badge", id)), Sense::hover())
+                    .on_hover_ui(|ui| {
+                        let failed = |x: NodeId| {
+                            evaluation
+                                .and_then(|e| e.outputs.get(&x))
+                                .is_some_and(|r| r.is_err())
+                        };
+                        let root = melt::root_cause(&p.graph, &failed, id);
+                        let root_message = evaluation
+                            .and_then(|e| e.outputs.get(&root))
+                            .and_then(|r| r.as_ref().err())
+                            .map_or(message.as_str(), String::as_str);
+                        let name = p.graph.node(root).map_or("?", |m| m.name.as_str());
+                        ui.label(ui_polish::one_line(
+                            &format!("原因: 「{name}」{root_message}"),
+                            80,
+                        ));
+                    });
+            }
             if overview {
                 // At overview zoom, keep card silhouettes, selection and wires, not
                 // illegible labels/sliders. Zoom in or Shift+F to edit.
@@ -797,14 +827,12 @@ impl GraphCanvas {
                 pos + egui::vec2(WIDTH - 15., 20.) * p.zoom,
                 egui::vec2(20., 22.) * p.zoom,
             );
-            painter.circle_stroke(
-                eye.center(),
-                4.5 * p.zoom,
-                Stroke::new(1_f32, if n.preview { col } else { theme::muted() }),
+            melt::eye(
+                &painter,
+                Rect::from_center_size(eye.center(), egui::vec2(16., 16.) * p.zoom),
+                n.preview,
+                if n.preview { col } else { theme::muted() },
             );
-            if n.preview {
-                painter.circle_filled(eye.center(), 2. * p.zoom, col);
-            }
             if ui
                 .interact(eye, Id::new(("node_preview", n.id)), Sense::click())
                 .on_hover_text("表示対象を切替（「表示中」モード）")
@@ -812,6 +840,10 @@ impl GraphCanvas {
             {
                 let m = &mut p.graph.nodes[*node_index];
                 m.preview = !m.preview;
+            }
+            if lod == melt::Lod::Header {
+                // Header only while zoomed out: no ports, rows or footer.
+                continue;
             }
             let slider_keys: Vec<&str> = n
                 .kind
@@ -837,12 +869,15 @@ impl GraphCanvas {
                 } else {
                     theme::port_color(spec.kind)
                 };
-                painter.circle_filled(
+                melt::port_marker(
+                    &painter,
                     ip,
                     5. * p.zoom,
+                    spec.kind,
                     if linked { port_col } else { theme::card_bg() },
+                    port_col,
+                    1.6,
                 );
-                painter.circle_stroke(ip, 5. * p.zoom, Stroke::new(1.6_f32, port_col));
                 if can == Some(true) {
                     painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4_f32, theme::teal()));
                 }
@@ -965,7 +1000,16 @@ impl GraphCanvas {
                 }
             }
             let op = output_pos(n, rect, p.pan, p.zoom);
-            painter.circle_filled(op, 6. * p.zoom, theme::port_color(n.kind.spec().output));
+            let out_col = theme::port_color(n.kind.spec().output);
+            melt::port_marker(
+                &painter,
+                op,
+                6. * p.zoom,
+                n.kind.spec().output,
+                out_col,
+                out_col,
+                1.0,
+            );
             painter.circle_filled(op, 2. * p.zoom, Color32::WHITE);
             let or = ui.interact(
                 Rect::from_center_size(op, egui::vec2(24., 24.) * p.zoom),
@@ -1076,16 +1120,49 @@ impl GraphCanvas {
         }
         if p.graph.nodes.is_empty() {
             painter.text(
-                rect.center() - egui::vec2(0., 25.),
+                rect.center() - egui::vec2(0., 62.),
                 Align2::CENTER_CENTER,
                 "ここから、形をつくろう。",
                 FontId::proportional(24.),
                 theme::ink(),
             );
+            let area = Rect::from_center_size(rect.center(), egui::vec2(360., 40.));
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(area)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                |ui| {
+                    ui.add_space(((area.width() - 304.) / 2.).max(0.));
+                    if melt::tool_button(
+                        ui,
+                        melt::Tool::Plus,
+                        "ノードを追加",
+                        "検索してノードを置く  Tab / Ctrl+K",
+                        true,
+                        true,
+                    )
+                    .clicked()
+                    {
+                        out.add_at = Some(to_world(rect.center(), rect, p.pan, p.zoom));
+                    }
+                    if melt::tool_button(
+                        ui,
+                        melt::Tool::Open,
+                        "サンプルを開く",
+                        "作品例から始める",
+                        false,
+                        true,
+                    )
+                    .clicked()
+                    {
+                        out.open_templates = true;
+                    }
+                },
+            );
             painter.text(
-                rect.center() + egui::vec2(0., 15.),
+                rect.center() + egui::vec2(0., 44.),
                 Align2::CENTER_CENTER,
-                "左のライブラリから追加、またはダブルクリックで検索",
+                "Tab・ダブルクリック・? でノードを検索（例: 円 / circle / twist）",
                 FontId::proportional(12.),
                 theme::muted(),
             );
@@ -1093,7 +1170,7 @@ impl GraphCanvas {
         let hint = if self.connecting.is_some() {
             "入力の丸をクリックして接続  ·  Esc で中止  ·  空いた所で離すと検索して追加"
         } else {
-            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でショートカット一覧"
+            "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でノード検索"
         };
         painter.rect_filled(
             Rect::from_min_max(
@@ -1173,10 +1250,10 @@ impl GraphCanvas {
             p.pan = [pan.x.clamp(-1e7, 1e7), pan.y.clamp(-1e7, 1e7)];
             ui.ctx().request_repaint();
         }
-        painter.rect_filled(map, 7, theme::panel_bg());
+        painter.rect_filled(map, 8, theme::panel_bg());
         painter.rect_stroke(
             map,
-            7,
+            8,
             Stroke::new(1_f32, theme::card_border()),
             egui::StrokeKind::Inside,
         );
@@ -1186,6 +1263,7 @@ impl GraphCanvas {
         let b = to_world(canvas.max, canvas, p.pan, p.zoom);
         let view = Rect::from_two_pos(drawing.project(a.into()), drawing.project(b.into()));
         if view.intersects(inner) {
+            mini.rect_filled(view.intersect(inner), 2, theme::teal().gamma_multiply(0.14));
             mini.rect_stroke(
                 view.intersect(inner),
                 2,
@@ -1552,7 +1630,13 @@ fn wire(
     selected: bool,
     zoom: f32,
 ) {
-    let w = if selected { 2.4 } else { 1.7_f32 };
+    let w = if theme::is_melt() {
+        melt::wire_width(selected)
+    } else if selected {
+        2.4
+    } else {
+        1.7_f32
+    };
     match shape {
         Some(DataShape::List(_)) => {
             bezier(painter, a, b, Stroke::new(w + 2.8, color));

@@ -26,6 +26,8 @@ pub enum DataType {
     Brep,
     /// SubD / T-spline control cage; see `subd`.
     Cage,
+    /// A G-code job (printer, settings, toolpaths). See `gcode_job.rs`.
+    Gcode,
 }
 impl DataType {
     pub fn label(self) -> &'static str {
@@ -41,6 +43,7 @@ impl DataType {
             Self::DisplayGeometry => "表示形状",
             Self::Brep => "厳密 B-rep",
             Self::Cage => "SubD ケージ",
+            Self::Gcode => "Gコード",
         }
     }
     pub fn accepts(self, source: Self) -> bool {
@@ -515,6 +518,28 @@ pub enum NodeKind {
     SubdExtrudeFace,
     SubdToBrep,
     SubdToMesh,
+    // G-code nodes (see `gcode_nodes.rs`); appended, serde names are snake_case.
+    GcodePrinter,
+    GcodeSlice,
+    GcodeContour,
+    GcodeSpiral,
+    GcodeSort,
+    GcodeSplit,
+    GcodeExtrusion,
+    GcodeSpeed,
+    GcodeTemp,
+    GcodeRetract,
+    GcodeZHop,
+    GcodeNonplanar,
+    GcodeTexture,
+    GcodeClay,
+    GcodeStart,
+    GcodeEnd,
+    GcodeJoin,
+    GcodeWrite,
+    GcodePreview,
+    GcodeEstimate,
+    GcodeSafety,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -880,6 +905,27 @@ impl NodeKind {
             Self::SubdExtrudeFace,
             Self::SubdToBrep,
             Self::SubdToMesh,
+            Self::GcodePrinter,
+            Self::GcodeSlice,
+            Self::GcodeContour,
+            Self::GcodeSpiral,
+            Self::GcodeSort,
+            Self::GcodeSplit,
+            Self::GcodeExtrusion,
+            Self::GcodeSpeed,
+            Self::GcodeTemp,
+            Self::GcodeRetract,
+            Self::GcodeZHop,
+            Self::GcodeNonplanar,
+            Self::GcodeTexture,
+            Self::GcodeClay,
+            Self::GcodeStart,
+            Self::GcodeEnd,
+            Self::GcodeJoin,
+            Self::GcodeWrite,
+            Self::GcodePreview,
+            Self::GcodeEstimate,
+            Self::GcodeSafety,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1495,6 +1541,7 @@ impl NodeKind {
                 crate::surface_nodes::spec(other)
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
+            other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1788,6 +1835,7 @@ pub enum Value {
     Brep(Arc<crate::kernel_bridge::BrepValue>),
     /// SubD / T-spline control cage.
     Cage(Arc<crate::subd::Cage>),
+    Gcode(Arc<crate::gcode_job::GcodeJob>),
 }
 impl Value {
     pub fn kind(&self) -> DataType {
@@ -1800,6 +1848,7 @@ impl Value {
             Self::Solid(_) => DataType::Solid,
             Self::Brep(_) => DataType::Brep,
             Self::Cage(_) => DataType::Cage,
+            Self::Gcode(_) => DataType::Gcode,
         }
     }
     pub fn weight(&self) -> usize {
@@ -1818,6 +1867,7 @@ impl Value {
             Self::Solid(s) => s.weight(),
             Self::Brep(b) => b.weight(),
             Self::Cage(c) => c.weight(),
+            Self::Gcode(j) => j.weight(),
         }
     }
     pub fn number(&self) -> Result<f64, String> {

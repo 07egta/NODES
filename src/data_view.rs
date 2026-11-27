@@ -139,6 +139,7 @@ pub fn value_text(value: &Value) -> String {
                 ""
             }
         ),
+        Value::Gcode(j) => j.summary(),
         Value::Solid(s) => format!(
             "閉じた B-rep · {} 面 / {} 稜線 · 体積 {}",
             s.brep().shell().faces().len(),
