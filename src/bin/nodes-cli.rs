@@ -423,8 +423,8 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
                     "GHX conversion output must be .morph.",
                 ));
             }
-            let project =
-                ghx::convert_path(input).map_err(|message| problem("ghx_conversion_failed", message))?;
+            let project = ghx::convert_path(input)
+                .map_err(|message| problem("ghx_conversion_failed", message))?;
             save_evaluated(&project, destination)
         }
         "export-stl" => export_stl(Path::new(&arguments[0]), Path::new(&arguments[1])),
