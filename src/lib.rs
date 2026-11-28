@@ -49,6 +49,7 @@ pub mod robust_geometry;
 pub mod script;
 pub mod sketch_nodes;
 pub mod stl_export;
+mod threemf_import;
 pub mod subd;
 pub mod templates;
 

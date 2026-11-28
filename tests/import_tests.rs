@@ -240,6 +240,7 @@ fn place_rejects_a_zero_scale() {
 fn file_kind_comes_from_the_extension() {
     assert_eq!(format_of(Path::new("part.STL")), Some(Format::Stl));
     assert_eq!(format_of(Path::new("part.obj")), Some(Format::Obj));
+    assert_eq!(format_of(Path::new("part.3MF")), Some(Format::ThreeMf));
     assert_eq!(format_of(Path::new("work.morph")), None);
 }
 

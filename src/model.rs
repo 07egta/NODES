@@ -221,7 +221,7 @@ pub enum NodeKind {
     OverhangCheck,
     Distance,
     PointComponent,
-    /// Mesh file import (STL or OBJ, see `import.rs`). The file path is kept in `Node::script`.
+    /// Mesh file import (STL, OBJ or limited 3MF, see `import.rs`). The file path is kept in `Node::script`.
     ImportMesh,
     SimplifyTree,
     TrimTree,

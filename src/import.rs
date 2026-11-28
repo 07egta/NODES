@@ -1,12 +1,14 @@
-//! Mesh file import (STL and OBJ) for the ファイル読み込み node.
+//! Mesh file import (STL, OBJ and limited 3MF) for the ファイル読み込み node.
 //!
 //! The files come from outside the app, so every input is treated as hostile: sizes are
 //! checked before anything is allocated, coordinates must be finite, slices are read with
 //! `get`, and every failure is a Japanese message. Nothing here panics.
 //!
-//! Vertices of both formats are welded by position (quantized to 0.000001 mm), so a closed
+//! STL/OBJ vertices are welded by position (quantized to 0.000001 mm), so a closed
 //! source becomes a closed indexed mesh. STL degenerate triangles are dropped;
 //! invalid or degenerate OBJ polygons are rejected instead of partly imported.
+//! 3MF preserves indexed geometry and converts its declared units to millimetres.
+pub use crate::threemf_import::parse_3mf;
 use crate::engine::{cancelled, cross, length, sub};
 use crate::model::{MAX_TRIANGLES, MAX_VERTICES, Mesh};
 use std::collections::HashMap;
@@ -29,7 +31,7 @@ const BAD_FACET: &str = "STL の面ごとの頂点が3個ではありません�
 const TOO_MANY_BYTES: &str = "ファイルが大きすぎます（上限 64 MiB）。";
 
 const NO_FILE: &str =
-    "ファイルが選ばれていません。「ファイルを選ぶ」で STL または OBJ を選んでください。";
+    "ファイルが選ばれていません。「ファイルを選ぶ」で STL・OBJ・3MF を選んでください。";
 const BAD_FORMAT: &str = "STL または OBJ として読めませんでした。ファイルが途中で切れていないか、形式を確認してください。";
 const BAD_NUMBER: &str =
     "座標の数値が正しくありません（NaN・無限大・極端に大きな値は使えません）。";
@@ -41,6 +43,7 @@ const INTERNAL: &str = "読み込み中に内部の整合性エラーが起き�
 pub enum Format {
     Stl,
     Obj,
+    ThreeMf,
 }
 
 /// File format from the extension (case-insensitive). None for other files.
@@ -49,6 +52,7 @@ pub fn format_of(path: &Path) -> Option<Format> {
     match extension.as_str() {
         "stl" => Some(Format::Stl),
         "obj" => Some(Format::Obj),
+        "3mf" => Some(Format::ThreeMf),
         _ => None,
     }
 }
@@ -62,13 +66,13 @@ pub fn source_key(path: &str) -> String {
     }
 }
 
-/// Reads and parses one STL or OBJ file. The size is checked before and after reading.
+/// Reads and parses one STL, OBJ or limited 3MF file. The size is checked before and after reading.
 pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
     if path.is_empty() {
         return Err(NO_FILE.into());
     }
     let format = format_of(Path::new(path))
-        .ok_or("STL または OBJ 以外のファイルは読み込めません。拡張子を確認してください。")?;
+        .ok_or("STL・OBJ・3MF 以外のファイルは読み込めません。拡張子を確認してください。")?;
     cancelled(cancel)?;
     let meta = std::fs::metadata(path).map_err(|_| {
         "ファイルを開けませんでした。移動・削除されていないか確認してください。".to_string()
@@ -99,6 +103,7 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
     match format {
         Format::Stl => parse_stl(&bytes, cancel),
         Format::Obj => parse_obj(&bytes, cancel),
+        Format::ThreeMf => parse_3mf(&bytes, cancel),
     }
 }
 

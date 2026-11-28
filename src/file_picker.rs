@@ -24,7 +24,7 @@ pub enum FileTask {
     PickSlicer,
     SavePart,
     LoadPart,
-    /// Mesh file for the ファイル読み込み node: STL or OBJ.
+    /// Mesh file for the ファイル読み込み node: STL, OBJ or limited 3MF.
     ImportMesh,
     ImportStep,
 }
@@ -72,7 +72,11 @@ impl FileTask {
     /// Whether a file in the listing belongs to this task.
     fn accepts(self, path: &Path) -> bool {
         match self {
-            Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
+            Self::ImportMesh => {
+                has_extension(path, "stl")
+                    || has_extension(path, "obj")
+                    || has_extension(path, "3mf")
+            }
             Self::ExportStep | Self::ImportStep => {
                 has_extension(path, "step")
                     || has_extension(path, "stp")
@@ -91,7 +95,7 @@ impl FileTask {
             Self::ExportObj => ".obj",
             Self::ExportPly => ".ply",
             Self::SavePart | Self::LoadPart => ".morphpart",
-            Self::ImportMesh => ".stl / .obj",
+            Self::ImportMesh => ".stl / .obj / .3mf",
             Self::ExportStep | Self::ImportStep => ".step / .stp / .iges / .igs",
             Self::ExportGcode => ".gcode",
             Self::ExportThreeMf => ".3mf",
