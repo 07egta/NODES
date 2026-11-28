@@ -20,9 +20,7 @@ fn step(p: &[f64], n: usize) -> Vec<f64> {
     let e_avg = e.iter().sum::<f64>() / nf;
     let mut next = Vec::with_capacity(p.len());
     next.push((f_avg + e_avg + (nf - 2.0) * c) / nf);
-    next.extend(
-        (0..n).map(|i| (c + e[i] + faces[(i + n - 1) % n] + faces[i]) / 4.0),
-    );
+    next.extend((0..n).map(|i| (c + e[i] + faces[(i + n - 1) % n] + faces[i]) / 4.0));
     next.extend(faces);
     next
 }
@@ -73,8 +71,7 @@ fn mode(n: usize, k: usize, sine: bool) -> Vec<f64> {
 
 fn limit(p: &[f64], n: usize) -> f64 {
     let nf = n as f64;
-    (nf * p[0]
-        + (4.0 * p[1..=n].iter().sum::<f64>() + p[n + 1..].iter().sum::<f64>()) / nf)
+    (nf * p[0] + (4.0 * p[1..=n].iter().sum::<f64>() + p[n + 1..].iter().sum::<f64>()) / nf)
         / (nf + 5.0)
 }
 
