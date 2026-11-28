@@ -55,6 +55,19 @@ fn flat_graft_partition_and_roundtrip_preserve_order_and_empty() {
     assert!(dt::unflatten(&Tree::default(), &t).is_err());
 }
 #[test]
+fn reverse_flips_items_inside_each_branch_and_keeps_empty_branches() {
+    let t = numbers(&[(&[0], &[1., 2., 3.]), (&[1], &[]), (&[2], &[4., 5.])]);
+    assert_eq!(
+        dt::reverse(&t).unwrap(),
+        numbers(&[(&[0], &[3., 2., 1.]), (&[1], &[]), (&[2], &[5., 4.])])
+    );
+    assert_eq!(
+        dt::apply_transform(&t, dt::PortTransform::from_number(4.).unwrap()).unwrap(),
+        dt::reverse(&t).unwrap()
+    );
+    assert_eq!(dt::reverse(&dt::reverse(&t).unwrap()).unwrap(), t);
+}
+#[test]
 fn mixed_depth_graft_collisions_do_not_lose_items() {
     let t = numbers(&[(&[0], &[1.]), (&[0, 0], &[])]);
     assert_eq!(dt::graft(&t).unwrap(), numbers(&[(&[0, 0], &[1.])]));

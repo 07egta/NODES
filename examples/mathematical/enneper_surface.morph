@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "エンネパー曲面 — 花弁のような鞍形",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "enneper_surface",
+        "name": "エンネパー曲面",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "scale": 20,
+          "extent": 1,
+          "u_segments": 64,
+          "v_segments": 64
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}

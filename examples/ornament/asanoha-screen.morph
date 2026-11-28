@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "麻の葉組子・中心線",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "asanoha_pattern",
+        "name": "麻の葉",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 7,
+          "ny": 5,
+          "size": 12
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          280,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

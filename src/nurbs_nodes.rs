@@ -3,6 +3,7 @@
 //! are Japanese. Inputs are few, with defaults that give a useful result straight away.
 use crate::engine::{Evaluation, as_mesh, cancelled, node_inputs, num};
 use crate::kernel_bridge::{self as kb, Bool, BrepValue};
+use crate::kernel_ops as ko;
 use crate::model::{DataType as D, Node, NodeKind as K, NodeSpec, Tree, Value, g, i, n};
 use crate::subd::Cage;
 use std::collections::BTreeMap;
@@ -45,6 +46,22 @@ pub const KINDS: &[K] = &[
     K::SubdExtrudeFace,
     K::SubdToBrep,
     K::SubdToMesh,
+    K::SubdCageEdit,
+    K::ExactTrimPlane,
+    K::ExactFilletVariable,
+    K::ExactOffsetSurface,
+    K::ExactDraft,
+    K::ExactMirror,
+    K::ExactLinearArray,
+    K::ExactPolarArray,
+    K::ExactPipe,
+    K::ExactPatch,
+    K::ExactBlendCurve,
+    K::ExactMatchCurve,
+    K::ExactContinuity,
+    K::ExactCurvatureComb,
+    K::ExactOffsetCurve,
+    K::ExactTorus,
 ];
 
 pub fn is_kind(kind: K) -> bool {
@@ -99,6 +116,16 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "sphere brep solid 球 厳密",
             Brep,
             [n("radius", "半径", 20., 0.01, 1e5, 0.5)]
+        ),
+        K::ExactTorus => spec!(
+            "厳密トーラス",
+            "Z 軸まわりのリング状 B-rep。大半径は管の中心まで、小半径は管の半径（mm）。大半径 > 小半径。",
+            "torus ring donut brep solid トーラス ドーナツ 厳密",
+            Brep,
+            [
+                n("major", "大半径", 30., 0.01, 1e5, 1.),
+                n("minor", "小半径", 8., 0.01, 1e5, 0.5)
+            ]
         ),
         K::ExactExtrude => spec!(
             "押し出して立体",
@@ -358,6 +385,150 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             Mesh,
             [CAGE]
         ),
+        K::SubdCageEdit => spec!(
+            "ケージ編集 (SubD)",
+            "ケージをビューポートで直接編集します。点・辺・面を選び、移動・押し出し・折り目・細分ができます（対称編集つき）。編集はノードに記録されます。",
+            "cage edit subd tspline 編集 直接編集 gumball 移動 押し出し",
+            Cage,
+            [CAGE]
+        ),
+        K::ExactTrimPlane => spec!(
+            "平面で切る",
+            "B-rep 立体を高さ z の水平面で切り、下（または上）を残します。切り口は厳密な平面です。",
+            "trim split plane cut 切る トリム 分割",
+            Brep,
+            [
+                B,
+                n("height", "高さ z", 10., -1e5, 1e5, 1.),
+                i("above", "上を残す (1=はい)", 0., 0., 1.)
+            ]
+        ),
+        K::ExactFilletVariable => spec!(
+            "可変フィレット",
+            "1 本の稜線を、始点と終点で違う半径で丸めます（直線の稜線）。",
+            "variable fillet filletedge 可変 フィレット",
+            Brep,
+            [
+                B,
+                i("edge", "稜線番号", 0., 0., 1e5),
+                n("r0", "始点の半径", 2., 0.01, 1e4, 0.5),
+                n("r1", "終点の半径", 6., 0.01, 1e4, 0.5)
+            ]
+        ),
+        K::ExactOffsetSurface => spec!(
+            "オフセット面",
+            "すべての面を法線方向に指定の距離だけずらした面を作ります（負で内側）。",
+            "offset surface offsetsrf オフセット 面",
+            Brep,
+            [B, n("distance", "距離", 2., -1e4, 1e4, 0.5)]
+        ),
+        K::ExactDraft => spec!(
+            "ドラフト角",
+            "垂直な側面を、床 (z = 0) を基準に内側へ傾けます。型抜きや印刷の抜け勾配に。",
+            "draft angle taper 抜き勾配 ドラフト",
+            Brep,
+            [B, n("angle", "角度（度）", 3., -60., 60., 0.5)]
+        ),
+        K::ExactMirror => spec!(
+            "B-rep ミラー",
+            "B-rep を X・Y・Z の平面で反転します。元を残すと結合します。",
+            "mirror brep ミラー 反転 対称",
+            Brep,
+            [
+                B,
+                i("axis", "軸 (0=X,1=Y,2=Z)", 0., 0., 2.),
+                i("keep", "元を残す (1=はい)", 1., 0., 1.)
+            ]
+        ),
+        K::ExactLinearArray => spec!(
+            "B-rep 直線配列",
+            "B-rep を X・Y・Z の間隔で個数分並べます。",
+            "array linear brep 配列 並べる",
+            Brep,
+            [
+                B,
+                i("count", "個数", 3., 1., 500.),
+                n("x", "X 間隔", 30., -1e5, 1e5, 1.),
+                n("y", "Y 間隔", 0., -1e5, 1e5, 1.),
+                n("z", "Z 間隔", 0., -1e5, 1e5, 1.)
+            ]
+        ),
+        K::ExactPolarArray => spec!(
+            "B-rep 円形配列",
+            "B-rep を Z 軸のまわりに個数分並べます。",
+            "array polar radial brep 円形配列",
+            Brep,
+            [
+                B,
+                i("count", "個数", 6., 1., 500.),
+                n("angle", "角度", 360., -360., 360., 1.)
+            ]
+        ),
+        K::ExactPipe => spec!(
+            "パイプ（厳密）",
+            "レール曲線に沿って厳密な円の断面を動かし、閉じた管の B-rep にします。",
+            "pipe tube brep パイプ 管",
+            Brep,
+            [
+                g("rail", "レール", D::Curve),
+                n("radius", "半径", 3., 0.01, 1e4, 0.5)
+            ]
+        ),
+        K::ExactPatch => spec!(
+            "パッチ（平面）",
+            "閉じた平らな曲線の内側を面でふさぎます。",
+            "patch planarsrf 平面 面 ふさぐ",
+            Brep,
+            [C]
+        ),
+        K::ExactBlendCurve => spec!(
+            "ブレンド曲線",
+            "曲線 A の終点から曲線 B の始点へ、なめらかにつなぐ曲線を作ります（G1 または G2）。",
+            "blend curve blendcrv ブレンド つなぐ g1 g2",
+            Curve,
+            [
+                g("a", "曲線 A", D::Curve),
+                g("b", "曲線 B", D::Curve),
+                i("g2", "曲率まで合わせる (1=G2)", 1., 0., 1.),
+                n("bulge", "ふくらみ", 1., 0.01, 10., 0.05)
+            ]
+        ),
+        K::ExactMatchCurve => spec!(
+            "曲線のマッチ",
+            "曲線 A の終わりを動かして、曲線 B の始点に位置 (G0)・接線 (G1)・曲率 (G2) を合わせます。",
+            "match curve matchcrv マッチ 合わせる 連続",
+            Curve,
+            [
+                g("a", "曲線 A", D::Curve),
+                g("b", "曲線 B", D::Curve),
+                i("level", "連続性 (0〜2)", 2., 0., 2.)
+            ]
+        ),
+        K::ExactContinuity => spec!(
+            "連続性チェック",
+            "曲線 A の終点と B の始点のつながりを調べ、[レベル (-1=離れている,0=G0,1=G1,2=G2), すき間 mm, 角度°, 曲率差] を出します。",
+            "continuity gcon g0 g1 g2 連続性 解析",
+            Number,
+            [g("a", "曲線 A", D::Curve), g("b", "曲線 B", D::Curve)]
+        ),
+        K::ExactCurvatureComb => spec!(
+            "曲率くし",
+            "曲線の曲率を「くし」の線で表示します。くしの先をつなぐ線も出力します。",
+            "curvature graph comb 曲率 くし 解析",
+            Curve,
+            [
+                C,
+                i("count", "本数", 60., 2., 1000.),
+                n("scale", "倍率", 200., 0.001, 1e6, 10.)
+            ]
+        ),
+        K::ExactOffsetCurve => spec!(
+            "オフセット曲線（厳密）",
+            "平らな曲線を、その平面内で指定の距離だけずらしたなめらかな NURBS 曲線にします。",
+            "offset curve offsetcrv オフセット",
+            Curve,
+            [C, n("distance", "距離", 5., -1e5, 1e5, 0.5)]
+        ),
         _ => spec!("不明なノード", "不明なノードです。", "unknown", Any, []),
     }
 }
@@ -386,6 +557,9 @@ fn index(v: f64) -> Option<usize> {
 fn out(b: BrepValue) -> Result<Vec<Value>, String> {
     Ok(vec![Value::Brep(Arc::new(b))])
 }
+fn outs(list: Vec<BrepValue>) -> Result<Vec<Value>, String> {
+    Ok(list.into_iter().map(|b| Value::Brep(Arc::new(b))).collect())
+}
 fn out_cage(c: Cage) -> Result<Vec<Value>, String> {
     Ok(vec![Value::Cage(Arc::new(c))])
 }
@@ -403,6 +577,7 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         )?),
         K::ExactSphere => out(kb::sphere([0.; 3], num(a, 0)?, stop)?),
+        K::ExactTorus => out(kb::torus(num(a, 0)?, num(a, 1)?, stop)?),
         K::ExactExtrude => out(kb::extrude(curve(a, 0)?, &[], num(a, 1)?, stop)?),
         K::ExactRevolve => out(kb::revolve(
             curve(a, 0)?,
@@ -494,6 +669,72 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
         }
         K::SubdToBrep => out(cage(a, 0)?.to_brep(num(a, 1)? != 0., stop)?),
         K::SubdToMesh => as_mesh(cage(a, 0)?.preview().as_ref().clone(), stop),
+        K::ExactTrimPlane => out(ko::trim_by_plane(
+            brep(a, 0)?,
+            num(a, 1)?,
+            num(a, 2)? != 0.,
+            stop,
+        )?),
+        K::ExactFilletVariable => out(ko::fillet_variable(
+            brep(a, 0)?,
+            num(a, 1)? as usize,
+            num(a, 2)?,
+            num(a, 3)?,
+            stop,
+        )?),
+        K::ExactOffsetSurface => out(ko::offset_surface(brep(a, 0)?, num(a, 1)?, stop)?),
+        K::ExactDraft => out(ko::draft(brep(a, 0)?, num(a, 1)?, stop)?),
+        K::ExactMirror => outs(ko::mirror(
+            brep(a, 0)?,
+            num(a, 1)? as usize,
+            num(a, 2)? != 0.,
+            stop,
+        )?),
+        K::ExactLinearArray => outs(ko::linear_array(
+            brep(a, 0)?,
+            [num(a, 2)?, num(a, 3)?, num(a, 4)?],
+            num(a, 1)? as usize,
+            stop,
+        )?),
+        K::ExactPolarArray => outs(ko::polar_array(
+            brep(a, 0)?,
+            num(a, 1)? as usize,
+            num(a, 2)?,
+            stop,
+        )?),
+        K::ExactPipe => out(ko::pipe(curve(a, 0)?, num(a, 1)?, stop)?),
+        K::ExactPatch => out(ko::planar_patch(curve(a, 0)?, stop)?),
+        K::ExactBlendCurve => Ok(vec![Value::Curve(Arc::new(ko::blend_curve(
+            curve(a, 0)?,
+            curve(a, 1)?,
+            num(a, 2)? != 0.,
+            num(a, 3)?,
+            stop,
+        )?))]),
+        K::ExactMatchCurve => Ok(vec![Value::Curve(Arc::new(ko::match_curve(
+            curve(a, 0)?,
+            curve(a, 1)?,
+            num(a, 2)? as usize,
+            stop,
+        )?))]),
+        K::ExactContinuity => Ok(ko::continuity(curve(a, 0)?, curve(a, 1)?)?
+            .into_iter()
+            .map(Value::Number)
+            .collect()),
+        K::ExactCurvatureComb => {
+            Ok(
+                ko::curvature_comb(curve(a, 0)?, num(a, 1)? as usize, num(a, 2)?, stop)?
+                    .into_iter()
+                    .map(|c| Value::Curve(Arc::new(c)))
+                    .collect(),
+            )
+        }
+        K::ExactOffsetCurve => Ok(vec![Value::Curve(Arc::new(ko::offset_curve(
+            curve(a, 0)?,
+            num(a, 1)?,
+            stop,
+        )?))]),
+        K::SubdCageEdit => out_cage(cage(a, 0)?.as_ref().clone()),
         _ => Err("このノードはリスト評価が必要です。".into()),
     }
 }
@@ -609,4 +850,28 @@ pub(crate) fn read_step(path: &str, stop: &dyn Fn() -> bool) -> Result<Tree, Str
                 .collect(),
         )]),
     })
+}
+
+/// ケージ編集: every cage of the input with the node's edit list (`script`, JSON) applied.
+pub fn run_cage_edit(
+    node: &Node,
+    inputs: &[Tree],
+    stop: &dyn Fn() -> bool,
+) -> Result<Tree, String> {
+    let input = inputs.first().ok_or("ケージを接続してください。")?;
+    let mut out = Tree::default();
+    for (path, values) in &input.branches {
+        let mut list = Vec::with_capacity(values.len());
+        for v in values {
+            cancelled(stop)?;
+            match v {
+                Value::Cage(c) => {
+                    list.push(Value::Cage(Arc::new(c.apply_edits(&node.script, stop)?)))
+                }
+                _ => return Err("ケージを接続してください。".into()),
+            }
+        }
+        out.branches.insert(path.clone(), list);
+    }
+    Ok(out)
 }

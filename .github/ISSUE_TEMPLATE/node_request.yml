@@ -1,0 +1,60 @@
+name: ノードの要望 / Node request
+description: 追加してほしいノードの要望 / Request a new node
+title: "[Node] "
+labels: ["node", "enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ノードの要望です。他製品の文言・アイコン・テンプレートはコピーせず、機能を言葉で説明してください。
+        Describe the function in your own words. Do not paste text, icons or templates from other products.
+  - type: input
+    id: name
+    attributes:
+      label: 名前 / Name
+      description: 日本語名と英語名（分かれば） / Japanese name and English name if known
+      placeholder: "例: 円弧上の点 / e.g. Points on arc"
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: 入力 / Inputs
+      description: 入力ポート名・型（数値、点、曲線、メッシュなど）と個数 / Port names, types (number, point, curve, mesh, etc.) and count
+      placeholder: |
+        - 曲線 (curve)
+        - 分割数 (number, 既定値 10)
+    validations:
+      required: true
+  - type: textarea
+    id: outputs
+    attributes:
+      label: 出力 / Outputs
+      description: 出力ポート名・型 / Port names and types
+      placeholder: |
+        - 点 (points)
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 用途 / Purpose
+      description: 何を作るために使うか、どんな場面で役立つか / What you would build with it and when it helps
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: 参考 / References
+      description: 数式、公開資料のURL、説明文など。他製品からの文言や画像の貼り付けは避けてください / Formulas, public documentation URLs, descriptions. Avoid pasting text or images from other products.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認 / Checks
+      options:
+        - label: 他製品の文言・アイコン・テンプレート・コードを含めていない / Contains no text, icons, templates or code from other products
+          required: true
+        - label: GPL / LGPL / AGPL のコードや依存を前提にしていない / Does not assume GPL, LGPL or AGPL code or dependencies
+          required: true
+        - label: 同じ内容の既存Issueがないことを確認した / I searched existing issues for duplicates
+          required: true

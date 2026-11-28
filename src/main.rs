@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 mod app;
+mod cage_edit;
 mod canvas;
 mod data_view;
 mod diagnostics_ui;
@@ -14,6 +15,7 @@ mod node_shelf;
 mod script_ui;
 mod stl_export_ui;
 mod theme;
+mod tutorial;
 mod ui_polish;
 mod viewport;
 

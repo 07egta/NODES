@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 開発への参加（CONTRIBUTING） / Contributing guide
+    url: https://github.com/07egta/NODES/blob/main/CONTRIBUTING.md
+    about: PRを出す前の条件と確認方法 / Conditions and checks before opening a PR
+  - name: 実装言語方針 / Implementation language policy
+    url: https://github.com/07egta/NODES/blob/main/docs/LANGUAGE_POLICY.md
+    about: Rust中心の方針と、他言語を使ってよい範囲 / Rust-first policy and where other languages are allowed

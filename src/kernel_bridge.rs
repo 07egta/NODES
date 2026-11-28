@@ -69,7 +69,7 @@ pub mod limits {
 
 pub const STOPPED: &str = "計算を停止しました。";
 
-fn stopped(stop: Stop) -> R<()> {
+pub(crate) fn stopped(stop: Stop) -> R<()> {
     if stop() { Err(STOPPED.into()) } else { Ok(()) }
 }
 
@@ -92,7 +92,7 @@ pub fn kernel_error(what: &str, e: KernelError) -> String {
 }
 
 /// Run a kernel call with panic protection, cancel checks and a Japanese error.
-fn kernel<T>(what: &str, stop: Stop, f: impl FnOnce() -> sk::Result<T>) -> R<T> {
+pub(crate) fn kernel<T>(what: &str, stop: Stop, f: impl FnOnce() -> sk::Result<T>) -> R<T> {
     stopped(stop)?;
     let result = sk::guard(what, f).map_err(|e| kernel_error(what, e));
     stopped(stop)?;
@@ -171,14 +171,28 @@ impl BrepValue {
         }
         match sk::guard("体積", || sk::measure_mass(&self.body)) {
             Ok(m) if m.volume.is_finite() => Some(m.volume.abs()),
-            _ => Some(mesh_volume(&self.preview).abs()),
+            _ => {
+                let volume = mesh_volume(&self.preview).abs();
+                volume.is_finite().then_some(volume)
+            }
         }
     }
 }
 
 /// Signed volume of a closed triangle mesh (mm³).
+///
+/// Translate to a referenced vertex before taking determinants. For a closed
+/// surface the integral is translation invariant, but world-coordinate
+/// determinants can lose all significant digits for small distant solids.
 pub fn mesh_volume(m: &Mesh) -> f64 {
-    let mut v = 0.;
+    let Some(origin) = m
+        .triangles
+        .iter()
+        .find_map(|t| m.vertices.get(t[0] as usize).copied())
+    else {
+        return 0.0;
+    };
+    let (mut sum, mut correction) = (0.0, 0.0);
     for t in &m.triangles {
         let (Some(a), Some(b), Some(c)) = (
             m.vertices.get(t[0] as usize),
@@ -187,9 +201,13 @@ pub fn mesh_volume(m: &Mesh) -> f64 {
         ) else {
             continue;
         };
-        v += dot(*a, cross(*b, *c)) / 6.;
+        let term = dot(sub(*a, origin), cross(sub(*b, origin), sub(*c, origin))) / 6.0;
+        let adjusted = term - correction;
+        let next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
     }
-    v
+    sum
 }
 
 /// Whether every undirected edge is used by exactly two triangles in opposite directions.
@@ -797,11 +815,11 @@ fn loop_on(plane: &Plane, c: &Curve, stop: Stop) -> R<Loop2> {
 // Operations
 // ---------------------------------------------------------------------------------------------
 
-fn brep(body: Body, stop: Stop) -> R<BrepValue> {
+pub(crate) fn brep(body: Body, stop: Stop) -> R<BrepValue> {
     BrepValue::new(body, stop)
 }
 
-fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
+pub(crate) fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
     let mut iter = bodies.into_iter();
     let Some(first) = iter.next() else {
         return Err(format!(
@@ -818,7 +836,7 @@ fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
     brep(acc, stop)
 }
 
-fn positive(what: &str, v: f64) -> R<f64> {
+pub(crate) fn positive(what: &str, v: f64) -> R<f64> {
     if v.is_finite() && v > tol::ABS && v <= limits::MAX_COORDINATE {
         Ok(v)
     } else {
@@ -862,6 +880,19 @@ pub fn sphere(center: P3, radius: f64, stop: Stop) -> R<BrepValue> {
         return Err("球の中心が無効です。".into());
     }
     let body = kernel("球", stop, || sk::sphere(v3(center), r))?;
+    brep(body, stop)
+}
+
+/// Exact ring torus about the Z axis, with dimensions in millimetres.
+pub fn torus(major: f64, minor: f64, stop: Stop) -> R<BrepValue> {
+    stopped(stop)?;
+    let (major, minor) = (positive("大半径", major)?, positive("小半径", minor)?);
+    if major - minor <= tol::ABS || major + minor > limits::MAX_COORDINATE {
+        return Err(
+            "トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。".into(),
+        );
+    }
+    let body = kernel("トーラス", stop, || sk::torus(Vec3::ZERO, major, minor))?;
     brep(body, stop)
 }
 
@@ -1200,7 +1231,7 @@ fn faceted_boolean_preview(
 }
 
 /// Edge pick points: every edge, or the listed edge numbers.
-fn edge_picks(b: &BrepValue, only: &[usize], stop: Stop) -> R<Vec<Vec3>> {
+pub(crate) fn edge_picks(b: &BrepValue, only: &[usize], stop: Stop) -> R<Vec<Vec3>> {
     let edges = kernel("稜線の取得", stop, || {
         b.body().edges(tol::chord(b.body().size()))
     })?;
@@ -1256,10 +1287,24 @@ pub fn shell(b: &BrepValue, thickness: f64, open: Option<usize>, stop: Stop) -> 
             )
         })?],
     };
-    let body = kernel("シェル", stop, || sk::shell(b.body(), &open_at, t)).map_err(|e| {
-        format!("{e}（現在のシェルは平面で囲まれた凸形状に対応しています。曲面の器は「厚みをつける」系のノードを使ってください。）")
-    })?;
-    brep(body, stop)
+    match kernel("シェル", stop, || sk::shell(b.body(), &open_at, t)) {
+        Ok(body) => brep(body, stop),
+        Err(e) if e == STOPPED => Err(e),
+        Err(planar) => {
+            // Curved solids: take the open face away and thicken the rest inward.
+            let face = match open {
+                Some(usize::MAX) => crate::kernel_ops::top_face(b, stop)?,
+                Some(i) => i,
+                None => {
+                    return Err(format!(
+                        "{planar}（閉じたままの中空化は平面の凸形状だけに対応しています。開ける面を選んでください。）"
+                    ));
+                }
+            };
+            crate::kernel_ops::shell_curved(b, t, face, stop)
+                .map_err(|curved| format!("{curved}（平面の方法でも失敗しました: {planar}）"))
+        }
+    }
 }
 
 /// Close the open boundary loops of a surface body with fill faces and sew it into a solid.
@@ -1735,9 +1780,22 @@ fn triangle_triangle(t1: [P3; 3], t2: [P3; 3]) -> Option<(P3, P3)> {
     (alo.max(blo) < ahi.min(bhi)).then_some((lo, hi))
 }
 
+/// Curves where two B-reps' surfaces cross. Closed solids use the kernel's exact intersection
+/// curves (`kernel_ops::exact_intersection`); open sheets fall back to the display meshes.
+pub fn brep_brep(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
+    if a.is_closed() && b.is_closed() {
+        match crate::kernel_ops::exact_intersection(a, b, stop) {
+            Ok(curves) => return Ok(curves),
+            Err(e) if e == STOPPED => return Err(e),
+            Err(_) => {}
+        }
+    }
+    brep_brep_mesh(a, b, stop)
+}
+
 /// Curves where two B-reps' surfaces cross, as polylines chained from their display meshes
 /// (approximate, within [`tol::chord`]).
-pub fn brep_brep(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
+pub fn brep_brep_mesh(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
     let (ma, mb) = (a.preview(), b.preview());
     let size = a.body().size().max(b.body().size());
     // Bin B's triangles in a grid to avoid testing every pair.
