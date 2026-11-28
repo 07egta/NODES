@@ -31,11 +31,18 @@ pub fn parse_xyz(bytes: &[u8], stop: &dyn Fn() -> bool) -> Result<Vec<Point>, St
     let mut result = Vec::new();
     for (i, line) in text.lines().enumerate() {
         tick(i, stop)?;
-        let mut fields = line.split('#').next().unwrap_or_default().split_whitespace();
+        let mut fields = line
+            .split('#')
+            .next()
+            .unwrap_or_default()
+            .split_whitespace();
         let Some(x) = fields.next() else {
             continue;
         };
-        let parse = |s: &str| s.parse::<f64>().map_err(|_| format!("XYZ {} 行目の数値が不正です。", i + 1));
+        let parse = |s: &str| {
+            s.parse::<f64>()
+                .map_err(|_| format!("XYZ {} 行目の数値が不正です。", i + 1))
+        };
         let p = [
             parse(x)?,
             parse(fields.next().ok_or("Y座標がありません。")?)?,
@@ -198,7 +205,10 @@ mod tests {
 
     #[test]
     fn xyz_rejects_bad_rows_and_nonfinite() {
-        assert_eq!(parse_xyz(b"# scan\n1 2 3\n-1 0 4", &|| false).unwrap(), vec![[1., 2., 3.], [-1., 0., 4.]]);
+        assert_eq!(
+            parse_xyz(b"# scan\n1 2 3\n-1 0 4", &|| false).unwrap(),
+            vec![[1., 2., 3.], [-1., 0., 4.]]
+        );
         for bytes in [b"1 2".as_slice(), b"1 2 3 4", b"NaN 0 0", b"inf 0 0"] {
             assert!(parse_xyz(bytes, &|| false).is_err());
         }
@@ -223,9 +233,15 @@ mod tests {
         let tree = KdTree::new(&points, &|| false).unwrap();
         for i in 0..50 {
             let q = [i as f64 / 2., 3.2, 2.1];
-            let (expected, p) = points.iter().enumerate().min_by(|a, b| {
-                distance2(*a.1, q).total_cmp(&distance2(*b.1, q)).then(a.0.cmp(&b.0))
-            }).unwrap();
+            let (expected, p) = points
+                .iter()
+                .enumerate()
+                .min_by(|a, b| {
+                    distance2(*a.1, q)
+                        .total_cmp(&distance2(*b.1, q))
+                        .then(a.0.cmp(&b.0))
+                })
+                .unwrap();
             let (actual, d) = tree.nearest(q, &|| false).unwrap().unwrap();
             assert_eq!(actual, expected);
             assert_eq!(d, distance2(*p, q).sqrt());
@@ -239,7 +255,10 @@ mod tests {
     fn directed_distances_known_translation() {
         let source = [[0., 0., 3.], [10., 0., 4.]];
         let target = [[0., 0., 0.], [10., 0., 0.]];
-        assert_eq!(directed_distances(&source, &target, &|| false).unwrap(), vec![3., 4.]);
+        assert_eq!(
+            directed_distances(&source, &target, &|| false).unwrap(),
+            vec![3., 4.]
+        );
         assert!(directed_distances(&source, &[], &|| false).is_err());
     }
 }
