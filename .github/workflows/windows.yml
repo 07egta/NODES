@@ -78,6 +78,16 @@ jobs:
         run: cargo test --locked --test engine_perf_tests -- --nocapture --test-threads=1
       - name: Build Linux desktop and console applications
         run: cargo build --release --locked --bins
+      - name: Verify portable Japanese project on Linux
+        run: python3 scripts/native_smoke.py --cli target/release/nodes-cli --fixture examples/01.morph --output-dir "$RUNNER_TEMP/native-cli-linux"
+      - name: Upload Linux fixture evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-cli-linux-${{ github.sha }}
+          path: ${{ runner.temp }}/native-cli-linux
+          if-no-files-found: warn
+          retention-days: 14
       - name: Prepare Linux development artifact
         run: |
           package="$RUNNER_TEMP/NODES-linux-x64"
@@ -123,6 +133,17 @@ jobs:
         run: cargo test --all-targets --locked
       - name: Build Windows desktop and console applications
         run: cargo build --release --locked --bins
+      - name: Verify portable Japanese project on Windows
+        shell: pwsh
+        run: python scripts/native_smoke.py --cli target/release/nodes-cli.exe --fixture examples/01.morph --output-dir "$env:RUNNER_TEMP/native-cli-windows"
+      - name: Upload Windows fixture evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-cli-windows-${{ github.sha }}
+          path: ${{ runner.temp }}/native-cli-windows
+          if-no-files-found: warn
+          retention-days: 14
       - name: Prepare development artifact
         shell: pwsh
         run: |
@@ -167,3 +188,62 @@ jobs:
           name: NODES-windows
           path: NODES-windows.zip
           retention-days: 30
+
+  linux-startup:
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: NODES-linux-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/nodes-artifact
+      - name: Install virtual X11 and Mesa runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y xvfb xauth libgl1 libglx-mesa0 libgl1-mesa-dri mesa-utils libxkbcommon0 libxcb-render0 libxcb-shape0 libxcb-xfixes0 libxi6 libxrandr2 libxinerama1 libxcursor1
+      - name: Verify real GUI frame using software OpenGL
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          mkdir "$RUNNER_TEMP/nodes-unpacked"
+          tar -xzf "$RUNNER_TEMP/nodes-artifact/NODES-linux-x64.tar.gz" -C "$RUNNER_TEMP/nodes-unpacked"
+          xvfb-run -a -s "-screen 0 1920x1080x24 +extension GLX" glxinfo -B
+          xvfb-run -a -s "-screen 0 1920x1080x24 +extension GLX" python3 scripts/native_smoke.py --cli "$RUNNER_TEMP/nodes-unpacked/nodes-cli" --gui "$RUNNER_TEMP/nodes-unpacked/NODES" --fixture examples/01.morph --output-dir "$RUNNER_TEMP/native-gui-linux"
+      - name: Upload startup and frame evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-gui-linux-${{ github.sha }}
+          path: ${{ runner.temp }}/native-gui-linux
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-startup:
+    if: github.event_name == 'workflow_dispatch'
+    needs: windows
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: NODES-windows-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/nodes-artifact
+      - name: Attempt real Windows GUI frame (hosted desktop availability may vary)
+        shell: pwsh
+        run: python scripts/native_smoke.py --cli "$env:RUNNER_TEMP/nodes-artifact/nodes-cli.exe" --gui "$env:RUNNER_TEMP/nodes-artifact/NODES.exe" --fixture examples/01.morph --output-dir "$env:RUNNER_TEMP/native-gui-windows"
+      - name: Upload Windows startup evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-gui-windows-${{ github.sha }}
+          path: ${{ runner.temp }}/native-gui-windows
+          if-no-files-found: warn
+          retention-days: 14

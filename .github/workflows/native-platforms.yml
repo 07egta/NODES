@@ -1,0 +1,184 @@
+name: Native platform validation
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/main.rs'
+      - 'src/app.rs'
+      - 'src/platform.rs'
+      - 'src/file_picker.rs'
+      - 'src/theme.rs'
+      - 'src/ui_polish.rs'
+      - 'src/stl_export*.rs'
+      - 'src/viewport.rs'
+      - 'scripts/native_smoke.py'
+      - 'scripts/package_macos.py'
+      - '.github/workflows/native-platforms.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'crates/**'
+      - 'vendor/**'
+      - 'scripts/native_smoke.py'
+      - 'scripts/package_macos.py'
+      - '.github/workflows/native-platforms.yml'
+  workflow_dispatch:
+    inputs:
+      extended:
+        description: 'Also check native Linux ARM64, Windows ARM64 and Intel macOS'
+        type: boolean
+        default: false
+      gui_smoke:
+        description: 'Attempt GUI rendering on hosted macOS (not physical hardware)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: 1.100.0
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_BUILD_JOBS: 2
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-${{ env.RUST_TOOLCHAIN }}-native-v1-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+      - name: Verify native host and record dependencies
+        run: |
+          rustc -vV
+          rustc -vV | grep -Fx 'host: aarch64-apple-darwin'
+          cargo tree --locked --target aarch64-apple-darwin --edges normal,build > "$RUNNER_TEMP/native-dependencies.txt"
+      - name: Formatting and native check
+        run: |
+          cargo fmt --all -- --check
+          cargo check --all-targets --locked
+          cargo clippy --all-targets --locked -- -D warnings
+      - name: Native unit and integration tests
+        run: cargo test --all-targets --locked
+      - name: Build native release binaries
+        run: cargo build --release --locked --bins
+      - name: Verify Japanese project file and STL
+        run: python3 scripts/native_smoke.py --cli target/release/nodes-cli --fixture examples/01.morph --output-dir "$RUNNER_TEMP/native-cli-macos"
+      - name: Package native macOS development app
+        run: python3 scripts/package_macos.py --repo . --bin-dir target/release --output-dir "$RUNNER_TEMP/native-package"
+      - name: Upload development app archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: NODES-macos-arm64-${{ github.sha }}
+          path: ${{ runner.temp }}/native-package/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+      - name: Attempt real GUI frame from bundle
+        if: github.event_name == 'workflow_dispatch' && inputs.gui_smoke
+        run: |
+          python3 scripts/native_smoke.py --cli "$RUNNER_TEMP/native-package/NODES-macos-arm64/nodes-cli" --gui "$RUNNER_TEMP/native-package/NODES-macos-arm64/NODES.app/Contents/MacOS/NODES" --fixture examples/01.morph --output-dir "$RUNNER_TEMP/native-gui-macos"
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-evidence-macos-arm64-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-dependencies.txt
+            ${{ runner.temp }}/native-cli-macos
+            ${{ runner.temp }}/native-gui-macos
+          if-no-files-found: warn
+          retention-days: 14
+
+  secondary-native:
+    if: github.event_name == 'workflow_dispatch' && inputs.extended
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y pkg-config libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libx11-dev libxi-dev libxrandr-dev libxinerama-dev libxcursor-dev libgl1-mesa-dev
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-${{ env.RUST_TOOLCHAIN }}-native-v1-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+      - name: Verify native compiler host
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: |
+          rustc -vV
+          rustc -vV | grep -Fx "host: $EXPECTED_TARGET"
+          cargo tree --locked --target "$EXPECTED_TARGET" --edges normal,build > "$RUNNER_TEMP/native-dependencies.txt"
+      - name: Native check and tests
+        run: |
+          cargo check --all-targets --locked
+          cargo test --all-targets --locked
+      - name: Build native release binaries
+        run: cargo build --release --locked --bins
+      - name: Verify project on native architecture
+        run: |
+          cli=target/release/nodes-cli
+          if [ "$RUNNER_OS" = Windows ]; then cli=target/release/nodes-cli.exe; fi
+          python scripts/native_smoke.py --cli "$cli" --fixture examples/01.morph --output-dir "$RUNNER_TEMP/native-cli"
+      - name: Package Intel macOS development app
+        if: runner.os == 'macOS'
+        run: python3 scripts/package_macos.py --repo . --bin-dir target/release --output-dir "$RUNNER_TEMP/native-package"
+      - name: Upload architecture evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-evidence-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-dependencies.txt
+            ${{ runner.temp }}/native-cli
+            ${{ runner.temp }}/native-package/*.tar.gz
+          if-no-files-found: warn
+          retention-days: 14
