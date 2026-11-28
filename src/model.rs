@@ -385,6 +385,7 @@ pub enum NodeKind {
     MeshConstruct,
     MeshSelfContact,
     MeshThicknessSample,
+    MeshBedFit,
     MeshCompact,
     MeshNonManifold,
     // Mathematical curve nodes: appended to preserve legacy serde names.
@@ -540,6 +541,8 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    GcodeColorChange,
+    GcodeColorGradient,
     // More exact NURBS / SubD nodes (`nurbs_nodes`), appended.
     SubdCageEdit,
     ExactTrimPlane,
@@ -593,14 +596,6 @@ pub enum NodeKind {
     MatterExpansionRatio,
     MatterPlateContact,
     MatterInverseAngle,
-    // GENESIS: append-only stable serialized IDs.
-    GenesisScopes,
-    GenesisScopeIds,
-    GenesisRelief,
-    ExactTorus,
-    // BioMorph growth (append-only serialized IDs).
-    BioSpaceColonization,
-    BioCoiledShell,
     // Ornament nodes: append-only serialized identifiers.
     TruchetPattern,
     AsanohaPattern,
@@ -618,6 +613,7 @@ pub enum NodeKind {
     GenesisScopes,
     GenesisScopeIds,
     GenesisRelief,
+    ExactTorus,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -860,6 +856,7 @@ impl NodeKind {
             Self::MeshConstruct,
             Self::MeshSelfContact,
             Self::MeshThicknessSample,
+            Self::MeshBedFit,
             Self::MeshCompact,
             Self::MeshNonManifold,
             Self::CurveLine,
@@ -1007,6 +1004,8 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::GcodeColorChange,
+            Self::GcodeColorGradient,
             Self::SubdCageEdit,
             Self::ExactTrimPlane,
             Self::ExactFilletVariable,
@@ -1056,12 +1055,6 @@ impl NodeKind {
             Self::MatterExpansionRatio,
             Self::MatterPlateContact,
             Self::MatterInverseAngle,
-            Self::GenesisScopes,
-            Self::GenesisScopeIds,
-            Self::GenesisRelief,
-            Self::ExactTorus,
-            Self::BioSpaceColonization,
-            Self::BioCoiledShell,
             Self::TruchetPattern,
             Self::AsanohaPattern,
             Self::ShippoPattern,
@@ -1076,6 +1069,7 @@ impl NodeKind {
             Self::GenesisScopes,
             Self::GenesisScopeIds,
             Self::GenesisRelief,
+            Self::ExactTorus,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
@@ -1732,6 +1726,7 @@ impl NodeKind {
             | Self::MeshConstruct
             | Self::MeshSelfContact
             | Self::MeshThicknessSample
+            | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other if crate::mathematical_surfaces::is_kind(other) => {

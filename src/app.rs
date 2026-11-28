@@ -712,7 +712,10 @@ impl NodesApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
-                    FileTask::ExportStl | FileTask::ExportObj | FileTask::ExportThreeMf => {
+                    FileTask::ExportStl
+                    | FileTask::ExportObj
+                    | FileTask::ExportPly
+                    | FileTask::ExportThreeMf => {
                         let sources = self.stl_sources();
                         self.stl_export.export_to(&sources, &path);
                         self.flush_stl_notice();
