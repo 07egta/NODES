@@ -1,0 +1,3 @@
+# OMEGA 54 — Intrinsic field laboratory
+
+Base: `c1213c885647c2e708017a63f6b7bdc8f9b66620`. Scope: intrinsic triangle-mesh fields, independent of UV coordinates. Read AGENTS.md, ARCHITECTURE.md, STATUS.md and inspected related PRs #48 (SolidCraft), #94 (implicit fields), #99 (mesh topology), #89 (BioMorph). No changes to other branches or persisted IDs. Rust only, no new dependencies. Initial work: bounded edge-geodesic distance, contour extraction and surface differential operators; analytical regression fixtures and a headless demonstration. Graph integration and CI gates will be tracked explicitly. Local checkout/compiler and network git are unavailable in this session; do not treat tests as passed.
