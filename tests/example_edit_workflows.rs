@@ -106,6 +106,7 @@ example_cases! {
     (math_mobius_strip, "mathematical/mobius_strip.morph", 0, "radius", 36.0, 1, Mesh, false),
     (genesis_facade, "genesis/facade.morph", 1, "tall_height", 20.0, 2, Mesh, false),
     (genesis_sculpture, "genesis/sculpture.morph", 1, "tall_height", 28.0, 2, Mesh, false),
+    (exact_curve_array, "omega43-exact-curve-array.morph", 3, "count", 17.0, 10, Number, false),
 }
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(0);
