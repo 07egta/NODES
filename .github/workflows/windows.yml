@@ -2,6 +2,8 @@ name: Check
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main, "evolve/**", "develop/**", "unify/**"]
   workflow_dispatch:
@@ -30,6 +32,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify and record exact candidate
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          tree=$(git rev-parse 'HEAD^{tree}')
+          parents=$(git show -s --format=%P HEAD)
+          test "$actual" = "$EXPECTED_SHA"
+          if [ "$EVENT_NAME" = pull_request ]; then
+            test "$parents" = "$BASE_SHA $HEAD_SHA"
+          elif [ "$EVENT_NAME" = merge_group ]; then
+            test "$actual" = "$HEAD_SHA"
+          fi
+          {
+            printf '### Exact candidate (%s)\n' "$RUNNER_OS"
+            printf '\nEvent: %s\n\nBase: %s\n\nHead: %s\n\nCheckout: %s\n\nTree: %s\n\nParents: %s\n' "$EVENT_NAME" "$BASE_SHA" "$HEAD_SHA" "$actual" "$tree" "$parents"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Install Rust and quality tools
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
@@ -101,6 +125,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify and record exact candidate
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          tree=$(git rev-parse 'HEAD^{tree}')
+          parents=$(git show -s --format=%P HEAD)
+          test "$actual" = "$EXPECTED_SHA"
+          if [ "$EVENT_NAME" = pull_request ]; then
+            test "$parents" = "$BASE_SHA $HEAD_SHA"
+          elif [ "$EVENT_NAME" = merge_group ]; then
+            test "$actual" = "$HEAD_SHA"
+          fi
+          {
+            printf '### Exact candidate (%s)\n' "$RUNNER_OS"
+            printf '\nEvent: %s\n\nBase: %s\n\nHead: %s\n\nCheckout: %s\n\nTree: %s\n\nParents: %s\n' "$EVENT_NAME" "$BASE_SHA" "$HEAD_SHA" "$actual" "$tree" "$parents"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
