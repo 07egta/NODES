@@ -59,3 +59,4 @@ pub mod surface_kernel;
 pub mod surface_nodes;
 
 pub mod xpbd;
+pub mod spatial_cells;
