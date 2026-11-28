@@ -604,6 +604,10 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
     // Ornament nodes: append-only serialized identifiers.
     TruchetPattern,
     AsanohaPattern,
@@ -622,6 +626,8 @@ pub enum NodeKind {
     GenesisScopeIds,
     GenesisRelief,
     ExactTorus,
+    OrigamiMiura,
+    OrigamiMiuraCreases,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -1070,6 +1076,10 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
             Self::TruchetPattern,
             Self::AsanohaPattern,
             Self::ShippoPattern,
@@ -1085,6 +1095,8 @@ impl NodeKind {
             Self::GenesisScopeIds,
             Self::GenesisRelief,
             Self::ExactTorus,
+            Self::OrigamiMiura,
+            Self::OrigamiMiuraCreases,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
@@ -1695,6 +1707,7 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::OrigamiMiura | Self::OrigamiMiuraCreases => crate::origami::spec(self),
             Self::Reroute => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "リルート点",
@@ -1715,6 +1728,7 @@ impl NodeKind {
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             other if crate::bio_patterns::is_kind(other) => crate::bio_patterns::spec(other),
+            other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
             other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea

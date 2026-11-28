@@ -105,6 +105,11 @@ pub const TEMPLATES: &[Template] = &[
         description: "ばらまいた点から、点ごとの縄張りの線を作ります。個数とシードを変えると模様が変わります。",
         tag: "くり返す",
     },
+    Template {
+        name: "ミウラ折りの可動外装",
+        description: "折り率を動かして、辺長を保つ薄い折り紙パネルの変形を観察します。",
+        tag: "折り紙",
+    },
 ];
 
 fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
@@ -743,6 +748,10 @@ fn build(index: usize) -> Result<Project, String> {
             )?;
             graph.connect(points, cells, "points")?;
             finish(&mut graph, cells, [560.0, 30.0])?;
+        }
+        19 => {
+            let sheet = add(&mut graph, NodeKind::OrigamiMiura, [20.0, 30.0], &[])?;
+            finish(&mut graph, sheet, [300.0, 30.0])?;
         }
         _ => {
             let base = add(

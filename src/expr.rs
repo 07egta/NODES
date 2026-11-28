@@ -2,7 +2,8 @@
 //!
 //! Variables are `x`, `y`, `z` and `w`; constants are `pi` and `e`. Operators are
 //! `+ - * / % ^` (with `^` right-associative and binding tighter than unary minus).
-//! Functions: sin cos tan sqrt abs min max floor ceil round ln exp (angles in radians).
+//! Functions include trigonometry (radians), roots, logarithms, hyperbolic
+//! functions, bounded interpolation and smoothstep. See the user guide.
 //! There are no loops, no user functions and no recursion beyond the parser's fixed
 //! depth, so any input terminates quickly. Full-width characters typed through a
 //! Japanese IME are accepted and normalised first.
@@ -39,6 +40,22 @@ pub enum Func {
     Round,
     Ln,
     Exp,
+    Asin,
+    Acos,
+    Atan,
+    Atan2,
+    Sinh,
+    Cosh,
+    Tanh,
+    Cbrt,
+    Hypot,
+    Log2,
+    Log10,
+    Log1p,
+    Expm1,
+    Clamp,
+    Lerp,
+    Smoothstep,
 }
 impl Func {
     fn from_name(name: &str) -> Option<Self> {
@@ -55,12 +72,29 @@ impl Func {
             "round" => Self::Round,
             "ln" => Self::Ln,
             "exp" => Self::Exp,
+            "asin" => Self::Asin,
+            "acos" => Self::Acos,
+            "atan" => Self::Atan,
+            "atan2" => Self::Atan2,
+            "sinh" => Self::Sinh,
+            "cosh" => Self::Cosh,
+            "tanh" => Self::Tanh,
+            "cbrt" => Self::Cbrt,
+            "hypot" => Self::Hypot,
+            "log2" => Self::Log2,
+            "log10" => Self::Log10,
+            "log1p" => Self::Log1p,
+            "expm1" => Self::Expm1,
+            "clamp" => Self::Clamp,
+            "lerp" => Self::Lerp,
+            "smoothstep" => Self::Smoothstep,
             _ => return None,
         })
     }
     fn arity(self) -> usize {
         match self {
-            Self::Min | Self::Max => 2,
+            Self::Min | Self::Max | Self::Atan2 | Self::Hypot => 2,
+            Self::Clamp | Self::Lerp | Self::Smoothstep => 3,
             _ => 1,
         }
     }
@@ -289,14 +323,16 @@ impl Parser {
                     let mut args = Vec::new();
                     loop {
                         args.push(self.additive(depth + 1)?);
-                        if matches!(self.peek(), Some(Tok::Comma)) {
-                            self.pos += 1;
-                        } else {
+                        if !matches!(self.peek(), Some(Tok::Comma)) {
                             break;
                         }
-                        if args.len() > 2 {
-                            break;
+                        if args.len() == func.arity() {
+                            return Err(format!(
+                                "関数「{name}」には値が {} 個必要です。",
+                                func.arity()
+                            ));
                         }
+                        self.pos += 1;
                     }
                     self.expect_close()?;
                     if args.len() != func.arity() {
@@ -366,8 +402,8 @@ impl Expr {
     /// its domain, and any non-finite intermediate result are errors, never NaN.
     pub fn eval(&self, vars: [f64; 4]) -> Result<f64, String> {
         match self {
-            Self::Num(v) => Ok(*v),
-            Self::Var(i) => Ok(vars.get(*i).copied().unwrap_or(0.)),
+            Self::Num(v) => finite(*v),
+            Self::Var(i) => finite(*vars.get(*i).ok_or(SYNTAX)?),
             Self::Neg(e) => Ok(-e.eval(vars)?),
             Self::Bin(op, l, r) => {
                 let x = l.eval(vars)?;
@@ -401,7 +437,10 @@ impl Expr {
                 finite(v)
             }
             Self::Call(func, args) => {
-                let x = args.first().ok_or(SYNTAX)?.eval(vars)?;
+                if args.len() != func.arity() {
+                    return Err(SYNTAX.into());
+                }
+                let x = args[0].eval(vars)?;
                 let v = match func {
                     Func::Sin => x.sin(),
                     Func::Cos => x.cos(),
@@ -431,6 +470,55 @@ impl Expr {
                         x.ln()
                     }
                     Func::Exp => x.exp(),
+                    Func::Asin => x.asin(),
+                    Func::Acos => x.acos(),
+                    Func::Atan => x.atan(),
+                    Func::Atan2 => x.atan2(args[1].eval(vars)?),
+                    Func::Sinh => x.sinh(),
+                    Func::Cosh => x.cosh(),
+                    Func::Tanh => x.tanh(),
+                    Func::Cbrt => x.cbrt(),
+                    Func::Hypot => x.hypot(args[1].eval(vars)?),
+                    Func::Log2 => x.log2(),
+                    Func::Log10 => x.log10(),
+                    Func::Log1p => x.ln_1p(),
+                    Func::Expm1 => x.exp_m1(),
+                    Func::Clamp => {
+                        let lo = args[1].eval(vars)?;
+                        let hi = args[2].eval(vars)?;
+                        if lo > hi {
+                            return Err("clamp の下限は上限以下にしてください。".into());
+                        }
+                        x.clamp(lo, hi)
+                    }
+                    Func::Lerp => {
+                        let b = args[1].eval(vars)?;
+                        let t = args[2].eval(vars)?;
+                        crate::number_interpolation::lerp(x, b, t)
+                    }
+                    Func::Smoothstep => {
+                        let lo = args[1].eval(vars)?;
+                        let hi = args[2].eval(vars)?;
+                        if lo >= hi {
+                            return Err("smoothstep の下限は上限より小さくしてください。".into());
+                        }
+                        if x <= lo {
+                            0.
+                        } else if x >= hi {
+                            1.
+                        } else {
+                            let span = hi - lo;
+                            let t = if span.is_finite() {
+                                (x - lo) / span
+                            } else {
+                                // Finite opposite-sign endpoints can have an infinite span.
+                                // Halve before subtraction so the ratio stays representable.
+                                (x * 0.5 - lo * 0.5) / (hi * 0.5 - lo * 0.5)
+                            };
+                            let t = t.clamp(0., 1.);
+                            t * t * (3. - 2. * t)
+                        }
+                    }
                 };
                 finite(v)
             }

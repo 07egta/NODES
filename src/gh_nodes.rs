@@ -124,7 +124,7 @@ static REMAP: NodeSpec = NodeSpec {
 static EXPRESSION: NodeSpec = NodeSpec {
     label: "式",
     category: "数値",
-    description: "x・y・z・w を使った数式を計算します（例: sin(x) * 10 + y）。式は設定パネルで書きます。使える関数: sin cos tan sqrt abs min max floor ceil round ln exp、記号 + - * / % ^ と pi・e。角度はラジアンです。",
+    description: "x・y・z・w を使った数式を計算します（例: sin(x) * 10 + y）。式は設定パネルで書きます。三角・逆三角・双曲線関数、根、対数、hypot、clamp、lerp、smoothstep など。記号 + - * / % ^ と pi・e。角度はラジアンです。",
     keywords: "expression formula equation math evaluate 式 数式 計算 関数",
     inputs: &[
         n("x", "x", 1., -1e6, 1e6, 0.1),

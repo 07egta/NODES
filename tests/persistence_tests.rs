@@ -328,9 +328,9 @@ fn templates_evaluate_and_solid_presets_are_closed() {
         for (id, output) in &result.outputs {
             assert!(output.is_ok(), "template {index}, node {id}: {output:?}");
         }
-        if index == 3 || index == 18 {
+        if index == 3 || index == 18 || index == 19 {
             continue;
-        } // The helix and the Voronoi lines are intentionally curves.
+        } // The helix and the Voronoi lines are intentionally curves; the Miura sheet is an open surface.
         let trees: Vec<_> = project
             .graph
             .nodes

@@ -2,6 +2,7 @@
 //! the separate NODES GUI binary intentionally uses the Windows GUI subsystem.
 use nodes::diagnostics::{self, DiagnosticReport};
 use nodes::engine::Evaluation;
+use nodes::ghx;
 use nodes::graph_api::{self, Request};
 use nodes::model::{NodeKind, Tree, Value};
 use nodes::node_package::Package;
@@ -31,6 +32,8 @@ Usage:
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
+  nodes-cli inspect-ghx INPUT.ghx REPORT.json
+  nodes-cli convert-ghx INPUT.ghx OUTPUT.morph
   nodes-cli pack-part MANIFEST.json PART.morphpart OUTPUT.nodespkg
   nodes-cli inspect-package PACKAGE.nodespkg
   nodes-cli unpack-part PACKAGE.nodespkg OUTPUT.morphpart
@@ -46,8 +49,9 @@ build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
 export-stl requires explicit, enabled, nonempty Output nodes containing only Mesh.
 Scripts, expressions, imports, clusters and external plugins are unavailable for Graph API evaluation.
+GHX inspection writes an inert report; conversion evaluates the supported scalar subset.
 Package commands inspect or copy data-only Cluster parts without evaluating them.
-Request limit: 1 MiB. Project limit: 8 MiB. Parent output directories must exist.
+Request limit: 1 MiB. Project and GHX limit: 8 MiB. Parent output directories must exist.
 ";
 
 #[derive(Debug)]
@@ -372,7 +376,8 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
         "validate" | "evaluate" | "diagnose" | "inspect-package" => 1,
-        "build" | "export-stl" | "diff" | "diff-content" | "unpack-part" => 2,
+        "build" | "export-stl" | "diff" | "diff-content" | "inspect-ghx" | "convert-ghx"
+        | "unpack-part" => 2,
         "apply" | "pack-part" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
@@ -428,6 +433,33 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             let mut result = save_evaluated(&project, Path::new(&arguments[2]))?;
             result["node_ids"] = json!(aliases);
             Ok(result)
+        }
+        "inspect-ghx" => {
+            let input = Path::new(&arguments[0]);
+            let destination = Path::new(&arguments[1]);
+            ghx::inspect_file(input, destination)
+                .map_err(|message| problem("ghx_inspection_failed", message))?;
+            Ok(json!({
+                "destination": destination.to_string_lossy(),
+                "evaluation_performed": false
+            }))
+        }
+        "convert-ghx" => {
+            let input = Path::new(&arguments[0]);
+            let destination = Path::new(&arguments[1]);
+            if !destination
+                .extension()
+                .and_then(|v| v.to_str())
+                .is_some_and(|s| s.eq_ignore_ascii_case("morph"))
+            {
+                return Err(problem(
+                    "invalid_destination",
+                    "GHX conversion output must be .morph.",
+                ));
+            }
+            let project = ghx::convert_path(input)
+                .map_err(|message| problem("ghx_conversion_failed", message))?;
+            save_evaluated(&project, destination)
         }
         "pack-part" => {
             let package = Package::pack_files(Path::new(&arguments[0]), Path::new(&arguments[1]))
