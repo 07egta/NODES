@@ -958,10 +958,13 @@ pub fn offset(m: &Mesh, distance: f64, stop: Stop) -> Result<Mesh, String> {
         .zip(&n)
         .map(|(p, n)| add(*p, mul(*n, distance)))
         .collect();
-    Ok(Mesh {
+    let result = Mesh {
         vertices,
         triangles: m.triangles.clone(),
-    })
+    };
+    check_offset_faces(m, &result.vertices, stop)?;
+    check_contacts(&result, stop)?;
+    Ok(result)
 }
 /// Turn a surface into a solid shell. The outer skin is `outer` along the normal and the
 /// inner skin `inner` (outer > inner); open edges get side walls. Closed meshes become
@@ -976,6 +979,11 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
     }
     let nv = m.vertices.len();
     let edges = edge_map(&m.triangles, stop)?;
+    if edges.values().any(|u| {
+        u.len() > 2 || (u.len() == 2 && u[0].from == u[1].from)
+    }) {
+        return Err("厚み付けには向きの整った多様体メッシュが必要です。".into());
+    }
     let open: Vec<&EdgeUse> = edges
         .values()
         .filter_map(|u| match u.as_slice() {
@@ -998,6 +1006,8 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
             .zip(&n)
             .map(|(p, n)| add(*p, mul(*n, inner))),
     );
+    check_offset_faces(m, &vertices[..nv], stop)?;
+    check_offset_faces(m, &vertices[nv..], stop)?;
     let off = nv as u32;
     let mut triangles = m.triangles.clone();
     triangles.extend(
@@ -1010,10 +1020,54 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
         triangles.push([b, a, a + off]);
         triangles.push([b, a + off, b + off]);
     }
-    Ok(Mesh {
+    let result = Mesh {
         vertices,
         triangles,
-    })
+    };
+    raw_check(&result, stop)?;
+    let audit = crate::mesh_fabrication::audit(&result, stop)?;
+    if !audit.closed_oriented() || audit.duplicate_vertices != 0 || audit.isolated_vertices != 0 {
+        return Err("厚み付け結果は閉じた有効な多様体ではありません。厚みを見直してください。".into());
+    }
+    check_contacts(&result, stop)?;
+    Ok(result)
+}
+
+// Conservative local fold guard along the straight vertex interpolation.
+// A positive projected area throughout the path is necessary for this guard,
+// but is not a certificate of global injectivity or exact offset distance.
+fn check_offset_faces(m: &Mesh, target: &[P], stop: Stop) -> Result<(), String> {
+    for (i, t) in m.triangles.iter().enumerate() {
+        tick(i, stop)?;
+        let [a, b, c] = t.map(|v| m.vertices[v as usize]);
+        let [x, y, z] = t.map(|v| target[v as usize]);
+        let e = sub(b, a);
+        let f = sub(c, a);
+        let de = sub(sub(y, x), e);
+        let df = sub(sub(z, x), f);
+        let n = unit(cross(e, f)).ok_or("退化面があるためオフセットできません。")?;
+        let q0 = dot(n, cross(e, f));
+        let q1 = dot(n, add(cross(de, f), cross(e, df)));
+        let q2 = dot(n, cross(de, df));
+        let mut minimum = q0.min(q0 + q1 + q2);
+        if q2 > 0. {
+            let t = (-q1 / (2. * q2)).clamp(0., 1.);
+            minimum = minimum.min(q0 + t * (q1 + t * q2));
+        }
+        if !minimum.is_finite() || minimum <= q0 * 1e-10 {
+            return Err("オフセット途中に面の反転または退化の可能性があります。厚みを見直してください。".into());
+        }
+    }
+    Ok(())
+}
+
+fn check_contacts(m: &Mesh, stop: Stop) -> Result<(), String> {
+    raw_check(m, stop)?;
+    let contacts = crate::mesh_geometry_checks::nonadjacent_contacts(m, stop)?;
+    if contacts != 0 {
+        return Err(format!("オフセット結果に非隣接面の接触候補が {contacts} 件あります。厚みを見直してください。"));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1225,4 +1279,21 @@ mod tests {
         assert!(remesh(&bad, 1., 1, GO).is_err());
         assert!(fill_holes(&bad, 10, GO).is_err());
     }
+    #[test]
+    fn offset_rejects_collapsed_or_crossing_shells() {
+        let m = Mesh {
+            vertices: vec![
+                [0., 0., 0.], [2., 0., 0.], [0., 2., 0.],
+                [0., 0., 0.5], [2., 0., 0.5], [0., 2., 0.5],
+            ],
+            triangles: vec![[0, 1, 2], [3, 5, 4]],
+        };
+        assert!(thicken(&m, 0.1, -0.1, GO).is_ok());
+        assert!(thicken(&m, 0.25, -0.25, GO).is_err());
+        let mut reversed = grid(1, 1.);
+        reversed.vertices.swap(0, 1);
+        let original = grid(1, 1.);
+        assert!(check_offset_faces(&original, &reversed.vertices, GO).is_err());
+    }
+
 }
