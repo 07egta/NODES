@@ -60,6 +60,7 @@ pub fn uses_list_access(kind: NodeKind) -> bool {
         || crate::generative::is_list(kind)
         || crate::nodes_shape::is_list_kind(kind)
         || crate::nurbs_nodes::is_list_kind(kind)
+        || crate::physics_nodes::is_list_kind(kind)
 }
 
 /// Return the actual input-access contract, or None for a nonexistent port.
@@ -73,7 +74,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
     let access = match kind {
         Script | Cluster => Custom,
         ImportMesh => FirstItem,
-        Output | Flatten | Graft => Tree,
+        Output | Reroute | Flatten | Graft => Tree,
         k if crate::gcode_nodes::is_kind(k) => Tree,
         MergeTree | EntwineTree | UnflattenTree => Tree,
         TreeBranch | TreeItem if index == 0 => Tree,
@@ -90,6 +91,13 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         Loft => FirstItem,
         MeshConstruct => List,
         ExactNetworkSurface if index <= 1 => List,
+        k if crate::physics_nodes::is_list_kind(k) => {
+            if crate::physics_nodes::input_is_list(k, index) {
+                List
+            } else {
+                FirstItem
+            }
+        }
         SubdCageEdit => Tree,
         ExactStepExport => Tree,
         CurveWeightedNurbs if index <= 2 => List,

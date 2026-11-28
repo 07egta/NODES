@@ -15,6 +15,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 const WIDTH: f32 = 218.0;
 const HEADER: f32 = 43.0;
 const ROW: f32 = 28.0;
+/// Size of a reroute dot, which is drawn small instead of as a full card.
+const DOT_W: f32 = 34.0;
+const DOT_H: f32 = 26.0;
 /// Snap grid in world units (matches the dot grid drawn at zoom 1).
 pub const GRID: f32 = 24.0;
 /// How many numeric inputs of a card are drawn as sliders.
@@ -122,10 +125,7 @@ impl MinimapDrawing {
         options: TessellationOptions,
     ) -> Option<Self> {
         let bounds = nodes.iter().fold(Rect::NOTHING, |bounds, node| {
-            bounds.union(Rect::from_min_size(
-                node.position.into(),
-                egui::vec2(WIDTH, height(node)),
-            ))
+            bounds.union(Rect::from_min_size(node.position.into(), node_size(node)))
         });
         if !bounds.is_positive() {
             return None;
@@ -149,7 +149,8 @@ impl MinimapDrawing {
         let mut mesh = egui::Mesh::default();
         for node in nodes {
             let start = drawing.project(node.position.into());
-            let size = egui::vec2((WIDTH * scale).max(1.), (height(node) * scale).max(1.));
+            let full = node_size(node);
+            let size = egui::vec2((full.x * scale).max(1.), (full.y * scale).max(1.));
             let color = if selected.contains(&node.id) {
                 theme::teal()
             } else {
@@ -197,7 +198,7 @@ fn group_rect(p: &Project, indices: &NodeIndices, members: &[NodeId], rect: Rect
             let n = &p.graph.nodes[index];
             bounds = bounds.union(Rect::from_min_size(
                 to_screen(n.position, rect, p.pan, p.zoom),
-                egui::vec2(WIDTH, height(n)) * p.zoom,
+                node_size(n) * p.zoom,
             ));
         }
     }
@@ -220,7 +221,18 @@ fn note_fill() -> Color32 {
 }
 
 fn height(node: &Node) -> f32 {
+    if node.kind == NodeKind::Reroute {
+        return DOT_H;
+    }
     HEADER + ROW * node.kind.spec().inputs.len() as f32 + 27.0
+}
+
+fn node_size(node: &Node) -> Vec2 {
+    if node.kind == NodeKind::Reroute {
+        egui::vec2(DOT_W, DOT_H)
+    } else {
+        egui::vec2(WIDTH, height(node))
+    }
 }
 
 fn parameter_number(
@@ -264,6 +276,14 @@ fn to_world(screen: Pos2, rect: Rect, pan: [f32; 2], zoom: f32) -> [f32; 2] {
     [p.x, p.y]
 }
 fn output_pos(n: &Node, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
+    if n.kind == NodeKind::Reroute {
+        return to_screen(
+            [n.position[0] + DOT_W, n.position[1] + DOT_H / 2.],
+            rect,
+            pan,
+            zoom,
+        );
+    }
     to_screen(
         [n.position[0] + WIDTH, n.position[1] + HEADER + 14.],
         rect,
@@ -272,6 +292,9 @@ fn output_pos(n: &Node, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     )
 }
 fn input_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
+    if n.kind == NodeKind::Reroute {
+        return to_screen([n.position[0], n.position[1] + DOT_H / 2.], rect, pan, zoom);
+    }
     to_screen(
         [
             n.position[0],
@@ -325,7 +348,7 @@ impl GraphCanvas {
             }
             bounds = bounds.union(Rect::from_min_size(
                 egui::pos2(n.position[0], n.position[1]),
-                egui::vec2(WIDTH, height(n)),
+                node_size(n),
             ));
         }
         if bounds.is_positive() {
@@ -381,6 +404,50 @@ impl GraphCanvas {
         }
     }
 
+    /// Align the selected cards by `edge` (0 = left/top, 1 = centre, 2 = right/bottom) on `axis`
+    /// (0 = horizontal, 1 = vertical), using each card's real size.
+    pub fn align_selected_edge(&self, p: &mut Project, axis: usize, edge: u8) {
+        if axis > 1 || edge > 2 || self.selected.len() < 2 {
+            return;
+        }
+        let size_of = |n: &Node| if axis == 0 { WIDTH } else { height(n) };
+        let cards: Vec<(NodeId, f32)> = p
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| self.selected.contains(&n.id))
+            .map(|n| (n.id, size_of(n)))
+            .collect();
+        if cards.len() < 2 {
+            return;
+        }
+        let at = |p: &Project, id: NodeId| p.graph.node(id).map_or(0., |n| n.position[axis]);
+        let target = match edge {
+            0 => cards
+                .iter()
+                .map(|c| at(p, c.0))
+                .fold(f32::INFINITY, f32::min),
+            2 => cards
+                .iter()
+                .map(|c| at(p, c.0) + c.1)
+                .fold(f32::NEG_INFINITY, f32::max),
+            _ => cards.iter().map(|c| at(p, c.0) + c.1 / 2.).sum::<f32>() / cards.len() as f32,
+        };
+        if !target.is_finite() {
+            return;
+        }
+        for (id, size) in cards {
+            let shift = match edge {
+                0 => 0.,
+                2 => size,
+                _ => size / 2.,
+            };
+            if let Some(node) = p.graph.node_mut(id) {
+                node.position[axis] = (target - shift).clamp(-1e6, 1e6);
+            }
+        }
+    }
+
     /// Equalize the gaps between selected card bounds, rather than their centers.
     pub fn distribute_selected(&self, p: &mut Project, axis: usize) {
         if axis > 1 {
@@ -395,7 +462,7 @@ impl GraphCanvas {
                 (
                     n.id,
                     n.position[axis],
-                    if axis == 0 { WIDTH } else { height(n) },
+                    if axis == 0 { node_size(n).x } else { height(n) },
                 )
             })
             .collect();
@@ -488,7 +555,7 @@ impl GraphCanvas {
             card_under |= p.graph.nodes.iter().any(|n| {
                 Rect::from_min_size(
                     to_screen(n.position, rect, p.pan, zoom),
-                    egui::vec2(WIDTH, height(n)) * zoom,
+                    node_size(n) * zoom,
                 )
                 .expand(12.)
                 .contains(pos)
@@ -561,7 +628,7 @@ impl GraphCanvas {
                 for n in &p.graph.nodes {
                     let nr = Rect::from_min_size(
                         to_screen(n.position, rect, p.pan, zoom),
-                        egui::vec2(WIDTH, height(n)) * zoom,
+                        node_size(n) * zoom,
                     );
                     if box_rect.intersects(nr) {
                         self.selected.insert(n.id);
@@ -573,6 +640,7 @@ impl GraphCanvas {
         }
         let mut to_connect = None;
         let mut to_disconnect = None;
+        let mut to_insert: Option<(NodeId, NodeId, String, Pos2)> = None;
         for n in &p.graph.nodes {
             for (key, from) in &n.inputs {
                 if let (Some(source_index), Some(index)) = (
@@ -586,6 +654,15 @@ impl GraphCanvas {
                         continue;
                     }
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
+                    // Per-input wire display (Grasshopper: Default / Faint / Hidden).
+                    let display = n
+                        .params
+                        .get(&format!("{}{key}", nodes::data_tree::WIRE_PREFIX))
+                        .copied()
+                        .unwrap_or(0.);
+                    if display == 2. && !selected {
+                        continue;
+                    }
                     let color = if theme::is_melt() {
                         melt::wire_color(src.kind.spec().output, selected)
                     } else if selected {
@@ -597,7 +674,33 @@ impl GraphCanvas {
                         .and_then(|e| e.outputs.get(from))
                         .and_then(|r| r.as_ref().ok())
                         .map(data_view::shape_of);
+                    let color = if display == 1. && !selected {
+                        color.gamma_multiply(0.35)
+                    } else {
+                        color
+                    };
                     wire(&painter, a, b, shape, color, selected, p.zoom);
+                    // Hovering the middle of a wire offers a reroute dot at that spot.
+                    if self.connecting.is_none()
+                        && !over_map
+                        && let Some(pos) = pointer
+                    {
+                        let mid = a.lerp(b, 0.5);
+                        if pos.distance(mid) < 14. {
+                            painter.circle_stroke(mid, 6., Stroke::new(1.4_f32, theme::teal()));
+                            painter.circle_filled(mid, 2., theme::teal());
+                            let hit = ui
+                                .interact(
+                                    Rect::from_center_size(mid, egui::vec2(18., 18.)),
+                                    Id::new(("wire_dot", n.id, key.as_str())),
+                                    Sense::click(),
+                                )
+                                .on_hover_text("クリックで中継点（リルート点）を置く");
+                            if hit.clicked() {
+                                to_insert = Some((*from, n.id, key.clone(), mid));
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -610,7 +713,7 @@ impl GraphCanvas {
             .filter_map(|(index, n)| {
                 let bounds = Rect::from_min_size(
                     to_screen(n.position, rect, p.pan, p.zoom),
-                    egui::vec2(WIDTH, height(n)) * p.zoom,
+                    node_size(n) * p.zoom,
                 );
                 bounds
                     .expand(28.)
@@ -629,6 +732,107 @@ impl GraphCanvas {
                 .filter(|_| !stale && !n.off)
                 .and_then(|e| e.outputs.get(&n.id))
                 .and_then(|r| r.as_ref().err());
+            if n.kind == NodeKind::Reroute {
+                // A reroute dot: a small pill with an input on the left and an output on the right.
+                let centre = nr.center();
+                let ring = if selected {
+                    theme::teal()
+                } else if error.is_some() {
+                    theme::error()
+                } else {
+                    theme::card_border()
+                };
+                painter.rect_filled(nr, 13, theme::card_bg());
+                painter.rect_stroke(
+                    nr,
+                    13,
+                    Stroke::new(if selected { 2. } else { 1_f32 }, ring),
+                    egui::StrokeKind::Inside,
+                );
+                painter.circle_filled(centre, 4.4 * p.zoom, col);
+                let body = ui.interact(
+                    Rect::from_center_size(centre, egui::vec2(DOT_W - 14., DOT_H) * p.zoom),
+                    Id::new(("node_header", n.id)),
+                    Sense::click_and_drag(),
+                );
+                if body.clicked() && !over_map {
+                    if ui.input(|i| i.modifiers.shift) {
+                        if !self.selected.remove(&n.id) {
+                            self.selected.insert(n.id);
+                        }
+                    } else {
+                        self.select_only(n.id);
+                    }
+                }
+                if body.drag_started() && !pan_active && !over_map {
+                    if !selected {
+                        self.select_only(n.id);
+                    }
+                    self.dragging = Some(n.id);
+                }
+                if body.dragged() && self.dragging == Some(n.id) && !pan_active && !over_map {
+                    let d = ui.input(|i| i.pointer.delta()) / p.zoom;
+                    for id in &self.selected {
+                        if let Some(index) = self.node_indices.get(*id) {
+                            let m = &mut p.graph.nodes[index];
+                            m.position[0] = (m.position[0] + d.x).clamp(-1e6, 1e6);
+                            m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
+                        }
+                    }
+                }
+                if body.drag_stopped() && self.dragging == Some(n.id) && self.snap {
+                    self.snap_selected(p);
+                }
+                body.on_hover_text("リルート点 · ドラッグで移動 · Delete で削除");
+                let linked = n.inputs.contains_key("value");
+                let ip = input_pos(n, 0, rect, p.pan, p.zoom);
+                let port_col = theme::port_color(nodes::model::DataType::Any);
+                melt::port_marker(
+                    &painter,
+                    ip,
+                    4. * p.zoom,
+                    nodes::model::DataType::Any,
+                    if linked { port_col } else { theme::card_bg() },
+                    port_col,
+                    1.4,
+                );
+                let pr = ui.interact(
+                    Rect::from_center_size(ip, egui::vec2(16., 24.) * p.zoom.max(0.6)),
+                    Id::new(("in", n.id, "value")),
+                    Sense::click_and_drag(),
+                );
+                if !over_map
+                    && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
+                    && self.connecting.is_some()
+                {
+                    to_connect = self.connecting.take().map(|from| (from, n.id, "value"));
+                }
+                if pr.secondary_clicked() && linked && !over_map {
+                    to_disconnect = Some((n.id, "value"));
+                }
+                let op = output_pos(n, rect, p.pan, p.zoom);
+                melt::port_marker(
+                    &painter,
+                    op,
+                    4. * p.zoom,
+                    nodes::model::DataType::Any,
+                    port_col,
+                    port_col,
+                    1.0,
+                );
+                let or = ui.interact(
+                    Rect::from_center_size(op, egui::vec2(16., 24.) * p.zoom.max(0.6)),
+                    Id::new(("out", n.id)),
+                    Sense::click_and_drag(),
+                );
+                if !over_map && (or.clicked() || or.drag_started()) {
+                    self.connecting = Some(n.id);
+                }
+                if !over_map && or.drag_started() {
+                    self.wire_drag = true;
+                }
+                continue;
+            }
             painter.rect_filled(
                 nr.translate(egui::vec2(0., 3.)),
                 9,
@@ -895,8 +1099,15 @@ impl GraphCanvas {
                 {
                     to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
                 }
-                if pr.secondary_clicked() && linked && !over_map {
-                    to_disconnect = Some((n.id, spec.key));
+                if !over_map {
+                    // Right-click menu, like Grasshopper's parameter menu.
+                    let mut cut = false;
+                    pr.context_menu(|ui| {
+                        cut = port_menu(ui, &mut p.graph.nodes[*node_index], spec.key, linked);
+                    });
+                    if cut {
+                        to_disconnect = Some((n.id, spec.key));
+                    }
                 }
                 pr.on_hover_text(format!(
                     "{} · {}{}{}",
@@ -1080,6 +1291,26 @@ impl GraphCanvas {
         }
         if let Some((to, key)) = to_disconnect {
             p.graph.disconnect(to, key);
+        }
+        if let Some((from, to, key, at)) = to_insert {
+            let world = to_world(at, rect, p.pan, p.zoom);
+            let position = [world[0] - DOT_W / 2., world[1] - DOT_H / 2.];
+            match p.graph.add(NodeKind::Reroute, position) {
+                Ok(id) => {
+                    let linked = p
+                        .graph
+                        .connect(from, id, "value")
+                        .and_then(|()| p.graph.connect(id, to, &key));
+                    match linked {
+                        Ok(()) => self.select_only(id),
+                        Err(e) => {
+                            p.graph.nodes.retain(|m| m.id != id);
+                            out.error = Some(e);
+                        }
+                    }
+                }
+                Err(e) => out.error = Some(e),
+            }
         }
         // A wire released on empty canvas (not on a port or a card) opens the node search,
         // and the chosen node gets connected to the wire's source.
@@ -1617,6 +1848,60 @@ fn dashed_wire_shapes(
         phase = (phase + length).rem_euclid(period);
     }
     shapes
+}
+
+/// Right-click menu of an input port: how the data is handled (Flatten, Graft,
+/// Simplify, Reverse) and how the wire is drawn. Returns `true` to disconnect.
+fn port_menu(ui: &mut egui::Ui, node: &mut Node, key: &str, linked: bool) -> bool {
+    use nodes::data_tree::{PORT_PREFIX, WIRE_PREFIX};
+    let mut cut = false;
+    if nodes::data_tree_nodes::supports_transform(node.kind) {
+        ui.label(theme::small("データの扱い"));
+        let tkey = format!("{PORT_PREFIX}{key}");
+        let current = node.params.get(&tkey).copied().unwrap_or(0.);
+        for (value, label) in [
+            (0., "そのまま"),
+            (1., "Flatten（1本のリストにする）"),
+            (2., "Graft（1個ずつ枝にする）"),
+            (3., "Simplify（共通の枝番号を省く）"),
+            (4., "Reverse（各リストを逆順）"),
+        ] {
+            if ui.selectable_label(current == value, label).clicked() {
+                if value == 0. {
+                    node.params.remove(&tkey);
+                } else {
+                    node.params.insert(tkey.clone(), value);
+                }
+                ui.close();
+            }
+        }
+        ui.separator();
+    }
+    ui.label(theme::small("ワイヤの表示"));
+    let wkey = format!("{WIRE_PREFIX}{key}");
+    let current = node.params.get(&wkey).copied().unwrap_or(0.);
+    for (value, label) in [
+        (0., "標準"),
+        (1., "うっすら（選ぶと濃くなる）"),
+        (2., "非表示（選ぶと見える）"),
+    ] {
+        if ui.selectable_label(current == value, label).clicked() {
+            if value == 0. {
+                node.params.remove(&wkey);
+            } else {
+                node.params.insert(wkey.clone(), value);
+            }
+            ui.close();
+        }
+    }
+    if linked {
+        ui.separator();
+        if ui.button("切断").clicked() {
+            cut = true;
+            ui.close();
+        }
+    }
+    cut
 }
 
 /// A wire styled by the shape of the data flowing through it:
