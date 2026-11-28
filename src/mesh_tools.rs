@@ -1238,8 +1238,11 @@ mod tests {
             p[2] = p[0] * 0.01;
         }
         let out = crate::gh_nodes::shell(&m, 1.0, GO).unwrap();
-        assert!((crate::mesh_fabrication::signed_volume(&out, GO).unwrap()
-            - 100.0 * 1.0001_f64.sqrt()).abs() < 1e-8);
+        assert!(
+            (crate::mesh_fabrication::signed_volume(&out, GO).unwrap() - 100.0 * 1.0001_f64.sqrt())
+                .abs()
+                < 1e-8
+        );
     }
 
     #[test]
