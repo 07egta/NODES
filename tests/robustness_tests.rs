@@ -43,19 +43,25 @@ fn check_tree(t: &Tree, what: &str) {
     }
 }
 
-static OK: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-static ERR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
-fn run(graph: &Graph, what: &str) {
+fn run(graph: &Graph, what: &str) -> (usize, usize) {
     let start = Instant::now();
     let result = Evaluator::default().evaluate(graph, &|| false);
     assert!(!result.cancelled);
-    for (id, out) in &result.outputs {
+    assert_eq!(
+        result.outputs.len(),
+        graph.nodes.len(),
+        "{what}: missing outputs"
+    );
+    let mut ok = 0;
+    let mut err = 0;
+    for node in &graph.nodes {
+        let id = node.id;
+        let out = &result.outputs[&id];
         if let Ok(t) = out {
-            OK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            ok += 1;
             check_tree(t, &format!("{what} (node {id})"));
         } else {
-            ERR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            err += 1;
         }
     }
     assert!(
@@ -63,6 +69,7 @@ fn run(graph: &Graph, what: &str) {
         "{what}: evaluation took {:?}",
         start.elapsed()
     );
+    (ok, err)
 }
 
 fn node_with(kind: NodeKind, set: impl Fn(&str, f64, f64, f64) -> f64) -> Graph {
@@ -240,6 +247,8 @@ fn random_in_range_mixes_never_panic() {
             )
         })
         .collect();
+    let mut ok = 0;
+    let mut err = 0;
     for &kind in &kinds {
         for round in 0..60 {
             let mut g = Graph::default();
@@ -278,14 +287,12 @@ fn random_in_range_mixes_never_panic() {
                     let _ = g.connect(a, target, spec.key);
                 }
             }
-            run(&g, &format!("{kind:?} random round {round}"));
+            let (case_ok, case_err) = run(&g, &format!("{kind:?} random round {round}"));
+            ok += case_ok;
+            err += case_err;
         }
     }
-    let (ok, err) = (
-        OK.load(std::sync::atomic::Ordering::Relaxed),
-        ERR.load(std::sync::atomic::Ordering::Relaxed),
-    );
-    println!("node results so far: {ok} ok, {err} err");
+    println!("random mix node results: {ok} ok, {err} err");
     assert!(
         ok > err / 4,
         "too few successful evaluations ({ok} ok / {err} err)"
@@ -346,7 +353,15 @@ fn shipped_examples_load_and_evaluate_finite() {
         }
         let project = nodes::persistence::load(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let result = Evaluator::default().evaluate(&project.graph, &|| false);
-        for (id, out) in &result.outputs {
+        assert!(!result.cancelled, "{path:?}: cancelled");
+        assert_eq!(
+            result.outputs.len(),
+            project.graph.nodes.len(),
+            "{path:?}: missing outputs"
+        );
+        for node in &project.graph.nodes {
+            let id = node.id;
+            let out = &result.outputs[&id];
             let t = out
                 .as_ref()
                 .unwrap_or_else(|e| panic!("{path:?} node {id}: {e}"));
