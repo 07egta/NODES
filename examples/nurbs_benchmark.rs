@@ -97,6 +97,38 @@ fn main() {
     time("zebra on the filleted box", 3, || {
         kb::fillet(&boxed, 3., &[], go).and_then(|f| ko::zebra(&f, 12., 0, go))
     });
+    time("trim by any plane (box, normal 1,0,1)", 3, || {
+        ko::trim_by_any_plane(&boxed, [0., 0., 0.], [1., 0., 1.], true, go)
+    });
+    time("seam analysis of the filleted box (17 stations)", 3, || {
+        kb::fillet(&boxed, 3., &[], go)
+            .and_then(|f| ko::seam_report(&f, 17., [1e-3, 0.5, 0.01], go))
+    });
+    time("curvature map of a sphere r=10", 3, || {
+        kb::sphere([0., 0., 0.], 10., go).and_then(|s| ko::curvature_map(&s, 4., go))
+    });
+    if let Ok(f) = kb::fillet(&boxed, 3., &[], go) {
+        time(
+            "list edges of the filleted box x20 (display mesh reused)",
+            3,
+            || {
+                for _ in 0..20 {
+                    f.body().edges(0.01).map_err(|e| format!("{e:?}"))?;
+                }
+                Ok(())
+            },
+        );
+    }
+    for levels in 0..=2usize {
+        let cage = Cage::box_cage(40., 40., 40., go);
+        if let Ok(cage) = cage {
+            time(
+                &format!("SubD box cage -> B-rep, {levels} refinement(s) around star points"),
+                1,
+                || cage.to_brep_refined(true, levels, go),
+            );
+        }
+    }
     println!(
         "threads available: {}",
         std::thread::available_parallelism().map_or(1, |n| n.get())
