@@ -216,15 +216,57 @@ pub fn rows(tree: &Tree, limit: usize) -> (Vec<Row>, usize) {
     (out, hidden)
 }
 
-/// Scrollable table of a node's output tree.
+const BRANCH_PAGE: usize = 32;
+const ITEM_PAGE: usize = 100;
+
+fn page_bounds(count: usize, requested: usize, size: usize) -> (usize, usize, usize) {
+    let last = count.saturating_sub(1) / size;
+    let page = requested.min(last);
+    let start = page * size;
+    (page, start, start.saturating_add(size).min(count))
+}
+
+fn page_control(ui: &mut egui::Ui, id: egui::Id, count: usize, size: usize) -> (usize, usize) {
+    let requested = ui.data_mut(|d| d.get_temp::<usize>(id).unwrap_or_default());
+    let (mut page, _, _) = page_bounds(count, requested, size);
+    let last = count.saturating_sub(1) / size;
+    if last > 0 {
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_enabled(page > 0, egui::Button::new("前へ"))
+                .clicked()
+            {
+                page -= 1;
+            }
+            ui.label(format!("{} / {}", page + 1, last + 1));
+            if ui
+                .add_enabled(page < last, egui::Button::new("次へ"))
+                .clicked()
+            {
+                page += 1;
+            }
+            ui.add(
+                egui::DragValue::new(&mut page)
+                    .range(0..=last)
+                    .prefix("頁 (0始まり) "),
+            );
+        });
+    }
+    let (page, start, end) = page_bounds(count, page, size);
+    ui.data_mut(|d| d.insert_temp(id, page));
+    (start, end)
+}
+
+/// Scrollable, paginated view of a node's output tree. No values are truncated
+/// permanently: branch and item pages can reach every entry, including empty paths.
 pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
     let shape = shape_of(tree);
     ui.label(
         RichText::new(format!("形: {}", shape.describe()))
             .size(12.)
-            .color(theme::TEAL),
+            .color(theme::teal()),
     );
-    if matches!(shape, DataShape::Empty) && tree.branches.is_empty() {
+    if tree.branches.is_empty() {
         ui.label(theme::small("値はありません。"));
         return;
     }
@@ -234,41 +276,43 @@ pub fn show_tree(ui: &mut egui::Ui, tree: &Tree, salt: &str, max_height: f32) {
         tree.item_count()
     )));
     ui.label(theme::small("数値・座標：かざして詳細、右クリックでコピー"));
+    let (start, end) = page_control(
+        ui,
+        ui.make_persistent_id((salt, "branches")),
+        tree.branches.len(),
+        BRANCH_PAGE,
+    );
     egui::ScrollArea::vertical()
         .id_salt(("data_view_scroll", salt))
         .max_height(max_height)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            let mut shown_rows = 0;
-            let mut hidden_branches = 0;
-            for (p, values) in tree.branches.iter().take(MAX_ROWS) {
-                egui::CollapsingHeader::new(format!("{} · {} 件", path_text(p), values.len()))
-                    .id_salt((salt, p))
+            for (path, values) in tree.branches.iter().skip(start).take(end - start) {
+                egui::CollapsingHeader::new(format!("{} · {} 件", path_text(path), values.len()))
+                    .id_salt((salt, path))
                     .default_open(tree.branches.len() == 1)
                     .show(ui, |ui| {
                         if values.is_empty() {
                             ui.label(theme::small("（空の枝）"));
+                            return;
                         }
-                        let limit = MAX_ROWS.saturating_sub(shown_rows).min(values.len());
-                        for (i, v) in values.iter().take(limit).enumerate() {
+                        let (first, last) = page_control(
+                            ui,
+                            ui.make_persistent_id((salt, path, "items")),
+                            values.len(),
+                            ITEM_PAGE,
+                        );
+                        for (i, value) in values.iter().enumerate().skip(first).take(last - first) {
                             ui.horizontal(|ui| {
                                 ui.label(
                                     RichText::new(format!("[{i}]"))
                                         .size(11.)
-                                        .color(theme::MUTED),
+                                        .color(theme::muted()),
                                 );
-                                show_value(ui, v);
+                                show_value(ui, value);
                             });
                         }
-                        shown_rows += limit;
-                        if limit < values.len() {
-                            ui.label(theme::small(format!("…ほか {} 件", values.len() - limit)));
-                        }
                     });
-            }
-            hidden_branches += tree.branches.len().saturating_sub(MAX_ROWS);
-            if hidden_branches > 0 {
-                ui.label(theme::small(format!("…ほか {hidden_branches} 枝")));
             }
         });
 }
@@ -290,6 +334,20 @@ mod tests {
                 })
                 .collect::<BTreeMap<_, _>>(),
         }
+    }
+
+    #[test]
+    fn pages_cover_every_entry_and_clamp_after_tree_shrinks() {
+        for (count, size) in [(0usize, 32usize), (1, 32), (32, 32), (33, 32), (1001, 100)] {
+            let mut covered = Vec::new();
+            for page in 0..=count.saturating_sub(1) / size {
+                let (_, start, end) = page_bounds(count, page, size);
+                covered.extend(start..end);
+            }
+            assert_eq!(covered, (0..count).collect::<Vec<_>>());
+        }
+        assert_eq!(page_bounds(3, usize::MAX, 32), (0, 0, 3));
+        assert_eq!(page_bounds(101, 99, 100), (1, 100, 101));
     }
 
     #[test]
