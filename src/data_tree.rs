@@ -98,9 +98,9 @@ struct Builder {
     weight: usize,
 }
 impl Builder {
-    fn append(&mut self, path: Path, items: &[Value]) -> Result<(), String> {
-        validate_path(&path)?;
-        let new = !self.tree.branches.contains_key(&path);
+    fn append(&mut self, path: &[u32], items: &[Value]) -> Result<(), String> {
+        validate_path(path)?;
+        let new = !self.tree.branches.contains_key(path);
         if new && self.tree.branches.len() >= MAX_ITEMS {
             return Err("枝数の上限を超えました。".into());
         }
@@ -118,11 +118,12 @@ impl Builder {
         if count > MAX_ITEMS || weight > MAX_TOTAL_WEIGHT / 2 {
             return Err("データツリーが容量の上限を超えました。".into());
         }
-        self.tree
-            .branches
-            .entry(path)
-            .or_default()
-            .extend_from_slice(items);
+        // Allocate an owned path only when the branch is first inserted.
+        if let Some(branch) = self.tree.branches.get_mut(path) {
+            branch.extend_from_slice(items);
+        } else {
+            self.tree.branches.insert(path.to_vec(), items.to_vec());
+        }
         self.items = count;
         self.weight = weight;
         Ok(())
@@ -135,9 +136,9 @@ impl Builder {
 pub fn flatten(tree: &Tree) -> Result<Tree, String> {
     validate_topology(tree)?;
     let mut b = Builder::default();
-    b.append(vec![0], &[])?;
+    b.append(&[0], &[])?;
     for values in tree.branches.values() {
-        b.append(vec![0], values)?;
+        b.append(&[0], values)?;
     }
     Ok(b.finish())
 }
@@ -148,13 +149,13 @@ pub fn graft(tree: &Tree) -> Result<Tree, String> {
     for (path, values) in &tree.branches {
         // NODES deliberately retains explicit empty branches.
         if values.is_empty() {
-            b.append(path.clone(), &[])?;
+            b.append(path, &[])?;
         }
         for (i, value) in values.iter().enumerate() {
             let mut p = path.clone();
             p.push(u32::try_from(i).map_err(|_| "枝番号が大きすぎます。")?);
             // Mixed-depth paths can collide: append, never overwrite.
-            b.append(p, std::slice::from_ref(value))?;
+            b.append(&p, std::slice::from_ref(value))?;
         }
     }
     Ok(b.finish())
@@ -165,14 +166,11 @@ pub fn graft(tree: &Tree) -> Result<Tree, String> {
 /// behaviour of GH1 is not confirmed here.)
 pub fn reverse(tree: &Tree) -> Result<Tree, String> {
     validate_topology(tree)?;
-    let mut b = Builder::default();
-    for (path, values) in &tree.branches {
-        b.append(path.clone(), &[])?;
-        for value in values.iter().rev() {
-            b.append(path.clone(), std::slice::from_ref(value))?;
-        }
+    let mut result = tree.clone();
+    for values in result.branches.values_mut() {
+        values.reverse();
     }
-    Ok(b.finish())
+    Ok(result)
 }
 
 pub fn simplify(tree: &Tree) -> Result<Tree, String> {
@@ -213,7 +211,7 @@ pub fn remap_paths(
     validate_topology(tree)?;
     let mut b = Builder::default();
     for (path, items) in &tree.branches {
-        b.append(f(path)?, items)?;
+        b.append(&f(path)?, items)?;
     }
     Ok(b.finish())
 }
@@ -223,7 +221,7 @@ pub fn merge(trees: &[Tree]) -> Result<Tree, String> {
     for t in trees {
         validate_topology(t)?;
         for (p, v) in &t.branches {
-            b.append(p.clone(), v)?;
+            b.append(p, v)?;
         }
     }
     Ok(b.finish())
@@ -237,7 +235,7 @@ pub fn entwine(trees: &[Tree]) -> Result<Tree, String> {
         for (p, v) in &t.branches {
             let mut path = vec![prefix];
             path.extend_from_slice(p);
-            b.append(path, v)?;
+            b.append(&path, v)?;
         }
     }
     Ok(b.finish())
@@ -262,7 +260,7 @@ pub fn prune_empty(tree: &Tree) -> Result<Tree, String> {
     let mut b = Builder::default();
     for (p, v) in &tree.branches {
         if !v.is_empty() {
-            b.append(p.clone(), v)?;
+            b.append(p, v)?;
         }
     }
     Ok(b.finish())
@@ -274,14 +272,30 @@ pub fn unflatten(data: &Tree, guide: &Tree) -> Result<Tree, String> {
     if data.item_count() != guide.item_count() {
         return Err("ガイドとデータの要素数が一致しません。".into());
     }
-    let data = flatten(data)?;
-    let all = &data.branches[&vec![0]];
-    let mut offset = 0;
+    // Stream source slices directly into the destination. The old intermediate
+    // flattened tree duplicated every Value container and geometry Arc.
+    let mut sources = data
+        .branches
+        .values()
+        .map(Vec::as_slice)
+        .filter(|values| !values.is_empty());
+    let mut current: &[Value] = &[];
     let mut b = Builder::default();
     for (p, v) in &guide.branches {
-        let end = offset + v.len();
-        b.append(p.clone(), &all[offset..end])?;
-        offset = end;
+        b.append(p, &[])?;
+        let mut remaining = v.len();
+        while remaining > 0 {
+            if current.is_empty() {
+                current = sources
+                    .next()
+                    .ok_or("ガイドとデータの要素数が一致しません。")?;
+            }
+            let count = remaining.min(current.len());
+            let (chunk, rest) = current.split_at(count);
+            b.append(p, chunk)?;
+            current = rest;
+            remaining -= count;
+        }
     }
     Ok(b.finish())
 }
@@ -308,7 +322,7 @@ pub fn flip_matrix(tree: &Tree) -> Result<Tree, String> {
         let mut p = first_path[..first_path.len() - 1].to_vec();
         p.push(col as u32);
         for row in tree.branches.values() {
-            b.append(p.clone(), &row[col..col + 1])?;
+            b.append(&p, &row[col..col + 1])?;
         }
     }
     Ok(b.finish())
@@ -340,6 +354,16 @@ pub fn match_branches(inputs: &[Tree]) -> Result<Vec<BranchMatch<'_>>, String> {
     if inputs.len() > 64 {
         return Err("入力数の上限を超えました。".into());
     }
+    match_borrowed_branches(&inputs.iter().collect::<Vec<_>>())
+}
+
+/// Match borrowed input trees without cloning their branch maps or values.
+pub(crate) fn match_borrowed_branches<'a>(
+    inputs: &[&'a Tree],
+) -> Result<Vec<BranchMatch<'a>>, String> {
+    if inputs.len() > 64 {
+        return Err("入力数の上限を超えました。".into());
+    }
     for t in inputs {
         validate_topology(t)?;
     }
@@ -360,7 +384,7 @@ pub fn match_branches(inputs: &[Tree]) -> Result<Vec<BranchMatch<'_>>, String> {
     };
     let branches: Vec<Vec<&[Value]>> = inputs
         .iter()
-        .map(|t| t.branches.values().map(Vec::as_slice).collect())
+        .map(|&t| t.branches.values().map(Vec::as_slice).collect())
         .collect();
     let mut result = Vec::with_capacity(best.0);
     for (index, path) in inputs[master].branches.keys().enumerate() {
@@ -465,7 +489,7 @@ pub fn cross_reference(inputs: &[Tree]) -> Result<Vec<Tree>, String> {
             return Err("クロス参照が大きすぎます。".into());
         }
         for b in &mut builders {
-            b.append(m.path.clone(), &[])?;
+            b.append(&m.path, &[])?;
         }
         for args in matches {
             for (b, v) in builders.iter_mut().zip(args) {
@@ -473,7 +497,7 @@ pub fn cross_reference(inputs: &[Tree]) -> Result<Vec<Tree>, String> {
                 if total_weight > MAX_TOTAL_WEIGHT {
                     return Err("クロス参照が大きすぎます。".into());
                 }
-                b.append(m.path.clone(), std::slice::from_ref(v))?;
+                b.append(&m.path, std::slice::from_ref(v))?;
             }
         }
     }
@@ -569,12 +593,12 @@ pub fn partition(tree: &Tree, size: usize) -> Result<Tree, String> {
     let mut b = Builder::default();
     for (p, v) in &tree.branches {
         if v.is_empty() {
-            b.append(p.clone(), &[])?;
+            b.append(p, &[])?;
         }
         for (i, chunk) in v.chunks(size).enumerate() {
             let mut path = p.clone();
             path.push(i as u32);
-            b.append(path, chunk)?;
+            b.append(&path, chunk)?;
         }
     }
     Ok(b.finish())

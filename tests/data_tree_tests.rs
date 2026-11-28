@@ -55,6 +55,39 @@ fn flat_graft_partition_and_roundtrip_preserve_order_and_empty() {
     assert!(dt::unflatten(&Tree::default(), &t).is_err());
 }
 #[test]
+fn unflatten_streams_across_source_and_guide_boundaries() {
+    let data = numbers(&[
+        (&[0], &[]),
+        (&[1], &[1., 2., 3.]),
+        (&[2], &[]),
+        (&[3], &[4.]),
+        (&[4], &[5., 6.]),
+    ]);
+    let guide = numbers(&[
+        (&[9, 0], &[0.]),
+        (&[9, 1], &[]),
+        (&[9, 2], &[0., 0., 0., 0.]),
+        (&[9, 3], &[0.]),
+        (&[9, 4], &[]),
+    ]);
+    assert_eq!(
+        dt::unflatten(&data, &guide).unwrap(),
+        numbers(&[
+            (&[9, 0], &[1.]),
+            (&[9, 1], &[]),
+            (&[9, 2], &[2., 3., 4., 5.]),
+            (&[9, 3], &[6.]),
+            (&[9, 4], &[]),
+        ])
+    );
+    assert_eq!(data.item_count(), 6);
+    assert_eq!(
+        dt::unflatten(&Tree::default(), &numbers(&[(&[8], &[])])).unwrap(),
+        numbers(&[(&[8], &[])])
+    );
+}
+
+#[test]
 fn reverse_flips_items_inside_each_branch_and_keeps_empty_branches() {
     let t = numbers(&[(&[0], &[1., 2., 3.]), (&[1], &[]), (&[2], &[4., 5.])]);
     assert_eq!(

@@ -2,6 +2,7 @@
 //! Cache keys deliberately exclude presentation-only state (name, position, preview).
 use crate::data_tree as dt;
 use crate::model::*;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
@@ -403,17 +404,19 @@ fn levels<'a>(order: &[&'a Node]) -> Vec<Vec<&'a Node>> {
     out
 }
 
-pub(crate) fn node_inputs(
+// Connected, untransformed trees are borrowed for the duration of a node evaluation.
+// Only defaults and port transforms need their own tree allocations.
+pub(crate) fn node_inputs<'a>(
     node: &Node,
-    outputs: &BTreeMap<NodeId, Result<Tree, String>>,
+    outputs: &'a BTreeMap<NodeId, Result<Tree, String>>,
     cancel: &dyn Fn() -> bool,
-) -> Result<Vec<Tree>, String> {
+) -> Result<Vec<Cow<'a, Tree>>, String> {
     let specs = node.kind.spec().inputs;
     let mut inputs = Vec::with_capacity(specs.len());
     for spec in specs {
         let tree = if let Some(source) = node.inputs.get(spec.key) {
             match outputs.get(source) {
-                Some(Ok(t)) => t.clone(),
+                Some(Ok(t)) => Cow::Borrowed(t),
                 Some(Err(_)) => {
                     return Err(format!(
                         "「{}」の入力元にエラーがあります。上流の赤いノードを確認してください。",
@@ -423,15 +426,21 @@ pub(crate) fn node_inputs(
                 None => return Err(format!("「{}」の計算結果がありません。", spec.label)),
             }
         } else if let Some(default) = spec.default {
-            Tree::single(Value::Number(
+            Cow::Owned(Tree::single(Value::Number(
                 *node.params.get(spec.key).unwrap_or(&default),
-            ))
+            )))
         } else {
             return Err(format!("「{}」を接続してください。", spec.label));
         };
         let tree = if let Some(&mode) = node.params.get(&format!("{}{}", dt::PORT_PREFIX, spec.key))
         {
-            dt::apply_transform(&tree, dt::PortTransform::from_number(mode)?)?
+            let mode = dt::PortTransform::from_number(mode)?;
+            if mode == dt::PortTransform::None {
+                dt::validate_topology(&tree)?;
+                tree
+            } else {
+                Cow::Owned(dt::apply_transform(&tree, mode)?)
+            }
         } else {
             tree
         };
@@ -481,6 +490,7 @@ pub(crate) fn evaluate_node(
 ) -> Result<Tree, String> {
     let inputs = node_inputs(node, outputs, cancel)?;
     if crate::data_tree_nodes::is_tree_kind(node.kind) {
+        let inputs: Vec<_> = inputs.into_iter().map(Cow::into_owned).collect();
         return checked_tree(
             crate::data_tree_nodes::run_tree(node, &inputs, cancel)?,
             cancel,
@@ -497,7 +507,11 @@ pub(crate) fn evaluate_node(
     }
     if node.kind == NodeKind::Output || node.kind == NodeKind::Reroute {
         return checked_tree(
-            inputs.into_iter().next().ok_or("形状がありません。")?,
+            inputs
+                .into_iter()
+                .next()
+                .ok_or("形状がありません。")?
+                .into_owned(),
             cancel,
         );
     }
@@ -505,6 +519,7 @@ pub(crate) fn evaluate_node(
         return checked_tree(crate::nurbs_nodes::read_step(&node.script, cancel)?, cancel);
     }
     if node.kind == NodeKind::ExactStepExport {
+        let inputs: Vec<_> = inputs.into_iter().map(Cow::into_owned).collect();
         let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
         return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
     }
@@ -523,6 +538,7 @@ pub(crate) fn evaluate_node(
     }
     // ケージ編集: the edit list is in `script` (see `nurbs_nodes::run_cage_edit`).
     if node.kind == NodeKind::SubdCageEdit {
+        let inputs: Vec<_> = inputs.into_iter().map(Cow::into_owned).collect();
         return checked_tree(
             crate::nurbs_nodes::run_cage_edit(node, &inputs, cancel)?,
             cancel,
@@ -530,6 +546,7 @@ pub(crate) fn evaluate_node(
     }
     // Gコード nodes work on whole trees of G-code jobs (see `gcode_nodes.rs`).
     if crate::gcode_nodes::is_kind(node.kind) {
+        let inputs: Vec<_> = inputs.into_iter().map(Cow::into_owned).collect();
         return checked_tree(crate::gcode_nodes::run(node, &inputs, cancel)?, cancel);
     }
     // ファイル読み込み: the path is in `script`; scale, centre and bed come from its inputs.
@@ -564,23 +581,24 @@ pub(crate) fn evaluate_node(
     let item_mode = matching.unwrap_or(dt::MatchMode::Longest);
     // A single branch is broadcast to the multi-branch input's paths. It does not add an
     // accidental extra root branch when one of the inputs has been grafted.
-    let mut paths = BTreeSet::new();
-    for tree in inputs
-        .iter()
-        .filter(|t| t.branches.len() > 1 || t.branches.keys().any(|p| p.as_slice() != [0]))
-    {
-        paths.extend(tree.branches.keys().cloned());
-    }
-    if paths.is_empty() {
-        for tree in &inputs {
-            paths.extend(tree.branches.keys().cloned());
-        }
-    }
     // Old .morph files omit MATCH_PARAM and keep the original exact-path behaviour.
     // When a matching mode is selected, use ordinal branch matching instead.
     let matched = if matching.is_some() || crate::node_access::uses_ordinal_matching(node.kind) {
-        dt::match_branches(&inputs)?
+        let borrowed: Vec<_> = inputs.iter().map(|tree| tree.as_ref()).collect();
+        dt::match_borrowed_branches(&borrowed)?
     } else {
+        let mut paths = BTreeSet::new();
+        for tree in inputs
+            .iter()
+            .filter(|t| t.branches.len() > 1 || t.branches.keys().any(|p| p.as_slice() != [0]))
+        {
+            paths.extend(tree.branches.keys().cloned());
+        }
+        if paths.is_empty() {
+            for tree in &inputs {
+                paths.extend(tree.branches.keys().cloned());
+            }
+        }
         paths
             .into_iter()
             .map(|path| {
@@ -2385,6 +2403,34 @@ mod tests {
         assert_eq!(t.branches.len(), 3);
         assert!(!t.branches.contains_key(&vec![0]));
     }
+    #[test]
+    fn connected_inputs_borrow_until_a_transform_is_needed() {
+        let mut graph = Graph::default();
+        let source = add(&mut graph, NodeKind::Number);
+        let target = add(&mut graph, NodeKind::Add);
+        graph.connect(source, target, "a").unwrap();
+        let original = Tree {
+            branches: BTreeMap::from([
+                (vec![1], vec![Value::Number(3.)]),
+                (vec![2], vec![Value::Number(4.)]),
+            ]),
+        };
+        let outputs = BTreeMap::from([(source, Ok(original))]);
+        let original = outputs[&source].as_ref().unwrap();
+        let inputs = node_inputs(graph.node(target).unwrap(), &outputs, &|| false).unwrap();
+        assert!(matches!(&inputs[0], Cow::Borrowed(t) if std::ptr::eq(*t, original)));
+
+        graph
+            .node_mut(target)
+            .unwrap()
+            .params
+            .insert(format!("{}a", dt::PORT_PREFIX), 1.);
+        let inputs = node_inputs(graph.node(target).unwrap(), &outputs, &|| false).unwrap();
+        assert!(matches!(&inputs[0], Cow::Owned(_)));
+        assert_eq!(*inputs[0], dt::flatten(original).unwrap());
+        assert_eq!(original.branches.len(), 2);
+    }
+
     #[test]
     fn graft_preserves_value_when_deeper_empty_path_collides() {
         // Construct a valid mixed-depth tree at the evaluator boundary; do not
