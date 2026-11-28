@@ -4,6 +4,7 @@ use nodes::diagnostics::{self, DiagnosticReport};
 use nodes::engine::Evaluation;
 use nodes::graph_api::{self, Request};
 use nodes::model::{NodeKind, Tree, Value};
+use nodes::node_package::Package;
 use nodes::persistence::{self, Project};
 use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
@@ -30,6 +31,9 @@ Usage:
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
+  nodes-cli pack-part MANIFEST.json PART.morphpart OUTPUT.nodespkg
+  nodes-cli inspect-package PACKAGE.nodespkg
+  nodes-cli unpack-part PACKAGE.nodespkg OUTPUT.morphpart
   nodes-cli --help
 
 Commands return one JSON document on stdout, including operational errors.
@@ -41,7 +45,8 @@ Evaluation failures also include error.diagnostics; exit code remains 1.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
 export-stl requires explicit, enabled, nonempty Output nodes containing only Mesh.
-Scripts, expressions, imports, clusters and external plugins are unavailable.
+Scripts, expressions, imports, clusters and external plugins are unavailable for Graph API evaluation.
+Package commands inspect or copy data-only Cluster parts without evaluating them.
 Request limit: 1 MiB. Project limit: 8 MiB. Parent output directories must exist.
 ";
 
@@ -366,9 +371,9 @@ fn export_stl(project_path: &Path, destination: &Path) -> Result<Json, CliError>
 fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
-        "validate" | "evaluate" | "diagnose" => 1,
-        "build" | "export-stl" | "diff" | "diff-content" => 2,
-        "apply" => 3,
+        "validate" | "evaluate" | "diagnose" | "inspect-package" => 1,
+        "build" | "export-stl" | "diff" | "diff-content" | "unpack-part" => 2,
+        "apply" | "pack-part" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
     if arguments.len() != expected {
@@ -423,6 +428,24 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             let mut result = save_evaluated(&project, Path::new(&arguments[2]))?;
             result["node_ids"] = json!(aliases);
             Ok(result)
+        }
+        "pack-part" => {
+            let package = Package::pack_files(Path::new(&arguments[0]), Path::new(&arguments[1]))
+                .map_err(|message| problem("invalid_package", message))?;
+            package
+                .save(Path::new(&arguments[2]))
+                .map_err(|message| problem("package_io", message))?;
+            Ok(json!({"package": package.info()}))
+        }
+        "inspect-package" | "unpack-part" => {
+            let package = Package::load(Path::new(&arguments[0]))
+                .map_err(|message| problem("invalid_package", message))?;
+            if command == "unpack-part" {
+                package
+                    .unpack_part(Path::new(&arguments[1]))
+                    .map_err(|message| problem("package_io", message))?;
+            }
+            Ok(json!({"package": package.info()}))
         }
         "export-stl" => export_stl(Path::new(&arguments[0]), Path::new(&arguments[1])),
         _ => unreachable!(),
