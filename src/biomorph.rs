@@ -87,7 +87,9 @@ fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
 fn charge(tests: &mut usize, amount: usize) -> Result<(), String> {
     *tests = tests.saturating_add(amount);
     if *tests > MAX_DISTANCE_TESTS {
-        return Err("成長の距離計算が上限を超えました。誘引点数や成長回数を減らしてください。".into());
+        return Err(
+            "成長の距離計算が上限を超えました。誘引点数や成長回数を減らしてください。".into(),
+        );
     }
     Ok(())
 }
@@ -185,7 +187,9 @@ fn grow(
                 continue;
             }
             if out.len() >= limit {
-                return Err("成長した枝の数が上限を超えました。成長回数を減らしてください。".into());
+                return Err(
+                    "成長した枝の数が上限を超えました。成長回数を減らしてください。".into(),
+                );
             }
             nodes.push(q);
             out.push(segment(p, q));
@@ -276,7 +280,10 @@ impl ShellSettings {
 
     fn size(&self) -> (usize, usize) {
         // Two layers, one quad per angular segment, and a rim at each end.
-        (2 * (self.steps + 1) * self.sides, 4 * (self.steps + 1) * self.sides)
+        (
+            2 * (self.steps + 1) * self.sides,
+            4 * (self.steps + 1) * self.sides,
+        )
     }
 }
 
@@ -325,9 +332,8 @@ fn coiled_shell(s: ShellSettings, cancel: &dyn Fn() -> bool) -> Result<Mesh, Str
             }
         }
     }
-    let index = |inner: bool, j: usize, k: usize| {
-        (if inner { layer } else { 0 } + j * ring + k) as u32
-    };
+    let index =
+        |inner: bool, j: usize, k: usize| (if inner { layer } else { 0 } + j * ring + k) as u32;
     for j in 0..s.steps {
         cancelled(cancel)?;
         for k in 0..ring {
@@ -389,7 +395,9 @@ mod tests {
         let out = grow(targets.clone(), s, 10, &|| false).unwrap();
         assert_eq!(out.len(), 4);
         for (i, v) in out.iter().enumerate() {
-            let Value::Curve(c) = v else { panic!("expected curve") };
+            let Value::Curve(c) = v else {
+                panic!("expected curve")
+            };
             assert_eq!(c.points, vec![[i as f64, 0., 0.], [i as f64 + 1., 0., 0.]]);
         }
         assert_eq!(out, grow(targets.clone(), s, 10, &|| false).unwrap());
@@ -427,7 +435,11 @@ mod tests {
                 crate::engine::cross(mesh.vertices[b as usize], mesh.vertices[c as usize]),
             );
         }
-        assert!(edges.values().all(|&(count, direction)| count == 2 && direction == 0));
+        assert!(
+            edges
+                .values()
+                .all(|&(count, direction)| count == 2 && direction == 0)
+        );
         assert!(volume6 > 0.);
     }
 }
