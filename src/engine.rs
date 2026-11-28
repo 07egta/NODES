@@ -674,10 +674,11 @@ pub(crate) fn evaluate_node(
             } else if list_kind {
                 crate::gh_nodes::run_list(node.kind, &lists, cancel)?
             } else {
-                let matches =
+                let mut matches =
                     dt::ItemMatches::new(&lists, item_mode, MAX_ITEMS.saturating_sub(total_items))?;
                 let mut values = Vec::new();
-                for args in matches {
+                let mut args = Vec::with_capacity(lists.len());
+                while matches.next_into(&mut args) {
                     cancelled(cancel)?;
                     preflight_run(
                         node.kind,
