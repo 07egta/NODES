@@ -133,3 +133,73 @@ fn parallel_and_sequential_levels_give_identical_results() {
     println!("wide=48 one_thread_ms={one_ms:.3} eight_threads_ms={many_ms:.3}");
     assert!(one_ms < LIMIT_MS && many_ms < LIMIT_MS);
 }
+
+/// A changed source can be absorbed by a node without changing its output.
+/// Measure cold, warm, cutoff and local edit costs at each requested scale.
+#[test]
+fn unchanged_output_stops_recomputation_at_three_scales() {
+    for count in [100, 1_000, 10_000] {
+        let mut graph = chain(count);
+        graph.nodes[0].params.insert("value".into(), 2.);
+        graph.nodes[1].kind = NodeKind::Multiply;
+        graph.nodes[1].params.insert("b".into(), 0.);
+        graph.validate().unwrap();
+        let mut evaluator = Evaluator::default();
+
+        let cold = evaluator.evaluate(&graph, &|| false);
+        assert_eq!((cold.computed, cold.cached), (count, 0));
+        assert!(cold.outputs.values().all(Result::is_ok));
+        let warm = evaluator.evaluate(&graph, &|| false);
+        assert_eq!((warm.computed, warm.cached), (0, count));
+        assert_same(&cold, &warm);
+
+        graph.nodes[0].params.insert("value".into(), 3.);
+        let cutoff = evaluator.evaluate(&graph, &|| false);
+        assert_eq!((cutoff.computed, cutoff.cached), (2, count - 2));
+        assert_same(&cutoff, &Evaluator::default().evaluate(&graph, &|| false));
+        assert!(!cutoff.node_timings[&0].cached);
+        assert!(!cutoff.node_timings[&1].cached);
+        assert!(cutoff.node_timings[&2].cached);
+
+        graph.nodes[count - 1].params.insert("b".into(), 2.);
+        let tail = evaluator.evaluate(&graph, &|| false);
+        assert_eq!((tail.computed, tail.cached), (1, count - 1));
+        assert_same(&tail, &Evaluator::default().evaluate(&graph, &|| false));
+
+        println!(
+            "flow nodes={count} cold_ms={:.3} warm_ms={:.3} cutoff_ms={:.3} tail_ms={:.3}",
+            cold.elapsed_ms, warm.elapsed_ms, cutoff.elapsed_ms, tail.elapsed_ms
+        );
+        for run in [&cold, &warm, &cutoff, &tail] {
+            assert!(!run.cancelled);
+            assert!(run.elapsed_ms < LIMIT_MS);
+        }
+    }
+}
+
+#[test]
+fn signed_zero_change_must_not_be_pruned() {
+    let mut graph = chain(3);
+    graph.nodes[0].params.insert("value".into(), 2.);
+    graph.nodes[1].kind = NodeKind::Multiply;
+    graph.nodes[1].params.insert("b".into(), 0.);
+    graph.nodes[2].kind = NodeKind::Multiply;
+    graph.nodes[2].params.insert("b".into(), 1.);
+    graph.validate().unwrap();
+
+    let mut evaluator = Evaluator::default();
+    let positive = evaluator.evaluate(&graph, &|| false);
+    let number_bits = |evaluation: &Evaluation| {
+        evaluation.outputs[&2].as_ref().unwrap().branches[&vec![0]][0]
+            .number()
+            .unwrap()
+            .to_bits()
+    };
+    assert_eq!(number_bits(&positive), 0.0_f64.to_bits());
+    graph.nodes[0].params.insert("value".into(), -2.);
+    let negative = evaluator.evaluate(&graph, &|| false);
+    assert_eq!((negative.computed, negative.cached), (3, 0));
+    assert_eq!(number_bits(&negative), (-0.0_f64).to_bits());
+    let fresh = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(number_bits(&negative), number_bits(&fresh));
+}
