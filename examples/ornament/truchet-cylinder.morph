@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "name": "トルシェ円筒・ランプの線スタディ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "truchet_pattern",
+        "name": "タイル",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 8,
+          "ny": 5,
+          "size": 10,
+          "segments": 12,
+          "seed": 13
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "cylinder_wrap",
+        "name": "円筒へ",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "radius": 12.732395447351628,
+          "width": 80
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

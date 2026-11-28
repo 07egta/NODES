@@ -569,6 +569,12 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // Ornament nodes: append-only serialized identifiers.
+    TruchetPattern,
+    AsanohaPattern,
+    ShippoPattern,
+    PowerDiagram2d,
+    LloydRelax2d,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -982,6 +988,11 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::TruchetPattern,
+            Self::AsanohaPattern,
+            Self::ShippoPattern,
+            Self::PowerDiagram2d,
+            Self::LloydRelax2d,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
