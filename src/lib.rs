@@ -28,6 +28,7 @@ mod number_aggregates;
 mod number_interpolation;
 pub mod nurbs_nodes;
 pub mod persistence;
+mod origami;
 pub mod physics;
 pub mod physics_nodes;
 pub mod polygon_triangulation;
