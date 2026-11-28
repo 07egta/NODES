@@ -39,6 +39,13 @@ pub const KINDS: &[K] = &[
     K::SurfaceGaussianCurvature,
     K::SurfaceMeanCurvature,
     K::SurfacePrincipalCurvatures,
+    K::SurfacePrincipalLines,
+    K::SurfaceNormalCurvature,
+    K::SurfaceUvCondition,
+    K::SurfaceBoundaryReport,
+    K::SurfaceFair,
+    K::SurfaceFairReport,
+    K::NurbsBicubicPanel,
 ];
 const S: crate::model::InputSpec = g("surface", "曲面", D::Surface);
 const B: crate::model::InputSpec = g("solid", "閉じた立体", D::Solid);
@@ -55,6 +62,11 @@ macro_rules! spec {
         &SPEC
     }};
 }
+const STRENGTH: crate::model::InputSpec = n("strength", "強度", 1., 0.01, 1., 0.05);
+const ITERATIONS: crate::model::InputSpec = i("iterations", "反復数", 8., 1., 32.);
+const KEEP: crate::model::InputSpec = i("keep", "接線も保持 (1=はい)", 0., 0., 1.);
+const TOL: crate::model::InputSpec = n("tolerance", "最大移動量", 2., 0.001, 1e6, 0.1);
+
 pub fn spec(kind: K) -> &'static NodeSpec {
     match kind {
         K::PlaneSurface => spec!(
@@ -155,6 +167,62 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "surface principal curvature k1 k2 曲率",
             Number,
             [S, U, V]
+        ),
+        K::SurfacePrincipalLines => spec!(
+            "主曲率方向の表示",
+            "最小・最大の主曲率方向を2本の線で表示。臍点では方向を定義できません。",
+            "principal directions curvature lines 主曲率 方向 class-a",
+            Curve,
+            [S, U, V, n("length", "半長", 5., 0.001, 1e6, 0.5)]
+        ),
+        K::SurfaceNormalCurvature => spec!(
+            "法曲率",
+            "U接線からの角度で指定した接平面内方向の符号付き法曲率。",
+            "normal curvature Euler 法曲率",
+            Number,
+            [S, U, V, n("angle", "角度 °", 0., -360., 360., 1.)]
+        ),
+        K::SurfaceUvCondition => spec!(
+            "UVの歪み",
+            "正規化UVヤコビアンの条件数。1は局所等方、特異点はエラー。",
+            "uv distortion condition number 歪み",
+            Number,
+            [S, U, V]
+        ),
+        K::SurfaceBoundaryReport => spec!(
+            "独立曲面の境界診断",
+            "対応するUV境界をサンプル。位置差、法線角、曲率テンソル差、一次・二次微分差、各最大位置のtを返す。全区間の保証ではありません。",
+            "boundary seam G0 G1 G2 C0 C1 C2 連続性 境界",
+            Number,
+            [
+                S,
+                i("edge_a", "A境界 U0/U1/V0/V1", 1., 0., 3.),
+                g("other", "曲面B", D::Surface),
+                i("edge_b", "B境界 U0/U1/V0/V1", 0., 0., 3.),
+                i("reverse", "Bを反転 (1=はい)", 0., 0., 1.),
+                i("samples", "測定点数", 33., 3., 257.)
+            ]
+        ),
+        K::SurfaceFair => spec!(
+            "境界保持フェアリング",
+            "開いた等重み・クランプ付きNURBSを薄板エネルギーで平滑化。制御点256個、反復32回まで。",
+            "surface fair thin plate smooth 平滑化 フェアリング",
+            Surface,
+            [S, STRENGTH, ITERATIONS, KEEP, TOL]
+        ),
+        K::SurfaceFairReport => spec!(
+            "フェアリングの評価",
+            "同じ設定で改善前後エネルギー、実行ステップ数、最大制御点移動を返す。",
+            "fair energy report before after 品質 評価",
+            Number,
+            [S, STRENGTH, ITERATIONS, KEEP, TOL]
+        ),
+        K::NurbsBicubicPanel => spec!(
+            "双三次NURBSパネル",
+            "4×4の制御格子。内側の高さを交互に振り、フェアリングの検証にも使える。",
+            "bicubic nurbs panel fairing 双三次 パネル",
+            Surface,
+            [W, DEP, n("rise", "内側制御点高さ", 5., -1e6, 1e6, 0.5)]
         ),
         K::SurfaceArea => spec!(
             "曲面積",
@@ -350,6 +418,13 @@ fn point(a: &[&Value], at: usize) -> Result<[f64; 3], String> {
         _ => Err("点を接続してください。".into()),
     }
 }
+fn whole(value: f64, min: usize, max: usize) -> Result<usize, String> {
+    if !value.is_finite() || value.fract() != 0. || value < min as f64 || value > max as f64 {
+        return Err(format!("{min}〜{max}の整数を指定してください。"));
+    }
+    Ok(value as usize)
+}
+
 fn made(s: Surface, stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     Ok(vec![Value::Surface(Arc::new(SurfaceValue::new(s, stop)?))])
 }
@@ -413,6 +488,106 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
                 _ => result.principal.to_vec(),
             };
             Ok(values.into_iter().map(Value::Number).collect())
+        }
+        K::SurfacePrincipalLines => {
+            let jet = surface(a)?.derivatives2(num(a, 1)?, num(a, 2)?, stop)?;
+            let length = num(a, 3)?;
+            if !length.is_finite() || !(0.001..=1e6).contains(&length) {
+                return Err("表示長が無効です。".into());
+            }
+            let p = jet.first.point;
+            Ok(jet
+                .principal_directions()?
+                .into_iter()
+                .map(|d| {
+                    let lo = std::array::from_fn(|i| p[i] - length * d[i]);
+                    let hi = std::array::from_fn(|i| p[i] + length * d[i]);
+                    Value::Curve(Arc::new(crate::model::Curve {
+                        points: vec![lo, hi],
+                        closed: false,
+                        geometry: None,
+                    }))
+                })
+                .collect())
+        }
+        K::SurfaceNormalCurvature => Ok(vec![Value::Number(
+            surface(a)?
+                .derivatives2(num(a, 1)?, num(a, 2)?, stop)?
+                .normal_curvature(num(a, 3)?)?,
+        )]),
+        K::SurfaceUvCondition => Ok(vec![Value::Number(
+            crate::surface_curvature::uv_condition(surface(a)?.evaluate(num(a, 1)?, num(a, 2)?)?)?,
+        )]),
+        K::SurfaceBoundaryReport => {
+            let Value::Surface(other) = a.get(2).copied().ok_or("曲面Bを接続してください。")?
+            else {
+                return Err("曲面Bを接続してください。".into());
+            };
+            let report = crate::surface_curvature::boundary_report(
+                (surface(a)?, whole(num(a, 1)?, 0, 3)?),
+                (other.geometry(), whole(num(a, 3)?, 0, 3)?),
+                whole(num(a, 4)?, 0, 1)? == 1,
+                whole(num(a, 5)?, 3, 257)?,
+                stop,
+            )?;
+            Ok(report
+                .errors
+                .into_iter()
+                .chain(report.worst_t)
+                .map(Value::Number)
+                .collect())
+        }
+        K::SurfaceFair | K::SurfaceFairReport => {
+            let opts = solidcraft_kernel::FairOptions::new(
+                num(a, 1)?,
+                whole(num(a, 2)?, 1, 32)?,
+                whole(num(a, 3)?, 0, 1)? == 1,
+                num(a, 4)?,
+            )
+            .map_err(|e| e.to_string())?;
+            let (result, report) = surface(a)?.fair_polynomial(&opts, stop)?;
+            if kind == K::SurfaceFair {
+                made(result, stop)
+            } else {
+                Ok([
+                    report.energy_before,
+                    report.energy_after,
+                    report.steps as f64,
+                    report.movement,
+                ]
+                .into_iter()
+                .map(Value::Number)
+                .collect())
+            }
+        }
+        K::NurbsBicubicPanel => {
+            let (w, d, h) = (num(a, 0)?, num(a, 1)?, num(a, 2)?);
+            if ![w, d, h].iter().all(|x| x.is_finite())
+                || !(0.001..=1e6).contains(&w)
+                || !(0.001..=1e6).contains(&d)
+                || h.abs() > 1e6
+            {
+                return Err("双三次パネルの寸法が無効です。".into());
+            }
+            let points = (0..4)
+                .flat_map(|i| {
+                    (0..4).map(move |j| {
+                        let z = if (1..=2).contains(&i) && (1..=2).contains(&j) {
+                            if i == j { h } else { -h }
+                        } else {
+                            0.
+                        };
+                        [w * i as f64 / 3., d * j as f64 / 3., z]
+                    })
+                })
+                .collect();
+            let knots = vec![0., 0., 0., 0., 1., 1., 1., 1.];
+            made(
+                Surface::nurbs(NurbsSurface::new(
+                    4, 4, 3, 3, knots.clone(), knots, points, vec![1.; 16],
+                )?),
+                stop,
+            )
         }
         K::SurfaceArea => Ok(vec![Value::Number(
             surface(a)?.area(num(a, 1)? as usize, stop)?,

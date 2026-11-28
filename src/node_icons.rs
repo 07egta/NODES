@@ -88,6 +88,47 @@ const CATEGORY_GLYPHS: &[(&str, Glyph)] = &[
 /// One icon per node kind. Kinds not listed here fall back to their category.
 const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     (
+        NodeKind::SurfacePrincipalLines,
+        &[
+            Part::Line(&[[0.1, 0.7], [0.5, 0.5], [0.9, 0.3]]),
+            Part::Line(&[[0.2, 0.25], [0.5, 0.5], [0.8, 0.75]]),
+            Part::Dot([0.5, 0.5]),
+        ],
+    ),
+    (
+        NodeKind::SurfaceNormalCurvature,
+        &[Part::Line(&[[0.1, 0.7], [0.3, 0.35], [0.5, 0.25], [0.7, 0.35], [0.9, 0.7]]),
+            Part::Line(&[[0.5, 0.25], [0.5, 0.05]])],
+    ),
+    (
+        NodeKind::SurfaceUvCondition,
+        &[Part::Line(&[[0.1, 0.2], [0.6, 0.2], [0.9, 0.8], [0.4, 0.8], [0.1, 0.2]]),
+            Part::Line(&[[0.25, 0.5], [0.75, 0.5]]),
+            Part::Line(&[[0.35, 0.2], [0.65, 0.8]])],
+    ),
+    (
+        NodeKind::SurfaceBoundaryReport,
+        &[Part::Line(&[[0.1, 0.75], [0.5, 0.3], [0.9, 0.4]]),
+            Part::Line(&[[0.1, 0.5], [0.5, 0.1], [0.9, 0.2]]),
+            Part::Line(&[[0.5, 0.3], [0.5, 0.1]]), Part::Dot([0.5, 0.3])],
+    ),
+    (
+        NodeKind::SurfaceFair,
+        &[Part::Line(&[[0.1, 0.65], [0.3, 0.25], [0.5, 0.7], [0.7, 0.25], [0.9, 0.65]]),
+            Part::Line(&[[0.1, 0.65], [0.5, 0.45], [0.9, 0.65]])],
+    ),
+    (
+        NodeKind::SurfaceFairReport,
+        &[Part::Line(&[[0.15, 0.15], [0.15, 0.85], [0.9, 0.85]]),
+            Part::Line(&[[0.2, 0.2], [0.4, 0.55], [0.65, 0.68], [0.9, 0.7]])],
+    ),
+    (
+        NodeKind::NurbsBicubicPanel,
+        &[Part::Line(&[[0.1, 0.6], [0.4, 0.25], [0.7, 0.3], [0.9, 0.6], [0.6, 0.8], [0.1, 0.6]]),
+            Part::Line(&[[0.25, 0.43], [0.55, 0.5], [0.75, 0.7]]),
+            Part::Line(&[[0.4, 0.25], [0.5, 0.55], [0.6, 0.8]])],
+    ),
+    (
         NodeKind::ExactTorus,
         &[Part::Ring([0.5, 0.5, 0.4]), Part::Ring([0.5, 0.5, 0.18])],
     ),

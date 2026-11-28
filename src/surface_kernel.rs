@@ -929,6 +929,53 @@ impl Surface {
         }
         Ok(Self(Geometry::Torus { major, minor }))
     }
+    /// Reuse the SolidCraft thin-plate solver on an open, clamped polynomial
+    /// control net. Nonuniform rational weights are deliberately unsupported:
+    /// the polynomial energy is not the rational surface's actual energy.
+    pub fn fair_polynomial(
+        &self,
+        opts: &solidcraft_kernel::FairOptions,
+        stop: &dyn Fn() -> bool,
+    ) -> R<(Self, solidcraft_kernel::FairReport)> {
+        check_cancel(stop)?;
+        let Geometry::Nurbs(n) = &self.0 else {
+            return fail("フェアリングにはNURBS曲面が必要です。");
+        };
+        let clamped = |knots: &[f64], degree: usize| {
+            knots[..=degree].iter().all(|&k| k == knots[0])
+                && knots[knots.len() - degree - 1..]
+                    .iter()
+                    .all(|&k| k == knots[knots.len() - 1])
+        };
+        if n.closed_u
+            || !clamped(&n.ku, n.pu)
+            || !clamped(&n.kv, n.pv)
+            || n.weights.iter().any(|&w| w != n.weights[0])
+        {
+            return fail("開いたクランプ付き・等重みNURBSのみ対応しています。");
+        }
+        if n.points.len() > 256 || opts.iterations > 32 {
+            return fail("フェアリングは制御点256個、反復32回までです。");
+        }
+        let grid = solidcraft_geom::Grid::from_fn([n.nu, n.nv], |i, j| n.points[i * n.nv + j])
+            .ok_or("制御格子のサイズが不正です。")?;
+        let result = solidcraft_kernel::fair_net([n.pu, n.pv], [&n.ku, &n.kv], &grid, opts)
+            .map_err(|e| format!("フェアリング: {e}"))?;
+        check_cancel(stop)?;
+        let points = result.ctrl.into_u_rows().into_iter().flatten().collect();
+        let out = NurbsSurface::new(
+            n.nu,
+            n.nv,
+            n.pu,
+            n.pv,
+            n.ku.clone(),
+            n.kv.clone(),
+            points,
+            n.weights.clone(),
+        )?;
+        Ok((Self::nurbs(out), result.report))
+    }
+
     pub fn name(&self) -> &'static str {
         match &self.0 {
             Geometry::Plane(_) => "Plane",

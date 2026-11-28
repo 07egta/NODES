@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "name": "OMEGA 77 曲面フェアリングスタディ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "nurbs_bicubic_panel",
+        "name": "改善前・双三次パネル",
+        "position": [
+          20,
+          40
+        ],
+        "params": {
+          "width": 40,
+          "depth": 40,
+          "rise": 8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "surface_fair",
+        "name": "改善後・境界保持",
+        "position": [
+          300,
+          40
+        ],
+        "params": {
+          "strength": 1,
+          "iterations": 8,
+          "keep": 0,
+          "tolerance": 8
+        },
+        "inputs": {
+          "surface": 0
+        },
+        "preview": true
+      },
+      {
+        "id": 2,
+        "kind": "surface_fair_report",
+        "name": "改善前後のエネルギー",
+        "position": [
+          300,
+          300
+        ],
+        "params": {
+          "strength": 1,
+          "iterations": 8,
+          "keep": 0,
+          "tolerance": 8
+        },
+        "inputs": {
+          "surface": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "surface_principal_lines",
+        "name": "改善前の主曲率方向",
+        "position": [
+          300,
+          560
+        ],
+        "params": {
+          "u": 0.25,
+          "v": 0.25,
+          "length": 5
+        },
+        "inputs": {
+          "surface": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "surface_uv_condition",
+        "name": "改善後の局所UV歪み",
+        "position": [
+          590,
+          40
+        ],
+        "params": {
+          "u": 0.25,
+          "v": 0.25
+        },
+        "inputs": {
+          "surface": 1
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    20,
+    35
+  ],
+  "zoom": 0.72
+}
