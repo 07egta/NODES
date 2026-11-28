@@ -149,6 +149,38 @@ pub fn value_text(value: &Value) -> String {
     }
 }
 
+/// Compact, bounded probe shared by wire and output-port tooltips.
+fn probe_lines(tree: &Tree) -> Vec<String> {
+    const BRANCH_LIMIT: usize = 4;
+    const ITEM_LIMIT: usize = 3;
+    let mut lines = vec![format!(
+        "{} 枝 / {} 個",
+        tree.branches.len(),
+        tree.item_count()
+    )];
+    for (path, items) in tree.branches.iter().take(BRANCH_LIMIT) {
+        lines.push(format!("{} · {} 個", path_text(path), items.len()));
+        for value in items.iter().take(ITEM_LIMIT) {
+            // Keep the tooltip narrow even for a long textual geometry summary.
+            let preview: String = value_text(value).chars().take(96).collect();
+            lines.push(format!("  {preview}"));
+        }
+        if items.len() > ITEM_LIMIT {
+            lines.push(format!("  … 残り {} 個", items.len() - ITEM_LIMIT));
+        }
+    }
+    if tree.branches.len() > BRANCH_LIMIT {
+        lines.push(format!("… 残り {} 枝", tree.branches.len() - BRANCH_LIMIT));
+    }
+    lines
+}
+
+pub fn show_probe(ui: &mut egui::Ui, tree: &Tree) {
+    for line in probe_lines(tree) {
+        ui.label(theme::small(line));
+    }
+}
+
 fn show_value(ui: &mut egui::Ui, value: &Value) {
     let label = RichText::new(value_text(value)).size(11.).monospace();
     if !matches!(value, Value::Number(_) | Value::Point(_)) {
@@ -348,6 +380,18 @@ mod tests {
         }
         assert_eq!(page_bounds(3, usize::MAX, 32), (0, 0, 3));
         assert_eq!(page_bounds(101, 99, 100), (1, 100, 101));
+    }
+
+    #[test]
+    fn probe_preserves_empty_branches_and_limits_preview_rows() {
+        let tree = numbers(&[(&[0], 5), (&[1], 0), (&[2], 1), (&[3], 1), (&[4], 1)]);
+        let lines = probe_lines(&tree);
+        assert_eq!(lines[0], "5 枝 / 8 個");
+        assert!(lines.iter().any(|line| line == "{1} · 0 個"));
+        assert!(lines.iter().any(|line| line == "  … 残り 2 個"));
+        assert_eq!(lines.last().map(String::as_str), Some("… 残り 1 枝"));
+        assert!(!lines.iter().any(|line| line.starts_with("{4}")));
+        assert_eq!(probe_lines(&Tree::default()), vec!["0 枝 / 0 個"]);
     }
 
     #[test]

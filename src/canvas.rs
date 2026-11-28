@@ -48,6 +48,8 @@ pub struct GraphCanvas {
     menu_at: [f32; 2],
     node_indices: NodeIndices,
     minimap: Option<MinimapDrawing>,
+    /// Transient live probe, cleared on project/history replacement.
+    probe_source: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -318,6 +320,7 @@ impl GraphCanvas {
         self.editing_note = None;
         self.note_focus = false;
         self.fit_selection_requested = false;
+        self.probe_source = None;
     }
 
     pub fn center_for_add(&self, p: &Project) -> [f32; 2] {
@@ -705,13 +708,21 @@ impl GraphCanvas {
                         if pos.distance(mid) < 14. {
                             painter.circle_stroke(mid, 6., Stroke::new(1.4_f32, theme::teal()));
                             painter.circle_filled(mid, 2., theme::teal());
-                            let hit = ui
-                                .interact(
-                                    Rect::from_center_size(mid, egui::vec2(18., 18.)),
-                                    Id::new(("wire_dot", n.id, key.as_str())),
-                                    Sense::click(),
-                                )
-                                .on_hover_text("クリックで中継点（リルート点）を置く");
+                            let hit = ui.interact(
+                                Rect::from_center_size(mid, egui::vec2(18., 18.)),
+                                Id::new(("wire_dot", n.id, key.as_str())),
+                                Sense::click(),
+                            );
+                            hit.context_menu(|ui| {
+                                if ui.button("値のプローブを固定").clicked() {
+                                    self.probe_source = Some(*from);
+                                    ui.close();
+                                }
+                            });
+                            let hit = hit.on_hover_ui(|ui| {
+                                ui.label("クリックで中継点 · 右クリックでプローブを固定");
+                                show_probe_result(ui, evaluation, stale, *from);
+                            });
                             if hit.clicked() {
                                 to_insert = Some((*from, n.id, key.clone(), mid));
                             }
@@ -1257,18 +1268,23 @@ impl GraphCanvas {
             if !over_map && or.drag_started() {
                 self.wire_drag = true;
             }
-            let shape = evaluation
-                .and_then(|e| e.outputs.get(&n.id))
-                .and_then(|r| r.as_ref().ok())
-                .map(data_view::shape_of);
-            or.on_hover_text(format!(
-                "{}の出力 · {}{}",
-                n.name,
-                n.kind.spec().output.label(),
-                shape
-                    .map(|s| format!("\n形: {}", s.describe()))
-                    .unwrap_or_default()
-            ));
+            if !over_map {
+                or.context_menu(|ui| {
+                    if ui.button("値のプローブを固定").clicked() {
+                        self.probe_source = Some(n.id);
+                        ui.close();
+                    }
+                });
+            }
+            or.on_hover_ui(|ui| {
+                ui.label(format!(
+                    "{}の出力 · {}",
+                    n.name,
+                    n.kind.spec().output.label()
+                ));
+                show_probe_result(ui, evaluation, stale, n.id);
+                ui.label(theme::small("右クリックでプローブを固定"));
+            });
             let text = if stale {
                 "更新中".to_owned()
             } else if n.off {
@@ -1452,6 +1468,24 @@ impl GraphCanvas {
         );
         if let Some(map) = map_rect {
             self.draw_minimap(ui, &painter, p, rect, map);
+        }
+        if let Some(id) = self.probe_source {
+            if let Some(node) = p.graph.node(id) {
+                let mut open = true;
+                egui::Window::new("固定プローブ")
+                    .id(Id::new("canvas_data_probe"))
+                    .open(&mut open)
+                    .default_width(280.)
+                    .show(ui.ctx(), |ui| {
+                        ui.label(&node.name);
+                        show_probe_result(ui, evaluation, stale, id);
+                    });
+                if !open {
+                    self.probe_source = None;
+                }
+            } else {
+                self.probe_source = None;
+            }
         }
         out
     }
@@ -1747,6 +1781,22 @@ impl GraphCanvas {
     }
 }
 
+fn show_probe_result(ui: &mut egui::Ui, evaluation: Option<&Evaluation>, stale: bool, id: NodeId) {
+    if stale {
+        ui.label(theme::small("更新中 · 最新の値を待っています"));
+        return;
+    }
+    match evaluation.and_then(|evaluation| evaluation.outputs.get(&id)) {
+        Some(Ok(tree)) => data_view::show_probe(ui, tree),
+        Some(Err(message)) => {
+            ui.colored_label(theme::error(), short(message, 96));
+        }
+        None => {
+            ui.label(theme::small("未計算"));
+        }
+    }
+}
+
 /// First `max` characters of `text`, with an ellipsis when cut.
 fn short(text: &str, max: usize) -> String {
     let mut out: String = text.chars().take(max).collect();
@@ -2029,6 +2079,7 @@ mod premium_tests {
         let mut canvas = GraphCanvas {
             selected: BTreeSet::from([kept, removed]),
             connecting: Some(removed),
+            probe_source: Some(kept),
             dragging: Some(kept),
             wire_drag: true,
             box_start: Some(Pos2::ZERO),
@@ -2044,6 +2095,7 @@ mod premium_tests {
         canvas.restore_graph(&graph);
         assert_eq!(canvas.selected, BTreeSet::from([kept]));
         assert!(canvas.connecting.is_none());
+        assert!(canvas.probe_source.is_none());
         assert!(canvas.dragging.is_none());
         assert!(!canvas.wire_drag);
         assert!(canvas.box_start.is_none());
