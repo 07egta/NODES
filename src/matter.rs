@@ -54,10 +54,7 @@ static INVERSE: NodeSpec = NodeSpec {
     category: "数値",
     description: "初期角と目標周期伸縮比から0〜45度の角度を逆算。範囲外の目標はエラー。",
     keywords: "auxetic inverse design pitch angle 逆設計 角度",
-    inputs: &[
-        START,
-        n("ratio", "目標倍率", 1.2, 0.5, 2., 0.01),
-    ],
+    inputs: &[START, n("ratio", "目標倍率", 1.2, 0.5, 2., 0.01)],
     output: D::Number,
 };
 
@@ -138,9 +135,18 @@ pub fn rotating_squares(
         triangles: Vec::with_capacity(nx * ny * 12),
     };
     const FACES: [[u32; 3]; 12] = [
-        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
-        [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5],
-        [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7],
+        [0, 2, 1],
+        [0, 3, 2],
+        [4, 5, 6],
+        [4, 6, 7],
+        [0, 1, 5],
+        [0, 5, 4],
+        [1, 2, 6],
+        [1, 6, 5],
+        [2, 3, 7],
+        [2, 7, 6],
+        [3, 0, 4],
+        [3, 4, 7],
     ];
     for y in 0..ny {
         for x in 0..nx {
@@ -151,10 +157,12 @@ pub fn rotating_squares(
             let offset = mesh.vertices.len() as u32;
             for z in [0., thickness] {
                 for [u, v] in [[-h, -h], [h, -h], [h, h], [-h, h]] {
-                    mesh.vertices.push([cx + c * u - sin * v, cy + sin * u + c * v, z]);
+                    mesh.vertices
+                        .push([cx + c * u - sin * v, cy + sin * u + c * v, z]);
                 }
             }
-            mesh.triangles.extend(FACES.iter().map(|f| f.map(|j| j + offset)));
+            mesh.triangles
+                .extend(FACES.iter().map(|f| f.map(|j| j + offset)));
         }
     }
     Ok(mesh)
@@ -173,14 +181,23 @@ pub(crate) fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<
     let number = match kind {
         K::MatterRotatingSquares => {
             let mesh = rotating_squares(
-                count(num(a, 0)?)?, count(num(a, 1)?)?, num(a, 2)?,
-                num(a, 3)?, num(a, 4)?, num(a, 5)?, stop,
+                count(num(a, 0)?)?,
+                count(num(a, 1)?)?,
+                num(a, 2)?,
+                num(a, 3)?,
+                num(a, 4)?,
+                num(a, 5)?,
+                stop,
             )?;
             return as_mesh(mesh, stop);
         }
         K::MatterExpansionRatio => expansion_ratio(num(a, 0)?, num(a, 1)?)?,
         K::MatterPlateContact => {
-            if plate_contact(num(a, 0)?, num(a, 1)?)? { 1. } else { 0. }
+            if plate_contact(num(a, 0)?, num(a, 1)?)? {
+                1.
+            } else {
+                0.
+            }
         }
         K::MatterInverseAngle => inverse_angle(num(a, 0)?, num(a, 1)?)?,
         _ => return Err("回転格子ノードではありません。".into()),
