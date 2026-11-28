@@ -92,6 +92,7 @@ example_cases! {
     (nurbs_panel, "surface-panel.morph", 0, "rise", 32.0, 2, Surface, false),
     (ruled_surface, "surface-ruled.morph", 0, "height", 28.0, 3, Surface, false),
     (revolved_nurbs_vase, "surface-vase.morph", 0, "middle", 42.0, 2, Surface, false),
+    (exact_curve_array, "omega43-exact-curve-array.morph", 3, "count", 17.0, 10, Number, false),
 }
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(0);
