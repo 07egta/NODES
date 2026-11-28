@@ -4,7 +4,11 @@ use solidcraft_kernel::boolean_checked::{BooleanStatus, boolean_checked};
 use solidcraft_kernel::{Body, BoolOp, box_solid, measure_mass};
 
 fn bx(lo: [f64; 3], hi: [f64; 3]) -> Body {
-    box_solid(Vec3::new(lo[0], lo[1], lo[2]), Vec3::new(hi[0], hi[1], hi[2])).unwrap()
+    box_solid(
+        Vec3::new(lo[0], lo[1], lo[2]),
+        Vec3::new(hi[0], hi[1], hi[2]),
+    )
+    .unwrap()
 }
 
 fn volume(a: &Body, b: &Body, op: BoolOp) -> f64 {
@@ -42,7 +46,12 @@ fn self_difference_empty_is_not_a_certified_success() {
     close(volume(&a, &a, BoolOp::Union), 1000.);
     close(volume(&a, &a, BoolOp::Intersect), 1000.);
     let r = boolean_checked(&a, &a, BoolOp::Cut, &|| false);
-    assert_eq!(r.status, BooleanStatus::AmbiguousIntersection, "{}", r.detail);
+    assert_eq!(
+        r.status,
+        BooleanStatus::AmbiguousIntersection,
+        "{}",
+        r.detail
+    );
     assert!(r.body.is_none());
 }
 

@@ -59,7 +59,14 @@ pub fn boolean_checked(a: &Body, b: &Body, op: BoolOp, stop: &dyn Fn() -> bool) 
     let body = match candidate {
         Ok(Some(body)) => body,
         Ok(None) if op == BoolOp::Union => return result(UnresolvedTopology, None, diagnostics, "reconstruction: unexpected empty union"),
-        Ok(None) => return result(AmbiguousIntersection, None, diagnostics, "classification: empty candidate; absence of shared material not independently proved"),
+        Ok(None) => {
+            return result(
+                AmbiguousIntersection,
+                None,
+                diagnostics,
+                "classification: empty candidate; absence of shared material not independently proved",
+            );
+        }
         Err(e) => {
             let status = if matches!(&e, KernelError::Invalid(_)) { InvalidInput } else { NumericalFailure };
             return result(status, None, diagnostics, format!("native Boolean: {e}"));

@@ -255,8 +255,23 @@ pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>)
 fn box_within(inner: &Aabb3, outer: &Aabb3, reach: f64) -> bool {
     !inner.is_empty()
         && !outer.is_empty()
-        && [inner.min.x, inner.min.y, inner.min.z, inner.max.x, inner.max.y, inner.max.z,
-            outer.min.x, outer.min.y, outer.min.z, outer.max.x, outer.max.y, outer.max.z, reach].iter().all(|x| x.is_finite())
+        && [
+            inner.min.x,
+            inner.min.y,
+            inner.min.z,
+            inner.max.x,
+            inner.max.y,
+            inner.max.z,
+            outer.min.x,
+            outer.min.y,
+            outer.min.z,
+            outer.max.x,
+            outer.max.y,
+            outer.max.z,
+            reach,
+        ]
+        .iter()
+        .all(|x| x.is_finite())
         && inner.min.x >= outer.min.x - reach
         && inner.min.y >= outer.min.y - reach
         && inner.min.z >= outer.min.z - reach
