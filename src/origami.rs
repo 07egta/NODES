@@ -112,7 +112,10 @@ impl Parameters {
                 triangles.extend([[a, b, c], [a, c, d]]);
             }
         }
-        Ok(Mesh { vertices, triangles })
+        Ok(Mesh {
+            vertices,
+            triangles,
+        })
     }
 }
 
