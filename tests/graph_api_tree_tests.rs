@@ -53,7 +53,9 @@ fn invalid_reserved_tree_settings_are_rejected_atomically() {
         (MATCH_PARAM, 3.),
         (MATCH_PARAM, 0.5),
         (MATCH_PARAM, f64::NAN),
-        ("__tree_port:a", 4.),
+        ("__tree_port:a", 5.),
+        ("__wire:a", 3.),
+        ("__wire:missing", 1.),
         ("__tree_port:a", f64::INFINITY),
         ("__tree_port:missing", 1.),
     ] {
