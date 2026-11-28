@@ -1,5 +1,7 @@
 //! Independent procedural design kernels. No CAD kernel or extra dependency.
 //! Curves are sampled polylines, not NURBS. All coordinates are in model units.
+mod panels;
+
 use crate::engine::{cancelled, cross, dot, finite_point, length, map_shape, num, shape, sub};
 use crate::model::*;
 use std::f64::consts::{PI, TAU};
@@ -301,6 +303,9 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         CurveArray => &CURVE_ARRAY,
         NoiseField => &NOISE_FIELD,
         LifeGrid => &LIFE_GRID,
+        ShapeMorph => &panels::MORPH,
+        InsetCell => &panels::INSET,
+        MeshFacePanels => &panels::FACE_PANELS,
         k if ornament::is_kind(k) => ornament::spec(k),
         _ => unreachable!("not a generative node"),
     }
@@ -331,6 +336,9 @@ pub(crate) fn is_kind(kind: NodeKind) -> bool {
             | NodeKind::CurveArray
             | NodeKind::NoiseField
             | NodeKind::LifeGrid
+            | NodeKind::ShapeMorph
+            | NodeKind::InsetCell
+            | NodeKind::MeshFacePanels
     ) || ornament::is_kind(kind)
 }
 pub(crate) fn is_list(kind: NodeKind) -> bool {
@@ -421,6 +429,10 @@ pub(crate) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), S
         PopulateMesh => count(a, 1, 2048)?,
         CurveArray => count(a, 2, 128)?,
         LifeGrid => count(a, 0, 64)? * count(a, 1, 64)?,
+        MeshFacePanels => match shape(a)? {
+            Value::Mesh(m) => m.triangles.len(),
+            _ => return Err("メッシュが必要です。".into()),
+        },
         _ => 1,
     };
     let weight = match kind {
@@ -429,7 +441,11 @@ pub(crate) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), S
         FractalTree => 2 * n,
         GridArray | CurveArray => shape(a)?.weight().saturating_mul(n),
         NoiseField => 2,
-        Rotate3d | Shear | Taper => shape(a)?.weight(),
+        Rotate3d | Shear | Taper | InsetCell => shape(a)?.weight(),
+        ShapeMorph => shape(a)?
+            .weight()
+            .max(a.get(1).ok_or("終了形状が必要です。")?.weight()),
+        MeshFacePanels => n.saturating_mul(3),
         _ => n,
     };
     Ok((weight, n))
@@ -477,6 +493,7 @@ pub(crate) fn run_item(
         return ornament::run_item(kind, a, cancel);
     }
     match kind {
+        ShapeMorph | InsetCell | MeshFacePanels => panels::run(kind, a, cancel),
         RectGrid | TriangularGrid | HexGrid | HexPanels | TriPanels => {
             let nx = count(a, 0, 64)?;
             let ny = count(a, 1, 64)?;

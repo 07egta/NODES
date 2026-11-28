@@ -1215,10 +1215,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d
         | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray
         | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d
-        | PopulateMesh | CurveArray | NoiseField | LifeGrid | TruchetPattern | AsanohaPattern
-        | ShippoPattern | PowerDiagram2d | LloydRelax2d => {
-            crate::generative::run_item(kind, a, cancel)
-        }
+        | PopulateMesh | CurveArray | NoiseField | LifeGrid | ShapeMorph | InsetCell
+        | MeshFacePanels | TruchetPattern | AsanohaPattern | ShippoPattern | PowerDiagram2d
+        | LloydRelax2d => crate::generative::run_item(kind, a, cancel),
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
         | PointComponent => crate::gh_nodes::run_item(kind, a, cancel),
         ArcCurve | Polyline | SmoothCurve | OffsetCurve | PointOnCurve | DivideCurve | Pipe
