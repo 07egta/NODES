@@ -33,10 +33,7 @@ fn ring_torus_rejects_invalid_inputs_and_cancellation() {
     ] {
         assert!(kb::torus(major, minor, &|| false).is_err());
     }
-    assert_eq!(
-        kb::torus(30., 8., &|| true).unwrap_err(),
-        kb::STOPPED
-    );
+    assert_eq!(kb::torus(30., 8., &|| true).unwrap_err(), kb::STOPPED);
 }
 
 #[test]
