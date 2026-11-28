@@ -4,7 +4,7 @@ use nodes::model::NodeKind;
 use nodes::persistence::{self, MAX_PROJECT_BYTES};
 use nodes::templates;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -108,7 +108,7 @@ fn failed_validation_or_oversized_previous_file_preserves_destination() {
     let temp = TempDir::new();
     let path = temp.project();
     let valid = templates::create(0);
-    persistence::save_with_backup(&path, &valid).unwrap();
+    assert_eq!(persistence::save_with_backup(&path, &valid).unwrap(), None);
     let before = fs::read(&path).unwrap();
     let mut invalid = valid.clone();
     invalid.zoom = f32::NAN;
@@ -136,7 +136,7 @@ fn save_reload_and_restore_preserve_tree_results_wires_and_next_id() {
     let before = Evaluator::default().evaluate(&project.graph, &|| false);
     assert!(before.outputs[&graft].as_ref().unwrap().branches.len() > 1);
 
-    persistence::save_with_backup(&path, &project).unwrap();
+    assert_eq!(persistence::save_with_backup(&path, &project).unwrap(), None);
     let mut reopened = persistence::load(&path).unwrap();
     assert_eq!(reopened, project);
     assert!(persistence::same_parameter_bits(&reopened.graph, &project.graph));
@@ -150,8 +150,62 @@ fn save_reload_and_restore_preserve_tree_results_wires_and_next_id() {
         .unwrap()
         .unwrap();
     assert_eq!(persistence::load(&path).unwrap(), reopened);
-    let recovered = persistence::load(Path::new(&backup)).unwrap();
+    let recovered = persistence::load(&backup).unwrap();
     assert_eq!(recovered, project);
     let restored = Evaluator::default().evaluate(&recovered.graph, &|| false);
     assert_eq!(restored.outputs[&graft], before.outputs[&graft]);
+}
+
+#[test]
+fn ordinary_autosave_does_not_generate_manual_backup_history() {
+    let temp = TempDir::new();
+    let path = temp.project();
+    let first = templates::create(0);
+    let mut second = first.clone();
+    second.name = "autosaved".into();
+    persistence::save(&path, &first).unwrap();
+    persistence::save(&path, &second).unwrap();
+    assert_eq!(persistence::load(&path).unwrap(), second);
+    assert_eq!(temp.count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn symlink_destination_is_not_replaced_or_followed() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new();
+    let original = temp.0.join("original.morph");
+    let path = temp.project();
+    let project = templates::create(0);
+    persistence::save(&original, &project).unwrap();
+    let original_bytes = fs::read(&original).unwrap();
+    symlink(&original, &path).unwrap();
+
+    assert!(persistence::save_with_backup(&path, &project).is_err());
+    assert!(fs::symlink_metadata(&path).unwrap().file_type().is_symlink());
+    assert_eq!(fs::read(&original).unwrap(), original_bytes);
+    assert_eq!(temp.count(), 2);
+}
+
+#[cfg(windows)]
+#[test]
+fn locked_destination_keeps_the_previous_document() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let temp = TempDir::new();
+    let path = temp.project();
+    let project = templates::create(0);
+    persistence::save(&path, &project).unwrap();
+    let before = fs::read(&path).unwrap();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&path)
+        .unwrap();
+
+    assert!(persistence::save_with_backup(&path, &project).is_err());
+    drop(lock);
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert_eq!(temp.count(), 1);
 }

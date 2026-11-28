@@ -193,7 +193,9 @@ fn backup_existing(path: &Path) -> std::io::Result<Option<PathBuf>> {
         return Err(Error::other("通常のファイルだけを上書きできます。"));
     }
     if metadata.len() > MAX_PROJECT_BYTES as u64 {
-        return Err(Error::other("既存の作品が 8 MB を超えています。別名で保存してください。"));
+        return Err(Error::other(
+            "既存の作品が 8 MB を超えています。別名で保存してください。",
+        ));
     }
     let source = File::open(path)?;
     if !source.metadata()?.is_file() {
@@ -204,7 +206,9 @@ fn backup_existing(path: &Path) -> std::io::Result<Option<PathBuf>> {
         .take((MAX_PROJECT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)?;
     if bytes.len() > MAX_PROJECT_BYTES {
-        return Err(Error::other("既存の作品が 8 MB を超えています。別名で保存してください。"));
+        return Err(Error::other(
+            "既存の作品が 8 MB を超えています。別名で保存してください。",
+        ));
     }
 
     let parent = path
