@@ -171,7 +171,10 @@ pub fn recent_from_saved(saved: &[NodeKind]) -> ui_polish::Recent {
 /// Adds `kind` just right of `source` and connects `source` to the first input of `kind`.
 pub fn add_suggested(graph: &mut Graph, source: NodeId, kind: NodeKind) -> Result<NodeId, String> {
     let source_node = graph.node(source).ok_or("接続元が見つかりません。")?;
-    let at = [source_node.position[0] + 280., source_node.position[1] + 40.];
+    let at = [
+        source_node.position[0] + 280.,
+        source_node.position[1] + 40.,
+    ];
     let input = kind.spec().inputs.first().ok_or("入力が見つかりません。")?;
     let next_id = graph.next_id;
     let original_len = graph.nodes.len();

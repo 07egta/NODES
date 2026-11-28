@@ -277,3 +277,32 @@ fn obj_accepts_inline_comments_on_faces() {
     let mesh = parse_obj(text.as_bytes(), &no_cancel).unwrap();
     assert_eq!(mesh.triangles.len(), 1);
 }
+
+#[test]
+fn ascii_stl_supports_bom_whitespace_and_complete_solid_blocks() {
+    let one = ascii_stl(&cube());
+    let text = format!("\u{feff} \n{one}\n{one}");
+    let mesh = parse_stl(text.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 24);
+    assert_eq!(mesh.vertices.len(), 8);
+}
+
+#[test]
+fn ascii_stl_rejects_nested_or_overfull_facets() {
+    let text = ascii_stl(&cube());
+    for bad in [
+        text.replacen("    endloop", "      vertex 0 0 0\n    endloop", 1),
+        text.replacen("    endloop", "  facet normal 0 0 1", 1),
+        text.replacen("  endfacet", "  endfacet unexpected", 1),
+    ] {
+        assert!(parse_stl(bad.as_bytes(), &no_cancel).is_err());
+    }
+}
+
+#[test]
+fn obj_comments_preserve_negative_indices_and_polygon_winding() {
+    let text = "v 0 0 0 # a\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf -4 -3 -2 -1# quad\n";
+    let mesh = parse_obj(text.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 2);
+    assert_eq!(mesh.vertices.len(), 4);
+}

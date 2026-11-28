@@ -303,3 +303,49 @@ fn node_budget_is_a_rejection_not_a_false_large_graph_success() {
     }
     assert!(oversized.validate().is_err());
 }
+
+#[test]
+fn reroute_dot_passes_values_through_and_new_kinds_keep_snake_case_ids() {
+    let mut graph = Graph::default();
+    let slider = add(&mut graph, NodeKind::Number);
+    let dot = add(&mut graph, NodeKind::Reroute);
+    let sum = add(&mut graph, NodeKind::Add);
+    set(&mut graph, slider, "value", 5.);
+    graph.connect(slider, dot, "value").unwrap();
+    graph.connect(dot, sum, "a").unwrap();
+    assert!(!graph.node(dot).unwrap().preview);
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(numbers(result.outputs[&dot].as_ref().unwrap()), vec![5.]);
+    assert_eq!(numbers(result.outputs[&sum].as_ref().unwrap()), vec![15.]);
+    for (kind, id) in [
+        (NodeKind::Reroute, "reroute"),
+        (NodeKind::MathSquareRoot, "math_square_root"),
+        (NodeKind::GateXnor, "gate_xnor"),
+        (NodeKind::PointPolar, "point_polar"),
+        (NodeKind::CurveAreaCentroid, "curve_area_centroid"),
+        (NodeKind::RotateDirection, "rotate_direction"),
+        (NodeKind::ProjectToZ, "project_to_z"),
+    ] {
+        assert_eq!(node_id(kind), id);
+    }
+}
+
+#[test]
+fn new_standard_components_evaluate_in_a_graph() {
+    let mut graph = Graph::default();
+    let value = add(&mut graph, NodeKind::Number);
+    let root = add(&mut graph, NodeKind::MathSquareRoot);
+    let polar = add(&mut graph, NodeKind::PointPolar);
+    set(&mut graph, value, "value", 16.);
+    graph.connect(value, root, "x").unwrap();
+    graph.connect(root, polar, "radius").unwrap();
+    set(&mut graph, polar, "angle", 90.);
+    set(&mut graph, polar, "elevation", 0.);
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(numbers(result.outputs[&root].as_ref().unwrap()), vec![4.]);
+    let tree = result.outputs[&polar].as_ref().unwrap();
+    match tree.branches.values().flatten().next() {
+        Some(Value::Point(p)) => assert!((p[1] - 4.).abs() < 1e-9 && p[0].abs() < 1e-9),
+        other => panic!("unexpected {other:?}"),
+    }
+}

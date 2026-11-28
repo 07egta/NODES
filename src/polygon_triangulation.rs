@@ -62,7 +62,9 @@ fn checkpoint(
         return Err("多角形の三角形分割が計算量上限を超えました。面を分割してください。".into());
     }
     if *remaining == 0 {
-        return Err("OBJ 全体の三角形分割が計算量上限を超えました。ファイルを分割してください。".into());
+        return Err(
+            "OBJ 全体の三角形分割が計算量上限を超えました。ファイルを分割してください。".into(),
+        );
     }
     *predicates += 1;
     *remaining -= 1;
