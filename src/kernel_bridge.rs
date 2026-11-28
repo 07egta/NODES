@@ -400,10 +400,10 @@ pub struct Piece {
 }
 
 impl Piece {
-    fn degree(&self) -> usize {
+    pub(crate) fn degree(&self) -> usize {
         self.h.len().saturating_sub(1)
     }
-    fn point_at(&self, t: f64) -> P3 {
+    pub(crate) fn point_at(&self, t: f64) -> P3 {
         let mut work = self.h.clone();
         let n = work.len();
         for r in 1..n {
