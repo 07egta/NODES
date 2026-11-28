@@ -76,7 +76,10 @@ fn different_sources_remain_distinct_even_when_values_are_equal() -> Result<(), 
     graph.connect(b, add, "b")?;
     let grouped = cluster::group_nodes(&mut graph, &[add], "Distinct")?;
     assert_eq!(graph.clusters[0].inputs.len(), 2);
-    assert_eq!(graph.node(grouped).ok_or("missing cluster")?.inputs.len(), 2);
+    assert_eq!(
+        graph.node(grouped).ok_or("missing cluster")?.inputs.len(),
+        2
+    );
     Ok(())
 }
 
@@ -96,6 +99,9 @@ fn old_port_json_stays_readable_and_serializes_without_new_field() -> Result<(),
     let json = r#"{"node":1,"key":"a","label":"Input"}"#;
     let port: ClusterPort = serde_json::from_str(json).map_err(|e| e.to_string())?;
     assert_eq!(port.targets().collect::<Vec<_>>(), vec![(1, "a")]);
-    assert_eq!(serde_json::to_string(&port).map_err(|e| e.to_string())?, json);
+    assert_eq!(
+        serde_json::to_string(&port).map_err(|e| e.to_string())?,
+        json
+    );
     Ok(())
 }
