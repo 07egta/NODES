@@ -325,7 +325,7 @@ impl FilePicker {
                                         entry.path.to_string_lossy().into_owned()
                                     });
                                     if entry.is_dir {
-                                        if double_clicked {
+                                        if clicked || double_clicked {
                                             navigate = Some(entry.path.clone());
                                         }
                                     } else if clicked || double_clicked {
@@ -356,7 +356,7 @@ impl FilePicker {
                 } else {
                     ui.label(
                         RichText::new(format!(
-                            "フォルダーはダブルクリックで開く  ·  {} ファイル",
+                            "フォルダーはクリックで開く  ·  {} ファイル",
                             self.task.filter_hint()
                         ))
                         .small()
@@ -384,7 +384,7 @@ impl FilePicker {
                     if ui.button("キャンセル").clicked() {
                         event = Some(PickerEvent::Cancelled);
                     }
-                    ui.label(RichText::new("拡張子は自動で補います").small().weak());
+                    ui.label(RichText::new("拡張子がない場合は自動で補います").small().weak());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .add_enabled(
@@ -524,9 +524,9 @@ impl FilePicker {
         }
         let extension = self.task.extension();
         if !self.task.accepts(&path) {
-            if self.task.picks_existing() && path.extension().is_some() {
+            if path.extension().is_some() {
                 self.error = Some(format!(
-                    "開けるファイルは {} です。",
+                    "対応する拡張子は {} です。ファイル名を確認してください。",
                     self.task.filter_hint()
                 ));
                 return None;
@@ -789,6 +789,37 @@ mod directory_listing_tests {
         let mut picker = FilePicker::new(FileTask::ExportStep, directory.0.clone(), "new".into());
         assert!(
             matches!(picker.choose(), Some(PickerEvent::Chosen(path)) if path == directory.0.join("new.step"))
+        );
+    }
+
+    #[test]
+    fn explicit_wrong_extension_never_redirects_save_to_another_file() {
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("nodes-picker-ext-{}-{id}", std::process::id()));
+        fs::create_dir(&path).unwrap();
+        let directory = TempDirectory(path);
+        for (task, wrong, bare, expected) in [
+            (FileTask::Save, "model.stl", "model", "model.morph"),
+            (FileTask::ExportStl, "model.obj", "model", "model.stl"),
+            (FileTask::ExportStep, "model.txt", "model", "model.step"),
+        ] {
+            let mut picker = FilePicker::new(task, directory.0.clone(), wrong.into());
+            assert!(picker.choose().is_none());
+            assert!(picker.error.is_some());
+            assert!(picker.overwrite.is_none());
+            let mut picker = FilePicker::new(task, directory.0.clone(), bare.into());
+            assert!(
+                matches!(picker.choose(), Some(PickerEvent::Chosen(path)) if path == directory.0.join(expected))
+            );
+        }
+        let mut picker =
+            FilePicker::new(FileTask::ExportStep, directory.0.clone(), "model.IGS".into());
+        assert!(
+            matches!(picker.choose(), Some(PickerEvent::Chosen(path)) if path == directory.0.join("model.IGS"))
         );
     }
 
