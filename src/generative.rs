@@ -121,7 +121,7 @@ static MULTIATTRACTOR: NodeSpec = NodeSpec {
 static CURVEATTRACTOR: NodeSpec = NodeSpec {
     label: "曲線アトラクター",
     category: "数値",
-    description: "点から折れ線の各線分への最短距離を計算します。閉曲線の最後の辺も含みます。",
+    description: "精密曲線は最近接パラメータの数値探索、折れ線は各線分への最短距離を計算します。",
     keywords: "curve attractor closest distance 曲線 引力 距離",
     inputs: &[
         g("point", "点", DataType::Point),
@@ -235,7 +235,7 @@ static POPULATE_MESH: NodeSpec = NodeSpec {
 static CURVE_ARRAY: NodeSpec = NodeSpec {
     label: "曲線に沿った配列",
     category: "配列",
-    description: "折れ線の弧長に沿って等間隔に形状を平行移動します。閉曲線の終点重複はありません。方向は変えません。",
+    description: "精密曲線または折れ線の弧長に沿って等間隔に形状を平行移動します。閉曲線の終点重複はありません。方向は変えません。",
     keywords: "curve array length arc distribute 配列 曲線 等間隔",
     inputs: &[
         GEOMETRY,
@@ -607,6 +607,11 @@ pub(crate) fn run_item(
             let Some(Value::Curve(c)) = a.get(1) else {
                 return Err("曲線が必要です。".into());
             };
+            if let Some(geometry) = &c.geometry {
+                let t = geometry.closest_parameter(p, cancel)?;
+                let distance = crate::curve_geometry::norm(sub(geometry.point(t)?, p));
+                return Ok(vec![Value::Number(distance)]);
+            }
             if c.points.is_empty() {
                 return Err("曲線に点がありません。".into());
             }
@@ -1013,6 +1018,26 @@ fn curve_array(
     cancel: &dyn Fn() -> bool,
 ) -> Result<Vec<Value>, String> {
     array_budget(source, n)?;
+    if let Some(geometry) = &c.geometry {
+        let table = geometry.length_table(cancel)?;
+        let total = table.total();
+        if total <= 1e-12 || !total.is_finite() {
+            return Err("曲線の長さがありません。".into());
+        }
+        let divisor = if geometry.closed()? {
+            n
+        } else {
+            n.saturating_sub(1).max(1)
+        };
+        let mut out = Vec::with_capacity(n);
+        for i in 0..n {
+            cancelled(cancel)?;
+            let distance = total * (i as f64 / divisor as f64);
+            let t = table.parameter(geometry, distance, cancel)?;
+            out.push(translated(source, geometry.point(t)?, cancel)?);
+        }
+        return Ok(out);
+    }
     if c.points.len() < 2 {
         return Err("曲線に点が足りません。".into());
     }
