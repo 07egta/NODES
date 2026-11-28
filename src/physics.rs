@@ -124,7 +124,9 @@ pub fn relax(
         || !cfg.gravity.is_finite()
         || !cfg.margin.is_finite()
         || cfg.margin < 0.
-        || cfg.floor.is_some_and(|z| !z.is_finite() || (z + cfg.margin).abs() > 1e9)
+        || cfg
+            .floor
+            .is_some_and(|z| !z.is_finite() || (z + cfg.margin).abs() > 1e9)
     {
         return Err("物理の設定が範囲外です。".into());
     }

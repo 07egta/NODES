@@ -1,7 +1,9 @@
 //! Two-sided swept-sphere CCD against static triangle meshes.
 //! A closest-point separating plane gives a conservative advancement bound.
 //! This is floating-point geometry, not interval-certified or solid containment.
-use crate::mesh_tools::{P, Stop, add, closest_on_triangle, cross, dot, len, mul, raw_check, sub, tick};
+use crate::mesh_tools::{
+    P, Stop, add, closest_on_triangle, cross, dot, len, mul, raw_check, sub, tick,
+};
 use crate::model::Mesh;
 
 const MAX_FACES: usize = 250_000;
@@ -28,7 +30,10 @@ impl Budget {
     }
 
     fn charge(&mut self, stop: Stop) -> Result<(), String> {
-        self.remaining = self.remaining.checked_sub(1).ok_or("CCD 計算量の上限を超えました。")?;
+        self.remaining = self
+            .remaining
+            .checked_sub(1)
+            .ok_or("CCD 計算量の上限を超えました。")?;
         tick(self.remaining, stop)
     }
 }
@@ -41,7 +46,10 @@ struct Bounds {
 
 impl Bounds {
     fn of_points(points: &[P]) -> Self {
-        let mut b = Self { lo: points[0], hi: points[0] };
+        let mut b = Self {
+            lo: points[0],
+            hi: points[0],
+        };
         for p in points.iter().skip(1) {
             b.lo = std::array::from_fn(|k| b.lo[k].min(p[k]));
             b.hi = std::array::from_fn(|k| b.hi[k].max(p[k]));
@@ -90,13 +98,21 @@ impl Node {
         if stop() {
             return Err("CCD の構築を中断しました。".into());
         }
-        let bounds = triangles.iter().skip(1).fold(triangles[0].bounds, |b, t| b.union(t.bounds));
+        let bounds = triangles
+            .iter()
+            .skip(1)
+            .fold(triangles[0].bounds, |b, t| b.union(t.bounds));
         let kind = if triangles.len() <= LEAF_SIZE {
-            NodeKind::Leaf { first, count: triangles.len() }
+            NodeKind::Leaf {
+                first,
+                count: triangles.len(),
+            }
         } else {
-            let axis = (0..3).max_by(|&a, &b| {
-                (bounds.hi[a] - bounds.lo[a]).total_cmp(&(bounds.hi[b] - bounds.lo[b]))
-            }).ok_or("CCD の軸が無効です。")?;
+            let axis = (0..3)
+                .max_by(|&a, &b| {
+                    (bounds.hi[a] - bounds.lo[a]).total_cmp(&(bounds.hi[b] - bounds.lo[b]))
+                })
+                .ok_or("CCD の軸が無効です。")?;
             let mid = triangles.len() / 2;
             triangles.select_nth_unstable_by(mid, |a, b| {
                 (a.bounds.lo[axis] + a.bounds.hi[axis])
@@ -149,7 +165,11 @@ impl StaticMesh {
             if scale < 1e-12 || len(cross(ab, ac)) <= scale * scale * 1e-12 {
                 return Err(format!("CCD: 退化または極端に細い三角形 {id}。"));
             }
-            triangles.push(Triangle { points, bounds: Bounds::of_points(&points), id });
+            triangles.push(Triangle {
+                points,
+                bounds: Bounds::of_points(&points),
+                id,
+            });
         }
         let root = Node::build(&mut triangles, 0, stop)?;
         Ok(Self { triangles, root })
@@ -173,8 +193,13 @@ impl StaticMesh {
         if !valid(start) || !valid(end) || !(0.0 < radius && radius <= 1e9) {
             return Err("CCD の座標または半径が範囲外です。".into());
         }
-        let scale = start.into_iter().chain(end).chain(self.root.bounds.lo)
-            .chain(self.root.bounds.hi).map(f64::abs).fold(1.0, f64::max);
+        let scale = start
+            .into_iter()
+            .chain(end)
+            .chain(self.root.bounds.lo)
+            .chain(self.root.bounds.hi)
+            .map(f64::abs)
+            .fold(1.0, f64::max);
         let tolerance = (64.0 * f64::EPSILON * scale).max(radius * 1e-8);
         if tolerance >= radius * 0.1 {
             return Err("CCD: 座標のスケールに対して半径が小さすぎます。".into());
@@ -253,7 +278,11 @@ fn triangle_impact(
             return Ok(None);
         }
         if gap <= 2.0 * sweep.tolerance {
-            return Ok(Some(Impact { toi: t, normal, triangle: tri.id }));
+            return Ok(Some(Impact {
+                toi: t,
+                normal,
+                triangle: tri.id,
+            }));
         }
         // Distance to the current supporting plane bounds the earliest possible
         // hit even when the nearest feature switches between face/edge/vertex.
@@ -284,8 +313,10 @@ mod tests {
     }
 
     fn hit(a: P, b: P, r: f64) -> Option<Impact> {
-        StaticMesh::new(&triangle(), GO).unwrap()
-            .sweep(a, b, r, &mut Budget::new(10_000), GO).unwrap()
+        StaticMesh::new(&triangle(), GO)
+            .unwrap()
+            .sweep(a, b, r, &mut Budget::new(10_000), GO)
+            .unwrap()
     }
 
     #[test]
@@ -321,25 +352,59 @@ mod tests {
     fn initial_overlap_invalid_geometry_budget_and_cancel_are_errors() {
         let mut m = triangle();
         let collider = StaticMesh::new(&m, GO).unwrap();
-        assert!(collider.sweep([1., 1., 0.1], [1., 1., 2.], 0.25, &mut Budget::new(100), GO).is_err());
-        assert!(collider.sweep([1., 1., 2.], [1., 1., -2.], 0.25, &mut Budget::new(0), GO).is_err());
-        assert!(collider.sweep([1., 1., 2.], [1., 1., -2.], 0.25, &mut Budget::new(100), &|| true).is_err());
+        assert!(
+            collider
+                .sweep([1., 1., 0.1], [1., 1., 2.], 0.25, &mut Budget::new(100), GO)
+                .is_err()
+        );
+        assert!(
+            collider
+                .sweep([1., 1., 2.], [1., 1., -2.], 0.25, &mut Budget::new(0), GO)
+                .is_err()
+        );
+        assert!(
+            collider
+                .sweep(
+                    [1., 1., 2.],
+                    [1., 1., -2.],
+                    0.25,
+                    &mut Budget::new(100),
+                    &|| true
+                )
+                .is_err()
+        );
         m.triangles[0] = [0, 1, 1];
         assert!(StaticMesh::new(&m, GO).is_err());
     }
 
     #[test]
     fn bvh_selects_earliest_hit_independent_of_face_order() {
-        let mut m = Mesh { vertices: Vec::new(), triangles: Vec::new() };
+        let mut m = Mesh {
+            vertices: Vec::new(),
+            triangles: Vec::new(),
+        };
         for i in (0..20).rev() {
             let base = m.vertices.len() as u32;
-            m.vertices.extend(triangle().vertices.into_iter().map(|p| add(p, [0., 0., i as f64])));
+            m.vertices.extend(
+                triangle()
+                    .vertices
+                    .into_iter()
+                    .map(|p| add(p, [0., 0., i as f64])),
+            );
             m.triangles.push([base, base + 1, base + 2]);
         }
         let run = |mesh: &Mesh| {
-            StaticMesh::new(mesh, GO).unwrap().sweep(
-                [1., 1., 25.], [1., 1., -5.], 0.5, &mut Budget::new(10_000), GO,
-            ).unwrap().unwrap()
+            StaticMesh::new(mesh, GO)
+                .unwrap()
+                .sweep(
+                    [1., 1., 25.],
+                    [1., 1., -5.],
+                    0.5,
+                    &mut Budget::new(10_000),
+                    GO,
+                )
+                .unwrap()
+                .unwrap()
         };
         let h = run(&m);
         assert!((h.toi - 5.5 / 30.).abs() < 1e-8);
@@ -355,7 +420,12 @@ mod tests {
         let timer = std::time::Instant::now();
         let mut budget = Budget::new(1_000_000);
         for _ in 0..10_000 {
-            std::hint::black_box(collider.sweep([1., 1., 100.], [1., 1., -100.], 0.25, &mut budget, GO).unwrap().unwrap());
+            std::hint::black_box(
+                collider
+                    .sweep([1., 1., 100.], [1., 1., -100.], 0.25, &mut budget, GO)
+                    .unwrap()
+                    .unwrap(),
+            );
         }
         eprintln!("10000 swept-sphere queries: {:?}", timer.elapsed());
     }
