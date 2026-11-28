@@ -829,8 +829,7 @@ fn old_files_without_the_new_nodes_still_load_and_evaluate() {
 #[test]
 fn shipped_example_files_load_and_evaluate() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
-    // The two G-code examples (13 and 14) are templates only; no .morph file ships yet.
-    for number in 1..=templates::TEMPLATES.len().min(12) {
+    for number in 1..=templates::TEMPLATES.len().min(14) {
         let path = dir.join(format!("{number:02}.morph"));
         let project = persistence::load(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let result = Evaluator::default().evaluate(&project.graph, &|| false);
@@ -840,7 +839,7 @@ fn shipped_example_files_load_and_evaluate() {
     }
     // The newest example files are written to match their templates exactly.
     // If this fails after a template edit, regenerate with `NODES --export-demos examples`.
-    for index in [6, 7, 8, 9, 10, 11] {
+    for index in [6, 7, 8, 9, 10, 11, 12, 13] {
         let path = dir.join(format!("{:02}.morph", index + 1));
         assert_eq!(persistence::load(&path).unwrap(), templates::create(index));
     }

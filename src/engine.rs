@@ -487,7 +487,7 @@ pub(crate) fn evaluate_node(
         }?;
         return checked_tree(result, cancel);
     }
-    if node.kind == NodeKind::Output {
+    if node.kind == NodeKind::Output || node.kind == NodeKind::Reroute {
         return checked_tree(
             inputs.into_iter().next().ok_or("形状がありません。")?,
             cancel,
@@ -820,7 +820,7 @@ pub(crate) fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value
     validate_mesh(&mesh, cancel)?;
     Ok(vec![Value::Mesh(Arc::new(mesh))])
 }
-fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
+pub(crate) fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
@@ -838,6 +838,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
     use NodeKind::*;
     match kind {
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
+        k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
@@ -1216,13 +1217,13 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshCompact | MeshNonManifold | MeshBoundaryLoops | MeshIslands | MeshTopologyStats => {
             crate::mesh_fabrication::run_item(kind, a, cancel)
         }
-        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem
-        | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList
-        | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree
-        | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper
-        | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex
-        | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems
-        | InsertItems | MemberIndex | RandomReduce | Jitter => {
+        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Reroute | Script | Cluster
+        | ListItem | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList
+        | SubList | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree
+        | TrimTree | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree
+        | PathMapper | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth
+        | CullIndex | DuplicateData | RepeatData | MassAddition | MassMultiplication
+        | ReplaceItems | InsertItems | MemberIndex | RandomReduce | Jitter => {
             Err("このノードはリスト評価が必要です。".into())
         }
         other => crate::math_nodes::run_item(other, a, cancel),
