@@ -13,3 +13,16 @@
 ## Validation limits
 
 The chat execution environment has no cargo/rustc and cannot resolve github.com for a local checkout. Source is accessed through the GitHub connector. New regression tests are to be run by CI; do not claim that they passed before evidence exists. Native desktop, Windows/Intel Arc, high DPI and screenshots remain unverified. No merge to main.
+
+## Implementation checkpoint
+
+- 3769bf3: canvas numeric widgets use local values and write only when IEEE bits change; restore_graph clears stale gesture state and prunes selection. Added direct state regression.
+- 3daff69: inspector uses the same non-mutating display approach; undo/redo and new/open/recovery clear old interaction state; recovery resets history and preview.
+- 3a121f1: headless egui regressions cover sparse default parameters across zoom/repaint, explicit signed-zero edit, and 120 nodes across 30 panning/idle frames.
+
+Manual reproduction (not executed here):
+- Open a valid v1 project with an omitted Number value and omitted Helix inputs. Inspect/zoom/pan; no parameter insertion, dirty marker or undo checkpoint should occur. Edit a number explicitly; only that key should be inserted.
+- Add a node, undo, redo, select it, undo again; start a wire and perform history restoration. No deleted ID or old wire should remain active.
+- Start editing a note in one project, then open another project with notes at the same index; editing must not carry over. Recover a project and check that preview/history belong only to the recovered document.
+
+Pending: CI fmt/clippy/test/build, native GUI verification, Windows/Intel Arc and real IME/DPI coverage. This is a focused repair, not exhaustive UI certification.
