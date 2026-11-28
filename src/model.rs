@@ -625,6 +625,16 @@ pub enum NodeKind {
     ExactDiagnose,
     SubdTsplinePatch,
     ExactThicken,
+    // OMEGA 67: independent standard mathematical components.
+    MathGoldenRatio,
+    MathSinc,
+    MathSecant,
+    MathCosecant,
+    MathCotangent,
+    MathReciprocal,
+    MathPow2,
+    MathPow10,
+    GateMajority,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1088,6 +1098,15 @@ impl NodeKind {
             Self::ExactDiagnose,
             Self::SubdTsplinePatch,
             Self::ExactThicken,
+            Self::MathGoldenRatio,
+            Self::MathSinc,
+            Self::MathSecant,
+            Self::MathCosecant,
+            Self::MathCotangent,
+            Self::MathReciprocal,
+            Self::MathPow2,
+            Self::MathPow10,
+            Self::GateMajority,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
