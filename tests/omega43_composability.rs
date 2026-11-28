@@ -20,7 +20,10 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
     let add = g.add(K::Add, [0.; 2]).unwrap();
     let length = g.add(K::ListLength, [0.; 2]).unwrap();
     g.node_mut(radius).unwrap().params.insert("value".into(), 10.);
-    g.node_mut(circle).unwrap().params.insert("segments".into(), 8.);
+    g.node_mut(circle)
+        .unwrap()
+        .params
+        .insert("segments".into(), 8.);
     g.node_mut(array).unwrap().params.insert("count".into(), 13.);
     g.node_mut(add).unwrap().params.insert("b".into(), 1.);
     g.connect(radius, circle, "radius").unwrap();
@@ -37,7 +40,10 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
 
     let mut evaluator = Evaluator::default();
     for segments in [8., 64.] {
-        g.node_mut(circle).unwrap().params.insert("segments".into(), segments);
+        g.node_mut(circle)
+            .unwrap()
+            .params
+            .insert("segments".into(), segments);
         let project = Project::new("exact array", g.clone());
         let loaded = persistence::decode_project(&serde_json::to_vec(&project).unwrap()).unwrap();
         let result = evaluator.evaluate(&loaded.graph, &|| false);
@@ -56,11 +62,27 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
             assert!((value.number().unwrap() - 1.).abs() < 1e-5);
         }
         assert_eq!(
-            result.outputs[&length].as_ref().unwrap().branches.values().flatten().next(),
+            result.outputs[&length]
+                .as_ref()
+                .unwrap()
+                .branches
+                .values()
+                .flatten()
+                .next(),
             Some(&Value::Number(13.))
         );
         let warm = evaluator.evaluate(&loaded.graph, &|| false);
         assert_eq!(warm.outputs, result.outputs);
         assert_eq!(warm.computed, 0);
     }
+}
+
+#[test]
+fn editable_curve_array_example_has_thirteen_points() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples/omega43-exact-curve-array.morph");
+    let project = persistence::load(&path).unwrap();
+    let result = Evaluator::default().evaluate(&project.graph, &|| false);
+    assert!(result.outputs.values().all(Result::is_ok));
+    assert_eq!(result.outputs[&3].as_ref().unwrap().item_count(), 13);
 }
