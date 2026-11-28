@@ -554,8 +554,14 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
     if seen != objects.len() {
         diagnostics.push("cyclic GHX graph; conversion forbidden".into());
     }
-    let mapped_candidates = objects.iter().filter(|o| o.candidate_node.is_some()).count();
-    let resolved_connections = connections.iter().filter(|c| c.source_object.is_some()).count();
+    let mapped_candidates = objects
+        .iter()
+        .filter(|o| o.candidate_node.is_some())
+        .count();
+    let resolved_connections = connections
+        .iter()
+        .filter(|c| c.source_object.is_some())
+        .count();
     let summary = Summary {
         objects: objects.len(),
         mapped_candidates,
@@ -706,7 +712,13 @@ fn convert_report(report: &Report) -> Res<Project> {
                 "Hidden",
                 "Locked",
             ],
-            &["Attributes", "Slider", "param_input", "param_output", "ParameterData"],
+            &[
+                "Attributes",
+                "Slider",
+                "param_input",
+                "param_output",
+                "ParameterData",
+            ],
         )?;
         if let Some(data) = c.chunk("ParameterData")? {
             allowed(
@@ -823,7 +835,9 @@ fn convert_report(report: &Report) -> Res<Project> {
         let target_port = wire
             .target_port
             .ok_or("stand-alone parameter input not convertible")?;
-        let source_kind = report.objects[source].candidate_node.ok_or("unknown source")?;
+        let source_kind = report.objects[source]
+            .candidate_node
+            .ok_or("unknown source")?;
         let target_kind = report.objects[wire.target_object]
             .candidate_node
             .ok_or("unknown target")?;
