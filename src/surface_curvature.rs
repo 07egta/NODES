@@ -58,13 +58,13 @@ impl SurfaceJet2 {
         }
         let u = self.first.du.map(|x| x / a);
         let v = self.first.dv.map(|x| x / b);
-        let cross = cross(u, v);
-        let sine = norm(cross);
+        let normal_cross = cross(u, v);
+        let sine = norm(normal_cross);
         if !sine.is_finite() || sine <= 1e-10 {
             return Err("曲面の接線が平行または悪条件のため曲率を評価できません。".into());
         }
         let cosine = dot(u, v).clamp(-1., 1.);
-        let normal = cross.map(|x| x / sine);
+        let normal = normal_cross.map(|x| x / sine);
         let e = dot(normal, self.duu) / a / a;
         let f = dot(normal, self.duv) / a / b;
         let g = dot(normal, self.dvv) / b / b;
