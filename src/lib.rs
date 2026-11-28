@@ -31,6 +31,7 @@ pub mod nurbs_nodes;
 pub mod persistence;
 pub mod physics;
 pub mod physics_nodes;
+pub mod point_cloud;
 pub mod polygon_triangulation;
 pub mod print_info;
 pub mod project_diff;
