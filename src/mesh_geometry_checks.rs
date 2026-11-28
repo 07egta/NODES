@@ -293,3 +293,111 @@ mod tests {
         assert_eq!(nonadjacent_contacts(&m, &no).unwrap(), 0);
     }
 }
+
+/// Conservative projected-area check for a linear vertex motion from the source
+/// to an offset skin. The projected signed double area is quadratic in time:
+/// test both endpoints and its interior minimum, not just the final face.
+/// This is a floating-point diagnostic, not a certified immersion predicate.
+pub(crate) fn guard_offset_sweep(
+    source: &Mesh,
+    moved: &[P],
+    stop: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    if moved.len() != source.vertices.len() {
+        return Err("オフセットの頂点数が一致しません。".into());
+    }
+    for (i, face) in source.triangles.iter().enumerate() {
+        if i.is_multiple_of(512) {
+            cancelled(stop)?;
+        }
+        let [a, b, c] = face.map(|v| source.vertices[v as usize]);
+        let [p, q, r] = face.map(|v| moved[v as usize]);
+        let (u, v) = (sub(b, a), sub(c, a));
+        let (du, dv) = (sub(sub(q, p), u), sub(sub(r, p), v));
+        let n = cross(u, v);
+        let area2 = dot(n, n);
+        let linear = dot(n, add(cross(du, v), cross(u, dv))) / area2;
+        let quadratic = dot(n, cross(du, dv)) / area2;
+        let end = 1.0 + linear + quadratic;
+        let mut minimum = 1.0_f64.min(end);
+        if quadratic > 0.0 {
+            let t = -linear / (2.0 * quadratic);
+            if t > 0.0 && t < 1.0 {
+                minimum = minimum.min(1.0 + t * (linear + t * quadratic));
+            }
+        }
+        if !area2.is_finite()
+            || area2 <= 0.0
+            || !linear.is_finite()
+            || !quadratic.is_finite()
+            || !end.is_finite()
+            || minimum <= 1e-10
+        {
+            return Err(format!(
+                "面 {i} のオフセット途中で投影面積が消失または反転する可能性があります。距離・厚みを小さくするか、曲率や鋭い角を調整してください。"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// An open sheet is allowed; invalid index topology and unusable vertices are not.
+pub(crate) fn guard_offset_source(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<(), String> {
+    validate_mesh(m, stop)?;
+    if m.triangles.is_empty() {
+        return Err("面のないメッシュです。".into());
+    }
+    let a = crate::mesh_fabrication::audit(m, stop)?;
+    if a.non_manifold_edges != 0
+        || a.non_manifold_vertices != 0
+        || a.orientation_conflicts != 0
+        || a.duplicate_faces != 0
+        || a.degenerate_faces != 0
+        || a.isolated_vertices != 0
+    {
+        return Err("厚み付け・オフセットの入力に非多様体、向きの不一致、重複面または孤立頂点があります。元のメッシュを修正してください。".into());
+    }
+    guard_offset_contacts(m, stop)
+}
+
+/// Bounded approximate global contact check. Exhaustion is an error, never a pass.
+pub(crate) fn guard_offset_contacts(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<(), String> {
+    let hits = nonadjacent_contacts(m, stop)?;
+    if hits != 0 {
+        return Err(format!(
+            "共有頂点のない面の自己接触候補が {hits} 組あります。元の形状の隙間を広げるか、距離・厚みを小さくしてください。"
+        ));
+    }
+    Ok(())
+}
+
+/// Necessary checks for an oriented closed shell; not a thickness certificate.
+pub(crate) fn guard_closed_shell(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<(), String> {
+    let a = crate::mesh_fabrication::audit(m, stop)?;
+    if !a.closed_oriented() || a.isolated_vertices != 0 {
+        return Err("厚み付け後のメッシュが閉じた向きのそろった多様体ではありません。厚みや元の面を調整してください。".into());
+    }
+    let volume = signed_volume(m, stop)?;
+    if !volume.is_finite() || volume <= 0.0 {
+        return Err("厚み付け後の符号付き体積が正ではありません。".into());
+    }
+    guard_offset_contacts(m, stop)
+}
+
+#[cfg(test)]
+mod omega93_tests {
+    use super::*;
+
+    #[test]
+    fn projected_area_detects_double_flip_even_with_positive_end_area() {
+        let source = Mesh {
+            vertices: vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]],
+            triangles: vec![[0, 1, 2]],
+        };
+        let moved = [[0., 0., 0.], [-1., 0., 0.], [0., -1., 0.]];
+        assert!(guard_offset_sweep(&source, &moved, &|| false).is_err());
+        let translated = [[0., 0., 1.], [1., 0., 1.], [0., 1., 1.]];
+        assert!(guard_offset_sweep(&source, &translated, &|| false).is_ok());
+        assert!(guard_offset_sweep(&source, &translated, &|| true).is_err());
+    }
+}

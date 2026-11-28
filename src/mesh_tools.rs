@@ -951,6 +951,7 @@ pub fn offset(m: &Mesh, distance: f64, stop: Stop) -> Result<Mesh, String> {
     if !distance.is_finite() {
         return Err("距離が無効です。".into());
     }
+    crate::mesh_geometry_checks::guard_offset_source(m, stop)?;
     let n = vertex_normals(&m.vertices, &m.triangles);
     let vertices: Vec<P> = m
         .vertices
@@ -958,10 +959,13 @@ pub fn offset(m: &Mesh, distance: f64, stop: Stop) -> Result<Mesh, String> {
         .zip(&n)
         .map(|(p, n)| add(*p, mul(*n, distance)))
         .collect();
-    Ok(Mesh {
+    crate::mesh_geometry_checks::guard_offset_sweep(m, &vertices, stop)?;
+    let out = Mesh {
         vertices,
         triangles: m.triangles.clone(),
-    })
+    };
+    crate::mesh_geometry_checks::guard_offset_contacts(&out, stop)?;
+    Ok(out)
 }
 /// Turn a surface into a solid shell. The outer skin is `outer` along the normal and the
 /// inner skin `inner` (outer > inner); open edges get side walls. Closed meshes become
@@ -974,6 +978,7 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
     if m.triangles.is_empty() {
         return Err("面のないメッシュです。".into());
     }
+    crate::mesh_geometry_checks::guard_offset_source(m, stop)?;
     let nv = m.vertices.len();
     let edges = edge_map(&m.triangles, stop)?;
     let open: Vec<&EdgeUse> = edges
@@ -998,6 +1003,8 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
             .zip(&n)
             .map(|(p, n)| add(*p, mul(*n, inner))),
     );
+    crate::mesh_geometry_checks::guard_offset_sweep(m, &vertices[..nv], stop)?;
+    crate::mesh_geometry_checks::guard_offset_sweep(m, &vertices[nv..], stop)?;
     let off = nv as u32;
     let mut triangles = m.triangles.clone();
     triangles.extend(
@@ -1010,10 +1017,12 @@ pub fn thicken(m: &Mesh, outer: f64, inner: f64, stop: Stop) -> Result<Mesh, Str
         triangles.push([b, a, a + off]);
         triangles.push([b, a + off, b + off]);
     }
-    Ok(Mesh {
+    let out = Mesh {
         vertices,
         triangles,
-    })
+    };
+    crate::mesh_geometry_checks::guard_closed_shell(&out, stop)?;
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -1204,6 +1213,38 @@ mod tests {
         assert!(o.vertices.iter().all(|p| (p[2].abs() - 2.).abs() < 1e-9));
         assert!(thicken(&g, 0., 0., GO).is_err());
     }
+
+    #[test]
+    fn omega93_separated_sheets_reject_colliding_skins() {
+        let mut m = grid(1, 10.);
+        let count = m.vertices.len() as u32;
+        let mut upper = m.vertices.clone();
+        for p in &mut upper {
+            p[2] += 1.0;
+        }
+        m.vertices.extend(upper);
+        let other: Vec<_> = m.triangles.iter().map(|t| t.map(|v| v + count)).collect();
+        m.triangles.extend(other);
+        let good = thicken(&m, 0.4, -0.4, GO).unwrap();
+        let volume = crate::mesh_fabrication::signed_volume(&good, GO).unwrap();
+        assert!((volume - 160.0).abs() < 1e-9);
+        assert!(thicken(&m, 0.6, -0.6, GO).is_err());
+    }
+
+    #[test]
+    fn omega93_tilted_sheet_not_rejected_by_axis_extent() {
+        let mut m = grid(1, 10.);
+        for p in &mut m.vertices {
+            p[2] = p[0] * 0.01;
+        }
+        let out = crate::gh_nodes::shell(&m, 1.0, GO).unwrap();
+        assert!(
+            (crate::mesh_fabrication::signed_volume(&out, GO).unwrap() - 100.0 * 1.0001_f64.sqrt())
+                .abs()
+                < 1e-8
+        );
+    }
+
     #[test]
     fn remesh_keeps_a_flat_sheet_flat_and_its_area() {
         let g = grid(8, 1.);
