@@ -20,7 +20,13 @@ fn cylinder_principal_lines_normal_curvature_and_sphere_umbilic() {
     near(jet.normal_curvature(90.).unwrap(), 0.);
     near(jet.normal_curvature(45.).unwrap(), -1. / 6.);
     let sphere = Surface::sphere(2.).unwrap();
-    assert!(sphere.derivatives2(0.2, 0.4, &|| false).unwrap().principal_directions().is_err());
+    assert!(
+        sphere
+            .derivatives2(0.2, 0.4, &|| false)
+            .unwrap()
+            .principal_directions()
+            .is_err()
+    );
     assert!(sphere.derivatives2(0.2, 0., &|| false).is_err());
 }
 
@@ -76,9 +82,19 @@ fn seam_detects_crease_and_curvature_jump() {
     let points = (0..3)
         .flat_map(|i| (0..2).map(move |j| [1. + i as f64 / 2., j as f64, f64::from(i == 2)]))
         .collect();
-    let b = Surface::nurbs(NurbsSurface::new(
-        3, 2, 2, 1, vec![0., 0., 0., 1., 1., 1.], vec![0., 0., 1., 1.], points, vec![1.; 6],
-    ).unwrap());
+    let b = Surface::nurbs(
+        NurbsSurface::new(
+            3,
+            2,
+            2,
+            1,
+            vec![0., 0., 0., 1., 1., 1.],
+            vec![0., 0., 1., 1.],
+            points,
+            vec![1.; 6],
+        )
+        .unwrap(),
+    );
     let r = boundary_report((&a, 1), (&b, 0), false, 9, &|| false).unwrap();
     near(r.errors[0], 0.);
     near(r.errors[1], 0.);
@@ -98,9 +114,7 @@ fn fairing_graph_reports_energy_and_preserves_boundary() {
     }
     let mut evaluator = Evaluator::default();
     let e = evaluator.evaluate(&graph, &|| false);
-    let values = |id| {
-        e.outputs[&id].as_ref().unwrap().branches.values().flatten()
-    };
+    let values = |id| e.outputs[&id].as_ref().unwrap().branches.values().flatten();
     let surface = |id| match values(id).next().unwrap() {
         Value::Surface(s) => s.geometry(),
         _ => panic!("surface expected"),
@@ -119,8 +133,12 @@ fn fairing_graph_reports_energy_and_preserves_boundary() {
             }
         }
     }
-    assert!(surface(panel).fair_polynomial(
-        &solidcraft_kernel::FairOptions::new(1., 8, true, 2.).unwrap(),
-        &|| false,
-    ).is_err());
+    assert!(
+        surface(panel)
+            .fair_polynomial(
+                &solidcraft_kernel::FairOptions::new(1., 8, true, 2.).unwrap(),
+                &|| false,
+            )
+            .is_err()
+    );
 }

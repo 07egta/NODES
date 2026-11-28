@@ -515,9 +515,9 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
                 .derivatives2(num(a, 1)?, num(a, 2)?, stop)?
                 .normal_curvature(num(a, 3)?)?,
         )]),
-        K::SurfaceUvCondition => Ok(vec![Value::Number(
-            crate::surface_curvature::uv_condition(surface(a)?.evaluate(num(a, 1)?, num(a, 2)?)?)?,
-        )]),
+        K::SurfaceUvCondition => Ok(vec![Value::Number(crate::surface_curvature::uv_condition(
+            surface(a)?.evaluate(num(a, 1)?, num(a, 2)?)?,
+        )?)]),
         K::SurfaceBoundaryReport => {
             let Value::Surface(other) = a.get(2).copied().ok_or("曲面Bを接続してください。")?
             else {
@@ -584,7 +584,14 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             let knots = vec![0., 0., 0., 0., 1., 1., 1., 1.];
             made(
                 Surface::nurbs(NurbsSurface::new(
-                    4, 4, 3, 3, knots.clone(), knots, points, vec![1.; 16],
+                    4,
+                    4,
+                    3,
+                    3,
+                    knots.clone(),
+                    knots,
+                    points,
+                    vec![1.; 16],
                 )?),
                 stop,
             )

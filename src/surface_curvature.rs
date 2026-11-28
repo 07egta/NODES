@@ -216,12 +216,7 @@ fn edge_uv(edge: usize, t: f64) -> [f64; 2] {
 
 /// Canonical derivative frame (s along the seam, r from A towards B).
 /// Changing edge or reversing correspondence applies the chain rule.
-fn edge_derivatives(
-    jet: SurfaceJet2,
-    edge: usize,
-    reverse: bool,
-    side_a: bool,
-) -> [Point3; 5] {
+fn edge_derivatives(jet: SurfaceJet2, edge: usize, reverse: bool, side_a: bool) -> [Point3; 5] {
     let s = if reverse { -1. } else { 1. };
     let inward = if edge.is_multiple_of(2) { 1. } else { -1. };
     let r = if side_a { -inward } else { inward };
