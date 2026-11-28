@@ -817,6 +817,7 @@ fn preflight_run(
             crate::origami::estimate(kind, args)?
         }
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
+        k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::estimate(k, args)?,
         k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
@@ -883,6 +884,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::gh_gaps2::is_item_kind(k) => crate::gh_gaps2::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
+        k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::run_item(k, a, cancel),
         k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         GenesisScopes | GenesisScopeIds | GenesisRelief => {

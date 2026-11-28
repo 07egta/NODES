@@ -1,4 +1,5 @@
 pub mod annotations;
+mod bio_patterns;
 mod biomorph;
 pub mod cluster;
 pub mod compatibility;
