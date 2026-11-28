@@ -111,6 +111,8 @@ pub struct Printer {
     pub origin: Origin,
     /// False for clay printers: no heater, fan or purge line is written.
     pub heated: bool,
+    /// Explicit user confirmation of Marlin ADVANCED_PAUSE_FEATURE on this machine.
+    pub m600_confirmed: bool,
     /// Filament diameter, or the cartridge diameter of a clay printer, mm.
     pub filament_d: f64,
     pub nozzle_d: f64,
@@ -124,9 +126,15 @@ impl Printer {
             bed: preset.bed(),
             origin: preset.origin(),
             heated: !clay,
+            m600_confirmed: false,
             filament_d: if clay { 30.0 } else { 1.75 },
             nozzle_d: if clay { 2.0 } else { 0.4 },
         }
+    }
+
+    /// A preset alone cannot establish support for a firmware-dependent command.
+    pub fn can_emit_m600(&self) -> bool {
+        self.heated && self.preset == Preset::GenericMarlin && self.m600_confirmed
     }
 
     /// Machine X, Y = design X, Y plus this offset.
@@ -416,7 +424,7 @@ pub struct GcodeJob {
     pub preview: Option<Preview>,
     /// Result of the last 安全チェック node.
     pub notes: Vec<Issue>,
-    /// Layer indices (0 = first layer) where the writer emits M600 (filament change).
+    /// Requested layer indices (0 = first layer) for filament changes.
     /// Sorted, no duplicates, never contains 0.
     pub color_changes: Vec<u32>,
 }
@@ -816,17 +824,18 @@ impl GcodeJob {
         }
 
         if !self.color_changes.is_empty() {
-            if !pr.heated {
+            let layer_count = self.layer_count();
+            if self.color_changes.iter().any(|&l| l < layer_count) && !pr.can_emit_m600() {
                 push(
-                    false,
-                    "この機種は加熱しないので、色替え（M600）は書き出されません。".into(),
+                    true,
+                    "色替えは M600 対応を確認した Marlin 汎用機でのみ書き出せます。プリンタ設定の確認項目を有効にするか、色替えを外してスライサーで設定してください。".into(),
                 );
-            } else if self.color_changes.iter().any(|&l| l >= self.layer_count()) {
+            }
+            if self.color_changes.iter().any(|&l| l >= layer_count) {
                 push(
                     false,
                     format!(
-                        "色替えの層が全 {} 層より後にあります。その色替えは書き出されません。",
-                        self.layer_count()
+                        "色替えの層が全 {layer_count} 層より後にあります。その色替えは書き出されません。"
                     ),
                 );
             }
@@ -1237,8 +1246,11 @@ impl GcodeJob {
                         next_change += 1;
                         change_here = true;
                     }
-                    if change_here && pr.heated {
-                        t.line(&format!("M600 ; 色替え（層 {} の前）", m.layer + 1))?;
+                    if change_here && pr.can_emit_m600() {
+                        t.line(&format!(
+                            "M600 ; 色替え（層 {} の前）",
+                            u64::from(m.layer) + 1
+                        ))?;
                     }
                     t.line(&format!(";LAYER:{}", m.layer))?;
                     t.line(&format!(";Z:{:.3}", m.to[2]))?;
@@ -1977,6 +1989,8 @@ mod tests {
             square(0.4, 1, PathKind::Outer),
             square(0.6, 2, PathKind::Outer),
         ]);
+        job.printer = Printer::from_preset(Preset::GenericMarlin);
+        job.printer.m600_confirmed = true;
         job.add_color_changes(&[0, 2, 2]).unwrap();
         assert_eq!(job.color_changes, vec![2]);
         let (text, stats) = job.render(&never).unwrap();
@@ -1991,6 +2005,35 @@ mod tests {
                 .iter()
                 .all(|n| !(n.error && n.text.contains("色替え")))
         );
+    }
+
+    #[test]
+    fn color_change_requires_explicit_marlin_confirmation() {
+        for preset in Preset::ALL {
+            for confirmed in [false, true] {
+                let mut job = job_with(vec![
+                    square(0.2, 0, PathKind::Outer),
+                    square(0.4, 1, PathKind::Outer),
+                ]);
+                job.printer = Printer::from_preset(preset);
+                job.profile = Profile::for_printer(&job.printer);
+                job.printer.m600_confirmed = confirmed;
+                job.add_color_changes(&[1]).unwrap();
+                let supported = preset == Preset::GenericMarlin && confirmed;
+                let issues = job.check(&never).unwrap();
+                assert_eq!(
+                    issues.iter().any(|i| i.error && i.text.contains("M600")),
+                    !supported,
+                    "{preset:?} confirmed={confirmed}"
+                );
+                if supported {
+                    let (code, _) = job.render(&never).unwrap();
+                    assert_eq!(code.lines().filter(|l| l.starts_with("M600 ")).count(), 1);
+                } else {
+                    assert!(job.render(&never).unwrap_err().contains("M600"));
+                }
+            }
+        }
     }
 
     #[test]

@@ -1,0 +1,13 @@
+# OMEGA 66 — FACTORY: firmware-aware manufacturing export
+
+- Base: main `09a2a546d442fea822d80fb4c756a81f067a8b00`; branch `fix/omega66-factory-m600-20261128`.
+- Reviewed AGENTS.md, architecture/status, OMEGA37, FAB-GCODE-PREFLIGHT-BOUNDS, current export and G-code node/writer sources. No open PR title directly duplicates this change.
+- Main already supports binary/ASCII STL, OBJ, experimental 3MF with per-body core base materials, binary PLY and two G-code paths. No need to add a second export engine.
+- Defect: `GcodeJob::render` emitted M600 for every heated preset, including A1 mini and Creator 5, without knowing firmware support. The node descriptions warned but preflight did not prevent it.
+- Fix: default-deny automatic M600. Require GenericMarlin AND explicit user confirmation AND heated printer. Existing projects retain node IDs and old port keys; new printer setting defaults to 0. Reject a job containing a reachable requested change if unsupported; an out-of-range request remains a warning. Other machines must use their verified slicer workflow. No substitution with speculative pause commands. User-authored start/end scripts are still unverified and are not covered by this generated-command guard.
+- Marlin documentation: https://marlinfw.org/docs/gcode/M600.html (requires ADVANCED_PAUSE_FEATURE).
+- 3MF Consortium specification: https://3mf.io/spec/ ; core unit and resource semantics: https://github.com/3MFConsortium/spec_core/blob/master/3MF%20Core%20Specification.md . Base materials do not prove AMS/filament-slot mapping. No 3MF project-format compatibility claim.
+- Existing automatic modal reset G21/G90/M82 or M83 is retained. No new dependencies. The internal guard does not establish machine safety or firmware support.
+- Tests added: all five presets with confirmation false/true; existing layer order test explicitly uses confirmed Marlin; graph evaluation tests that a default printer cannot export M600 and explicit GenericMarlin setting restores it.
+- Execution: local Rust toolchain and slicers absent; direct Git network unavailable. Source inspection and GitHub operations only. Rust tests/CI, external slicer import, slicing, firmware and physical printer results pending; do not merge until checked.
+- Next: run cargo fmt --all --check, cargo clippy --all-targets --locked -- -D warnings, cargo test --all-targets --locked; inspect Windows/Linux CI. Independently validate actual NODES-generated STL/3MF with ZIP/XML and dimensional/topology oracles; test Bambu Studio/Orca/Prusa/FlashPrint with exact versions and profiles. Do not use raw generated G-code on a printer until a model-specific validated workflow exists.
