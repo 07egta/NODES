@@ -421,31 +421,38 @@ impl<'a> ItemMatches<'a> {
         self.count
     }
 }
+impl<'a> ItemMatches<'a> {
+    /// Fill a caller-owned buffer, reusing its capacity across combinations.
+    /// Returns false and clears the buffer when exhausted.
+    pub fn next_into(&mut self, args: &mut Vec<&'a Value>) -> bool {
+        args.clear();
+        if self.next >= self.count {
+            return false;
+        }
+        let index = self.next;
+        self.next += 1;
+        if self.mode == MatchMode::Cross {
+            let mut n = index;
+            for list in self.lists.iter().rev() {
+                args.push(&list[n % list.len()]);
+                n /= list.len();
+            }
+            args.reverse();
+        } else {
+            args.extend(self.lists.iter().map(|l| &l[index.min(l.len() - 1)]));
+        }
+        true
+    }
+}
+
 impl<'a> Iterator for ItemMatches<'a> {
     type Item = Vec<&'a Value>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.next >= self.count {
             return None;
         }
-        let index = self.next;
-        self.next += 1;
-        if self.mode == MatchMode::Cross {
-            let mut n = index;
-            let mut args = Vec::with_capacity(self.lists.len());
-            for list in self.lists.iter().rev() {
-                args.push(&list[n % list.len()]);
-                n /= list.len();
-            }
-            args.reverse();
-            Some(args)
-        } else {
-            Some(
-                self.lists
-                    .iter()
-                    .map(|l| &l[index.min(l.len() - 1)])
-                    .collect(),
-            )
-        }
+        let mut args = Vec::with_capacity(self.lists.len());
+        self.next_into(&mut args).then_some(args)
     }
 }
 
@@ -458,7 +465,7 @@ pub fn cross_reference(inputs: &[Tree]) -> Result<Vec<Tree>, String> {
     let mut total_weight = 0usize;
     let mut remaining = MAX_ITEMS;
     for m in match_branches(inputs)? {
-        let matches = ItemMatches::new(&m.lists, MatchMode::Cross, remaining)?;
+        let mut matches = ItemMatches::new(&m.lists, MatchMode::Cross, remaining)?;
         remaining -= matches.cardinality();
         total_weight = total_weight.saturating_add((m.path.len() + 1).saturating_mul(inputs.len()));
         if total_weight > MAX_TOTAL_WEIGHT {
@@ -467,8 +474,9 @@ pub fn cross_reference(inputs: &[Tree]) -> Result<Vec<Tree>, String> {
         for b in &mut builders {
             b.append(m.path.clone(), &[])?;
         }
-        for args in matches {
-            for (b, v) in builders.iter_mut().zip(args) {
+        let mut args = Vec::with_capacity(m.lists.len());
+        while matches.next_into(&mut args) {
+            for (b, v) in builders.iter_mut().zip(args.iter().copied()) {
                 total_weight = total_weight.saturating_add(v.weight());
                 if total_weight > MAX_TOTAL_WEIGHT {
                     return Err("クロス参照が大きすぎます。".into());
