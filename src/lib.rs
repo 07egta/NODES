@@ -6,6 +6,7 @@ pub mod data_tree_nodes;
 pub mod diagnostics;
 pub mod engine;
 pub mod expr;
+pub mod friendly;
 pub mod gcode;
 pub mod gcode_job;
 pub mod gcode_nodes;
