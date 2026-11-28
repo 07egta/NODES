@@ -257,3 +257,23 @@ fn import_node_keeps_its_serde_name_and_is_listed() {
     );
     assert!(NodeKind::all().contains(&NodeKind::ImportMesh));
 }
+
+#[test]
+fn ascii_stl_rejects_vertices_spanning_facets() {
+    let text = "solid x\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nendloop\nendfacet\nfacet normal 0 0 1\nouter loop\nvertex 0 1 0\nendloop\nendfacet\nendsolid x\n";
+    assert!(parse_stl(text.as_bytes(), &no_cancel).is_err());
+}
+
+#[test]
+fn ascii_stl_rejects_missing_endsolid() {
+    let text = ascii_stl(&cube());
+    let truncated = text.strip_suffix("endsolid cube\n").unwrap();
+    assert!(parse_stl(truncated.as_bytes(), &no_cancel).is_err());
+}
+
+#[test]
+fn obj_accepts_inline_comments_on_faces() {
+    let text = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3 # triangle\n";
+    let mesh = parse_obj(text.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 1);
+}

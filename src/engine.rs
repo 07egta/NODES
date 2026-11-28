@@ -796,6 +796,7 @@ fn preflight_run(
         k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
         NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
+        k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
     };
@@ -859,6 +860,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        GenesisScopes | GenesisScopeIds | GenesisRelief => {
+            crate::genesis::run_item(kind, a, cancel)
+        }
         BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
@@ -1234,7 +1238,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
         | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
         | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
-        | MeshCompact | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
+        | MeshBedFit | MeshCompact | MeshNonManifold => {
+            crate::mesh_fabrication::run_item(kind, a, cancel)
+        }
         MeshConstruct | Loft | Merge | Flatten | Graft | Output | Reroute | Script | Cluster
         | ListItem | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList
         | SubList | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree
@@ -1574,7 +1580,7 @@ fn mirror(
         }
     }
 }
-fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
+pub(crate) fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
     let (x, y) = (w / 2., d / 2.);
     Mesh {
         vertices: vec![

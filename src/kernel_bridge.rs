@@ -883,6 +883,19 @@ pub fn sphere(center: P3, radius: f64, stop: Stop) -> R<BrepValue> {
     brep(body, stop)
 }
 
+/// Exact ring torus about the Z axis, with dimensions in millimetres.
+pub fn torus(major: f64, minor: f64, stop: Stop) -> R<BrepValue> {
+    stopped(stop)?;
+    let (major, minor) = (positive("大半径", major)?, positive("小半径", minor)?);
+    if major - minor <= tol::ABS || major + minor > limits::MAX_COORDINATE {
+        return Err(
+            "トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。".into(),
+        );
+    }
+    let body = kernel("トーラス", stop, || sk::torus(Vec3::ZERO, major, minor))?;
+    brep(body, stop)
+}
+
 /// Extrude a closed planar curve (with optional holes) by `height` along its plane normal
 /// (the normal faces +Z where it can).
 pub fn extrude(outer: &Curve, holes: &[&Curve], height: f64, stop: Stop) -> R<BrepValue> {

@@ -12,6 +12,7 @@ pub mod gcode;
 pub mod gcode_job;
 pub mod gcode_nodes;
 pub mod generative;
+pub mod genesis;
 pub mod gh_gaps;
 pub mod gh_nodes;
 pub mod ghx;

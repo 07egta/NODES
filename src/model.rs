@@ -385,6 +385,7 @@ pub enum NodeKind {
     MeshConstruct,
     MeshSelfContact,
     MeshThicknessSample,
+    MeshBedFit,
     MeshCompact,
     MeshNonManifold,
     // Mathematical curve nodes: appended to preserve legacy serde names.
@@ -540,6 +541,8 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    GcodeColorChange,
+    GcodeColorGradient,
     // More exact NURBS / SubD nodes (`nurbs_nodes`), appended.
     SubdCageEdit,
     ExactTrimPlane,
@@ -589,6 +592,11 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // GENESIS: append-only stable serialized IDs.
+    GenesisScopes,
+    GenesisScopeIds,
+    GenesisRelief,
+    ExactTorus,
     MatterRotatingSquares,
     MatterExpansionRatio,
     MatterPlateContact,
@@ -841,6 +849,7 @@ impl NodeKind {
             Self::MeshConstruct,
             Self::MeshSelfContact,
             Self::MeshThicknessSample,
+            Self::MeshBedFit,
             Self::MeshCompact,
             Self::MeshNonManifold,
             Self::CurveLine,
@@ -988,6 +997,8 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::GcodeColorChange,
+            Self::GcodeColorGradient,
             Self::SubdCageEdit,
             Self::ExactTrimPlane,
             Self::ExactFilletVariable,
@@ -1033,6 +1044,10 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::GenesisScopes,
+            Self::GenesisScopeIds,
+            Self::GenesisRelief,
+            Self::ExactTorus,
             Self::MatterRotatingSquares,
             Self::MatterExpansionRatio,
             Self::MatterPlateContact,
@@ -1673,6 +1688,7 @@ impl NodeKind {
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
+            other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1697,6 +1713,7 @@ impl NodeKind {
             | Self::MeshConstruct
             | Self::MeshSelfContact
             | Self::MeshThicknessSample
+            | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
