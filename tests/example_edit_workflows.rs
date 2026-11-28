@@ -92,6 +92,12 @@ example_cases! {
     (nurbs_panel, "surface-panel.morph", 0, "rise", 32.0, 2, Surface, false),
     (ruled_surface, "surface-ruled.morph", 0, "height", 28.0, 3, Surface, false),
     (revolved_nurbs_vase, "surface-vase.morph", 0, "middle", 42.0, 2, Surface, false),
+    (math_catenoid, "mathematical/catenoid.morph", 0, "radius", 28.0, 1, Mesh, false),
+    (math_dini_surface, "mathematical/dini_surface.morph", 0, "scale", 28.0, 1, Mesh, false),
+    (math_enneper_surface, "mathematical/enneper_surface.morph", 0, "scale", 28.0, 1, Mesh, false),
+    (math_helicoid, "mathematical/helicoid.morph", 0, "radius", 36.0, 1, Mesh, false),
+    (math_klein_bottle, "mathematical/klein_bottle.morph", 0, "scale", 12.0, 1, Mesh, false),
+    (math_mobius_strip, "mathematical/mobius_strip.morph", 0, "radius", 36.0, 1, Mesh, false),
     (genesis_facade, "genesis/facade.morph", 1, "tall_height", 20.0, 2, Mesh, false),
     (genesis_sculpture, "genesis/sculpture.morph", 1, "tall_height", 28.0, 2, Mesh, false),
 }

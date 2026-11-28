@@ -592,6 +592,13 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // Mathematical surfaces (analytic formulas, mesh outputs).
+    Catenoid,
+    Helicoid,
+    EnneperSurface,
+    MobiusStrip,
+    KleinBottle,
+    DiniSurface,
     // GENESIS: append-only stable serialized IDs.
     GenesisScopes,
     GenesisScopeIds,
@@ -1034,6 +1041,12 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::Catenoid,
+            Self::Helicoid,
+            Self::EnneperSurface,
+            Self::MobiusStrip,
+            Self::KleinBottle,
+            Self::DiniSurface,
             Self::GenesisScopes,
             Self::GenesisScopeIds,
             Self::GenesisRelief,
@@ -1696,6 +1709,9 @@ impl NodeKind {
             | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            other if crate::mathematical_surfaces::is_kind(other) => {
+                crate::mathematical_surfaces::spec(other)
+            }
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| crate::biomorph::spec(other))
