@@ -81,7 +81,7 @@ pub fn spec(kind: K) -> &'static NodeSpec {
     match kind {
         K::GcodePrinter => spec!(
             "プリンタ設定",
-            "機種を選んで G-code の土台を作ります。機種 0=Bambu A1 mini（原点は角）1=Bambu A1 mini（原点は中心 90,90）2=FlashForge Creator 5 3=TRONXY Moore 1（粘土）4=Marlin 汎用。ベッド寸法は仮の値なので、実機の仕様で確認してください。",
+            "機種を選んで G-code の土台を作ります。機種 0=Bambu A1 mini（原点は角）1=Bambu A1 mini（原点は中心 90,90）2=FlashForge Creator 5 3=TRONXY Moore 1（粘土）4=Marlin 汎用。ベッド寸法は仮の値なので、実機の仕様で確認してください。M600 は Marlin 汎用で実機の ADVANCED_PAUSE_FEATURE を確認した場合のみ許可してください。",
             "printer preset bambu a1 mini flashforge tronxy moore marlin gcode プリンタ 機種 ベッド",
             Gcode,
             [
@@ -90,7 +90,14 @@ pub fn spec(kind: K) -> &'static NodeSpec {
                 n("bed_y", "ベッドY（0=機種の値）", 0., 0., 1000., 1.),
                 n("bed_z", "ベッド高さ（0=機種の値）", 0., 0., 1000., 1.),
                 n("filament_d", "フィラメント径（0=既定）", 0., 0., 100., 0.05),
-                n("nozzle_d", "ノズル径（0=既定）", 0., 0., 20., 0.05)
+                n("nozzle_d", "ノズル径（0=既定）", 0., 0., 20., 0.05),
+                i(
+                    "m600_confirmed",
+                    "Marlin M600 実機対応確認（1=許可）",
+                    0.,
+                    0.,
+                    1.
+                )
             ]
         ),
         K::GcodeSlice => spec!(
@@ -358,7 +365,7 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::GcodeColorChange => spec!(
             "色替え（M600）",
-            "指定した層の直前に、フィラメント交換の指令 M600 を入れます。層番号は 0 が 1 層目で、0 は無視されます。2 回以上入れるときは「くり返し」に間隔を入れます（0=1 回だけ）。交換中の待ち時間は見積りに入りません。M600 に対応するファームウェアが必要で、実機では未確認です。",
+            "指定した層の直前に、フィラメント交換の指令 M600 を入れます。層番号は 0 が 1 層目で、0 は無視されます。2 回以上入れるときは「くり返し」に間隔を入れます（0=1 回だけ）。交換中の待ち時間は見積りに入りません。プリンタ設定で Marlin の M600 対応を明示確認した場合のみ書き出せます。実機では未確認です。",
             "color change filament swap m600 multicolor 色替え フィラメント交換 多色 gcode",
             Gcode,
             [
@@ -370,7 +377,7 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::GcodeColorGradient => spec!(
             "グラデーション層",
-            "はじめの層から終わりの層まで、色替え M600 を等間隔に入れます（最初と最後の層にも入る）。色の数だけ交換が必要なので、フィラメントを順に並べて使います。色の見た目は実機で確認してください。",
+            "はじめの層から終わりの層まで、色替え M600 を等間隔に入れます（最初と最後の層にも入る）。色の数だけ交換が必要なので、フィラメントを順に並べて使います。プリンタ設定で Marlin の M600 対応を明示確認してください。色の見た目は実機で確認してください。",
             "gradient color change layers filament m600 グラデーション 色替え 層 多色 gcode",
             Gcode,
             [
@@ -712,6 +719,10 @@ fn printer(inputs: &[Tree]) -> Result<Tree, String> {
     let nozzle = scalar(inputs, 5)?;
     if nozzle > 0.0 {
         printer.nozzle_d = nozzle;
+    }
+    // Older callers/projects without the new port must default to unconfirmed.
+    if inputs.get(6).is_some() {
+        printer.m600_confirmed = index_of(inputs, 6)? == 1;
     }
     let job = finish(GcodeJob::new(printer))?;
     Ok(Tree::single(Value::Gcode(Arc::new(job))))
@@ -1470,6 +1481,16 @@ mod tests {
             panic!("no job");
         };
         assert_eq!(job.color_changes, vec![5, 15, 25, 30]);
+        assert!(job.render(&never).unwrap_err().contains("M600"));
+
+        g.node_mut(printer).unwrap().params.extend([
+            ("preset".to_string(), 4.),
+            ("m600_confirmed".to_string(), 1.),
+        ]);
+        let tree = eval(&g, change).unwrap();
+        let Some(Value::Gcode(job)) = tree.branches.values().flatten().next() else {
+            panic!("no job");
+        };
         let (text, stats) = job.render(&never).unwrap();
         assert_eq!(text.matches("M600").count(), 4);
         assert_eq!(stats.color_changes, 4);
