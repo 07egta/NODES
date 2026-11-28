@@ -3332,7 +3332,17 @@ fn parse_parameter_number(text: &str) -> Option<f64> {
         .filter(|c| !c.is_whitespace())
         .map(|c| if c == '−' { '-' } else { c })
         .collect();
-    text.parse::<f64>().ok().filter(|number| number.is_finite())
+    // Fast path preserves exact decimal round-trips, including signed zero.
+    if let Ok(number) = text.parse::<f64>() {
+        return number.is_finite().then_some(number);
+    }
+    // The expression evaluator rejects non-finite variables at use sites.
+    // Numeric editors accept constants only, not graph-dependent variables.
+    nodes::expr::parse(&text)
+        .ok()?
+        .eval([f64::NAN; 4])
+        .ok()
+        .filter(|number| number.is_finite())
 }
 
 pub(crate) fn parameter_slider<'a>(value: &'a mut f64, spec: &InputSpec) -> egui::Slider<'a> {
