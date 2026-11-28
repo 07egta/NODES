@@ -416,7 +416,13 @@ pub struct GcodeJob {
     pub preview: Option<Preview>,
     /// Result of the last 安全チェック node.
     pub notes: Vec<Issue>,
+    /// Layer indices (0 = first layer) where the writer emits M600 (filament change).
+    /// Sorted, no duplicates, never contains 0.
+    pub color_changes: Vec<u32>,
 }
+
+/// Most filament changes one job may hold.
+pub const MAX_COLOR_CHANGES: usize = 256;
 
 impl GcodeJob {
     pub fn new(printer: Printer) -> Self {
@@ -430,7 +436,23 @@ impl GcodeJob {
             end: Script::default(),
             preview: None,
             notes: Vec::new(),
+            color_changes: Vec::new(),
         }
+    }
+
+    /// Adds filament changes at the start of the given layers. Layer 0 is ignored
+    /// (a change before anything is printed is just a loading step).
+    pub fn add_color_changes(&mut self, layers: &[u32]) -> Result<(), String> {
+        self.color_changes
+            .extend(layers.iter().copied().filter(|&l| l > 0));
+        self.color_changes.sort_unstable();
+        self.color_changes.dedup();
+        if self.color_changes.len() > MAX_COLOR_CHANGES {
+            return Err(format!(
+                "色替えは {MAX_COLOR_CHANGES} 回までです。回数を減らしてください。"
+            ));
+        }
+        Ok(())
     }
 
     pub fn point_count(&self) -> usize {
@@ -674,6 +696,8 @@ pub struct Stats {
     pub travel_mm: f64,
     pub layers: u32,
     pub retractions: usize,
+    /// Number of M600 filament changes. The time they take (heating, manual swap) is not counted.
+    pub color_changes: usize,
     pub low: [f64; 3],
     pub high: [f64; 3],
 }
@@ -684,6 +708,7 @@ impl GcodeJob {
             low: [f64::INFINITY; 3],
             high: [f64::NEG_INFINITY; 3],
             layers: self.layer_count(),
+            color_changes: self.color_changes.len(),
             ..Stats::default()
         };
         self.walk(cancel, &mut |m| {
@@ -729,6 +754,29 @@ impl GcodeJob {
     }
 }
 
+/// Evenly spaced layers for a colour gradient: `count` changes, the first at `from`
+/// and the last at `to` (0-based layer indices). One change goes at `from`.
+pub fn gradient_layers(from: u32, to: u32, count: u32) -> Result<Vec<u32>, String> {
+    if count == 0 || count as usize > MAX_COLOR_CHANGES {
+        return Err(format!(
+            "色替えの回数は 1〜{MAX_COLOR_CHANGES} にしてください。"
+        ));
+    }
+    if to < from {
+        return Err("終わりの層は、はじめの層以上にしてください。".into());
+    }
+    if count == 1 {
+        return Ok(vec![from]);
+    }
+    let span = f64::from(to - from);
+    let steps = f64::from(count - 1);
+    let mut out: Vec<u32> = (0..count)
+        .map(|k| from + (span * f64::from(k) / steps).round() as u32)
+        .collect();
+    out.dedup();
+    Ok(out)
+}
+
 // ---------------------------------------------------------------------------
 // Safety check
 // ---------------------------------------------------------------------------
@@ -765,6 +813,23 @@ impl GcodeJob {
         if let Err(e) = pr.validate().and_then(|()| pf.validate()) {
             push(true, e);
             return Ok(out);
+        }
+
+        if !self.color_changes.is_empty() {
+            if !pr.heated {
+                push(
+                    false,
+                    "この機種は加熱しないので、色替え（M600）は書き出されません。".into(),
+                );
+            } else if self.color_changes.iter().any(|&l| l >= self.layer_count()) {
+                push(
+                    false,
+                    format!(
+                        "色替えの層が全 {} 層より後にあります。その色替えは書き出されません。",
+                        self.layer_count()
+                    ),
+                );
+            }
         }
 
         // Non-finite or absurd coordinates.
@@ -1101,10 +1166,18 @@ impl GcodeJob {
             }
         }
         if self.start.mode != ScriptMode::Auto {
+            t.line(
+                "; 注意: ユーザーの開始 G-code の動作・座標オフセット・機種固有設定は未検証です。",
+            )?;
             t.line("; ---- ユーザーの開始 G-code ----")?;
             push_script(&mut t, &self.start.text)?;
             t.line("; ---- ここまで ----")?;
         }
+        // Body coordinates are absolute millimeters. A custom start script may
+        // leave the printer in inches or relative XYZ mode. Restore both before
+        // selecting E mode, since G90 can also affect E on some firmware.
+        t.line("G21 ; 単位は mm")?;
+        t.line("G90 ; 座標は絶対値")?;
         // The extruder mode is always set here, whatever the script did.
         t.line(if pf.relative_e {
             "M83 ; 押し出し量は相対値"
@@ -1137,6 +1210,7 @@ impl GcodeJob {
         let mut fan_on = false;
         let mut top_z = 0.0_f64;
         let mut last = [0.0_f64, 0.0, 0.0];
+        let mut next_change = 0usize;
         let fan_value = (pf.fan_pct * 2.55).round();
         let relative = pf.relative_e;
         self.walk(cancel, &mut |m| {
@@ -1154,6 +1228,18 @@ impl GcodeJob {
             };
             match m.op {
                 Op::Layer => {
+                    let mut change_here = false;
+                    while self
+                        .color_changes
+                        .get(next_change)
+                        .is_some_and(|&l| l <= m.layer)
+                    {
+                        next_change += 1;
+                        change_here = true;
+                    }
+                    if change_here && pr.heated {
+                        t.line(&format!("M600 ; 色替え（層 {} の前）", m.layer + 1))?;
+                    }
                     t.line(&format!(";LAYER:{}", m.layer))?;
                     t.line(&format!(";Z:{:.3}", m.to[2]))?;
                     if pr.heated
@@ -1221,6 +1307,7 @@ impl GcodeJob {
             t.line("M84 ; モーター停止")?;
         }
         if self.end.mode != ScriptMode::Auto {
+            t.line("; 注意: ユーザーの終了 G-code の動作は未検証です。")?;
             t.line("; ---- ユーザーの終了 G-code ----")?;
             push_script(&mut t, &self.end.text)?;
             t.line("; ---- ここまで ----")?;
@@ -1870,6 +1957,57 @@ mod tests {
     }
 
     #[test]
+    fn gradient_layers_are_even_and_include_both_ends() {
+        assert_eq!(
+            gradient_layers(10, 50, 5).unwrap(),
+            vec![10, 20, 30, 40, 50]
+        );
+        assert_eq!(gradient_layers(7, 7, 1).unwrap(), vec![7]);
+        // Too many changes for the span collapse onto the same layers.
+        assert_eq!(gradient_layers(3, 5, 6).unwrap(), vec![3, 4, 5]);
+        assert!(gradient_layers(5, 3, 2).is_err());
+        assert!(gradient_layers(0, 10, 0).is_err());
+        assert!(gradient_layers(0, 10, 100_000).is_err());
+    }
+
+    #[test]
+    fn color_change_is_written_once_before_its_layer() {
+        let mut job = job_with(vec![
+            square(0.2, 0, PathKind::Outer),
+            square(0.4, 1, PathKind::Outer),
+            square(0.6, 2, PathKind::Outer),
+        ]);
+        job.add_color_changes(&[0, 2, 2]).unwrap();
+        assert_eq!(job.color_changes, vec![2]);
+        let (text, stats) = job.render(&never).unwrap();
+        assert_eq!(text.matches("M600").count(), 1);
+        let m600 = text.find("M600").unwrap();
+        assert!(m600 > text.find(";LAYER:1").unwrap());
+        assert!(m600 < text.find(";LAYER:2").unwrap());
+        assert_eq!(stats.color_changes, 1);
+        assert!(
+            job.check(&never)
+                .unwrap()
+                .iter()
+                .all(|n| !(n.error && n.text.contains("色替え")))
+        );
+    }
+
+    #[test]
+    fn color_change_past_the_last_layer_is_warned_not_written() {
+        let mut job = job_with(vec![square(0.2, 0, PathKind::Outer)]);
+        job.add_color_changes(&[5]).unwrap();
+        let (text, _) = job.render(&never).unwrap();
+        assert!(!text.contains("M600"));
+        assert!(
+            job.check(&never)
+                .unwrap()
+                .iter()
+                .any(|n| !n.error && n.text.contains("色替え"))
+        );
+    }
+
+    #[test]
     fn extrusion_formula_matches_hand_calculation() {
         // 10 mm line, 0.4 wide, 0.2 high, 1.75 filament: 10*0.08/(pi*0.875^2)
         let e = extrusion_e(10.0, 0.4, 0.2, 1.75);
@@ -1905,14 +2043,14 @@ mod tests {
     }
 
     #[test]
-    fn render_always_sets_extruder_mode_and_resets_e() {
+    fn render_always_sets_body_units_xyz_and_extruder_mode() {
         for relative in [false, true] {
             for mode in [ScriptMode::Auto, ScriptMode::AutoPlus, ScriptMode::Custom] {
                 let mut job = job_with(vec![square(0.2, 0, PathKind::Outer)]);
                 job.profile.relative_e = relative;
                 job.start = Script {
                     mode,
-                    text: "M83\nM82\nG28".into(),
+                    text: "G28\nG20\nG91\nM83\nM82".into(),
                 };
                 let (text, _) = job.render(&never).unwrap();
                 let wanted = if relative { "M83" } else { "M82" };
@@ -1926,7 +2064,18 @@ mod tests {
                     last_mode.starts_with(wanted),
                     "{mode:?} {relative}: {last_mode}"
                 );
-                assert!(head.contains("G92 E0"));
+                let units = head.rfind("G21").unwrap();
+                let xyz = head.rfind("G90").unwrap();
+                let extrusion = head.rfind(wanted).unwrap();
+                let reset = head.rfind("G92 E0").unwrap();
+                assert!(units < xyz && xyz < extrusion && extrusion < reset);
+                if mode != ScriptMode::Auto {
+                    assert!(head.rfind("G20").unwrap() < units);
+                    assert!(head.rfind("G91").unwrap() < xyz);
+                } else {
+                    assert!(!head.contains("G20"));
+                    assert!(!head.contains("G91"));
+                }
             }
         }
     }

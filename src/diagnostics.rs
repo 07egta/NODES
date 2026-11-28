@@ -67,6 +67,21 @@ pub struct DiagnosticReport {
     /// Enabled node visits, including partial visits interrupted by cancellation.
     /// Descending measured time, with node ID as a deterministic tie breaker.
     pub hotspots: Vec<NodeHotspot>,
+    /// Absent when structural graph validation fails.
+    pub dependency_profile: Option<DependencyProfile>,
+}
+
+/// A read-only view of the longest consumed-input chain and measured node path.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct DependencyProfile {
+    /// Maximum number of nodes in a structural chain; zero for an empty graph.
+    pub depth: usize,
+    /// Heaviest contiguous chain of enabled nodes with valid recorded timings.
+    /// Includes cached/partial visits; not a wall-clock duration or speedup estimate.
+    pub measured_path: Vec<NodeId>,
+    /// Sum of recorded timings along the path; saturates at f64::MAX.
+    /// None when no eligible timing exists.
+    pub measured_path_ms: Option<f64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -327,6 +342,7 @@ pub fn diagnose_cancellable(
         disabled_nodes: Vec::new(),
         unevaluated_nodes: Vec::new(),
         hotspots: Vec::new(),
+        dependency_profile: None,
     };
     for node in &nodes {
         cancellation.step()?;
@@ -398,6 +414,12 @@ pub fn diagnose_cancellable(
             return cancellation.finish(report);
         }
     };
+    report.dependency_profile = Some(dependency_profile(
+        graph,
+        &order,
+        evaluation,
+        &mut cancellation,
+    )?);
     report.summary.complete =
         !evaluation.cancelled && report.summary.completed_count == report.summary.node_count;
     if report.summary.failed_count == 0 {
@@ -591,6 +613,78 @@ pub fn diagnose_cancellable(
     cancellation.finish(report)
 }
 
+// Recovered from PR #20 (4ef925c), adapted to the current diagnostics API.
+// Only actual cluster inputs participate. Traverse the validated DAG once;
+// missing measurements break the weighted path rather than inventing zero costs.
+fn dependency_profile<F: Fn() -> bool>(
+    graph: &Graph,
+    order: &[&Node],
+    evaluation: &Evaluation,
+    cancellation: &mut Cancellation<F>,
+) -> Option<DependencyProfile> {
+    let mut profile = DependencyProfile::default();
+    let mut depths = BTreeMap::<NodeId, usize>::new();
+    let mut weights = BTreeMap::<NodeId, (f64, Option<NodeId>)>::new();
+    let mut endpoint: Option<(NodeId, f64)> = None;
+
+    for &node in order {
+        cancellation.step()?;
+        let mut depth = 1;
+        let mut best_parent: Option<(NodeId, f64)> = None;
+        for spec in node
+            .kind
+            .spec()
+            .inputs
+            .iter()
+            .take(crate::cluster::real_input_count(graph, node))
+        {
+            cancellation.step()?;
+            let Some(&parent) = node.inputs.get(spec.key) else {
+                continue;
+            };
+            if let Some(&parent_depth) = depths.get(&parent) {
+                depth = depth.max(parent_depth + 1);
+            }
+            if let Some(&(cost, _)) = weights.get(&parent)
+                && best_parent.is_none_or(|(id, best)| cost > best || (cost == best && parent < id))
+            {
+                best_parent = Some((parent, cost));
+            }
+        }
+        depths.insert(node.id, depth);
+        profile.depth = profile.depth.max(depth);
+
+        if node.off {
+            continue;
+        }
+        let Some(ms) = evaluation
+            .node_timings
+            .get(&node.id)
+            .and_then(|timing| valid_time(timing.elapsed_ms))
+        else {
+            continue;
+        };
+        let cost = (best_parent.map_or(0.0, |(_, cost)| cost) + ms).min(f64::MAX);
+        weights.insert(node.id, (cost, best_parent.map(|(id, _)| id)));
+        if endpoint.is_none_or(|(id, best)| cost > best || (cost == best && node.id < id)) {
+            endpoint = Some((node.id, cost));
+        }
+    }
+
+    if let Some((id, cost)) = endpoint {
+        profile.measured_path_ms = Some(cost);
+        let mut current = Some(id);
+        while let Some(id) = current {
+            cancellation.step()?;
+            profile.measured_path.push(id);
+            current = weights.get(&id).and_then(|(_, parent)| *parent);
+        }
+        profile.measured_path.reverse();
+    }
+    cancellation.check_now()?;
+    Some(profile)
+}
+
 fn valid_time(time: f64) -> Option<f64> {
     (time.is_finite() && time >= 0.).then_some(time)
 }
@@ -692,5 +786,117 @@ impl AffectedPreview {
                 Some(ids)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod dependency_profile_tests {
+    use super::*;
+    use crate::engine::NodeTiming;
+
+    fn add(graph: &mut Graph, kind: NodeKind) -> NodeId {
+        graph.add(kind, [0.0; 2]).unwrap()
+    }
+
+    fn timing(evaluation: &mut Evaluation, id: NodeId, elapsed_ms: f64) {
+        evaluation.node_timings.insert(
+            id,
+            NodeTiming {
+                elapsed_ms,
+                cached: false,
+            },
+        );
+    }
+
+    #[test]
+    fn duplicate_wires_and_diamond_use_a_single_measured_path() {
+        let mut graph = Graph::default();
+        let a = add(&mut graph, NodeKind::Number);
+        let b = add(&mut graph, NodeKind::Add);
+        let c = add(&mut graph, NodeKind::Add);
+        let d = add(&mut graph, NodeKind::Multiply);
+        graph.connect(a, b, "a").unwrap();
+        graph.connect(a, b, "b").unwrap();
+        graph.connect(a, c, "a").unwrap();
+        graph.connect(b, d, "a").unwrap();
+        graph.connect(c, d, "b").unwrap();
+        let mut evaluation = Evaluation::default();
+        for (id, ms) in [(a, 2.0), (b, 5.0), (c, 5.0), (d, 1.0)] {
+            timing(&mut evaluation, id, ms);
+        }
+        let report = diagnose(&graph, &evaluation);
+        let profile = report.dependency_profile.as_ref().unwrap();
+        assert_eq!(report.summary.connection_count, 5);
+        assert_eq!(profile.depth, 3);
+        assert_eq!(profile.measured_path, vec![a, b, d]);
+        assert_eq!(profile.measured_path_ms, Some(8.0));
+        graph.nodes.reverse();
+        assert_eq!(
+            serde_json::to_value(diagnose(&graph, &evaluation)).unwrap(),
+            serde_json::to_value(report).unwrap()
+        );
+    }
+
+    #[test]
+    fn missing_invalid_and_disabled_timings_do_not_bridge_the_path() {
+        let mut graph = Graph::default();
+        let a = add(&mut graph, NodeKind::Number);
+        let b = add(&mut graph, NodeKind::Add);
+        let c = add(&mut graph, NodeKind::Add);
+        let d = add(&mut graph, NodeKind::Add);
+        graph.connect(a, b, "a").unwrap();
+        graph.connect(b, c, "a").unwrap();
+        graph.connect(c, d, "a").unwrap();
+        graph.node_mut(c).unwrap().off = true;
+        let mut evaluation = Evaluation {
+            cancelled: true,
+            ..Evaluation::default()
+        };
+        for (id, ms) in [(a, 2.0), (b, f64::NAN), (c, 100.0), (d, 3.0)] {
+            timing(&mut evaluation, id, ms);
+        }
+        let profile = diagnose(&graph, &evaluation).dependency_profile.unwrap();
+        assert_eq!(profile.depth, 4);
+        assert_eq!(profile.measured_path, vec![d]);
+        assert_eq!(profile.measured_path_ms, Some(3.0));
+    }
+
+    #[test]
+    fn unused_cluster_socket_does_not_extend_the_path() {
+        let mut graph = Graph::default();
+        let a = add(&mut graph, NodeKind::Number);
+        let cluster = add(&mut graph, NodeKind::Cluster);
+        graph.connect(a, cluster, "in7").unwrap();
+        let mut evaluation = Evaluation::default();
+        timing(&mut evaluation, a, 2.0);
+        timing(&mut evaluation, cluster, 3.0);
+        let profile = diagnose(&graph, &evaluation).dependency_profile.unwrap();
+        assert_eq!(profile.depth, 1);
+        assert_eq!(profile.measured_path, vec![cluster]);
+        assert_eq!(profile.measured_path_ms, Some(3.0));
+    }
+
+    #[test]
+    fn empty_invalid_and_synthetic_overflow_reports_remain_serializable() {
+        let mut graph = Graph::default();
+        let mut evaluation = Evaluation::default();
+        let profile = diagnose(&graph, &evaluation).dependency_profile.unwrap();
+        assert_eq!(profile.depth, 0);
+        assert_eq!(profile.measured_path_ms, None);
+
+        let a = add(&mut graph, NodeKind::Add);
+        let b = add(&mut graph, NodeKind::Add);
+        graph.connect(a, b, "a").unwrap();
+        timing(&mut evaluation, a, f64::MAX);
+        timing(&mut evaluation, b, f64::MAX);
+        let report = diagnose(&graph, &evaluation);
+        let profile = report.dependency_profile.as_ref().unwrap();
+        assert_eq!(profile.measured_path_ms, Some(f64::MAX));
+        assert!(serde_json::to_value(report).is_ok());
+
+        graph.node_mut(a).unwrap().inputs.insert("a".into(), b);
+        let report = diagnose(&graph, &evaluation);
+        assert!(report.graph_error.is_some());
+        assert!(report.dependency_profile.is_none());
     }
 }

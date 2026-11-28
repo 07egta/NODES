@@ -171,14 +171,28 @@ impl BrepValue {
         }
         match sk::guard("体積", || sk::measure_mass(&self.body)) {
             Ok(m) if m.volume.is_finite() => Some(m.volume.abs()),
-            _ => Some(mesh_volume(&self.preview).abs()),
+            _ => {
+                let volume = mesh_volume(&self.preview).abs();
+                volume.is_finite().then_some(volume)
+            }
         }
     }
 }
 
 /// Signed volume of a closed triangle mesh (mm³).
+///
+/// Translate to a referenced vertex before taking determinants. For a closed
+/// surface the integral is translation invariant, but world-coordinate
+/// determinants can lose all significant digits for small distant solids.
 pub fn mesh_volume(m: &Mesh) -> f64 {
-    let mut v = 0.;
+    let Some(origin) = m
+        .triangles
+        .iter()
+        .find_map(|t| m.vertices.get(t[0] as usize).copied())
+    else {
+        return 0.0;
+    };
+    let (mut sum, mut correction) = (0.0, 0.0);
     for t in &m.triangles {
         let (Some(a), Some(b), Some(c)) = (
             m.vertices.get(t[0] as usize),
@@ -187,9 +201,13 @@ pub fn mesh_volume(m: &Mesh) -> f64 {
         ) else {
             continue;
         };
-        v += dot(*a, cross(*b, *c)) / 6.;
+        let term = dot(sub(*a, origin), cross(sub(*b, origin), sub(*c, origin))) / 6.0;
+        let adjusted = term - correction;
+        let next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
     }
-    v
+    sum
 }
 
 /// Whether every undirected edge is used by exactly two triangles in opposite directions.
@@ -862,6 +880,19 @@ pub fn sphere(center: P3, radius: f64, stop: Stop) -> R<BrepValue> {
         return Err("球の中心が無効です。".into());
     }
     let body = kernel("球", stop, || sk::sphere(v3(center), r))?;
+    brep(body, stop)
+}
+
+/// Exact ring torus about the Z axis, with dimensions in millimetres.
+pub fn torus(major: f64, minor: f64, stop: Stop) -> R<BrepValue> {
+    stopped(stop)?;
+    let (major, minor) = (positive("大半径", major)?, positive("小半径", minor)?);
+    if major - minor <= tol::ABS || major + minor > limits::MAX_COORDINATE {
+        return Err(
+            "トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。".into(),
+        );
+    }
+    let body = kernel("トーラス", stop, || sk::torus(Vec3::ZERO, major, minor))?;
     brep(body, stop)
 }
 

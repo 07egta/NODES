@@ -48,43 +48,31 @@ impl Frame {
     /// Shade the pixels whose centres lie inside `v`, where they are nearer than
     /// what is already stored. Degenerate or non-finite triangles are skipped.
     pub fn triangle(&mut self, v: [Vertex; 3]) {
+        if self.width == 0 || self.height == 0 {
+            return;
+        }
+        let Some(inverse) = triangle_inverse(v) else {
+            return;
+        };
         let [a, b, c] = v;
-        let finite = v.iter().all(|p| {
-            p.x.is_finite()
-                && p.y.is_finite()
-                && p.key.is_finite()
-                && p.rgb.iter().all(|c| c.is_finite())
-        });
-        if !finite || self.width == 0 || self.height == 0 {
-            return;
-        }
-        let area = edge(a, b, c.x, c.y);
-        if area.abs() < 1.0e-9 {
-            return;
-        }
         let max_x = (self.width as f32 - 1.0).max(0.0);
         let max_y = (self.height as f32 - 1.0).max(0.0);
         let min_px = a.x.min(b.x).min(c.x).floor().clamp(0.0, max_x) as usize;
         let max_px = a.x.max(b.x).max(c.x).ceil().clamp(0.0, max_x) as usize;
         let min_py = a.y.min(b.y).min(c.y).floor().clamp(0.0, max_y) as usize;
         let max_py = a.y.max(b.y).max(c.y).ceil().clamp(0.0, max_y) as usize;
-        let inverse = 1.0 / area;
-
         for py in min_py..=max_py {
             let y = py as f32 + 0.5;
             for px in min_px..=max_px {
                 let x = px as f32 + 0.5;
-                // Barycentric weights; each is edge / area, so the sign of the
-                // area does not matter.
-                let wa = edge(b, c, x, y) * inverse;
-                let wb = edge(c, a, x, y) * inverse;
-                let wc = edge(a, b, x, y) * inverse;
-                if wa < 0.0 || wb < 0.0 || wc < 0.0 {
+                let Some([wa, wb, wc]) = weights(v, inverse, x, y) else {
                     continue;
-                }
-                let key = wa * a.key + wb * b.key + wc * c.key;
+                };
+                let key = depth_key(v, [wa, wb, wc]);
                 let index = py * self.width + px;
-                if key.partial_cmp(&self.key[index]) != Some(std::cmp::Ordering::Greater) {
+                if !key.is_finite()
+                    || key.partial_cmp(&self.key[index]) != Some(std::cmp::Ordering::Greater)
+                {
                     continue;
                 }
                 self.key[index] = key;
@@ -99,6 +87,43 @@ impl Frame {
             }
         }
     }
+}
+
+/// Return the same interpolated depth key the rasterizer uses at a pixel
+/// centre. A click uses this instead of a triangle's average world depth.
+/// Coordinates are in raster pixels, not egui points.
+pub fn sample_key(v: [Vertex; 3], x: f32, y: f32) -> Option<f32> {
+    let inverse = triangle_inverse(v)?;
+    let w = weights(v, inverse, x, y)?;
+    let key = depth_key(v, w);
+    key.is_finite().then_some(key)
+}
+
+fn triangle_inverse(v: [Vertex; 3]) -> Option<f32> {
+    if !v.iter().all(|p| {
+        p.x.is_finite()
+            && p.y.is_finite()
+            && p.key.is_finite()
+            && p.rgb.iter().all(|c| c.is_finite())
+    }) {
+        return None;
+    }
+    let [a, b, c] = v;
+    let area = edge(a, b, c.x, c.y);
+    (area.is_finite() && area.abs() >= 1.0e-9).then(|| 1.0 / area)
+}
+
+fn weights(v: [Vertex; 3], inverse: f32, x: f32, y: f32) -> Option<[f32; 3]> {
+    let [a, b, c] = v;
+    // The sign of the area does not matter; both windings are rendered.
+    let wa = edge(b, c, x, y) * inverse;
+    let wb = edge(c, a, x, y) * inverse;
+    let wc = edge(a, b, x, y) * inverse;
+    (wa >= 0.0 && wb >= 0.0 && wc >= 0.0).then_some([wa, wb, wc])
+}
+
+fn depth_key(v: [Vertex; 3], [wa, wb, wc]: [f32; 3]) -> f32 {
+    wa * v[0].key + wb * v[1].key + wc * v[2].key
 }
 
 /// Twice the signed area of (a, b, p): positive when `p` is left of a->b.
@@ -133,6 +158,30 @@ mod tests {
         let rgba = frame.into_rgba();
         let i = (8 + 1) * 4;
         assert_eq!(&rgba[i..i + 4], &[0, 255, 0, 255]);
+    }
+
+    #[test]
+    fn sample_key_matches_depth_buffer_for_intersecting_triangles() {
+        let x = [0.0, 8.0, 0.0];
+        let y = [0.0, 0.0, 8.0];
+        let mut slanted = tri(x, y, 0.0, [255.0, 0.0, 0.0]);
+        slanted[0].key = 6.0;
+        let flat = tri(x, y, 2.5, [0.0, 255.0, 0.0]);
+        let mut frame = Frame::new(8, 8);
+        frame.triangle(slanted);
+        frame.triangle(flat);
+        let rgba = frame.into_rgba();
+        for (px, py, expected) in [(0, 0, [255, 0, 0, 255]), (5, 0, [0, 255, 0, 255])] {
+            let a = sample_key(slanted, px as f32 + 0.5, py as f32 + 0.5).unwrap();
+            let b = sample_key(flat, px as f32 + 0.5, py as f32 + 0.5).unwrap();
+            assert_eq!(a > b, expected[0] == 255);
+            let index = (py * 8 + px) * 4;
+            let pixel = &rgba[index..index + 4];
+            // Colour interpolation may truncate by one even for constant RGB.
+            assert!(pixel.iter().zip(expected).all(|(a, b)| a.abs_diff(b) <= 1));
+        }
+        assert_eq!(sample_key(slanted, 7.5, 7.5), None);
+        assert_eq!(sample_key([slanted[0]; 3], 0.5, 0.5), None);
     }
 
     #[test]
