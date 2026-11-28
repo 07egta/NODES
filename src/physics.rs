@@ -7,9 +7,11 @@
 //! * `soap_film`: area minimisation with pinned boundary (soap film / minimal surface).
 //! * `disk_from_curve`: a triangulated disc spanning a closed curve, to feed `soap_film`.
 #![allow(clippy::needless_range_loop)]
+pub mod ccd;
+
 use crate::engine::cancelled;
 use crate::mesh_tools::{
-    P, Stop, TriGrid, add, boundary_flags, cross, dot, edge_map, len, mul, raw_check, sub, tick,
+    P, Stop, add, boundary_flags, cross, dot, edge_map, len, mul, raw_check, sub, tick,
     vertex_normals,
 };
 use crate::model::Mesh;
@@ -121,6 +123,8 @@ pub fn relax(
         || cfg.rest_scale < 0.
         || !cfg.gravity.is_finite()
         || !cfg.margin.is_finite()
+        || cfg.margin < 0.
+        || cfg.floor.is_some_and(|z| !z.is_finite() || (z + cfg.margin).abs() > 1e9)
     {
         return Err("物理の設定が範囲外です。".into());
     }
@@ -145,21 +149,18 @@ pub fn relax(
         .iter()
         .map(|&d| cfg.stiffness * d.max(1) as f64)
         .collect();
-    let grid = match collider {
+    let collider = match collider {
         Some(c) => {
-            raw_check(c, stop)?;
-            if x.len().saturating_mul(c.triangles.len().min(64)) > WORK_BUDGET {
-                return Err("衝突判定が重すぎます。".into());
+            if cfg.margin <= 0. {
+                return Err("CCD のすき間は正の値にしてください。".into());
             }
-            Some(TriGrid::new(c, (cfg.margin * 2.).max(1e-6), stop)?)
+            Some(ccd::StaticMesh::new(c, stop)?)
         }
         None => None,
     };
+    let mut collision_budget = ccd::Budget::new(WORK_BUDGET);
     let scale = extent(&x);
-    let mut max_step = scale * 0.05;
-    if let Some(g) = &grid {
-        max_step = max_step.min(g.cell_size() * 0.4);
-    }
+    let max_step = scale * 0.05;
     let tol = scale * 1e-8;
     let dt = 0.9;
     let mut vel = vec![[0.; 3]; x.len()];
@@ -209,26 +210,40 @@ pub fn relax(
                 step = mul(step, max_step / l);
                 vel[i] = mul(step, 1. / dt);
             }
-            x[i] = add(x[i], step);
-            if let Some(z0) = cfg.floor
-                && x[i][2] < z0 + cfg.margin
-            {
-                x[i][2] = z0 + cfg.margin;
-                vel[i][2] = vel[i][2].max(0.);
-            }
-            if let Some(g) = &grid
-                && let Some(hit) = g.nearest(x[i])
-            {
-                let signed = dot(sub(x[i], hit.point), hit.normal);
-                if signed < cfg.margin && hit.distance < cfg.margin * 2. + g.cell_size() {
-                    x[i] = add(hit.point, mul(hit.normal, cfg.margin));
-                    let vn = dot(vel[i], hit.normal);
-                    if vn < 0. {
-                        vel[i] = sub(vel[i], mul(hit.normal, vn));
+            let start = x[i];
+            let mut target = add(start, step);
+            let mut floor_hit = None;
+            if let Some(z0) = cfg.floor {
+                let floor = z0 + cfg.margin;
+                if collider.is_some() && start[2] < floor {
+                    return Err("CCD: 頂点が床の下から開始しています。".into());
+                }
+                if target[2] < floor {
+                    if collider.is_some() {
+                        let t = (floor - start[2]) / (target[2] - start[2]);
+                        target = add(start, mul(step, t));
                     }
+                    target[2] = floor;
+                    floor_hit = Some(floor);
                 }
             }
-            moved = moved.max(l.min(max_step));
+            if let Some(c) = &collider
+                && let Some(hit) =
+                    c.sweep(start, target, cfg.margin, &mut collision_budget, stop)?
+            {
+                target = add(start, mul(sub(target, start), hit.toi));
+                // Inelastic, frictionless first contact. The unspent displacement
+                // is not applied without another sweep; relaxation resumes next iteration.
+                let vn = dot(vel[i], hit.normal);
+                if vn < 0. {
+                    vel[i] = sub(vel[i], mul(hit.normal, vn));
+                }
+            }
+            if floor_hit.is_some_and(|floor| target[2] <= floor) {
+                vel[i][2] = vel[i][2].max(0.);
+            }
+            x[i] = target;
+            moved = moved.max(len(sub(target, start)));
         }
         if x.iter().any(|p| !finite(*p)) {
             return Err("計算が発散しました。荷重を下げるか反復を減らしてください。".into());
@@ -539,7 +554,8 @@ mod tests {
         }
         let table = grid(8, 1.);
         let m = relax(&cloth, &[], &cfg, Some(&table), GO).unwrap();
-        assert!(m.vertices.iter().all(|p| p[2] > -0.5));
+        // The swept sphere stays above the two-sided table by its margin.
+        assert!(m.vertices.iter().all(|p| p[2] >= cfg.margin - 1e-8));
     }
     #[test]
     fn soap_film_reduces_area_and_keeps_the_rim() {
