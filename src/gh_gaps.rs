@@ -259,10 +259,12 @@ fn closed_points(c: &Curve) -> Result<&[[f64; 3]], String> {
 
 /// Half the sum of cross products: the vector area of a closed polygon.
 fn area_vector(points: &[[f64; 3]]) -> [f64; 3] {
+    let origin = points[0];
     let mut sum = [0.; 3];
     for (index, p) in points.iter().enumerate() {
         let q = points[(index + 1) % points.len()];
-        let c = cross(*p, q);
+        // Local coordinates avoid cancellation of large world-space products.
+        let c = cross(sub(*p, origin), sub(q, origin));
         sum = [sum[0] + c[0], sum[1] + c[1], sum[2] + c[2]];
     }
     sum.map(|v| v * 0.5)
@@ -337,8 +339,14 @@ pub fn run_item(
             }
             number(v.log10())
         }
-        GateNand => flag(!(bit(x()?)? && bit(y()?)?)),
-        GateNor => flag(!(bit(x()?)? || bit(y()?)?)),
+        GateNand => {
+            let (a, b) = (bit(x()?)?, bit(y()?)?);
+            flag(!(a && b))
+        }
+        GateNor => {
+            let (a, b) = (bit(x()?)?, bit(y()?)?);
+            flag(!(a || b))
+        }
         GateXnor => flag(bit(x()?)? == bit(y()?)?),
         DomainIncludes => {
             let (v, p, q) = (x()?, y()?, num(a, 2)?);
@@ -378,13 +386,13 @@ pub fn run_item(
                 let t = dot(cross(sub(pair[0], origin), sub(pair[1], origin)), unit) * 0.5;
                 total += t;
                 for (k, slot) in sum.iter_mut().enumerate() {
-                    *slot += (origin[k] + pair[0][k] + pair[1][k]) / 3. * t;
+                    *slot += ((pair[0][k] - origin[k]) + (pair[1][k] - origin[k])) / 3. * t;
                 }
             }
             if total.abs() < EPS {
                 return Err("面積が 0 です。平面上の閉じた曲線を接続してください。".into());
             }
-            point(sum.map(|v| v / total))
+            point(std::array::from_fn(|k| origin[k] + sum[k] / total))
         }
         CurveExplode => {
             let c = curve_of(a)?;
