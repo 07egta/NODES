@@ -1101,7 +1101,9 @@ impl GcodeJob {
             }
         }
         if self.start.mode != ScriptMode::Auto {
-            t.line("; 注意: ユーザーの開始 G-code の動作・座標オフセット・機種固有設定は未検証です。")?;
+            t.line(
+                "; 注意: ユーザーの開始 G-code の動作・座標オフセット・機種固有設定は未検証です。",
+            )?;
             t.line("; ---- ユーザーの開始 G-code ----")?;
             push_script(&mut t, &self.start.text)?;
             t.line("; ---- ここまで ----")?;
