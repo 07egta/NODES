@@ -7,26 +7,34 @@ use std::sync::{
     mpsc::{self, Receiver, RecvError, SendError, SyncSender, TryRecvError, TrySendError},
 };
 
+struct Mailbox<T> {
+    pending: Option<T>,
+    receiver_alive: bool,
+}
+
 pub struct LatestSender<T> {
-    pending: Arc<Mutex<Option<T>>>,
+    state: Arc<Mutex<Mailbox<T>>>,
     wake: SyncSender<()>,
 }
 
 pub struct LatestReceiver<T> {
-    pending: Arc<Mutex<Option<T>>>,
+    state: Arc<Mutex<Mailbox<T>>>,
     wake: Receiver<()>,
 }
 
 pub fn channel<T>() -> (LatestSender<T>, LatestReceiver<T>) {
-    let pending = Arc::new(Mutex::new(None));
+    let state = Arc::new(Mutex::new(Mailbox {
+        pending: None,
+        receiver_alive: true,
+    }));
     let (sender, receiver) = mpsc::sync_channel(1);
     (
         LatestSender {
-            pending: Arc::clone(&pending),
+            state: Arc::clone(&state),
             wake: sender,
         },
         LatestReceiver {
-            pending,
+            state,
             wake: receiver,
         },
     )
@@ -36,28 +44,29 @@ impl<T> LatestSender<T> {
     /// Replace the undelivered snapshot and signal a receiver without waiting.
     /// Dropping a superseded snapshot happens outside the mutex.
     pub fn send(&self, value: T) -> Result<(), SendError<T>> {
-        let mut slot = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-        let old = slot.replace(value);
-        let result = match self.wake.try_send(()) {
-            Ok(()) | Err(TrySendError::Full(())) => Ok(()),
-            Err(TrySendError::Disconnected(())) => {
-                // The slot is still locked; the value we just placed is present.
-                Err(SendError(
-                    slot.take().expect("mailbox holds the submitted value"),
-                ))
-            }
-        };
-        drop(slot);
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if !state.receiver_alive {
+            return Err(SendError(value));
+        }
+        // Signal while holding the state lock. A receiver may consume the wake,
+        // but cannot take the snapshot until it has been published below.
+        match self.wake.try_send(()) {
+            Ok(()) | Err(TrySendError::Full(())) => {}
+            Err(TrySendError::Disconnected(())) => return Err(SendError(value)),
+        }
+        let old = state.pending.replace(value);
+        drop(state);
         drop(old);
-        result
+        Ok(())
     }
 }
 
 impl<T> LatestReceiver<T> {
     fn take(&self) -> Option<T> {
-        self.pending
+        self.state
             .lock()
             .unwrap_or_else(|e| e.into_inner())
+            .pending
             .take()
     }
 
@@ -78,6 +87,19 @@ impl<T> LatestReceiver<T> {
                 return Ok(value);
             }
         }
+    }
+}
+
+impl<T> Drop for LatestReceiver<T> {
+    fn drop(&mut self) {
+        // Mark closed before the wake receiver is dropped, so a concurrent
+        // sender cannot publish a new snapshot into an abandoned mailbox.
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.receiver_alive = false;
+        let pending = state.pending.take();
+        drop(state);
+        // User-defined destructors must never run under the mailbox lock.
+        drop(pending);
     }
 }
 
@@ -145,6 +167,53 @@ mod tests {
         }
         producer.join().unwrap();
         assert_eq!(previous, 20_000);
+    }
+
+    #[test]
+    fn dropping_receiver_releases_pending_snapshot_while_sender_lives() {
+        let (tx, rx) = channel();
+        let payload = Arc::new(vec![0_u8; 1024 * 1024]);
+        let weak = Arc::downgrade(&payload);
+        tx.send(payload).unwrap();
+        assert!(weak.upgrade().is_some());
+        drop(rx);
+        assert!(weak.upgrade().is_none());
+        // The sender still exists and returns ownership on failure.
+        let rejected = Arc::new(vec![1_u8]);
+        let weak = Arc::downgrade(&rejected);
+        let error = tx.send(rejected).unwrap_err();
+        assert!(weak.upgrade().is_some());
+        assert_eq!(error.0.as_slice(), &[1]);
+        drop(error);
+        assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn receiver_drop_racing_with_send_never_retains_a_snapshot() {
+        for _ in 0..64 {
+            let (tx, rx) = channel();
+            let first = Arc::new(1);
+            let first_weak = Arc::downgrade(&first);
+            tx.send(first).unwrap();
+            let second = Arc::new(2);
+            let second_weak = Arc::downgrade(&second);
+            let barrier = std::sync::Barrier::new(2);
+            let result = std::thread::scope(|scope| {
+                let producer = scope.spawn(|| {
+                    barrier.wait();
+                    tx.send(second)
+                });
+                barrier.wait();
+                drop(rx);
+                producer.join().unwrap()
+            });
+            if let Err(error) = result {
+                assert_eq!(*error.0, 2);
+            }
+            assert!(first_weak.upgrade().is_none());
+            assert!(second_weak.upgrade().is_none());
+            assert!(tx.send(Arc::new(3)).is_err());
+        }
     }
 
     #[test]
