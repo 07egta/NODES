@@ -373,15 +373,7 @@ pub fn format_theme(mode: theme::Mode) -> String {
 
 /// Settings file beside the autosave file (same folder rules as `recovery.morph`).
 pub fn settings_path() -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
-        std::env::var_os("LOCALAPPDATA")
-            .map(|p| PathBuf::from(p).join("NODES").join("settings.txt"))
-    } else {
-        std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".local/share")))
-            .map(|p| p.join("morphlet/settings.txt"))
-    }
+    nodes::platform::data_dir().map(|p| p.join("settings.txt"))
 }
 
 /// Saved theme; Melt when nothing is saved yet. An older saved `theme=dark` or

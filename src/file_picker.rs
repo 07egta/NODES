@@ -73,6 +73,7 @@ impl FileTask {
     fn accepts(self, path: &Path) -> bool {
         match self {
             Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
+            Self::PickSlicer => nodes::platform::is_slicer_executable(path),
             Self::ExportStep | Self::ImportStep => {
                 has_extension(path, "step")
                     || has_extension(path, "stp")
@@ -95,6 +96,7 @@ impl FileTask {
             Self::ExportStep | Self::ImportStep => ".step / .stp / .iges / .igs",
             Self::ExportGcode => ".gcode",
             Self::ExportThreeMf => ".3mf",
+            Self::PickSlicer if !cfg!(windows) => "実行可能ファイル",
             Self::PickSlicer => ".exe",
         }
     }
@@ -369,7 +371,11 @@ impl FilePicker {
                     let field = ui.add(
                         egui::TextEdit::singleline(&mut self.filename)
                             .desired_width(ui.available_width())
-                            .hint_text(format!("作品.{}", self.task.extension())),
+                            .hint_text(if self.task == FileTask::PickSlicer {
+                                "実行ファイル".to_owned()
+                            } else {
+                                format!("作品.{}", self.task.extension())
+                            }),
                     );
                     if self.focus_filename {
                         field.request_focus();
@@ -524,6 +530,10 @@ impl FilePicker {
         }
         let extension = self.task.extension();
         if !self.task.accepts(&path) {
+            if self.task == FileTask::PickSlicer && !cfg!(windows) {
+                self.error = Some("実行可能なスライサーのファイルを指定してください。".into());
+                return None;
+            }
             if self.task.picks_existing() && path.extension().is_some() {
                 self.error = Some(format!(
                     "開けるファイルは {} です。",
@@ -626,6 +636,11 @@ fn shortcuts() -> Vec<(String, PathBuf)> {
         && let Some(parent) = executable.parent()
     {
         examples.push(parent.join("examples"));
+        if cfg!(target_os = "macos")
+            && let Some(contents) = parent.parent()
+        {
+            examples.push(contents.join("Resources/examples"));
+        }
     }
     if let Ok(directory) = std::env::current_dir() {
         examples.push(directory.join("examples"));

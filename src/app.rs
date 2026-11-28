@@ -3300,15 +3300,7 @@ fn safe_name(name: &str) -> String {
     }
 }
 fn recovery_path() -> Option<PathBuf> {
-    if cfg!(target_os = "windows") {
-        std::env::var_os("LOCALAPPDATA")
-            .map(|p| PathBuf::from(p).join("NODES").join("recovery.morph"))
-    } else {
-        std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".local/share")))
-            .map(|p| p.join("morphlet/recovery.morph"))
-    }
+    nodes::platform::data_dir().map(|p| p.join("recovery.morph"))
 }
 // Reading a parameter must not quantize it or change a loaded document. The
 // metadata step is interaction speed, not an origin-offset grid of valid values.

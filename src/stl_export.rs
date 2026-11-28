@@ -1495,6 +1495,11 @@ pub fn default_file_name(base: &str, format: OutputFormat, now: SystemTime) -> S
 
 /// Install locations checked on Windows, in order. Only existing files are used.
 pub fn slicer_candidates() -> Vec<PathBuf> {
+    // On Unix the user explicitly selects the executable (including inside a macOS .app).
+    // Do not guess a binary on PATH or search writable directories automatically.
+    if !cfg!(windows) {
+        return Vec::new();
+    }
     let program_files = std::env::var_os("ProgramFiles")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(r"C:\Program Files"));
@@ -1509,7 +1514,9 @@ pub fn slicer_candidates() -> Vec<PathBuf> {
 }
 
 pub fn detect_slicer() -> Option<PathBuf> {
-    slicer_candidates().into_iter().find(|p| p.is_file())
+    slicer_candidates()
+        .into_iter()
+        .find(|p| crate::platform::is_slicer_executable(p))
 }
 
 /// The program is run directly with the file as its only argument. No shell is involved.
@@ -1520,8 +1527,8 @@ pub fn slicer_command(exe: &Path, file: &Path) -> Command {
 }
 
 pub fn launch_slicer(exe: &Path, file: &Path) -> Result<(), String> {
-    if !exe.is_file() {
-        return Err("スライサーの exe が見つかりません。選び直してください。".into());
+    if !crate::platform::is_slicer_executable(exe) {
+        return Err("スライサーの実行ファイルが見つからないか、実行できません。".into());
     }
     slicer_command(exe, file)
         .spawn()
@@ -1530,14 +1537,7 @@ pub fn launch_slicer(exe: &Path, file: &Path) -> Result<(), String> {
 }
 
 pub fn config_path() -> Option<PathBuf> {
-    let base = if cfg!(windows) {
-        std::env::var_os("APPDATA").map(PathBuf::from)
-    } else {
-        std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
-    };
-    base.map(|dir| dir.join("NODES").join("stl_export.json"))
+    crate::platform::config_dir().map(|dir| dir.join("stl_export.json"))
 }
 
 pub fn load_stored(path: &Path) -> StoredSettings {

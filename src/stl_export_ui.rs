@@ -327,10 +327,10 @@ impl StlExportUi {
             .stored
             .slicer_exe
             .clone()
-            .filter(|p| p.is_file())
+            .filter(|p| nodes::platform::is_slicer_executable(p))
             .or_else(detect_slicer);
         let Some(exe) = exe else {
-            self.say("スライサーが見つかりません。exe を選んでください。", true);
+            self.say("スライサーが見つかりません。実行ファイルを選んでください。", true);
             return Some(UiRequest::PickSlicer {
                 directory: sources.start_dir.clone(),
             });
@@ -339,7 +339,7 @@ impl StlExportUi {
             Ok(()) => {
                 self.stored.slicer_exe = Some(exe);
                 self.persist();
-                self.say("スライサーで開きました。", false);
+                self.say("スライサーを起動しました。", false);
             }
             Err(error) => self.say(error, true),
         }

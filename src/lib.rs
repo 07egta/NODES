@@ -37,6 +37,7 @@ pub mod nurbs_nodes;
 mod origami;
 pub mod parameters;
 pub mod persistence;
+pub mod platform;
 pub mod physics;
 pub mod physics_nodes;
 pub mod point_cloud;
