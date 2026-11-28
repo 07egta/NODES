@@ -1969,11 +1969,29 @@ fn chain_segments(segments: &[(P3, P3)], eps: f64) -> R<Vec<Curve>> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// T-spline sheets and sewing (used by `subd`)
+// Independent tensor sheets, research-only T-spline sheets and sewing (used by `subd`)
 // ---------------------------------------------------------------------------------------------
 
-/// A T-spline surface as a surface body of NURBS faces (SolidCraft `tspline_sheet`).
+/// Construct a single tensor-product NURBS face without invoking the T-spline kernel.
+pub fn nurbs_sheet_body(s: &solidcraft_geom::bspline::NurbsSurface, stop: Stop) -> R<Body> {
+    kernel("NURBS → B-rep", stop, || sk::nurbs_sheet(s))
+}
+
+/// Default-off application boundary for T-spline experiments. This is not an IP clearance.
+pub const TSPLINE_REVIEW_REQUIRED: &str =
+    "T-spline は知的財産調査中のため無効です。通常の SubD / NURBS を使用してください。";
+
+pub(crate) fn require_experimental_tspline() -> R<()> {
+    if cfg!(feature = "experimental-tspline") {
+        Ok(())
+    } else {
+        Err(TSPLINE_REVIEW_REQUIRED.into())
+    }
+}
+
+/// A research-only T-spline surface as NURBS faces (SolidCraft `tspline_sheet`).
 pub fn tspline_body(ts: &solidcraft_geom::tspline::TSpline, stop: Stop) -> R<Body> {
+    require_experimental_tspline()?;
     kernel("T-spline → B-rep", stop, || sk::tspline_sheet(ts))
 }
 
