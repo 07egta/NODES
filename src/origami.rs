@@ -24,9 +24,7 @@ static CREASES: NodeSpec = NodeSpec {
     category: "折り紙",
     description: "平面の折線と外周を重複なしで生成します。山谷の区別や切断指示は含みません。",
     keywords: "miura origami crease pattern 展開図 折線",
-    inputs: &[
-        INPUTS[0], INPUTS[1], INPUTS[2], INPUTS[3], INPUTS[4],
-    ],
+    inputs: &[INPUTS[0], INPUTS[1], INPUTS[2], INPUTS[3], INPUTS[4]],
     output: DataType::Curve,
 };
 
@@ -167,12 +165,23 @@ mod tests {
     use super::*;
 
     fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
-        a.iter().zip(b).map(|(x, y)| (x - y).powi(2)).sum::<f64>().sqrt()
+        a.iter()
+            .zip(b)
+            .map(|(x, y)| (x - y).powi(2))
+            .sum::<f64>()
+            .sqrt()
     }
 
     #[test]
     fn all_face_edges_and_diagonals_are_preserved() {
-        let mut p = Parameters { nx: 4, ny: 3, a: 13., b: 21., alpha: 55., fold: 0. };
+        let mut p = Parameters {
+            nx: 4,
+            ny: 3,
+            a: 13.,
+            b: 21.,
+            alpha: 55.,
+            fold: 0.,
+        };
         let flat = p.mesh(&|| false).unwrap();
         for fold in [0.1, 0.5, 0.95] {
             p.fold = fold;
@@ -182,8 +191,12 @@ mod tests {
                 for j in 0..3 {
                     let a = tri[j] as usize;
                     let b = tri[(j + 1) % 3] as usize;
-                    assert!((distance(flat.vertices[a], flat.vertices[b])
-                        - distance(bent.vertices[a], bent.vertices[b])).abs() < 1e-9);
+                    assert!(
+                        (distance(flat.vertices[a], flat.vertices[b])
+                            - distance(bent.vertices[a], bent.vertices[b]))
+                        .abs()
+                            < 1e-9
+                    );
                 }
             }
         }
