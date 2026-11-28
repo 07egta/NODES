@@ -9,3 +9,11 @@ Existing tests/large_graph_tests.rs covers 10,000 nodes; existing engine cache/c
 
 ## Verification
 Local checkout cannot reach GitHub (DNS) and cargo/rustc are absent. Connector-based edits only. No claim of fmt, clippy, tests, GUI or performance results until corresponding evidence is available. Keep draft until CI and native checks.
+
+## Implementation checkpoint
+- ClusterPort retains the legacy node/key/label and optionally stores additional_targets. Old JSON without the field reads unchanged; new shared ports require a reader that supports the field.
+- Grouping counts distinct external source IDs instead of wires. All target input keys are preserved; a shared disconnected slot exposes a numeric default only if all targets agree bit-for-bit.
+- Validation checks every target, including duplicates across slots. The existing cluster inspector lists each inner target and diagnostic messages include definition/node IDs.
+- Headless tests: repeated source above eight wires, distinct equal-valued sources, malformed duplicate target, legacy port JSON, graph/part roundtrip.
+- Manual example: create one Number and ten chained Add nodes. Connect Number to each b and the first a; select only the ten Add nodes and group. Inspect one shared input and eleven target entries; changing Number updates the result. Export/import the part and reconnect Number.
+- Not implemented: full nested editor, automatic inner label synchronization, expansion, Data Dam, timer, remote parameters, new Data Tree components. No current CI or native GUI evidence. Existing nested port default limitations are unchanged.

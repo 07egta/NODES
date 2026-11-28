@@ -145,6 +145,18 @@ pub fn cluster_panel(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) -> Option
         def.inputs.len(),
         cluster::MAX_CLUSTER_INPUTS
     )));
+    ui.collapsing("公開入力の接続先", |ui| {
+        for (index, port) in def.inputs.iter().enumerate() {
+            ui.label(format!("入力 {}: {}", index + 1, port.label));
+            for (target, key) in port.targets() {
+                let name = def
+                    .graph
+                    .node(target)
+                    .map_or("不明", |node| node.name.as_str());
+                ui.label(theme::small(format!("  {name} (ID {target}) / {key}")));
+            }
+        }
+    });
     let mut action = None;
     if ui
         .button("部品として書き出す（.morphpart）")
