@@ -569,6 +569,8 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    OrigamiMiura,
+    OrigamiMiuraCreases,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -982,6 +984,8 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::OrigamiMiura,
+            Self::OrigamiMiuraCreases,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1590,6 +1594,7 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::OrigamiMiura | Self::OrigamiMiuraCreases => crate::origami::spec(self),
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
             other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
