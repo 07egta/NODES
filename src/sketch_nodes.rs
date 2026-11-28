@@ -20,7 +20,10 @@ use crate::kernel_bridge as kb;
 use crate::model::{Curve, Tree, Value};
 use solidcraft_geom::{Seg2, Vec2};
 use solidcraft_sketch::{ConstraintKind, CurveKind, Sketch, find_profiles, solve};
+use std::collections::BTreeMap;
 use std::sync::Arc;
+
+pub mod session;
 
 pub const MAX_SKETCH_TEXT: usize = 64 * 1024;
 pub const MAX_COMMANDS: usize = 2000;
@@ -59,10 +62,15 @@ fn err(line: usize, e: impl std::fmt::Display) -> String {
 
 /// Build the sketch from its text.
 pub fn parse(text: &str) -> R<Sketch> {
+    parse_with_sources(text).map(|(sketch, _)| sketch)
+}
+
+fn parse_with_sources(text: &str) -> R<(Sketch, BTreeMap<String, usize>)> {
     if text.len() > MAX_SKETCH_TEXT {
         return Err("スケッチの文章が長すぎます。".into());
     }
     let mut sk = Sketch::new();
+    let mut sources = BTreeMap::new();
     let mut count = 0usize;
     for (i, raw) in text.lines().enumerate() {
         let line = i + 1;
@@ -84,6 +92,7 @@ pub fn parse(text: &str) -> R<Sketch> {
                 .map(|_| ())
                 .map_err(|e| err(line, e))
         };
+        let constraints_before = sk.constraints.len();
         match cmd {
             "点" | "point" => {
                 let p = Vec2::new(num(a(2), "X", line)?, num(a(3), "Y", line)?);
@@ -153,6 +162,72 @@ pub fn parse(text: &str) -> R<Sketch> {
                     dim(kind, &mut sk)?;
                 }
             }
+            "楕円" | "ellipse" => {
+                let c = point(&sk, a(2), line)?;
+                let m = point(&sk, a(3), line)?;
+                let r = num(a(4), "短半径", line)?;
+                let center = sk.point(c).ok_or_else(|| err(line, "中心点がありません。"))?;
+                let major = sk.point(m).ok_or_else(|| err(line, "長軸点がありません。"))?;
+                if r <= 1e-9 || center.dist(major) < r {
+                    return Err(err(line, "短半径は正で長半径以下にしてください。"));
+                }
+                sk.add_curve(CurveKind::Ellipse { c, m, r }, Some(id))
+                    .map_err(|e| err(line, e))?;
+            }
+            "ベジェ" | "bezier" | "Bスプライン" | "bspline" => {
+                let (degree, start) = if matches!(cmd, "ベジェ" | "bezier") {
+                    let degree = u8::try_from(w.len().saturating_sub(3))
+                        .map_err(|_| err(line, "次数が大きすぎます。"))?;
+                    (degree, 2)
+                } else {
+                    let degree = a(2)
+                        .and_then(|v| v.parse::<u8>().ok())
+                        .ok_or_else(|| err(line, "次数は正の整数にしてください。"))?;
+                    (degree, 3)
+                };
+                let pts = (start..w.len())
+                    .map(|i| point(&sk, a(i), line))
+                    .collect::<R<Vec<_>>>()?;
+                if degree == 0 || pts.len() <= usize::from(degree) {
+                    return Err(err(line, "制御点数は次数より多くしてください。"));
+                }
+                sk.add_curve(
+                    CurveKind::Spline {
+                        pts,
+                        control: true,
+                        degree,
+                        periodic: false,
+                    },
+                    Some(id),
+                )
+                .map_err(|e| err(line, e))?;
+            }
+            "補助線" | "construction" | "ブロック" | "block" => {
+                let ci = curve(&sk, a(1), line)?;
+                let entity = sk.curves.get_mut(ci).ok_or_else(|| err(line, "曲線がありません。"))?;
+                if matches!(cmd, "補助線" | "construction") {
+                    entity.construction = true;
+                } else {
+                    entity.fixed = true;
+                }
+            }
+            "水平点" | "horizontal_points" | "垂直点" | "vertical_points" => {
+                let (p, q) = (point(&sk, a(1), line)?, point(&sk, a(2), line)?);
+                let kind = if matches!(cmd, "水平点" | "horizontal_points") {
+                    ConstraintKind::HorizontalPoints { p, q }
+                } else {
+                    ConstraintKind::VerticalPoints { p, q }
+                };
+                dim(kind, &mut sk)?;
+            }
+            "対称" | "symmetric" => dim(
+                ConstraintKind::Symmetric {
+                    p: point(&sk, a(1), line)?,
+                    q: point(&sk, a(2), line)?,
+                    l: curve(&sk, a(3), line)?,
+                },
+                &mut sk,
+            )?,
             "水平" | "horizontal" => dim(
                 ConstraintKind::Horizontal {
                     l: curve(&sk, a(1), line)?,
@@ -193,7 +268,7 @@ pub fn parse(text: &str) -> R<Sketch> {
                 &mut sk,
             )?,
             "平行" | "parallel" | "直交" | "perpendicular" | "接する" | "tangent" | "等しい"
-            | "equal" | "同心" | "concentric" | "滑らか" | "smooth" => {
+            | "equal" | "同心" | "concentric" | "滑らか" | "smooth" | "同一直線" | "collinear" => {
                 let (x, y) = (curve(&sk, a(1), line)?, curve(&sk, a(2), line)?);
                 let kind = match cmd {
                     "平行" | "parallel" => ConstraintKind::Parallel { a: x, b: y },
@@ -201,6 +276,7 @@ pub fn parse(text: &str) -> R<Sketch> {
                     "接する" | "tangent" => ConstraintKind::Tangent { a: x, b: y },
                     "等しい" | "equal" => ConstraintKind::Equal { a: x, b: y },
                     "同心" | "concentric" => ConstraintKind::Concentric { a: x, b: y },
+                    "同一直線" | "collinear" => ConstraintKind::Collinear { a: x, b: y },
                     _ => ConstraintKind::Smooth { a: x, b: y },
                 };
                 dim(kind, &mut sk)?
@@ -236,6 +312,51 @@ pub fn parse(text: &str) -> R<Sketch> {
                 },
                 &mut sk,
             )?,
+            "点線距離" | "point_line_distance" => dim(
+                ConstraintKind::PointLineDistance {
+                    p: point(&sk, a(1), line)?,
+                    l: curve(&sk, a(2), line)?,
+                    value: num(a(3), "距離", line)?,
+                },
+                &mut sk,
+            )?,
+            "点円距離" | "point_circle_distance" => {
+                let inside = match a(4).copied() {
+                    Some("inside" | "内側") => true,
+                    Some("outside" | "外側") => false,
+                    _ => return Err(err(line, "inside または outside を指定してください。")),
+                };
+                dim(
+                    ConstraintKind::PointCircleDistance {
+                        p: point(&sk, a(1), line)?,
+                        c: curve(&sk, a(2), line)?,
+                        value: num(a(3), "距離", line)?,
+                        inside,
+                    },
+                    &mut sk,
+                )?;
+            }
+            "弧長" | "arc_length" => dim(
+                ConstraintKind::ArcLength {
+                    c: curve(&sk, a(1), line)?,
+                    value: num(a(2), "弧長", line)?,
+                },
+                &mut sk,
+            )?,
+            "弧角度" | "arc_sweep" => dim(
+                ConstraintKind::ArcSweep {
+                    c: curve(&sk, a(1), line)?,
+                    value: num(a(2), "角度", line)?.to_radians(),
+                },
+                &mut sk,
+            )?,
+            "線角度" | "line_angle" => dim(
+                ConstraintKind::LineAngle {
+                    l: curve(&sk, a(1), line)?,
+                    value: num(a(2), "角度", line)?.to_radians(),
+                },
+                &mut sk,
+            )?,
             "角度" | "angle" => {
                 let (x, y) = (curve(&sk, a(1), line)?, curve(&sk, a(2), line)?);
                 let value = num(a(3), "角度", line)?.to_radians();
@@ -258,8 +379,11 @@ pub fn parse(text: &str) -> R<Sketch> {
                 ));
             }
         }
+        for c in sk.constraints.iter().skip(constraints_before) {
+            sources.insert(c.id.clone(), line);
+        }
     }
-    Ok(sk)
+    Ok((sk, sources))
 }
 
 /// Solve the sketch. Returns the remaining degrees of freedom.
@@ -386,11 +510,21 @@ pub fn run(text: &str, mode: usize, stop: &dyn Fn() -> bool) -> R<Tree> {
                 .into(),
         );
     }
-    let mut sk = parse(text)?;
-    solve_sketch(&mut sk)?;
+    if stop() {
+        return Err(kb::STOPPED.into());
+    }
+    let mut session = session::SketchSession::from_text(text)?;
+    let attempt = session.solve();
+    if stop() {
+        return Err(kb::STOPPED.into());
+    }
+    if !attempt.committed {
+        return Err(session.failure_message(&attempt));
+    }
+    let sk = session.sketch();
     let mut out = Vec::new();
     if mode == 0 {
-        for profile in find_profiles(&sk) {
+        for profile in find_profiles(sk) {
             if stop() {
                 return Err(kb::STOPPED.into());
             }
@@ -408,6 +542,9 @@ pub fn run(text: &str, mode: usize, stop: &dyn Fn() -> bool) -> R<Tree> {
         }
     } else {
         for (ci, c) in sk.curves.iter().enumerate() {
+            if stop() {
+                return Err(kb::STOPPED.into());
+            }
             if c.construction {
                 continue;
             }
