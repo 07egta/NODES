@@ -516,11 +516,18 @@ impl NodesApp {
         self.save_to(path)
     }
     fn save_to(&mut self, path: PathBuf) -> bool {
-        match persistence::save(&path, &self.project) {
-            Ok(()) => {
+        match persistence::save_with_backup(&path, &self.project) {
+            Ok(backup) => {
                 self.file_path = Some(path);
                 self.dirty = false;
-                self.notify("作品を保存しました", false);
+                if let Some(backup) = backup {
+                    self.notify(
+                        format!("作品を保存しました（前の版: {}）", backup.display()),
+                        false,
+                    );
+                } else {
+                    self.notify("作品を保存しました", false);
+                }
                 true
             }
             Err(e) => {

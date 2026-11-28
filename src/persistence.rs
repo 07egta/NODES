@@ -147,16 +147,108 @@ impl<W: Write> Write for ProjectWriter<W> {
     }
 }
 
+fn write_project(file: &mut BufWriter<File>, project: &Project) -> std::io::Result<()> {
+    let mut bounded = ProjectWriter {
+        inner: file,
+        remaining: MAX_PROJECT_BYTES,
+    };
+    serde_json::to_writer_pretty(&mut bounded, project).map_err(std::io::Error::other)?;
+    bounded.write_all(b"\n")
+}
+
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     project.validate()?;
+    atomic_write(path, |file| write_project(file, project))
+}
+
+/// A manual save retains the exact previous bytes in a new sibling file before
+/// replacing the destination. Recovery snapshots and exporters use `save` or
+/// `atomic_write` instead, so periodic autosave does not generate backup history.
+/// If the previous file cannot be read or safely backed up, abort the save.
+/// Concurrent external writers still require coordination by the caller.
+pub fn save_with_backup(path: &Path, project: &Project) -> Result<Option<PathBuf>, String> {
+    project.validate()?;
+    let mut backup = None;
     atomic_write(path, |file| {
-        let mut bounded = ProjectWriter {
-            inner: file,
-            remaining: MAX_PROJECT_BYTES,
+        write_project(file, project)?;
+        backup = backup_existing(path).map_err(|e| {
+            std::io::Error::new(e.kind(), format!("前の作品のバックアップに失敗しました: {e}"))
+        })?;
+        Ok(())
+    })?;
+    Ok(backup)
+}
+
+/// Do not decode the previous document: newer schemas, unknown node types and
+/// even damaged files must be retained byte-for-byte, not normalized or erased.
+fn backup_existing(path: &Path) -> std::io::Result<Option<PathBuf>> {
+    use std::io::{Error, ErrorKind};
+
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if !metadata.is_file() {
+        return Err(Error::other("通常のファイルだけを上書きできます。"));
+    }
+    if metadata.len() > MAX_PROJECT_BYTES as u64 {
+        return Err(Error::other("既存の作品が 8 MB を超えています。別名で保存してください。"));
+    }
+    let source = File::open(path)?;
+    if !source.metadata()?.is_file() {
+        return Err(Error::other("通常のファイルだけを上書きできます。"));
+    }
+    let mut bytes = Vec::new();
+    source
+        .take((MAX_PROJECT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_PROJECT_BYTES {
+        return Err(Error::other("既存の作品が 8 MB を超えています。別名で保存してください。"));
+    }
+
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    // Keep the original name recognizable without exceeding ordinary filename
+    // limits when the destination already has a long name.
+    let prefix: String = path
+        .file_name()
+        .ok_or_else(|| Error::other("作品のファイル名が見つかりません。"))?
+        .to_string_lossy()
+        .chars()
+        .take(40)
+        .collect();
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    for _ in 0..32 {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let candidate = parent.join(format!(
+            "{prefix}.backup-{timestamp}-{}-{sequence}.morph",
+            std::process::id()
+        ));
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&candidate) {
+            Ok(file) => file,
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
         };
-        serde_json::to_writer_pretty(&mut bounded, project).map_err(std::io::Error::other)?;
-        bounded.write_all(b"\n")
-    })
+        let written = file.write_all(&bytes).and_then(|_| file.sync_all());
+        drop(file);
+        if let Err(e) = written {
+            let _ = fs::remove_file(&candidate);
+            return Err(e);
+        }
+        // On Unix ensure the backup directory entry is durable before the
+        // caller replaces the only previous destination. Windows cannot open
+        // directories this way; the backup file itself has been flushed.
+        #[cfg(unix)]
+        File::open(parent)?.sync_all()?;
+        return Ok(Some(candidate));
+    }
+    Err(Error::other("バックアップのファイル名を確保できませんでした。"))
 }
 
 pub(crate) fn atomic_write(
