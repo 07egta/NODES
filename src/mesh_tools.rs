@@ -1091,10 +1091,17 @@ mod tests {
     fn fill_holes_restores_a_missing_triangle_and_ear_clips_a_ring() {
         let g = grid(4, 1.);
         let mut h = g.clone();
-        h.triangles.remove(5);
+        // Face 10 is fully interior; face 5 touches the outside at vertex 2.
+        assert_eq!(h.triangles.remove(10), [6, 7, 12]);
+        let rings = crate::mesh_fabrication::boundary_loops(&h, GO).unwrap();
+        assert_eq!(rings.iter().map(Vec::len).collect::<Vec<_>>(), vec![16, 3]);
         let f = fill_holes(&h, 10, GO).unwrap();
         assert_eq!(f.triangles.len(), g.triangles.len());
         assert!((area(&f) - 16.).abs() < 1e-9);
+        let report = crate::mesh_fabrication::audit(&f, GO).unwrap();
+        assert_eq!(report.boundary_edges, 16);
+        assert_eq!(report.non_manifold_vertices, 0);
+        assert_eq!(report.orientation_conflicts, 0);
         // A bigger hole: remove every face touching the centre vertex (12).
         let mut big = g.clone();
         big.triangles.retain(|t| !t.contains(&12));
@@ -1108,6 +1115,16 @@ mod tests {
             big.triangles.len()
         );
     }
+    #[test]
+    fn fill_holes_rejects_a_hole_touching_the_outer_boundary() {
+        let mut h = grid(4, 1.);
+        assert_eq!(h.triangles.remove(5), [2, 8, 7]);
+        let report = crate::mesh_fabrication::audit(&h, GO).unwrap();
+        assert_eq!(report.non_manifold_vertices, 1);
+        assert!(crate::mesh_fabrication::boundary_loops(&h, GO).is_err());
+        assert!(fill_holes(&h, 10, GO).is_err());
+    }
+
     #[test]
     fn thicken_builds_walls_and_offset_moves_along_normals() {
         let g = grid(4, 1.);
