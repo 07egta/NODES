@@ -88,41 +88,8 @@ const CATEGORY_GLYPHS: &[(&str, Glyph)] = &[
 /// One icon per node kind. Kinds not listed here fall back to their category.
 const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     (
-        NodeKind::OrigamiMiura,
-        &[Part::Line(&[
-            [0.1, 0.6],
-            [0.3, 0.25],
-            [0.5, 0.6],
-            [0.7, 0.25],
-            [0.9, 0.6],
-        ])],
-    ),
-    (
-        NodeKind::OrigamiMiuraCreases,
-        &[
-            Part::Line(&[[0.1, 0.2], [0.8, 0.2], [0.9, 0.8], [0.2, 0.8], [0.1, 0.2]]),
-            Part::Line(&[[0.15, 0.5], [0.85, 0.5]]),
-            Part::Line(&[[0.45, 0.2], [0.55, 0.8]]),
-        ],
-    ),
-    (
-        NodeKind::MatterRotatingSquares,
-        &[
-            Part::Line(&[
-                [0.08, 0.35],
-                [0.35, 0.08],
-                [0.62, 0.35],
-                [0.35, 0.62],
-                [0.08, 0.35],
-            ]),
-            Part::Line(&[
-                [0.38, 0.65],
-                [0.65, 0.38],
-                [0.92, 0.65],
-                [0.65, 0.92],
-                [0.38, 0.65],
-            ]),
-        ],
+        NodeKind::ExactTorus,
+        &[Part::Ring([0.5, 0.5, 0.4]), Part::Ring([0.5, 0.5, 0.18])],
     ),
     (
         NodeKind::PhysSpringRelax,
@@ -504,6 +471,26 @@ const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     ),
     (NodeKind::Box, BOX),
     (
+        NodeKind::GenesisScopes,
+        &[
+            Part::Line(&[[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9], [0.1, 0.1]]),
+            Part::Line(&[[0.45, 0.1], [0.45, 0.9]]),
+            Part::Line(&[[0.45, 0.58], [0.9, 0.58]]),
+            Part::Line(&[[0.1, 0.38], [0.45, 0.38]]),
+        ],
+    ),
+    (
+        NodeKind::GenesisScopeIds,
+        &[
+            Part::Line(&[[0.5, 0.15], [0.25, 0.48], [0.12, 0.82]]),
+            Part::Line(&[[0.25, 0.48], [0.38, 0.82]]),
+            Part::Line(&[[0.5, 0.15], [0.75, 0.48], [0.62, 0.82]]),
+            Part::Line(&[[0.75, 0.48], [0.88, 0.82]]),
+            Part::Dot([0.5, 0.15]),
+        ],
+    ),
+    (NodeKind::GenesisRelief, BOX),
+    (
         NodeKind::Cylinder,
         &[
             Part::Line(&[
@@ -845,6 +832,43 @@ const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
         ],
     ),
     (NodeKind::ImportMesh, IMPORT),
+    (
+        NodeKind::OrigamiMiura,
+        &[Part::Line(&[
+            [0.1, 0.6],
+            [0.3, 0.25],
+            [0.5, 0.6],
+            [0.7, 0.25],
+            [0.9, 0.6],
+        ])],
+    ),
+    (
+        NodeKind::OrigamiMiuraCreases,
+        &[
+            Part::Line(&[[0.1, 0.2], [0.8, 0.2], [0.9, 0.8], [0.2, 0.8], [0.1, 0.2]]),
+            Part::Line(&[[0.15, 0.5], [0.85, 0.5]]),
+            Part::Line(&[[0.45, 0.2], [0.55, 0.8]]),
+        ],
+    ),
+    (
+        NodeKind::MatterRotatingSquares,
+        &[
+            Part::Line(&[
+                [0.08, 0.35],
+                [0.35, 0.08],
+                [0.62, 0.35],
+                [0.35, 0.62],
+                [0.08, 0.35],
+            ]),
+            Part::Line(&[
+                [0.38, 0.65],
+                [0.65, 0.38],
+                [0.92, 0.65],
+                [0.65, 0.92],
+                [0.38, 0.65],
+            ]),
+        ],
+    ),
 ];
 
 /// Draws the icon of `kind` into `rect`. `category` picks the fallback when the kind has no icon.

@@ -93,6 +93,8 @@ example_cases! {
     (nurbs_panel, "surface-panel.morph", 0, "rise", 32.0, 2, Surface, false),
     (ruled_surface, "surface-ruled.morph", 0, "height", 28.0, 3, Surface, false),
     (revolved_nurbs_vase, "surface-vase.morph", 0, "middle", 42.0, 2, Surface, false),
+    (genesis_facade, "genesis/facade.morph", 1, "tall_height", 20.0, 2, Mesh, false),
+    (genesis_sculpture, "genesis/sculpture.morph", 1, "tall_height", 28.0, 2, Mesh, false),
 }
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(0);
