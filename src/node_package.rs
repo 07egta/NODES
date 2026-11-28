@@ -184,7 +184,12 @@ impl Package {
                 .find(|def| def.id == self.part.root)
                 .map_or("", |def| def.name.as_str()),
             definition_count: self.part.clusters.len(),
-            node_count: self.part.clusters.iter().map(|def| def.graph.nodes.len()).sum(),
+            node_count: self
+                .part
+                .clusters
+                .iter()
+                .map(|def| def.graph.nodes.len())
+                .sum(),
             part_bytes: self.envelope.part_json.len(),
             evaluation_performed: false,
         }
@@ -205,8 +210,9 @@ impl Package {
     }
 
     pub fn pack_files(manifest: &Path, part: &Path) -> Result<Self, String> {
-        let manifest: Manifest = serde_json::from_slice(&read_regular(manifest, MAX_MANIFEST_BYTES)?)
-            .map_err(|e| format!("Manifest JSON が正しくありません（{} 行目）。", e.line()))?;
+        let manifest: Manifest =
+            serde_json::from_slice(&read_regular(manifest, MAX_MANIFEST_BYTES)?)
+                .map_err(|e| format!("Manifest JSON が正しくありません（{} 行目）。", e.line()))?;
         Self::from_part(manifest, &read_regular(part, cluster::MAX_PART_BYTES)?)
     }
 
