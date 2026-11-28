@@ -2,6 +2,8 @@
 //! Certification concerns the represented inputs, not their measurement error.
 use std::cmp::Ordering;
 
+pub mod spatial;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Interval {
     lo: f64,
@@ -84,7 +86,7 @@ fn parts(x: f64) -> (u64, usize, bool) {
     (mantissa, exponent.saturating_sub(1), bits >> 63 != 0)
 }
 
-fn add_word(words: &mut Magnitude, word: u64, shift: usize) {
+fn add_word<const N: usize>(words: &mut [u64; N], word: u64, shift: usize) {
     let mut i = shift / 64;
     let mut carry = (word as u128) << (shift % 64);
     while carry != 0 {
