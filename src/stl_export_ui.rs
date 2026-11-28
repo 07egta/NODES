@@ -3,7 +3,7 @@
 use crate::file_picker::FileTask;
 use crate::theme;
 use eframe::egui::{self, Align2, Color32, RichText};
-use nodes::model::{Mesh, Tree};
+use nodes::model::{Mesh, NodeId, Tree};
 use nodes::stl_export::{
     BodyStats, Check, ExportOptions, Level, OutputFormat, RepairReport, StoredSettings,
     WriteFailure, WriteSummary, check_bodies, config_path, default_file_name, detect_slicer,
@@ -31,6 +31,8 @@ pub enum SourceMode {
 pub struct StlSources {
     pub output: Result<Vec<Tree>, String>,
     pub selected: Result<Vec<Tree>, String>,
+    pub selection: Vec<NodeId>,
+    pub output_follows_selection: bool,
     pub revision: u64,
     pub base_name: String,
     pub start_dir: PathBuf,
@@ -49,9 +51,15 @@ pub enum UiRequest {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct AnalysisKey {
+struct SourceKey {
     revision: u64,
     mode: SourceMode,
+    selection: Vec<NodeId>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ExportKey {
+    source: SourceKey,
     options: ExportOptions,
     repaired: bool,
 }
@@ -64,8 +72,7 @@ struct Analysis {
 }
 
 struct RepairState {
-    revision: u64,
-    mode: SourceMode,
+    source: SourceKey,
     meshes: Vec<Mesh>,
     report: RepairReport,
 }
@@ -83,9 +90,11 @@ pub struct StlExportUi {
     mode: SourceMode,
     options: ExportOptions,
     repair: Option<RepairState>,
-    analysis: Option<(AnalysisKey, Result<Analysis, String>)>,
+    analysis: Option<(ExportKey, Result<Analysis, String>)>,
+    pending_export: Option<ExportKey>,
     stored: StoredSettings,
     config: Option<PathBuf>,
+    project_destination: Option<PathBuf>,
     last_files: Vec<PathBuf>,
     status: Option<(String, bool)>,
     notice: Option<(String, bool)>,
@@ -100,15 +109,18 @@ impl Default for StlExportUi {
 impl StlExportUi {
     pub fn new() -> Self {
         let config = config_path();
-        let stored = config.as_deref().map(load_stored).unwrap_or_default();
+        let mut stored = config.as_deref().map(load_stored).unwrap_or_default();
+        stored.last_base_file = None;
         Self {
             open: false,
             mode: SourceMode::Output,
             options: ExportOptions::default(),
             repair: None,
             analysis: None,
+            pending_export: None,
             stored,
             config,
+            project_destination: None,
             last_files: Vec::new(),
             status: None,
             notice: None,
@@ -158,10 +170,35 @@ impl StlExportUi {
         result.as_ref().map_err(Clone::clone)
     }
 
+    fn source_key(&self, sources: &StlSources) -> Result<SourceKey, String> {
+        self.trees(sources)?;
+        let selection = if self.mode == SourceMode::Selected || sources.output_follows_selection {
+            sources.selection.clone()
+        } else {
+            Vec::new()
+        };
+        Ok(SourceKey {
+            revision: sources.revision,
+            mode: self.mode,
+            selection,
+        })
+    }
+
+    fn export_key(&self, sources: &StlSources) -> Result<ExportKey, String> {
+        let source = self.source_key(sources)?;
+        Ok(ExportKey {
+            repaired: self
+                .repair
+                .as_ref()
+                .is_some_and(|repair| repair.source == source),
+            source,
+            options: self.options.clone(),
+        })
+    }
+
     fn repair_for(&self, sources: &StlSources) -> Option<&RepairState> {
-        self.repair
-            .as_ref()
-            .filter(|r| r.revision == sources.revision && r.mode == self.mode)
+        let source = self.source_key(sources).ok()?;
+        self.repair.as_ref().filter(|r| r.source == source)
     }
 
     /// Meshes after the optional repair, split, scale and placement; plus the skipped count.
@@ -175,19 +212,12 @@ impl StlExportUi {
         Ok((prepare_bodies(&base, &self.options)?, skipped))
     }
 
-    fn ensure_analysis(&mut self, sources: &StlSources) {
-        let key = AnalysisKey {
-            revision: sources.revision,
-            mode: self.mode,
-            options: self.options.clone(),
-            repaired: self.repair_for(sources).is_some(),
-        };
-        if self
-            .analysis
-            .as_ref()
-            .is_some_and(|(cached, _)| *cached == key)
+    fn analyze(&mut self, sources: &StlSources) -> Result<Analysis, String> {
+        let key = self.export_key(sources)?;
+        if let Some((cached, result)) = &self.analysis
+            && *cached == key
         {
-            return;
+            return result.clone();
         }
         let max = self.options.max_size_mm;
         let result = self.prepared(sources).and_then(|(bodies, skipped)| {
@@ -197,20 +227,21 @@ impl StlExportUi {
                 skipped,
             })
         });
-        self.analysis = Some((key, result));
+        self.analysis = Some((key, result.clone()));
+        result
     }
 
     fn repair(&mut self, sources: &StlSources) {
-        let outcome = self
-            .trees(sources)
-            .and_then(|trees| gather_meshes(trees))
-            .and_then(|(meshes, _)| repair_meshes(&meshes));
+        let outcome = self.source_key(sources).and_then(|source| {
+            let (meshes, _) = gather_meshes(self.trees(sources)?)?;
+            let (meshes, report) = repair_meshes(&meshes)?;
+            Ok((source, meshes, report))
+        });
         match outcome {
-            Ok((meshes, report)) => {
+            Ok((source, meshes, report)) => {
                 let changed = report.changed();
                 self.repair = Some(RepairState {
-                    revision: sources.revision,
-                    mode: self.mode,
+                    source,
                     meshes,
                     report,
                 });
@@ -228,7 +259,15 @@ impl StlExportUi {
         }
     }
 
-    fn pick_request(&self, sources: &StlSources) -> UiRequest {
+    fn pick_request(&mut self, sources: &StlSources) -> Option<UiRequest> {
+        self.cancel_picker();
+        match self.export_key(sources) {
+            Ok(key) => self.pending_export = Some(key),
+            Err(error) => {
+                self.say(error, true);
+                return None;
+            }
+        }
         let task = match self.options.format {
             OutputFormat::StlBinary | OutputFormat::StlAscii => FileTask::ExportStl,
             OutputFormat::Obj => FileTask::ExportObj,
@@ -241,7 +280,7 @@ impl StlExportUi {
             .clone()
             .filter(|d| d.is_dir())
             .unwrap_or_else(|| sources.start_dir.clone());
-        UiRequest::Pick {
+        Some(UiRequest::Pick {
             task,
             directory,
             file_name: default_file_name(
@@ -249,11 +288,40 @@ impl StlExportUi {
                 self.options.format,
                 SystemTime::now(),
             ),
+        })
+    }
+
+    pub fn cancel_picker(&mut self) {
+        self.pending_export = None;
+    }
+
+    pub fn project_changed(&mut self) {
+        self.open = false;
+        self.repair = None;
+        self.analysis = None;
+        self.cancel_picker();
+        self.project_destination = None;
+        self.last_files.clear();
+        self.status = None;
+        self.notice = None;
+    }
+
+    pub fn finish_picker(&mut self, sources: &StlSources, base: &Path) {
+        let pending = self.pending_export.take();
+        if let (Some(pending), Ok(current)) = (pending, self.export_key(sources))
+            && pending == current
+        {
+            self.export_to(sources, base);
+        } else {
+            self.say(
+                "書き出す形状や設定が変わりました。内容を確認してからもう一度書き出してください。",
+                true,
+            );
         }
     }
 
     /// Writes to `base` (the chosen name; split bodies get numbered suffixes).
-    pub fn export_to(&mut self, sources: &StlSources, base: &Path) {
+    fn export_to(&mut self, sources: &StlSources, base: &Path) {
         match self.write(sources, base) {
             Ok(summary) => {
                 let text = match summary.files.first() {
@@ -284,7 +352,7 @@ impl StlExportUi {
 
     fn remember_destination(&mut self, base: &Path) {
         self.stored.last_dir = base.parent().map(Path::to_path_buf);
-        self.stored.last_base_file = Some(base.to_path_buf());
+        self.project_destination = Some(base.to_path_buf());
         self.persist();
     }
 
@@ -305,8 +373,7 @@ impl StlExportUi {
     /// Re-exports to the remembered file (hot reload for the slicer). Opens the picker if none.
     pub fn quick(&mut self, sources: &StlSources) -> Option<UiRequest> {
         let reusable = self
-            .stored
-            .last_base_file
+            .project_destination
             .clone()
             .filter(|p| has_extension(p, self.options.format.extension()));
         match reusable {
@@ -314,7 +381,7 @@ impl StlExportUi {
                 self.export_to(sources, &base);
                 None
             }
-            None => Some(self.pick_request(sources)),
+            None => self.pick_request(sources),
         }
     }
 
@@ -393,7 +460,6 @@ impl StlExportUi {
         if !self.open {
             return None;
         }
-        self.ensure_analysis(sources);
         let mut open = true;
         let mut request: Option<UiRequest> = None;
         egui::Window::new("STL・3Dプリント用に書き出す")
@@ -493,11 +559,11 @@ impl StlExportUi {
         });
         ui.separator();
 
-        let mut ready = false;
+        let analysis = self.analyze(sources);
+        let ready = analysis.is_ok();
         let mut has_error = false;
-        match self.analysis.as_ref().map(|(_, result)| result.clone()) {
-            Some(Ok(analysis)) => {
-                ready = true;
+        match analysis {
+            Ok(analysis) => {
                 let [sx, sy, sz] = analysis.stats.size_mm;
                 egui::Grid::new("stl_export_stats")
                     .num_columns(2)
@@ -545,14 +611,11 @@ impl StlExportUi {
                     )));
                 }
             }
-            Some(Err(error)) => {
+            Err(error) => {
                 ui.colored_label(theme::error(), error);
                 ui.label(theme::small(
                     "立体を作り、「出力」ノードにつないでください。",
                 ));
-            }
-            None => {
-                ui.label("形状を確認しています…");
             }
         }
 
@@ -596,7 +659,7 @@ impl StlExportUi {
             }
             if ui
                 .add_enabled(ready, egui::Button::new("すぐ書き出し（Ctrl+Shift+E）"))
-                .on_hover_text("前回と同じファイルへ、今の設定で上書きします。スライサーの再読み込みに使えます。")
+                .on_hover_text("この作品で直前に書き出したファイルを上書きします。保存先がなければ選択画面を開きます。")
                 .clicked()
             {
                 action = Some(Action::Quick);
@@ -638,7 +701,7 @@ impl StlExportUi {
 
         match action {
             Some(Action::Repair) => self.repair(sources),
-            Some(Action::Export) => request = Some(self.pick_request(sources)),
+            Some(Action::Export) => request = self.pick_request(sources),
             Some(Action::Quick) => request = self.quick(sources),
             Some(Action::OpenSlicer) => request = self.open_slicer(sources),
             Some(Action::PickSlicer) => {
@@ -663,4 +726,89 @@ fn check_row(ui: &mut egui::Ui, check: &Check) {
         ui.label(RichText::new(check.title).strong());
         ui.add(egui::Label::new(theme::small(check.detail.as_str())).wrap());
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nodes::model::Value;
+    use std::sync::Arc;
+
+    fn sources(id: NodeId, size: f64) -> StlSources {
+        let mesh = Mesh {
+            vertices: vec![[0., 0., 0.], [size, 0., 0.], [0., size, 0.]],
+            triangles: vec![[0, 1, 2]],
+        };
+        let trees = vec![Tree::single(Value::Mesh(Arc::new(mesh)))];
+        StlSources {
+            output: Ok(trees.clone()),
+            selected: Ok(trees),
+            selection: vec![id],
+            output_follows_selection: true,
+            revision: 3,
+            base_name: "test".into(),
+            start_dir: std::env::temp_dir(),
+        }
+    }
+
+    #[test]
+    fn selection_change_recomputes_dimensions_and_drops_old_repair() {
+        let first = sources(1, 10.0);
+        let second = sources(2, 20.0);
+        let mut dialog = StlExportUi::new();
+        for mode in [SourceMode::Selected, SourceMode::Output] {
+            dialog.mode = mode;
+            dialog.repair(&first);
+            assert!(dialog.repair_for(&first).is_some());
+            assert_eq!(dialog.analyze(&first).unwrap().stats.size_mm[0], 10.0);
+            assert!(dialog.repair_for(&second).is_none());
+            assert_eq!(dialog.analyze(&second).unwrap().stats.size_mm[0], 20.0);
+        }
+        let mut updating = second;
+        updating.output = Err("updating".into());
+        assert_eq!(dialog.analyze(&updating).unwrap_err(), "updating");
+    }
+
+    #[test]
+    fn picker_writes_only_current_export_and_quick_path_is_project_scoped() {
+        let mut first = sources(1, 10.0);
+        first.output_follows_selection = false;
+        let mut dialog = StlExportUi::new();
+        dialog.config = None;
+        dialog.stored = StoredSettings::default();
+        let serial = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = first
+            .start_dir
+            .join(format!("nodes-export-ui-{}-{serial}", std::process::id()));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("result.stl");
+
+        assert!(dialog.pick_request(&first).is_some());
+        dialog.options.scale = 2.0;
+        dialog.finish_picker(&first, &path);
+        assert!(!path.exists());
+
+        assert!(dialog.pick_request(&first).is_some());
+        first.revision += 1;
+        dialog.finish_picker(&first, &path);
+        assert!(!path.exists());
+
+        assert!(dialog.pick_request(&first).is_some());
+        first.selection = vec![2];
+        dialog.finish_picker(&first, &path);
+        let bytes = std::fs::read(&path).unwrap();
+        let mesh = nodes::import::parse_stl(&bytes, &|| false).unwrap();
+        let (_, stats) = check_bodies(&[mesh], 256.0).unwrap();
+        assert_eq!(stats.size_mm, [20.0, 20.0, 0.0]);
+        std::fs::remove_file(&path).unwrap();
+
+        assert_eq!(dialog.project_destination.as_deref(), Some(path.as_path()));
+        dialog.project_changed();
+        assert!(dialog.quick(&first).is_some());
+        assert!(!path.exists());
+        std::fs::remove_dir(directory).unwrap();
+    }
 }

@@ -555,6 +555,7 @@ impl NodesApp {
         };
         if let Some((project, path)) = new {
             self.project = project;
+            self.stl_export.project_changed();
             self.clipboard.clear();
             self.wire_source = None;
             self.palette_open = false;
@@ -617,6 +618,7 @@ impl NodesApp {
                     self.after_save = None;
                     self.import_target = None;
                     self.step_export = None;
+                    self.stl_export.cancel_picker();
                 }
                 PickerEvent::Chosen(path) => match task {
                     FileTask::Open => self.request(PendingAction::Open(path), ctx),
@@ -717,7 +719,7 @@ impl NodesApp {
                     | FileTask::ExportPly
                     | FileTask::ExportThreeMf => {
                         let sources = self.stl_sources();
-                        self.stl_export.export_to(&sources, &path);
+                        self.stl_export.finish_picker(&sources, &path);
                         self.flush_stl_notice();
                     }
                     FileTask::PickSlicer => {
@@ -2679,9 +2681,25 @@ impl NodesApp {
         }
     }
     fn stl_sources(&self) -> StlSources {
+        // File dialogs can accept a path before this frame's graph edits queue a revision.
+        let edited =
+            !self.stale() && !same_calculation(&self.edits.previous.graph, &self.project.graph);
+        let (output, selected) = if edited {
+            let message = "形状を更新中です。更新が終わってから書き出してください。";
+            (Err(message.into()), Err(message.into()))
+        } else {
+            (self.result_trees(), self.selected_trees())
+        };
         StlSources {
-            output: self.result_trees(),
-            selected: self.selected_trees(),
+            output,
+            selected,
+            selection: self.canvas.selected.iter().copied().collect(),
+            output_follows_selection: !self
+                .project
+                .graph
+                .nodes
+                .iter()
+                .any(|n| n.kind == NodeKind::Output),
             revision: self.result_revision,
             base_name: safe_name(&self.project.name),
             start_dir: self.start_directory(),
@@ -2813,6 +2831,7 @@ impl NodesApp {
             ui.horizontal(|ui| {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
+                    self.stl_export.project_changed();
                     self.clipboard.clear();
                     self.canvas.selected.clear();
                     self.canvas.restore_graph(&self.project.graph);
