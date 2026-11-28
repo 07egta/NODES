@@ -1258,7 +1258,14 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | BrepOffset
         | SurfaceGaussianCurvature
         | SurfaceMeanCurvature
-        | SurfacePrincipalCurvatures => crate::surface_nodes::run(kind, a, cancel),
+        | SurfacePrincipalCurvatures
+        | SurfacePrincipalLines
+        | SurfaceNormalCurvature
+        | SurfaceUvCondition
+        | SurfaceBoundaryReport
+        | SurfaceFair
+        | SurfaceFairReport
+        | NurbsBicubicPanel => crate::surface_nodes::run(kind, a, cancel),
         MeshArea | MeshVolume | MeshCenter | MeshDimensions | MeshMass | MeshAudit
         | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
         | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
