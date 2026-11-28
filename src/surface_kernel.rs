@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 
+pub mod certified_intersection;
+
 pub type Point3 = [f64; 3];
 type R<T> = Result<T, String>;
 const MAX_CONTROL: usize = 32;
