@@ -372,6 +372,18 @@ fn iges_round_trip_keeps_a_cylinder() {
 
 // ---- T-spline patches with T-junctions ----
 
+#[cfg(not(feature = "experimental-tspline"))]
+#[test]
+fn tspline_patch_is_disabled_but_independent_subd_remains_available() {
+    let result = Cage::tspline_patch(80., 60., 6, 5, 12., &go);
+    assert_eq!(result.unwrap_err(), kb::TSPLINE_REVIEW_REQUIRED);
+    let cage = Cage::box_cage(10., 20., 30., &go).unwrap();
+    assert!(cage.to_brep(false, &go).unwrap().is_closed());
+    let tube = Cage::cylinder_cage(10., 20., 8, 5, 0., &go).unwrap();
+    assert!(tube.to_brep(true, &go).unwrap().is_closed());
+}
+
+#[cfg(feature = "experimental-tspline")]
 #[test]
 fn tspline_patch_local_refinement_keeps_the_surface_and_converts() {
     use nodes::subd::{EditOp, edits_text};
