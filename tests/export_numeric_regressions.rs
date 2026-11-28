@@ -74,7 +74,6 @@ fn obj_preserves_large_coordinates_and_small_offsets_together() {
     ]);
 }
 
-
 #[test]
 fn binary_stl_normal_matches_quantized_vertices() {
     let temp = TempDir::new();

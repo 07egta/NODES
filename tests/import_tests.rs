@@ -279,7 +279,6 @@ fn obj_accepts_inline_comments_on_faces() {
     assert_eq!(mesh.triangles.len(), 1);
 }
 
-
 #[test]
 fn ascii_stl_allows_bom_whitespace_and_multiple_solids() {
     let part = ascii_stl(&cube());

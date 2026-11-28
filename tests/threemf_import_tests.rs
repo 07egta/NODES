@@ -62,8 +62,12 @@ fn invalid_and_unsupported_inputs_fail_closed() {
         xml.replace("millimeter", "invalid"),
         xml.replace("v3=\"1\"", "v3=\"99\""),
         xml.replace("x=\"1\"", "x=\"NaN\""),
-        xml.replace("<mesh>", "<components>").replace("</mesh>", "</components>"),
-        xml.replace("unit=\"millimeter\"", "unit=\"millimeter\" requiredextensions=\"p\""),
+        xml.replace("<mesh>", "<components>")
+            .replace("</mesh>", "</components>"),
+        xml.replace(
+            "unit=\"millimeter\"",
+            "unit=\"millimeter\" requiredextensions=\"p\"",
+        ),
         xml.replace("objectid=\"1\"", "objectid=\"99\""),
         format!("<!DOCTYPE model [<!ENTITY x SYSTEM 'file:///etc/passwd'>]>{xml}"),
     ] {
@@ -73,7 +77,10 @@ fn invalid_and_unsupported_inputs_fail_closed() {
     assert!(parse_3mf(&package(&xml, &bad_rels), &|| false).is_err());
     let mut archive = package(&xml, RELS);
     assert!(parse_3mf(&archive, &|| true).is_err());
-    let index = archive.windows(xml.len()).position(|w| w == xml.as_bytes()).unwrap();
+    let index = archive
+        .windows(xml.len())
+        .position(|w| w == xml.as_bytes())
+        .unwrap();
     archive[index] ^= 1;
     assert!(parse_3mf(&archive, &|| false).is_err());
     archive.pop();

@@ -17,7 +17,8 @@ const MAX_OBJECTS: usize = 4096;
 const BAD_ZIP: &str = "3MF の ZIP 構造が不正か、未対応の形式です。";
 const BAD_XML: &str = "3MF の XML 構造または数値が不正です。";
 const LIMIT: &str = "3MF の読み込み上限を超えています。";
-const UNSUPPORTED: &str = "未対応の 3MF 構造です。単純なメッシュの 3MF または STL を使用してください。";
+const UNSUPPORTED: &str =
+    "未対応の 3MF 構造です。単純なメッシュの 3MF または STL を使用してください。";
 
 type Res<T> = Result<T, String>;
 
@@ -121,8 +122,7 @@ fn zip_part(b: &[u8], wanted: &str, limit: usize, stop: &dyn Fn() -> bool) -> Re
             }
             input.to_vec()
         } else {
-            miniz_oxide::inflate::decompress_to_vec_with_limit(input, size)
-                .map_err(|_| BAD_ZIP)?
+            miniz_oxide::inflate::decompress_to_vec_with_limit(input, size).map_err(|_| BAD_ZIP)?
         };
         cancelled(stop)?;
         if data.len() != size || crc32(&data) != crc {
@@ -188,7 +188,8 @@ fn check_start_part(bytes: &[u8], stop: &dyn Fn() -> bool) -> Res<()> {
                         if required(&attributes, "Type")? == MODEL_REL {
                             let target = required(&attributes, "Target")?;
                             if found
-                                || attr(&attributes, "TargetMode").unwrap_or("Internal") != "Internal"
+                                || attr(&attributes, "TargetMode").unwrap_or("Internal")
+                                    != "Internal"
                                 || target.strip_prefix('/').unwrap_or(target) != MODEL_PATH
                             {
                                 return Err(UNSUPPORTED.into());
@@ -260,8 +261,7 @@ fn append_instance(
             return Err(BAD_XML.into());
         }
     }
-    let det = m[0] * (m[4] * m[8] - m[5] * m[7])
-        - m[1] * (m[3] * m[8] - m[5] * m[6])
+    let det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6])
         + m[2] * (m[3] * m[7] - m[4] * m[6]);
     if !det.is_finite() || det == 0.0 {
         return Err(BAD_XML.into());
@@ -338,7 +338,11 @@ fn parse_model(bytes: &[u8], stop: &dyn Fn() -> bool) -> Res<Mesh> {
                 let parent = stack.last().map(String::as_str).unwrap_or("");
                 match (parent, name.local_name.as_str()) {
                     ("", "model") => {
-                        if !attr(&attributes, "requiredextensions").unwrap_or("").trim().is_empty() {
+                        if !attr(&attributes, "requiredextensions")
+                            .unwrap_or("")
+                            .trim()
+                            .is_empty()
+                        {
                             return Err(UNSUPPORTED.into());
                         }
                         unit = unit_mm(&attributes)?;
@@ -362,8 +366,12 @@ fn parse_model(bytes: &[u8], stop: &dyn Fn() -> bool) -> Res<Mesh> {
                     }
                     ("basematerials", "base") | ("model" | "object", "metadata") => {}
                     ("object", "mesh") if !mesh_seen => mesh_seen = true,
-                    ("mesh", "vertices") if !vertices_seen && !triangles_seen => vertices_seen = true,
-                    ("mesh", "triangles") if vertices_seen && !triangles_seen => triangles_seen = true,
+                    ("mesh", "vertices") if !vertices_seen && !triangles_seen => {
+                        vertices_seen = true
+                    }
+                    ("mesh", "triangles") if vertices_seen && !triangles_seen => {
+                        triangles_seen = true
+                    }
                     ("vertices", "vertex") => {
                         raw_vertices += 1;
                         if raw_vertices > MAX_VERTICES {
