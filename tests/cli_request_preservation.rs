@@ -74,7 +74,8 @@ fn apply_protects_request_but_allows_in_place_project_save() {
     fs::write(&build, include_bytes!("../examples/interop/ai-add.json")).unwrap();
     cli("build", &[&build, &project], 0);
     let before = fs::read(&project).unwrap();
-    let bytes = br#"{"api_version":1,"edits":[{"op":"set","node":"0","input":"value","value":11}]}"#;
+    let bytes =
+        br#"{"api_version":1,"edits":[{"op":"set","node":"0","input":"value","value":11}]}"#;
     fs::write(&edit, bytes).unwrap();
     let result = cli("apply", &[&project, &edit, &edit], 1);
     assert_eq!(result["error"]["code"], "invalid_destination");
