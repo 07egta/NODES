@@ -165,6 +165,7 @@ impl Evaluator {
                 for n in &graph.nodes {
                     out.outputs.insert(n.id, Err(e.clone()));
                 }
+                out.cancelled = stop();
                 out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
                 return out;
             }
@@ -197,6 +198,10 @@ impl Evaluator {
             // Phase 1 (sequential): disabled nodes, cache keys and cache hits.
             let mut slots: Vec<Slot> = Vec::with_capacity(level.len());
             for node in level {
+                if stop() {
+                    out.cancelled = true;
+                    break 'levels;
+                }
                 let id = node.id;
                 let node_start = Instant::now();
                 // Disabled node: empty output, never cached; revision 0 marks "off" for children.
@@ -346,6 +351,9 @@ impl Evaluator {
                     .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
             }
         }
+        // Cache-only, disabled-only and empty graphs may never execute a kernel.
+        // Observe cancellation before returning even when no fresh slot was missing.
+        out.cancelled |= stop();
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
