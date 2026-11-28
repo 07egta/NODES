@@ -798,6 +798,8 @@ fn preflight_run(
         }
         NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
+        k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
+        NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
@@ -1194,7 +1196,8 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d
         | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray
         | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d
-        | PopulateMesh | CurveArray | NoiseField | LifeGrid => {
+        | PopulateMesh | CurveArray | NoiseField | LifeGrid | TruchetPattern | AsanohaPattern
+        | ShippoPattern | PowerDiagram2d | LloydRelax2d => {
             crate::generative::run_item(kind, a, cancel)
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
