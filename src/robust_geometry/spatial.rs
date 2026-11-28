@@ -273,3 +273,51 @@ pub fn power_side(p: Point3, a: WeightedSite, b: WeightedSite) -> Option<Certifi
     exact.product(&[b.weight], false, 1074);
     Some(exact.sign())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn orientation_and_sphere() {
+        let a = [0.; 3];
+        let b = [1., 0., 0.];
+        let c = [0., 1., 0.];
+        let d = [0., 0., 1.];
+        assert_eq!(orient3d(a, b, c, d).unwrap().sign, Ordering::Greater);
+        assert_eq!(orient3d(a, c, b, d).unwrap().sign, Ordering::Less);
+        assert_eq!(orient3d(a, b, c, b).unwrap().sign, Ordering::Equal);
+        assert_eq!(insphere(a, b, c, d, [0.5; 3]).unwrap().sign, Ordering::Greater);
+        assert_eq!(insphere(a, b, c, d, [1.; 3]).unwrap().sign, Ordering::Equal);
+        assert_eq!(insphere(a, b, c, d, [2.; 3]).unwrap().sign, Ordering::Less);
+        assert_eq!(insphere(a, c, b, d, [0.5; 3]).unwrap().sign, Ordering::Less);
+    }
+
+    #[test]
+    fn extreme_scales() {
+        for s in [f64::from_bits(1), 1e-150, 1e150, f64::MAX] {
+            let a = [0.; 3];
+            let b = [s, 0., 0.];
+            let c = [0., s, 0.];
+            let d = [0., 0., s];
+            assert_eq!(orient3d(a, b, c, d).unwrap().sign, Ordering::Greater);
+            assert_eq!(insphere(a, b, c, d, [s; 3]).unwrap().sign, Ordering::Equal);
+        }
+    }
+
+    #[test]
+    fn weighted_and_invalid() {
+        let a = WeightedSite::unweighted([0.; 3]);
+        let b = WeightedSite { point: [2., 0., 0.], weight: 4. };
+        assert_eq!(power_side([0.; 3], a, b).unwrap().sign, Ordering::Equal);
+        assert_eq!(power_side([1., 0., 0.], a, b).unwrap().sign, Ordering::Greater);
+        let mut sites = [[0.; 3], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [1.; 3]]
+            .map(WeightedSite::unweighted);
+        sites[4].weight = 1.;
+        assert_eq!(weighted_insphere(sites).unwrap().sign, Ordering::Greater);
+        sites[4].weight = -1.;
+        assert_eq!(weighted_insphere(sites).unwrap().sign, Ordering::Less);
+        sites[4].weight = f64::NAN;
+        assert!(weighted_insphere(sites).is_none());
+    }
+}
