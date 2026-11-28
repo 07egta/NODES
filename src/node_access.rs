@@ -52,7 +52,7 @@ impl InputAccess {
 pub fn uses_list_access(kind: NodeKind) -> bool {
     matches!(
         kind,
-        NodeKind::Merge | NodeKind::Loft | NodeKind::MeshConstruct
+        NodeKind::Merge | NodeKind::Loft | NodeKind::MeshConstruct | NodeKind::BioSpaceColonization
     ) || crate::gh_nodes::is_list_kind(kind)
         || crate::data_tree_nodes::is_list_kind(kind)
         || crate::math_nodes::is_list_kind(kind)
