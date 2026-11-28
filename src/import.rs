@@ -434,36 +434,40 @@ pub fn place(mesh: &mut Mesh, scale: f64, center: bool, bed: bool) -> Result<(),
     if mesh.vertices.is_empty() {
         return Err("読み込んだ形状に頂点がありません。".into());
     }
-    for point in &mut mesh.vertices {
-        *point = point.map(|v| v * scale);
-    }
+    // Compute and validate every transformed coordinate before modifying the mesh.
+    // In particular, an overflow must not leave an otherwise usable mesh corrupted.
     let mut low = [f64::INFINITY; 3];
     let mut high = [f64::NEG_INFINITY; 3];
     for point in &mesh.vertices {
         for (axis, value) in point.iter().enumerate() {
-            low[axis] = low[axis].min(*value);
-            high[axis] = high[axis].max(*value);
+            let scaled = value * scale;
+            if !scaled.is_finite() {
+                return Err(BAD_NUMBER.into());
+            }
+            low[axis] = low[axis].min(scaled);
+            high[axis] = high[axis].max(scaled);
         }
     }
     let mut offset = [0.0f64; 3];
     if center {
-        offset[0] = -(low[0] + high[0]) / 2.;
-        offset[1] = -(low[1] + high[1]) / 2.;
+        offset[0] = -low[0].midpoint(high[0]);
+        offset[1] = -low[1].midpoint(high[1]);
     }
     if bed {
         offset[2] = -low[2];
     }
-    for point in &mut mesh.vertices {
-        for (value, shift) in point.iter_mut().zip(offset) {
-            *value += shift;
-        }
-    }
-    let finite = mesh
-        .vertices
-        .iter()
-        .all(|p| p.iter().all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE));
-    if !finite {
+    let transform = |point: [f64; 3]| {
+        std::array::from_fn::<_, 3, _>(|axis| point[axis] * scale + offset[axis])
+    };
+    if !mesh.vertices.iter().all(|&point| {
+        transform(point)
+            .iter()
+            .all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE)
+    }) {
         return Err("倍率や位置が大きすぎて座標の範囲を超えます。倍率を見直してください。".into());
+    }
+    for point in &mut mesh.vertices {
+        *point = transform(*point);
     }
     Ok(())
 }
@@ -517,6 +521,22 @@ mod security_tests {
                 "{malformed}"
             );
         }
+    }
+
+    #[test]
+    fn failed_placement_preserves_original_vertices_and_triangles() {
+        let original = Mesh {
+            vertices: vec![[1., 2., 3.], [2., 2., 3.], [1., 3., 3.]],
+            triangles: vec![[0, 1, 2]],
+        };
+        for scale in [1e10, f64::MAX, 0., f64::NAN] {
+            let mut mesh = original.clone();
+            assert!(place(&mut mesh, scale, false, false).is_err());
+            assert_eq!(mesh, original);
+        }
+        let mut mesh = original.clone();
+        assert!(place(&mut mesh, f64::MAX, true, true).is_err());
+        assert_eq!(mesh, original);
     }
 
     #[test]
