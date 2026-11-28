@@ -1940,9 +1940,7 @@ mod rendering_tests {
                 viewport.projected = Some(viewport.project(camera, rect, scale, true, 0));
                 let projection = viewport.projected.as_ref().unwrap();
                 let image = projection.image.as_ref().unwrap();
-                for (point, expected) in
-                    [(Pos2::new(15.0, 15.0), 1), (Pos2::new(75.0, 15.0), 2)]
-                {
+                for (point, expected) in [(Pos2::new(15.0, 15.0), 1), (Pos2::new(75.0, 15.0), 2)] {
                     let p = raster_position(rect, projection.raster_size, point);
                     let index = p.y.floor() as usize * image.size[0] + p.x.floor() as usize;
                     let pixel = image.pixels[index];

@@ -178,12 +178,7 @@ mod tests {
             let index = (py * 8 + px) * 4;
             let pixel = &rgba[index..index + 4];
             // Colour interpolation may truncate by one even for constant RGB.
-            assert!(
-                pixel
-                    .iter()
-                    .zip(expected)
-                    .all(|(a, b)| a.abs_diff(b) <= 1)
-            );
+            assert!(pixel.iter().zip(expected).all(|(a, b)| a.abs_diff(b) <= 1));
         }
         assert_eq!(sample_key(slanted, 7.5, 7.5), None);
         assert_eq!(sample_key([slanted[0]; 3], 0.5, 0.5), None);
