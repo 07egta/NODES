@@ -796,6 +796,7 @@ fn preflight_run(
         k if crate::mathematical_surfaces::is_kind(k) => {
             crate::mathematical_surfaces::estimate(k, args)?
         }
+        k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
         NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
@@ -863,6 +864,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
+        k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         GenesisScopes | GenesisScopeIds | GenesisRelief => {
             crate::genesis::run_item(kind, a, cancel)

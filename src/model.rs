@@ -592,6 +592,10 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
     // Ornament nodes: append-only serialized identifiers.
     TruchetPattern,
     AsanohaPattern,
@@ -1047,6 +1051,10 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
             Self::TruchetPattern,
             Self::AsanohaPattern,
             Self::ShippoPattern,
@@ -1691,6 +1699,7 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
             other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea

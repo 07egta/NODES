@@ -76,6 +76,7 @@ example_cases! {
     (wave_facade, "generative/03-wave-facade.morph", 2, "amplitude", 12.0, 4, Mesh, true),
     (slat_chair, "generative/04-slat-chair.morph", 0, "depth", 50.0, 11, Mesh, false),
     (spiral_stair, "generative/05-spiral-stair.morph", 3, "step", 5.0, 6, Mesh, true),
+    (matter_rotating_squares, "matter/rotating-squares.morph", 1, "value", 25.0, 3, Mesh, false),
     (honeycomb, "generative/06-honeycomb.morph", 1, "height", 6.0, 2, Mesh, false),
     (organic_sculpture, "generative/07-organic-sculpture.morph", 1, "amp", 8.0, 3, Mesh, false),
     (fractal_tree, "generative/08-fractal-tree.morph", 0, "length", 42.0, 1, Curve, false),
