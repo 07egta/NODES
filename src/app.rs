@@ -115,23 +115,76 @@ enum WorkspaceMode {
     Easy,
     Advanced,
     Expert,
+    Parametric,
+    Generative,
+    Architecture,
+    Mechanical,
+    Mathematical,
+    Physics,
+    Printing,
+    Analysis,
+    Presentation,
 }
 
 impl WorkspaceMode {
-    const ALL: [Self; 3] = [Self::Easy, Self::Advanced, Self::Expert];
+    const ALL: [Self; 12] = [
+        Self::Easy,
+        Self::Advanced,
+        Self::Expert,
+        Self::Parametric,
+        Self::Generative,
+        Self::Architecture,
+        Self::Mechanical,
+        Self::Mathematical,
+        Self::Physics,
+        Self::Printing,
+        Self::Analysis,
+        Self::Presentation,
+    ];
 
     fn label(self) -> &'static str {
         match self {
             Self::Easy => "かんたん",
             Self::Advanced => "標準",
             Self::Expert => "詳細",
+            Self::Parametric => "パラメトリック設計",
+            Self::Generative => "生成デザイン",
+            Self::Architecture => "建築",
+            Self::Mechanical => "機械設計",
+            Self::Mathematical => "数理造形",
+            Self::Physics => "物理シミュレーション",
+            Self::Printing => "3Dプリント",
+            Self::Analysis => "形状解析",
+            Self::Presentation => "プレゼンテーション",
         }
+    }
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::Easy => "beginner",
+            Self::Advanced => "standard",
+            Self::Expert => "professional",
+            Self::Parametric => "parametric",
+            Self::Generative => "generative",
+            Self::Architecture => "architecture",
+            Self::Mechanical => "mechanical",
+            Self::Mathematical => "mathematical",
+            Self::Physics => "physics",
+            Self::Printing => "printing",
+            Self::Analysis => "analysis",
+            Self::Presentation => "presentation",
+        }
+    }
+
+    fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.key() == key)
     }
 
     fn panels(self) -> (bool, bool) {
         match self {
             Self::Easy => (false, true),
-            Self::Advanced | Self::Expert => (true, true),
+            Self::Presentation => (false, true),
+            _ => (true, true),
         }
     }
 }
@@ -175,6 +228,8 @@ pub struct NodesApp {
     show_library: bool,
     workspace_mode: WorkspaceMode,
     show_workspace: bool,
+    show_inspector: bool,
+    saved_workspace: (bool, bool, bool),
     clipboard: Vec<Node>,
     palette_open: bool,
     palette_focus: bool,
@@ -273,6 +328,19 @@ impl NodesApp {
         }
         let recent = node_shelf::recent_from_saved(&saved_recent);
         let show_tutorial = file_path.is_none() && screenshot.is_none();
+        let workspace_mode = if screenshot.is_some() {
+            WorkspaceMode::Advanced
+        } else {
+            ui_polish::read_setting("workspace_mode")
+                .as_deref()
+                .and_then(WorkspaceMode::from_key)
+                .unwrap_or(WorkspaceMode::Advanced)
+        };
+        let layout = if screenshot.is_some() {
+            (true, true, true)
+        } else {
+            Self::load_workspace_layout(workspace_mode)
+        };
         let mut app = Self {
             edits: EditTracker::new(&project),
             project,
@@ -298,9 +366,11 @@ impl NodesApp {
             palette_ime: false,
             library_filter: 0,
             favorites: favorites.iter().copied().collect(),
-            show_library: true,
-            workspace_mode: WorkspaceMode::Advanced,
-            show_workspace: true,
+            show_library: layout.0,
+            workspace_mode,
+            show_workspace: layout.1,
+            show_inspector: layout.2,
+            saved_workspace: layout,
             clipboard: Vec::new(),
             category: "すべて".into(),
             palette_open: false,
@@ -1296,6 +1366,50 @@ impl NodesApp {
             }
         }
     }
+    fn load_workspace_layout(mode: WorkspaceMode) -> (bool, bool, bool) {
+        let defaults = mode.panels();
+        ui_polish::read_setting(&format!("workspace_{}", mode.key()))
+            .as_deref()
+            .and_then(parse_workspace_layout)
+            .unwrap_or((defaults.0, defaults.1, mode != WorkspaceMode::Presentation))
+    }
+
+    fn persist_workspace(&mut self) {
+        if self.screenshot.is_some() {
+            return;
+        }
+        let now = (self.show_library, self.show_workspace, self.show_inspector);
+        if now != self.saved_workspace {
+            let line = format!(
+                "workspace_{}={},{},{}",
+                self.workspace_mode.key(),
+                u8::from(now.0),
+                u8::from(now.1),
+                u8::from(now.2)
+            );
+            if let Err(e) = ui_polish::save_setting_line(&line) {
+                self.notify(e, true);
+            }
+            self.saved_workspace = now;
+        }
+    }
+
+    fn switch_workspace(&mut self, mode: WorkspaceMode) {
+        if self.workspace_mode == mode {
+            return;
+        }
+        self.persist_workspace();
+        self.workspace_mode = mode;
+        let layout = Self::load_workspace_layout(mode);
+        (self.show_library, self.show_workspace, self.show_inspector) = layout;
+        self.saved_workspace = layout;
+        if self.screenshot.is_none()
+            && let Err(e) = ui_polish::save_setting_line(&format!("workspace_mode={}", mode.key()))
+        {
+            self.notify(e, true);
+        }
+    }
+
     fn topbar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("topbar")
             .exact_height(44.)
@@ -1428,14 +1542,26 @@ impl NodesApp {
                                     .selectable_label(self.workspace_mode == mode, mode.label())
                                     .clicked()
                                 {
-                                    self.workspace_mode = mode;
-                                    (self.show_library, self.show_workspace) = mode.panels();
+                                    self.switch_workspace(mode);
                                     ui.close();
                                 }
                             }
                             ui.separator();
                             ui.checkbox(&mut self.show_library, "ノードライブラリ");
                             ui.checkbox(&mut self.show_workspace, "3D と設定");
+                            ui.checkbox(&mut self.show_inspector, "詳細設定");
+                            if ui.button("ノード編集に集中").clicked() {
+                                self.show_library = false;
+                                self.show_workspace = false;
+                                ui.close();
+                            }
+                            if ui.button("配置を初期化").clicked() {
+                                (self.show_library, self.show_workspace) =
+                                    self.workspace_mode.panels();
+                                self.show_inspector =
+                                    self.workspace_mode != WorkspaceMode::Presentation;
+                                ui.close();
+                            }
                             if ui.button("診断と処理時間").clicked() {
                                 self.diagnostics_window.open = true;
                                 ui.close();
@@ -2260,7 +2386,8 @@ impl NodesApp {
                 if items.is_none() {
                     self.discard_outdated_preview();
                 }
-                let h = (ui.available_height() * 0.48).max(48.);
+                let fraction = if self.show_inspector { 0.48 } else { 0.90 };
+                let h = (ui.available_height() * fraction).max(48.);
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
@@ -2305,17 +2432,20 @@ impl NodesApp {
                     }
                 });
                 ui.add_space(2.);
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        egui::Frame::new().inner_margin(8).show(ui, |ui| {
-                            egui::CollapsingHeader::new("ビュー設定")
-                                .default_open(true)
-                                .show(ui, |ui| self.viewport.controls(ui));
-                            ui.separator();
-                            self.inspector(ui);
+                ui.checkbox(&mut self.show_inspector, "詳細設定を表示");
+                if self.show_inspector {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            egui::Frame::new().inner_margin(8).show(ui, |ui| {
+                                egui::CollapsingHeader::new("ビュー設定")
+                                    .default_open(self.workspace_mode != WorkspaceMode::Easy)
+                                    .show(ui, |ui| self.viewport.controls(ui));
+                                ui.separator();
+                                self.inspector(ui);
+                            });
                         });
-                    });
+                }
             });
     }
     fn center_panel(&mut self, ctx: &egui::Context) {
@@ -2959,6 +3089,7 @@ impl eframe::App for NodesApp {
         self.center_panel(ctx);
         self.palette(ctx);
         self.persist_shelf_lists();
+        self.persist_workspace();
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
         let stats = crate::tutorial::Stats::of(&self.project.graph);
@@ -3272,6 +3403,24 @@ fn ordered_kinds() -> Vec<NodeKind> {
     ordered.sort_by_key(|kind| category_rank(kind.spec().category));
     ordered
 }
+fn parse_workspace_layout(value: &str) -> Option<(bool, bool, bool)> {
+    let mut parts = value.split(',');
+    let parse = |part| match part {
+        Some("0") => Some(false),
+        Some("1") => Some(true),
+        _ => None,
+    };
+    let layout = (
+        parse(parts.next())?,
+        parse(parts.next())?,
+        parse(parts.next())?,
+    );
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(layout)
+}
+
 fn category_rank(category: &str) -> usize {
     [
         "立体",
@@ -3418,6 +3567,25 @@ mod tests {
         assert_eq!(WorkspaceMode::Easy.panels(), (false, true));
         assert_eq!(WorkspaceMode::Advanced.panels(), (true, true));
         assert_eq!(WorkspaceMode::Expert.panels(), (true, true));
+    }
+
+    #[test]
+    fn workspace_keys_roundtrip_and_are_unique() {
+        let mut keys = BTreeSet::new();
+        for mode in WorkspaceMode::ALL {
+            assert!(keys.insert(mode.key()));
+            assert_eq!(WorkspaceMode::from_key(mode.key()), Some(mode));
+            assert!(mode.panels().1);
+        }
+        assert_eq!(WorkspaceMode::from_key("unknown"), None);
+    }
+
+    #[test]
+    fn workspace_layout_rejects_corrupt_settings() {
+        assert_eq!(parse_workspace_layout("0,1,0"), Some((false, true, false)));
+        for invalid in ["", "1,1", "1,2,0", "1,0,1,0", "true,1,0"] {
+            assert_eq!(parse_workspace_layout(invalid), None);
+        }
     }
 
     #[test]
