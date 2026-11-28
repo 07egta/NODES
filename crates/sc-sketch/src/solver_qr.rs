@@ -173,7 +173,10 @@ mod tests {
     fn rank_is_scale_invariant_and_flags_near_threshold() {
         for scale in [1e-120, 1.0, 1e120] {
             let j = Mat { rows: 2, cols: 2, data: vec![scale, 0.0, 0.0, scale * 2e-7] };
-            let Some(p) = rank_profile(&j, 1e-7) else { assert!(false, "missing rank profile"); return };
+            let Some(p) = rank_profile(&j, 1e-7) else {
+                assert!(false, "missing rank profile");
+                return;
+            };
             assert_eq!((p.rank_high_threshold, p.rank, p.rank_low_threshold), (1, 2, 2));
             assert!(p.threshold_sensitive());
         }
@@ -182,7 +185,10 @@ mod tests {
     #[test]
     fn underdetermined_minimum_displacement() {
         let j = Mat { rows: 1, cols: 2, data: vec![1.0, 1.0] };
-        let Some(x) = damped_step(&j, &[-2.0], &[1.0, 1.0], 1e-6) else { assert!(false, "missing step"); return };
+        let Some(x) = damped_step(&j, &[-2.0], &[1.0, 1.0], 1e-6) else {
+            assert!(false, "missing step");
+            return;
+        };
         let expected = 2.0 / (2.0 + 1e-6 + 1e-12);
         assert!(x.iter().all(|v| (v - expected).abs() < 1e-9));
     }
@@ -190,7 +196,10 @@ mod tests {
     #[test]
     fn column_pivoting_restores_original_variable_order() {
         let j = Mat { rows: 2, cols: 2, data: vec![0.01, 0.0, 0.0, 100.0] };
-        let Some(x) = damped_step(&j, &[-0.02, 300.0], &[1.0, 1.0], 1e-12) else { assert!(false, "missing step"); return };
+        let Some(x) = damped_step(&j, &[-0.02, 300.0], &[1.0, 1.0], 1e-12) else {
+            assert!(false, "missing step");
+            return;
+        };
         assert!((x[0] - 2.0).abs() < 1e-6);
         assert!((x[1] + 3.0).abs() < 1e-9);
     }

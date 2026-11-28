@@ -3,8 +3,8 @@
 
 #[path = "solver_qr.rs"]
 mod solver_qr;
-pub use solver_qr::{QR_MAX_COLS, QR_MAX_ROWS, RankProfile, rank_profile};
 pub(crate) use solver_qr::damped_step;
+pub use solver_qr::{QR_MAX_COLS, QR_MAX_ROWS, RankProfile, rank_profile};
 
 /// Row-major dense matrix.
 #[derive(Clone, Debug)]
