@@ -8,7 +8,7 @@ use nodes::stl_export::{
     BodyStats, Check, ExportOptions, Level, OutputFormat, RepairReport, StoredSettings,
     WriteFailure, WriteSummary, check_bodies, config_path, default_file_name, detect_slicer,
     gather_meshes, launch_slicer, load_stored, prepare_bodies, repair_meshes, save_stored,
-    write_bodies_detailed,
+    write_bodies_colored,
 };
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -232,6 +232,7 @@ impl StlExportUi {
         let task = match self.options.format {
             OutputFormat::StlBinary | OutputFormat::StlAscii => FileTask::ExportStl,
             OutputFormat::Obj => FileTask::ExportObj,
+            OutputFormat::Ply => FileTask::ExportPly,
             OutputFormat::ThreeMf => FileTask::ExportThreeMf,
         };
         let directory = self
@@ -290,11 +291,12 @@ impl StlExportUi {
     fn write(&mut self, sources: &StlSources, base: &Path) -> Result<WriteSummary, WriteFailure> {
         self.options.validate()?;
         let (bodies, _) = self.prepared(sources)?;
-        let summary = write_bodies_detailed(
+        let summary = write_bodies_colored(
             self.options.format,
             base,
             &bodies,
             self.options.split_bodies,
+            self.options.color_bodies,
         )?;
         self.remember_destination(base);
         Ok(summary)
@@ -374,6 +376,7 @@ fn estimated_bytes(format: OutputFormat, triangles: usize) -> u64 {
         OutputFormat::StlBinary => 84 + 50 * t,
         OutputFormat::StlAscii => 260 * t,
         OutputFormat::ThreeMf | OutputFormat::Obj => 100 * t,
+        OutputFormat::Ply => 40 * t,
     }
 }
 
@@ -436,6 +439,15 @@ impl StlExportUi {
             &mut self.options.split_bodies,
             "離れた部品ごとに別ファイルにする（部品が複数あるとき）",
         );
+        if matches!(
+            self.options.format,
+            OutputFormat::ThreeMf | OutputFormat::Ply
+        ) {
+            ui.checkbox(
+                &mut self.options.color_bodies,
+                "部品ごとに色を付ける（3MF・PLY。スライサーでの色の扱いは実機で未確認）",
+            );
+        }
         ui.horizontal_wrapped(|ui| {
             ui.label("置き方");
             ui.radio_value(
