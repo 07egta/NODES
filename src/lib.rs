@@ -39,6 +39,7 @@ pub mod polygon_triangulation;
 pub mod print_info;
 pub mod project_diff;
 pub mod raster;
+pub mod robust_geometry;
 pub mod script;
 pub mod stl_export;
 pub mod subd;
