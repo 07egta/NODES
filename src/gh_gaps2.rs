@@ -530,8 +530,8 @@ fn douglas_peucker(
         let (a, b) = (points[start], points[end]);
         let mut far = 0.;
         let mut at = None;
-        for k in start + 1..end {
-            let d = distance_to_segment(points[k], a, b);
+        for (k, p) in points.iter().enumerate().take(end).skip(start + 1) {
+            let d = distance_to_segment(*p, a, b);
             if d > far {
                 far = d;
                 at = Some(k);
