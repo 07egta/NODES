@@ -65,6 +65,9 @@ pub mod limits {
     pub const MAX_STEP_BYTES: usize = 64 * 1024 * 1024;
     pub const MAX_COORDINATE: f64 = 1e6;
     pub const MAX_SAMPLES: usize = 20_000;
+    /// Work budgets for the NODES intersection searches (not the native kernel).
+    pub const MAX_INTERSECTION_PAIRS: usize = 10_000_000;
+    pub const MAX_INTERSECTION_GRID_ENTRIES: usize = 2_000_000;
 }
 
 pub const STOPPED: &str = "計算を停止しました。";
@@ -221,6 +224,11 @@ pub fn is_watertight(m: &Mesh) -> bool {
     }
     let mut directed: HashMap<(u32, u32), u32> = HashMap::with_capacity(m.triangles.len() * 3);
     for t in &m.triangles {
+        if t.iter()
+            .any(|&i| m.vertices.get(i as usize).is_none_or(|p| !finite(*p)))
+        {
+            return false;
+        }
         for k in 0..3 {
             let a = t[k];
             let b = t[(k + 1) % 3];
@@ -392,10 +400,10 @@ pub struct Piece {
 }
 
 impl Piece {
-    fn degree(&self) -> usize {
+    pub(crate) fn degree(&self) -> usize {
         self.h.len().saturating_sub(1)
     }
-    fn point_at(&self, t: f64) -> P3 {
+    pub(crate) fn point_at(&self, t: f64) -> P3 {
         let mut work = self.h.clone();
         let n = work.len();
         for r in 1..n {
@@ -823,6 +831,43 @@ pub(crate) fn brep(body: Body, stop: Stop) -> R<BrepValue> {
     BrepValue::new(body, stop)
 }
 
+/// Native topology is independent of a watertight faceted display.
+pub(crate) fn require_brep_topology(what: &str, body: &Body, stop: Stop) -> R<()> {
+    if !kernel(what, stop, || Ok(body.has_closed_brep_topology()))? {
+        return Err(format!(
+            "{what}: 閉じた精密 B-rep ではありません（開いたシェル、面方向、またはメッシュ形状）。"
+        ));
+    }
+    Ok(())
+}
+
+fn require_closed_preview(what: &str, value: &BrepValue, stop: Stop) -> R<()> {
+    stopped(stop)?;
+    if !value.is_closed() {
+        return Err(format!(
+            "{what}: 結果のメッシュに開きまたは面方向の問題があるため、立体として返せません。"
+        ));
+    }
+    let volume = mesh_volume(value.preview());
+    if !volume.is_finite() || volume <= 0.0 {
+        return Err(format!("{what}: 結果の体積または面方向が無効です。"));
+    }
+    stopped(stop)
+}
+
+pub(crate) fn require_closed_brep(what: &str, value: &BrepValue, stop: Stop) -> R<()> {
+    require_brep_topology(what, value.body(), stop)?;
+    require_closed_preview(what, value, stop)
+}
+
+/// Construct a solid result transactionally. Open sheets still use `brep`.
+pub(crate) fn solid_result(what: &str, body: Body, stop: Stop) -> R<BrepValue> {
+    require_brep_topology(what, &body, stop)?;
+    let result = brep(body, stop)?;
+    require_closed_preview(what, &result, stop)?;
+    Ok(result)
+}
+
 pub(crate) fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepValue> {
     let mut iter = bodies.into_iter();
     let Some(first) = iter.next() else {
@@ -833,9 +878,8 @@ pub(crate) fn first_body(what: &str, bodies: Vec<Body>, stop: Stop) -> R<BrepVal
     let mut acc = first;
     for b in iter {
         stopped(stop)?;
-        if let Some(u) = kernel(what, stop, || sk::boolean(&acc, &b, sk::BoolOp::Union))? {
-            acc = u;
-        }
+        acc = kernel(what, stop, || sk::boolean(&acc, &b, sk::BoolOp::Union))?
+            .ok_or_else(|| format!("{what}: 複数の部分を結合できませんでした。"))?;
     }
     brep(acc, stop)
 }
@@ -1162,25 +1206,22 @@ pub fn boolean(a: &BrepValue, b: &BrepValue, op: Bool, stop: Stop) -> R<BrepValu
         Bool::Difference => ("差（ブーリアン）", sk::BoolOp::Cut),
         Bool::Intersection => ("積（ブーリアン）", sk::BoolOp::Intersect),
     };
-    if !a.is_closed() || !b.is_closed() {
-        return Err(format!(
-            "{what}: 閉じた立体どうしでのみ計算できます。開いた面は「穴をふさぐ」で閉じてください。"
-        ));
-    }
+    require_closed_brep(what, a, stop)?;
+    require_closed_brep(what, b, stop)?;
     match kernel(what, stop, || sk::boolean(a.body(), b.body(), kop))? {
         Some(body) => {
+            require_brep_topology(what, &body, stop)?;
             let mut result = brep(body, stop)?;
             if !result.is_closed() {
                 // The kernel may produce a valid B-rep whose trimmed faces leave gaps in
                 // the mesh, for example at the tangencies of two equal crossing cylinders.
                 // Keep the original body for STEP, measurement and subsequent operations.
-                let preview = faceted_boolean_preview(a.body(), b.body(), result.body(), kop, stop);
-                stopped(stop)?;
-                if let Ok(preview) = preview {
-                    result.preview = Arc::new(preview);
-                    result.closed = true;
-                }
+                let preview =
+                    faceted_boolean_preview(a.body(), b.body(), result.body(), kop, stop)?;
+                result.preview = Arc::new(preview);
+                result.closed = true;
             }
+            require_closed_preview(what, &result, stop)?;
             Ok(result)
         }
         None => Err(format!(
@@ -1218,6 +1259,9 @@ fn faceted_boolean_preview(
     let raw = kernel("メッシュ化", stop, || faceted.tessellate(chord))?;
     let bounds = raw.bounds();
     let mesh = weld_tessellation(&raw, result.size(), stop)?;
+    if !is_watertight(&mesh) {
+        return Err("ブーリアンの表示メッシュが閉じていません。".into());
+    }
     let volume = crate::mesh_fabrication::signed_volume(&mesh, stop)?;
     let exact = kernel("体積", stop, || sk::measure_mass(result))?;
     if !exact.volume.is_finite()
@@ -1257,23 +1301,26 @@ pub(crate) fn edge_picks(b: &BrepValue, only: &[usize], stop: Stop) -> R<Vec<Vec
 /// Constant-radius fillet of all edges (or the listed ones).
 pub fn fillet(b: &BrepValue, radius: f64, only: &[usize], stop: Stop) -> R<BrepValue> {
     let r = positive("フィレット半径", radius)?;
+    require_closed_brep("フィレット", b, stop)?;
     let picks = edge_picks(b, only, stop)?;
     let body = kernel("フィレット", stop, || sk::fillet(b.body(), &picks, r))?;
-    brep(body, stop)
+    solid_result("フィレット", body, stop)
 }
 
 /// Equal-distance chamfer of all edges (or the listed ones).
 pub fn chamfer(b: &BrepValue, distance: f64, only: &[usize], stop: Stop) -> R<BrepValue> {
     let d = positive("面取り距離", distance)?;
+    require_closed_brep("面取り", b, stop)?;
     let picks = edge_picks(b, only, stop)?;
     let body = kernel("面取り", stop, || sk::chamfer(b.body(), &picks, d))?;
-    brep(body, stop)
+    solid_result("面取り", body, stop)
 }
 
 /// Hollow a solid with walls of `thickness`, removing the face with the given number, or by
 /// default the highest face (an open box or cup). `open = None` keeps every face (a sealed void).
 pub fn shell(b: &BrepValue, thickness: f64, open: Option<usize>, stop: Stop) -> R<BrepValue> {
     let t = positive("厚み", thickness)?;
+    require_closed_brep("シェル", b, stop)?;
     let faces = kernel("面の取得", stop, || {
         b.body().faces(tol::chord(b.body().size()))
     })?;
@@ -1292,7 +1339,7 @@ pub fn shell(b: &BrepValue, thickness: f64, open: Option<usize>, stop: Stop) -> 
         })?],
     };
     match kernel("シェル", stop, || sk::shell(b.body(), &open_at, t)) {
-        Ok(body) => brep(body, stop),
+        Ok(body) => solid_result("シェル", body, stop),
         Err(e) if e == STOPPED => Err(e),
         Err(planar) => {
             // Curved solids: take the open face away and thicken the rest inward.
@@ -1638,6 +1685,7 @@ pub fn curve_curve(a: &Curve, b: &Curve, stop: Stop) -> R<Vec<P3>> {
         .chain(&sb)
         .fold(1f64, |m, (_, _, p)| m.max(norm(*p)));
     let mut found: Vec<P3> = Vec::new();
+    let mut pairs = 0usize;
     for wa in sa.windows(2) {
         stopped(stop)?;
         let (Some(x0), Some(x1)) = (wa.first(), wa.get(1)) else {
@@ -1648,6 +1696,7 @@ pub fn curve_curve(a: &Curve, b: &Curve, stop: Stop) -> R<Vec<P3>> {
         }
         let la = dist(x0.2, x1.2);
         for wb in sb.windows(2) {
+            intersection_pair(&mut pairs, stop)?;
             let (Some(y0), Some(y1)) = (wb.first(), wb.get(1)) else {
                 continue;
             };
@@ -1700,6 +1749,17 @@ pub fn curve_curve(a: &Curve, b: &Curve, stop: Stop) -> R<Vec<P3>> {
     Ok(found)
 }
 
+fn intersection_pair(pairs: &mut usize, stop: Stop) -> R<()> {
+    *pairs += 1;
+    if *pairs > limits::MAX_INTERSECTION_PAIRS {
+        return Err("交差候補が多すぎます。入力を分割してください。".into());
+    }
+    if *pairs % 1024 == 0 {
+        stopped(stop)?;
+    }
+    Ok(())
+}
+
 fn triangle(m: &Mesh, t: &[u32; 3]) -> Option<[P3; 3]> {
     Some([
         *m.vertices.get(t[0] as usize)?,
@@ -1734,11 +1794,12 @@ fn segment_triangle(p0: P3, p1: P3, tri: [P3; 3]) -> Option<f64> {
 }
 
 /// Points where a curve crosses a B-rep's surface. Accuracy follows the display mesh
-/// ([`tol::chord`]): an approximation, refined on the curve only.
+/// ([`tol::chord`]): an approximation from sampled curve segments and mesh triangles.
 pub fn curve_brep(c: &Curve, b: &BrepValue, stop: Stop) -> R<Vec<P3>> {
     let (_, samples) = dense(c, stop)?;
     let mesh = b.preview();
     let mut out: Vec<P3> = Vec::new();
+    let mut pairs = 0usize;
     for w in samples.windows(2) {
         stopped(stop)?;
         let (Some(x0), Some(x1)) = (w.first(), w.get(1)) else {
@@ -1749,6 +1810,7 @@ pub fn curve_brep(c: &Curve, b: &BrepValue, stop: Stop) -> R<Vec<P3>> {
         }
         let (lo, hi) = (x0.2.map2(x1.2, f64::min), x0.2.map2(x1.2, f64::max));
         for t in &mesh.triangles {
+            intersection_pair(&mut pairs, stop)?;
             let Some(tri) = triangle(mesh, t) else {
                 continue;
             };
@@ -1836,15 +1898,11 @@ fn triangle_triangle(t1: [P3; 3], t2: [P3; 3]) -> Option<(P3, P3)> {
     (alo.max(blo) < ahi.min(bhi)).then_some((lo, hi))
 }
 
-/// Curves where two B-reps' surfaces cross. Closed solids use the kernel's exact intersection
-/// curves (`kernel_ops::exact_intersection`); open sheets fall back to the display meshes.
+/// Closed solids: checked fitted intersection curves, or an explicit error.
+/// Open sheets: the documented mesh approximation. No silent fallback on solid failure.
 pub fn brep_brep(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
     if a.is_closed() && b.is_closed() {
-        match crate::kernel_ops::exact_intersection(a, b, stop) {
-            Ok(curves) => return Ok(curves),
-            Err(e) if e == STOPPED => return Err(e),
-            Err(_) => {}
-        }
+        return crate::kernel_ops::exact_intersection(a, b, stop);
     }
     brep_brep_mesh(a, b, stop)
 }
@@ -1858,16 +1916,24 @@ pub fn brep_brep_mesh(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>>
     let cell = (size / 32.).max(tol::ABS * 1000.);
     let key = |p: P3| p.map(|v| (v / cell).floor() as i64);
     let mut grid: HashMap<[i64; 3], Vec<usize>> = HashMap::new();
+    let cells = |lo: [i64; 3], hi: [i64; 3]| {
+        (0..3)
+            .map(|k| hi[k].saturating_sub(lo[k]).saturating_add(1))
+            .fold(1i64, i64::saturating_mul)
+    };
+    let mut entries = 0usize;
     for (i, t) in mb.triangles.iter().enumerate() {
+        stopped(stop)?;
         let Some(tri) = triangle(mb, t) else { continue };
         let lo = key(tri[0].map2(tri[1], f64::min).map2(tri[2], f64::min));
         let hi = key(tri[0].map2(tri[1], f64::max).map2(tri[2], f64::max));
-        if (0..3)
-            .map(|k| hi[k].saturating_sub(lo[k]).saturating_add(1))
-            .product::<i64>()
-            > 4096
-        {
+        let count = cells(lo, hi);
+        if count > 4096 {
             return Err("交線の計算に必要な分割が大きすぎます。".into());
+        }
+        entries = entries.saturating_add(count as usize);
+        if entries > limits::MAX_INTERSECTION_GRID_ENTRIES {
+            return Err("交線の空間分割が大きすぎます。".into());
         }
         for x in lo[0]..=hi[0] {
             for y in lo[1]..=hi[1] {
@@ -1879,16 +1945,27 @@ pub fn brep_brep_mesh(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>>
     }
     let mut segments: Vec<(P3, P3)> = Vec::new();
     let mut tested = std::collections::HashSet::new();
+    let mut pairs = 0usize;
+    let mut visited_cells = 0usize;
     for t in &ma.triangles {
         stopped(stop)?;
         let Some(tri) = triangle(ma, t) else { continue };
         let lo = key(tri[0].map2(tri[1], f64::min).map2(tri[2], f64::min));
         let hi = key(tri[0].map2(tri[1], f64::max).map2(tri[2], f64::max));
+        let count = cells(lo, hi);
+        if count > 4096 {
+            return Err("交線の計算に必要な分割が大きすぎます。".into());
+        }
+        visited_cells = visited_cells.saturating_add(count as usize);
+        if visited_cells > limits::MAX_INTERSECTION_PAIRS {
+            return Err("交線の空間検索が大きすぎます。".into());
+        }
         tested.clear();
         for x in lo[0]..=hi[0] {
             for y in lo[1]..=hi[1] {
                 for z in lo[2]..=hi[2] {
                     for &j in grid.get(&[x, y, z]).map(Vec::as_slice).unwrap_or(&[]) {
+                        intersection_pair(&mut pairs, stop)?;
                         if !tested.insert(j) {
                             continue;
                         }
@@ -1906,10 +1983,11 @@ pub fn brep_brep_mesh(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>>
             return Err("交線が細かすぎます。".into());
         }
     }
-    chain_segments(&segments, tol::weld(size) * 100.)
+    chain_segments(&segments, tol::weld(size) * 100., stop)
 }
 
-fn chain_segments(segments: &[(P3, P3)], eps: f64) -> R<Vec<Curve>> {
+fn chain_segments(segments: &[(P3, P3)], eps: f64, stop: Stop) -> R<Vec<Curve>> {
+    stopped(stop)?;
     let mut points = Vec::with_capacity(segments.len() * 2);
     for (a, b) in segments {
         points.push(*a);
@@ -1932,6 +2010,7 @@ fn chain_segments(segments: &[(P3, P3)], eps: f64) -> R<Vec<Curve>> {
     // Open chains start at their ends; then closed loops anywhere.
     starts.sort_by_key(|k| (adj.get(k).map_or(0, Vec::len) == 2, *k));
     for s in starts {
+        stopped(stop)?;
         let mut path = vec![s];
         let mut cur = s;
         loop {
@@ -1944,8 +2023,11 @@ fn chain_segments(segments: &[(P3, P3)], eps: f64) -> R<Vec<Curve>> {
             used.insert((cur.min(m), cur.max(m)));
             path.push(m);
             cur = m;
+            if path.len() % 1024 == 0 {
+                stopped(stop)?;
+            }
             if path.len() > 1_000_000 {
-                break;
+                return Err("交線が長すぎます。".into());
             }
         }
         if path.len() < 2 {
