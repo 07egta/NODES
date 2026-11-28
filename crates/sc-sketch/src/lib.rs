@@ -65,12 +65,12 @@ pub use profiles::{
     without_text_counters,
 };
 pub use shape::{Shape, intersections, intersections_within, nearest_crossing, nearest_curve_intersection};
-pub use solver::solve_after_edit_with_analysis;
 pub use solver::{
     Analysis, CONSISTENT, DrivingValues, Hold, MAX_COMPONENT_VARS, SolveReport, SolveStatus, constraint_residual, determined_by, fillets_kept,
     flips_from_stored, measure_dimension, move_line_towards, move_point_towards, solve, solve_after_edit, solve_after_link_move,
     solve_after_value_edit, solve_holding, solve_with,
 };
+pub use solver::{NumericalOutcome, current_rank_profile, solve_after_edit_with_analysis};
 pub use text::{TextAlign, TextStyle};
 pub use thin::{MAX_THIN_SEGMENTS, thin_wall_regions};
 pub use wire::{MAX_FIT_POINTS, MAX_WIRE_POINTS, Wire, WireArc, WireSpace, arc_from_3_points, arc_polyline, arc_sweep, fit_polyline};
