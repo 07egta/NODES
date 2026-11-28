@@ -33,14 +33,16 @@ pub enum OutputFormat {
     StlAscii,
     ThreeMf,
     Obj,
+    Ply,
 }
 
 impl OutputFormat {
-    pub const ALL: [OutputFormat; 4] = [
+    pub const ALL: [OutputFormat; 5] = [
         OutputFormat::StlBinary,
         OutputFormat::StlAscii,
         OutputFormat::ThreeMf,
         OutputFormat::Obj,
+        OutputFormat::Ply,
     ];
 
     pub fn extension(self) -> &'static str {
@@ -48,6 +50,7 @@ impl OutputFormat {
             Self::StlBinary | Self::StlAscii => "stl",
             Self::ThreeMf => "3mf",
             Self::Obj => "obj",
+            Self::Ply => "ply",
         }
     }
 
@@ -57,6 +60,7 @@ impl OutputFormat {
             Self::StlAscii => "STL テキスト（ASCII）",
             Self::ThreeMf => "3MF（試験的）",
             Self::Obj => "OBJ（3D ソフト用）",
+            Self::Ply => "PLY（バイナリ・色つき可）",
         }
     }
 }
@@ -69,6 +73,8 @@ pub struct ExportOptions {
     pub center_xy: bool,
     pub split_bodies: bool,
     pub max_size_mm: f64,
+    /// 3MF / PLY only: give each body its own colour (fixed palette).
+    pub color_bodies: bool,
 }
 
 impl Default for ExportOptions {
@@ -80,6 +86,7 @@ impl Default for ExportOptions {
             center_xy: true,
             split_bodies: false,
             max_size_mm: DEFAULT_MAX_SIZE_MM,
+            color_bodies: false,
         }
     }
 }
@@ -975,18 +982,31 @@ pub fn write_bodies_detailed(
     bodies: &[Mesh],
     separate: bool,
 ) -> Result<WriteSummary, WriteFailure> {
+    write_bodies_colored(format, path, bodies, separate, false)
+}
+
+/// Same as `write_bodies_detailed`; with `color_bodies` the 3MF and PLY writers give
+/// every body its own colour from `BODY_PALETTE`. STL and OBJ cannot hold colour and
+/// ignore the flag.
+pub fn write_bodies_colored(
+    format: OutputFormat,
+    path: &Path,
+    bodies: &[Mesh],
+    separate: bool,
+    color_bodies: bool,
+) -> Result<WriteSummary, WriteFailure> {
     if bodies.is_empty() {
         return Err(WriteFailure::from(
             "書き出せる立体がありません。".to_owned(),
         ));
     }
     if separate && bodies.len() > 1 {
-        commit_prepared(prepare_split(format, path, bodies)?)
+        commit_prepared(prepare_split(format, path, bodies, color_bodies)?)
     } else {
         // The existing single-file writers already validate, flush and replace
         // atomically; an additional staging pass would provide no extra safety.
-        let triangles =
-            write_file(format, path, bodies).map_err(|message| WriteFailure::at(path, message))?;
+        let triangles = write_file(format, path, bodies, color_bodies)
+            .map_err(|message| WriteFailure::at(path, message))?;
         Ok(WriteSummary {
             files: vec![path.to_path_buf()],
             triangles,
@@ -1058,6 +1078,7 @@ fn prepare_split(
     format: OutputFormat,
     path: &Path,
     bodies: &[Mesh],
+    color_bodies: bool,
 ) -> Result<Vec<PreparedOutput>, WriteFailure> {
     let targets: Vec<_> = (0..bodies.len())
         .map(|index| numbered_path(path, index + 1, bodies.len()))
@@ -1084,8 +1105,13 @@ fn prepare_split(
             .map_err(|message| WriteFailure::at(&target, message))?;
         // Reuse the exact writer/validator for each format. It finishes its
         // atomic write to our owned stage, leaving all destinations untouched.
-        output.triangles = write_file(format, &output.stage, std::slice::from_ref(body))
-            .map_err(|message| WriteFailure::at(&target, message))?;
+        output.triangles = write_file(
+            format,
+            &output.stage,
+            std::slice::from_ref(body),
+            color_bodies,
+        )
+        .map_err(|message| WriteFailure::at(&target, message))?;
         triangles = triangles
             .checked_add(output.triangles)
             .ok_or_else(|| WriteFailure::at(&target, "合計の面数が大きすぎます。"))?;
@@ -1120,7 +1146,12 @@ fn commit_prepared(prepared: Vec<PreparedOutput>) -> Result<WriteSummary, WriteF
     Ok(completed)
 }
 
-fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usize, String> {
+fn write_file(
+    format: OutputFormat,
+    path: &Path,
+    bodies: &[Mesh],
+    color_bodies: bool,
+) -> Result<usize, String> {
     match format {
         OutputFormat::StlBinary => {
             persistence::export_stl(path, &to_trees(bodies)).map(|r| r.triangles)
@@ -1133,7 +1164,17 @@ fn write_file(format: OutputFormat, path: &Path, bodies: &[Mesh]) -> Result<usiz
         }
         OutputFormat::ThreeMf => {
             let triangles = ensure_writable(bodies)?;
-            let bytes = encode_3mf(bodies)?;
+            let bytes = if color_bodies {
+                encode_3mf_colored(bodies)?
+            } else {
+                encode_3mf(bodies)?
+            };
+            persistence::atomic_write(path, |file| file.write_all(&bytes))?;
+            Ok(triangles)
+        }
+        OutputFormat::Ply => {
+            let triangles = ensure_writable(bodies)?;
+            let bytes = encode_ply(bodies, color_bodies)?;
             persistence::atomic_write(path, |file| file.write_all(&bytes))?;
             Ok(triangles)
         }
@@ -1169,6 +1210,31 @@ const RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Relationships x
 /// A mesh containing nested shells remains a single object. This does not detect
 /// shell nesting, self-intersection or geometric overlap between model objects.
 pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
+    encode_3mf_inner(bodies, false)
+}
+
+/// Fixed colours (R, G, B) given to bodies in order, repeating after the last one.
+pub const BODY_PALETTE: [[u8; 3]; 8] = [
+    [0xE6, 0x4B, 0x35],
+    [0x4D, 0xBB, 0xD5],
+    [0x00, 0xA0, 0x87],
+    [0xF3, 0x9B, 0x7F],
+    [0x3C, 0x54, 0x88],
+    [0x84, 0x91, 0xB4],
+    [0xB0, 0x9C, 0x85],
+    [0x7E, 0x61, 0x48],
+];
+
+/// Like `encode_3mf`, but every object is named (`NODES_n`) and refers to a
+/// `basematerials` colour from `BODY_PALETTE`. This is the plain 3MF core material
+/// extension; it is not Bambu Studio's own project format (no filament slots).
+/// Whether a slicer maps these colours to filaments has not been checked on a real
+/// printer or slicer.
+pub fn encode_3mf_colored(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
+    encode_3mf_inner(bodies, true)
+}
+
+fn encode_3mf_inner(bodies: &[Mesh], colored: bool) -> Result<Vec<u8>, String> {
     ensure_writable(bodies)?;
     if bodies.is_empty() {
         return Err("3MFに書き出せるモデルがありません。".into());
@@ -1176,6 +1242,19 @@ pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
     let mut model = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"millimeter\" xml:lang=\"ja-JP\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\">\n <resources>\n",
     );
+    // Resource ids: objects use 1..=n, the colour table uses n+1.
+    let material_id = bodies.len() + 1;
+    if colored {
+        model.push_str(&format!("  <basematerials id=\"{material_id}\">\n"));
+        for index in 0..bodies.len() {
+            let [r, g, b] = BODY_PALETTE[index % BODY_PALETTE.len()];
+            model.push_str(&format!(
+                "   <base name=\"NODES_{}\" displaycolor=\"#{r:02X}{g:02X}{b:02X}\"/>\n",
+                index + 1
+            ));
+        }
+        model.push_str("  </basematerials>\n");
+    }
     for (index, body) in bodies.iter().enumerate() {
         let id = index + 1;
         // The model object requires indexed, consistently oriented manifold
@@ -1188,9 +1267,15 @@ pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
                 "3MF オブジェクト {id} の体積が正ではありません。内側の殻を別オブジェクトにせず、面方向を確認してください。"
             ));
         }
-        model.push_str(&format!(
-            "  <object id=\"{id}\" type=\"model\">\n   <mesh>\n    <vertices>\n"
-        ));
+        if colored {
+            model.push_str(&format!(
+                "  <object id=\"{id}\" name=\"NODES_{id}\" type=\"model\" pid=\"{material_id}\" pindex=\"{index}\">\n   <mesh>\n    <vertices>\n"
+            ));
+        } else {
+            model.push_str(&format!(
+                "  <object id=\"{id}\" type=\"model\">\n   <mesh>\n    <vertices>\n"
+            ));
+        }
         // Rust's shortest round-trip representation avoids 6-decimal rounding
         // that could collapse close vertices. Coordinates are checked beforehand.
         for p in &body.vertices {
@@ -1218,6 +1303,61 @@ pub fn encode_3mf(bodies: &[Mesh]) -> Result<Vec<u8>, String> {
         ("_rels/.rels", RELS.as_bytes()),
         ("3D/3dmodel.model", model.as_bytes()),
     ])
+}
+
+/// Binary little-endian PLY, millimetres, `double` coordinates. With `color_bodies`
+/// each vertex carries the body's `BODY_PALETTE` colour as `red green blue` (uchar).
+/// Bodies are written one after another; vertices are not merged between bodies.
+pub fn encode_ply(bodies: &[Mesh], color_bodies: bool) -> Result<Vec<u8>, String> {
+    ensure_writable(bodies)?;
+    let mut vertex_total = 0usize;
+    let mut face_total = 0usize;
+    for body in bodies {
+        vertex_total = vertex_total
+            .checked_add(body.vertices.len())
+            .ok_or("頂点が多すぎます。")?;
+        face_total = face_total
+            .checked_add(body.triangles.len())
+            .ok_or("面が多すぎます。")?;
+    }
+    if u32::try_from(vertex_total).is_err() || u32::try_from(face_total).is_err() {
+        return Err("PLY に書ける頂点・面の数を超えました。".into());
+    }
+    let mut out = Vec::with_capacity(256 + vertex_total * 27 + face_total * 13);
+    out.extend_from_slice(
+        b"ply\nformat binary_little_endian 1.0\ncomment NODES; units: millimeters\n",
+    );
+    out.extend_from_slice(format!("element vertex {vertex_total}\n").as_bytes());
+    out.extend_from_slice(b"property double x\nproperty double y\nproperty double z\n");
+    if color_bodies {
+        out.extend_from_slice(b"property uchar red\nproperty uchar green\nproperty uchar blue\n");
+    }
+    out.extend_from_slice(format!("element face {face_total}\n").as_bytes());
+    out.extend_from_slice(b"property list uchar uint vertex_indices\nend_header\n");
+    for (index, body) in bodies.iter().enumerate() {
+        let color = BODY_PALETTE[index % BODY_PALETTE.len()];
+        for p in &body.vertices {
+            for c in p {
+                out.extend_from_slice(&c.to_le_bytes());
+            }
+            if color_bodies {
+                out.extend_from_slice(&color);
+            }
+        }
+    }
+    let mut offset = 0u32;
+    for body in bodies {
+        for t in &body.triangles {
+            out.push(3);
+            for &v in t {
+                let global = v.checked_add(offset).ok_or("頂点番号が大きすぎます。")?;
+                out.extend_from_slice(&global.to_le_bytes());
+            }
+        }
+        let count = u32::try_from(body.vertices.len()).map_err(|_| "頂点が多すぎます。")?;
+        offset = offset.checked_add(count).ok_or("頂点が多すぎます。")?;
+    }
+    Ok(out)
 }
 
 pub fn crc32(data: &[u8]) -> u32 {
@@ -1450,6 +1590,7 @@ mod batch_commit_tests {
             OutputFormat::StlBinary,
             &base,
             &[mesh.clone(), mesh.clone(), mesh],
+            false,
         )
         .unwrap();
         for target in &targets {
