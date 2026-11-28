@@ -86,7 +86,7 @@ fn cpu_add(
 
     let mut output = Vec::with_capacity(lhs.len());
     for (index, (a, b)) in lhs.iter().zip(rhs).enumerate() {
-        if index % 256 == 0 {
+        if index & 255 == 0 {
             check_cancel(cancel)?;
         }
         if a.iter().chain(b).any(|component| !component.is_finite()) {
@@ -111,7 +111,7 @@ fn matches_reference(
         return Ok(false);
     }
     for (index, (actual, reference)) in actual.iter().zip(reference).enumerate() {
-        if index % 256 == 0 {
+        if index & 255 == 0 {
             check_cancel(cancel)?;
         }
         for (&actual, &reference) in actual.iter().zip(reference) {
@@ -305,7 +305,13 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                add_vectors(a, b, ComputeMode::PreferAccelerator, Some(&mut stub), &cancel),
+                add_vectors(
+                    a,
+                    b,
+                    ComputeMode::PreferAccelerator,
+                    Some(&mut stub),
+                    &cancel
+                ),
                 Err(expected)
             );
         }
