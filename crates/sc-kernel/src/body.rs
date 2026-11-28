@@ -1723,6 +1723,15 @@ impl Body {
         let mut seen = std::collections::HashSet::new();
         self.solid.vertex_iter().filter(|v| seen.insert(v.id())).count()
     }
+    /// Whether this is a native B-rep with at least one closed, oriented shell and
+    /// every shell closed. This is a topology check, not a self-intersection or
+    /// geometric validity certificate; a mesh body never satisfies it.
+    pub fn has_closed_brep_topology(&self) -> bool {
+        !self.is_mesh()
+            && !self.solid.boundaries().is_empty()
+            && self.solid.boundaries().iter().all(|shell| shell.shell_condition() == truck_topology::shell::ShellCondition::Closed)
+    }
+
     /// What is wrong with the body as a solid: shells that aren't closed and consistently
     /// oriented, faces that don't mesh, a volume that isn't positive. Empty when it is sound.
     pub fn validity(&self) -> Vec<String> {

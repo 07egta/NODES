@@ -222,7 +222,7 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::ExactBrepBrep => spec!(
             "面どうしの交線",
-            "2 つの B-rep の面が交わる線（表示メッシュから求める近似の折れ線）。",
+            "閉じた立体は解析面上の残差を検証した近似曲線。開いた面は表示メッシュによる近似の折れ線。",
             "brep brep surface surface intersection bbx ssx 交線",
             Curve,
             [B, B2]

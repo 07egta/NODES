@@ -52,6 +52,8 @@ UI・描画系（egui 0.36 / wgpu。NODES は egui 0.33 なので一切取り込
 例外: vendor の truck は上流 truck のコードであり、内部に panic を含みます。NODES からは
 必ず `solidcraft-kernel` の公開 API（`guard` 済み）経由で呼びます。
 
+- 2026-11-28 (OMEGA 74): `crates/sc-kernel/src/body.rs` に B-rep シェルの閉鎖・方向を確認する公開読み取り API `has_closed_brep_topology` を追加。アルゴリズム本体とライセンスは変更せず、NODES 側の立体演算がメッシュの閉鎖性だけで精密立体と判定しないようにする。
+
 ## NODES側の統合
 
 - 立体ブーリアンが成功して表示メッシュに開きがある場合、NODES は SolidCraft の

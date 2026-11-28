@@ -49,15 +49,20 @@ const MAX_FIT_POINTS: usize = 120;
 
 /// The curves where two closed solids' surfaces cross, from the kernel's boolean: the edges of
 /// the intersection whose history says two faces meet there (truck's intersection curves, held
-/// on both surfaces by Newton projection). Each is sampled finely and fitted with a cubic NURBS
-/// through the samples. An empty list: the solids do not cross.
+/// on both surfaces by Newton projection). Each is sampled and fitted with a cubic NURBS.
+/// Analytic face pairs are checked against both underlying surfaces; other face pairs are
+/// explicitly unsupported here. This is a sampled residual check, not a global certificate.
+/// An empty list means no transverse meet edges were found, not proof of no tangency.
 pub fn exact_intersection(a: &BrepValue, b: &BrepValue, stop: Stop) -> R<Vec<Curve>> {
+    kb::require_closed_brep("面どうしの交線", a, stop)?;
+    kb::require_closed_brep("面どうしの交線", b, stop)?;
     let Some(both) = kernel("面どうしの交線", stop, || {
         sk::boolean(a.body(), b.body(), sk::BoolOp::Intersect)
     })?
     else {
         return Ok(Vec::new());
     };
+    kb::require_brep_topology("面どうしの交線", &both, stop)?;
     meet_curves(&both, stop)
 }
 
@@ -87,14 +92,20 @@ fn meet_curves(body: &Body, stop: Stop) -> R<Vec<Curve>> {
         let mut pts = resample(&raw, MAX_FIT_POINTS);
         // Analytic faces on both sides (planes, cylinders, cones, spheres, tori): pull every
         // sample onto both surfaces by alternating projection.
-        if let [fa, fb, ..] = prov.faces.as_slice()
-            && let (Some(sa), Some(sb)) = (sk::face_surface(body, *fa), sk::face_surface(body, *fb))
-        {
-            for p in &mut pts {
-                *p = onto_both(&sa, &sb, *p);
-            }
+        let [fa, fb] = prov.faces.as_slice() else {
+            return Err("交線の両側の面を特定できません。".into());
+        };
+        let (Some(sa), Some(sb)) = kernel("交線の面", stop, || {
+            Ok((sk::face_surface(body, *fa), sk::face_surface(body, *fb)))
+        })?
+        else {
+            return Err("この自由曲面の交線は両面の残差を検証できないため未対応です。".into());
+        };
+        for p in &mut pts {
+            stopped(stop)?;
+            *p = onto_both(&sa, &sb, *p);
         }
-        fit_accurate(&pts, FIT_TOLERANCE, 4, &mut curves, stop)?;
+        fit_accurate(&pts, FIT_TOLERANCE, 4, (&sa, &sb), &mut curves, stop)?;
     }
     Ok(curves)
 }
@@ -162,34 +173,71 @@ fn resample(pts: &[P3], count: usize) -> Vec<P3> {
 /// How far a fitted intersection curve may stray from its samples (mm).
 pub const FIT_TOLERANCE: f64 = 1e-4;
 
-/// Fit the samples with cubic NURBS pieces that stay within `tolerance` of them: a piece that
-/// strays is split in half (up to `depth` times), and the last resort is the samples' polyline.
+/// Fit the samples, splitting an inadequate fit. Even the degree-one fallback must
+/// satisfy the two-surface residual test (including interior points of each span).
 fn fit_accurate(
     pts: &[P3],
     tolerance: f64,
     depth: usize,
+    surfaces: (&sk::FaceSurface, &sk::FaceSurface),
     out: &mut Vec<Curve>,
     stop: Stop,
 ) -> R<()> {
     stopped(stop)?;
     let fitted = fit_points(pts, stop)?;
-    if deviation(&fitted, pts, stop)? <= tolerance {
+    if deviation(&fitted, pts, stop)? <= tolerance
+        && surface_residual(&fitted, surfaces, stop)? <= tolerance
+    {
         out.push(fitted);
         return Ok(());
     }
     if depth == 0 || pts.len() < 8 {
-        out.push(kb::curve_value(
+        let polyline = kb::curve_value(
             CurveGeometry::nurbs(NurbsCurve::polyline(pts.to_vec(), false)?),
             stop,
-        )?);
+        )?;
+        let residual = surface_residual(&polyline, surfaces, stop)?;
+        if residual > tolerance || deviation(&polyline, pts, stop)? > tolerance {
+            return Err(format!(
+                "交線の近似が許容誤差 {tolerance} mm を満たしません（両面残差 {residual} mm）。"
+            ));
+        }
+        out.push(polyline);
         return Ok(());
     }
     let mid = pts.len() / 2;
     let (Some(first), Some(second)) = (pts.get(..=mid), pts.get(mid..)) else {
-        return Ok(());
+        return Err("交線を分割できません。".into());
     };
-    fit_accurate(first, tolerance, depth - 1, out, stop)?;
-    fit_accurate(second, tolerance, depth - 1, out, stop)
+    fit_accurate(first, tolerance, depth - 1, surfaces, out, stop)?;
+    fit_accurate(second, tolerance, depth - 1, surfaces, out, stop)
+}
+
+/// Sample both surfaces at fixed subdivisions of every Bézier span. This estimates
+/// residual; it does not certify the entire continuous span or trimmed-face membership.
+fn surface_residual(
+    curve: &Curve,
+    (a, b): (&sk::FaceSurface, &sk::FaceSurface),
+    stop: Stop,
+) -> R<f64> {
+    let (pieces, _) = kb::curve_pieces(curve, stop)?;
+    let mut worst = 0.0f64;
+    for piece in &pieces {
+        stopped(stop)?;
+        let n = 16 * piece.degree().max(1);
+        for i in 0..=n {
+            let p = v3(piece.point_at(i as f64 / n as f64));
+            for surface in [a, b] {
+                let q = surface.nearest(p).ok_or("交線の面への投影ができません。")?;
+                let d = q.dist(p);
+                if !d.is_finite() {
+                    return Err("交線の残差が有限ではありません。".into());
+                }
+                worst = worst.max(d);
+            }
+        }
+    }
+    Ok(worst)
 }
 
 /// Largest distance from the points to the curve (to its fine polyline).
@@ -197,6 +245,7 @@ fn deviation(c: &Curve, points: &[P3], stop: Stop) -> R<f64> {
     let dense = kb::sample_curve(c, 24, stop)?;
     let mut worst = 0f64;
     for p in points {
+        stopped(stop)?;
         let mut best = f64::INFINITY;
         for w in dense.windows(2) {
             let (Some(a), Some(b)) = (w.first(), w.get(1)) else {
@@ -264,6 +313,7 @@ pub fn fit_points(points: &[P3], stop: Stop) -> R<Curve> {
 /// Cut a solid with the horizontal plane `z = height` and keep the part below (`keep_above` false)
 /// or above. The cut face is exact (the plane).
 pub fn trim_by_plane(b: &BrepValue, height: f64, keep_above: bool, stop: Stop) -> R<BrepValue> {
+    kb::require_closed_brep("平面で切る", b, stop)?;
     if !height.is_finite() || height.abs() > kb::limits::MAX_COORDINATE {
         return Err("切る高さが無効です。".into());
     }
@@ -282,12 +332,12 @@ pub fn trim_by_plane(b: &BrepValue, height: f64, keep_above: bool, stop: Stop) -
                 Some(acc) => kernel("平面で切る", stop, || {
                     sk::boolean(&acc, &part, sk::BoolOp::Union)
                 })?
-                .unwrap_or(acc),
+                .ok_or("平面で切る: 複数の部分を結合できませんでした。")?,
             });
         }
     }
     match best {
-        Some(body) => brep(body, stop),
+        Some(body) => kb::solid_result("平面で切る", body, stop),
         None => Err(format!(
             "平面 z = {height} の{}に残る部分がありません。高さを変えてください。",
             if keep_above { "上" } else { "下" }
@@ -299,6 +349,7 @@ pub fn trim_by_plane(b: &BrepValue, height: f64, keep_above: bool, stop: Stop) -
 /// thickened inward (`thicken`, exact for planes and cylinders, fitted within 0.01 mm otherwise).
 pub fn shell_curved(b: &BrepValue, thickness: f64, open: usize, stop: Stop) -> R<BrepValue> {
     let t = positive("厚み", thickness)?;
+    kb::require_closed_brep("シェル", b, stop)?;
     if open >= b.face_count() {
         return Err(format!(
             "面番号 {open} はありません（0〜{}）。",
@@ -311,7 +362,7 @@ pub fn shell_curved(b: &BrepValue, thickness: f64, open: usize, stop: Stop) -> R
     let solid = kernel("シェル（厚みづけ）", stop, || {
         sk::thicken(&sheet, -t, false)
     })?;
-    brep(solid, stop)
+    kb::solid_result("シェル", solid, stop)
 }
 
 /// The number of the highest face (the usual one to open for a cup).
@@ -330,6 +381,7 @@ pub fn top_face(b: &BrepValue, stop: Stop) -> R<usize> {
 /// Fillet one straight edge with radius `r0` at its start and `r1` at its end.
 pub fn fillet_variable(b: &BrepValue, edge: usize, r0: f64, r1: f64, stop: Stop) -> R<BrepValue> {
     let (r0, r1) = (positive("始点の半径", r0)?, positive("終点の半径", r1)?);
+    kb::require_closed_brep("可変フィレット", b, stop)?;
     let edges = kernel("稜線の取得", stop, || {
         b.body().edges(tol::chord(b.body().size()))
     })?;
@@ -344,7 +396,7 @@ pub fn fillet_variable(b: &BrepValue, edge: usize, r0: f64, r1: f64, stop: Stop)
         sk::fillet_variable(b.body(), e.mid, start, r0, r1)
     })
     .map_err(|m| format!("{m}（可変フィレットは今のところ直線の稜線に対応しています。）"))?;
-    brep(body, stop)
+    kb::solid_result("可変フィレット", body, stop)
 }
 
 /// Every face offset by `distance` along its outward normal (negative: inward), as one sheet.
