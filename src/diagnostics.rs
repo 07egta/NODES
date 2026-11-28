@@ -14,6 +14,13 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
+#[path = "diagnostic_inputs.rs"]
+mod inputs;
+pub use inputs::{
+    FailureInput, InputCheck, InputIssue, InputState, InputTransform, MAX_INPUT_PREVIEW_WORK,
+    SourceResult, inspect_failure_inputs,
+};
+
 pub const DIAGNOSTIC_SCHEMA_VERSION: u32 = 1;
 /// Exact counts are retained when the display/API relationship lists are shortened.
 pub const MAX_REPORTED_ROOTS: usize = 64;

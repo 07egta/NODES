@@ -2980,6 +2980,7 @@ impl eframe::App for NodesApp {
         if let Some(id) = self.diagnostics_window.show(
             ctx,
             self.diagnostics.as_ref(),
+            self.evaluation.as_ref(),
             &self.project.graph,
             stale,
             self.revision,

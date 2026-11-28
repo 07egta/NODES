@@ -2,10 +2,15 @@
 //!
 //! Rendering does not evaluate nodes or rebuild the dependency graph. Navigation
 //! uses current node IDs and labels; stale snapshots cannot change the selection.
-use crate::{theme, ui_polish};
+use crate::{data_view, theme, ui_polish};
 use eframe::egui::{self, RichText};
 use nodes::{
-    diagnostics::{DiagnosticReport, NodeFailure, NodeRef},
+    data_tree::PortTransform,
+    diagnostics::{
+        DiagnosticReport, InputCheck, InputIssue, InputState, InputTransform, NodeFailure,
+        NodeRef, SourceResult, inspect_failure_inputs,
+    },
+    engine::Evaluation,
     model::{Graph, Node, NodeId},
 };
 use std::collections::BTreeMap;
@@ -22,6 +27,7 @@ pub struct DiagnosticsWindow {
     pages: [usize; 5],
     node_index: BTreeMap<NodeId, usize>,
     index_revision: Option<u64>,
+    inspect_target: Option<NodeId>,
 }
 
 impl DiagnosticsWindow {
@@ -30,6 +36,7 @@ impl DiagnosticsWindow {
         &mut self,
         ctx: &egui::Context,
         report: Option<&DiagnosticReport>,
+        evaluation: Option<&Evaluation>,
         graph: &Graph,
         stale: bool,
         revision: u64,
@@ -46,6 +53,7 @@ impl DiagnosticsWindow {
                 .collect();
             self.index_revision = Some(revision);
             self.pages = [0; 5];
+            self.inspect_target = None;
         }
         let nodes = IndexedNodes {
             graph,
@@ -150,8 +158,23 @@ impl DiagnosticsWindow {
                                 &mut self.pages[4],
                             );
                         } else {
-                            selected =
-                                show_errors(ui, report, &nodes, stale, &filter, &mut self.pages);
+                            let inspected = if !stale && report.graph_error.is_none() {
+                                evaluation.and_then(|evaluation| {
+                                    show_inspection(ui, &nodes, evaluation, &mut self.inspect_target)
+                                })
+                            } else {
+                                None
+                            };
+                            selected = show_errors(
+                                ui,
+                                report,
+                                &nodes,
+                                stale,
+                                &filter,
+                                &mut self.pages,
+                                &mut self.inspect_target,
+                            )
+                            .or(inspected);
                         }
                     });
             });
@@ -355,6 +378,7 @@ fn show_errors(
     stale: bool,
     filter: &NodeFilter,
     pages: &mut [usize; 5],
+    inspect_target: &mut Option<NodeId>,
 ) -> Option<NodeId> {
     let mut selected = None;
     if let Some(error) = &report.graph_error {
@@ -402,6 +426,7 @@ fn show_errors(
                                 "下流のエラー {} ノード",
                                 failure.affected_count
                             )));
+                            inspect_button(ui, failure.node.id, stale, inspect_target);
                         });
                         ui.label(RichText::new(&failure.message).color(theme::error()));
                         if failure.message_truncated {
@@ -448,7 +473,8 @@ fn show_errors(
             );
             for &index in &matching[range] {
                 let failure = &report.blocked_nodes[index];
-                if let Some(id) = blocked_failure(ui, report, failure, nodes, stale) {
+                if let Some(id) = blocked_failure(ui, report, failure, nodes, stale, inspect_target)
+                {
                     selected = Some(id);
                 }
             }
@@ -493,12 +519,14 @@ fn blocked_failure(
     failure: &NodeFailure,
     nodes: &IndexedNodes<'_>,
     stale: bool,
+    inspect_target: &mut Option<NodeId>,
 ) -> Option<NodeId> {
     let mut selected = None;
     ui.push_id(("blocked_error", failure.node.id), |ui| {
         if node_link(ui, nodes, &failure.node, stale) {
             selected = Some(failure.node.id);
         }
+        inspect_button(ui, failure.node.id, stale, inspect_target);
         ui.label(theme::small(&failure.message));
         if failure.message_truncated {
             ui.label(theme::small("長いメッセージの一部を省略しています。"));
@@ -524,6 +552,158 @@ fn blocked_failure(
         ui.add_space(6.);
     });
     selected
+}
+
+fn inspect_button(
+    ui: &mut egui::Ui,
+    id: NodeId,
+    stale: bool,
+    target: &mut Option<NodeId>,
+) {
+    if ui
+        .add_enabled(!stale, egui::Button::new("入力の詳細").small())
+        .clicked()
+    {
+        *target = Some(id);
+    }
+}
+
+fn show_inspection(
+    ui: &mut egui::Ui,
+    nodes: &IndexedNodes<'_>,
+    evaluation: &Evaluation,
+    target: &mut Option<NodeId>,
+) -> Option<NodeId> {
+    let id = (*target)?;
+    let node = nodes.node(id)?;
+    let inputs = inspect_failure_inputs(nodes.graph, evaluation, id)?;
+    let mut selected = None;
+    ui.push_id(("failure_input_inspection", id), |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new("入力の確認").strong());
+            if node_link(ui, nodes, &NodeRef::from(node), false) {
+                selected = Some(id);
+            }
+            if ui.small_button("閉じる").clicked() {
+                *target = None;
+            }
+        });
+        ui.label(theme::small(
+            "入力元の実データ（ツリー変換・照合前）です。候補は原因の確定ではありません。",
+        ));
+        if inputs.is_empty() {
+            ui.label(theme::small("公開された入力ポートはありません。"));
+        }
+        for input in inputs {
+            ui.push_id(input.key, |ui| {
+                ui.separator();
+                ui.label(RichText::new(format!("{} · {}", input.label, input.expected.label())).strong());
+                match input.state {
+                    InputState::Connected { source, result } => {
+                        if let Some(source_node) = nodes.node(source) {
+                            if node_link(ui, nodes, &NodeRef::from(source_node), false) {
+                                selected = Some(source);
+                            }
+                        } else {
+                            ui.label(format!("入力元 #{source}"));
+                        }
+                        match result {
+                            SourceResult::Available(tree) => {
+                                ui.label(theme::small(format!(
+                                    "入力元の出力: {} 枝 / {} 要素",
+                                    tree.branches.len(),
+                                    tree.item_count(),
+                                )));
+                                if tree.item_count() == 0 {
+                                    ui.label(theme::small(
+                                        "空のデータです。空の出力自体はエラーではありません。",
+                                    ));
+                                }
+                                egui::CollapsingHeader::new("入力元のデータを見る")
+                                    .id_salt("source_values")
+                                    .show(ui, |ui| {
+                                        data_view::show_tree(ui, tree, "diagnostic_input", 180.);
+                                    });
+                            }
+                            SourceResult::Failed => {
+                                ui.colored_label(theme::error(), "入力元が失敗しています。");
+                                ui.label(theme::small("まず入力元のエラーを確認してください。"));
+                            }
+                            SourceResult::NotEvaluated => {
+                                ui.label(theme::small("入力元の計算結果はまだありません。"));
+                            }
+                        }
+                    }
+                    InputState::LocalNumber(value) => {
+                        ui.label(format!("接続なし · 設定値 {value:e}"));
+                    }
+                    InputState::MissingRequired => {
+                        ui.colored_label(theme::error(), "必要な入力が未接続です。");
+                        ui.label(theme::small(format!(
+                            "{} 型を出力する適切なノードを接続してください。",
+                            input.expected.label()
+                        )));
+                    }
+                    InputState::OptionalUnconnected => {
+                        ui.label(theme::small("任意入力 · 接続なし"));
+                    }
+                    InputState::ClusterDefault => {
+                        ui.label(theme::small("まとめノードの内部既定値を使用します。"));
+                    }
+                }
+                match input.transform {
+                    InputTransform::Configured(PortTransform::None) => {}
+                    InputTransform::Configured(transform) => {
+                        ui.label(theme::small(format!(
+                            "ポート変換: {transform:?}（上の表示には未適用）"
+                        )));
+                    }
+                    InputTransform::Invalid => {
+                        ui.colored_label(theme::error(), "ポート変換の設定が無効です。");
+                    }
+                    InputTransform::Custom => {
+                        ui.label(theme::small("独自の入力処理を行うノードです。"));
+                    }
+                }
+                show_input_check(ui, input.check);
+            });
+        }
+        ui.separator();
+    });
+    selected
+}
+
+fn show_input_check(ui: &mut egui::Ui, check: InputCheck<'_>) {
+    match check {
+        InputCheck::Issue { path, index, issue } => {
+            if let (Some(path), Some(index)) = (path, index) {
+                ui.label(theme::small(format!(
+                    "確認位置: {}[{index}]",
+                    data_view::path_text(path)
+                )));
+            }
+            let hint = match issue {
+                InputIssue::TypeMismatch(actual) => format!(
+                    "現在の型は {} です。入力元または型変換ノードを確認してください。",
+                    actual.label()
+                ),
+                InputIssue::NonFinite => "有限な数値を指定してください。".into(),
+                InputIssue::OutOfRange { value, min, max } => {
+                    format!("値 {value:e} を {min:e} 〜 {max:e} の範囲にしてください。")
+                }
+                InputIssue::NonInteger(value) => {
+                    format!("値 {value:e} を整数にしてください。")
+                }
+            };
+            ui.colored_label(theme::error(), hint);
+        }
+        InputCheck::NoIssueInPreview { limited: true } => {
+            ui.label(theme::small(
+                "先頭の一部だけを確認しました。残りはデータ表示から確認できます。",
+            ));
+        }
+        InputCheck::NoIssueInPreview { limited: false } | InputCheck::NotChecked => {}
+    }
 }
 
 fn node_link(ui: &mut egui::Ui, nodes: &IndexedNodes<'_>, node: &NodeRef, stale: bool) -> bool {
@@ -572,7 +752,7 @@ mod tests {
                 ..Default::default()
             };
             let _ = ctx.run(input, |ctx| {
-                window.show(ctx, Some(&report), &graph, false, 1);
+                window.show(ctx, Some(&report), Some(&evaluation), &graph, false, 1);
             });
             widths.push(ctx.memory(|memory| {
                 memory
