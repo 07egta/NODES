@@ -80,8 +80,7 @@ type Magnitude = [u64; LIMBS];
 fn parts(x: f64) -> (u64, usize, bool) {
     let bits = x.to_bits();
     let exponent = ((bits >> 52) & 0x7ff) as usize;
-    let mantissa = (bits & ((1_u64 << 52) - 1))
-        | if exponent == 0 { 0 } else { 1_u64 << 52 };
+    let mantissa = (bits & ((1_u64 << 52) - 1)) | if exponent == 0 { 0 } else { 1_u64 << 52 };
     (mantissa, exponent.saturating_sub(1), bits >> 63 != 0)
 }
 
