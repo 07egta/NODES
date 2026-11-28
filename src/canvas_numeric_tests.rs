@@ -252,3 +252,54 @@ fn canvas_numeric_focus_follows_node_and_port_when_order_and_slider_assignment_c
     );
     assert_eq!(test.project.graph.node(source).unwrap().params["value"], 1.);
 }
+
+#[test]
+fn passive_canvas_render_does_not_materialize_missing_defaults() {
+    let mut graph = Graph::default();
+    let number = graph.add(NodeKind::Number, [40., 40.]).unwrap();
+    let helix = graph.add(NodeKind::Helix, [380., 40.]).unwrap();
+    graph.node_mut(number).unwrap().params.clear();
+    graph.node_mut(helix).unwrap().params.clear();
+    graph.validate().unwrap();
+    let mut test = CanvasTest::new(graph, 1.);
+    let before = test.project.clone();
+    for zoom in [0.7, 1., 1.8, 1.] {
+        test.project.zoom = zoom;
+        for _ in 0..5 {
+            test.frame(vec![]);
+        }
+        assert_eq!(test.project.graph, before.graph);
+        assert!(persistence::same_parameter_bits(
+            &test.project.graph,
+            &before.graph
+        ));
+    }
+    test.focus_number(number, 0);
+    test.enter("-0");
+    let params = &test.project.graph.node(number).unwrap().params;
+    assert_eq!(params.len(), 1);
+    assert_eq!(params["value"].to_bits(), (-0.0_f64).to_bits());
+    assert!(test.project.graph.node(helix).unwrap().params.is_empty());
+}
+
+#[test]
+fn hundred_node_canvas_repeated_idle_frames_preserve_graph() {
+    let mut graph = Graph::default();
+    for i in 0..120 {
+        let id = graph
+            .add(
+                NodeKind::Number,
+                [(i % 12) as f32 * 250., (i / 12) as f32 * 150.],
+            )
+            .unwrap();
+        graph.node_mut(id).unwrap().params.clear();
+    }
+    let mut test = CanvasTest::new(graph, 0.7);
+    let before = test.project.graph.clone();
+    for i in 0..30 {
+        test.project.pan = [-(i as f32) * 30., -(i as f32) * 15.];
+        test.frame(vec![]);
+    }
+    assert_eq!(test.project.graph, before);
+    test.project.validate().unwrap();
+}
