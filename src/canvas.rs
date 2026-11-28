@@ -7,7 +7,7 @@ use eframe::egui::{self, Align2, Color32, FontId, Id, Pos2, Rect, Sense, Shape, 
 use nodes::{
     annotations::{self, GROUP_COLORS, MAX_GROUP_NAME_BYTES, MAX_NOTE_BYTES},
     engine::Evaluation,
-    model::{InputSpec, Node, NodeId, NodeKind},
+    model::{DataType, Graph, InputSpec, Node, NodeId, NodeKind},
     persistence::Project,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -306,6 +306,137 @@ fn input_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Po
     )
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WireStatus {
+    Compatible,
+    TypeMismatch,
+    Cycle,
+}
+
+impl WireStatus {
+    fn message(self) -> &'static str {
+        match self {
+            Self::Compatible => "接続できます",
+            Self::TypeMismatch => "入力と出力の型が合いません。",
+            Self::Cycle => "循環する接続はできません。",
+        }
+    }
+}
+
+/// All ancestors of the output, including itself. Connecting its output to any
+/// of these nodes would create a cycle. Walk once per active frame, not once per port.
+fn wire_ancestors(graph: &Graph, indices: &NodeIndices, source: NodeId) -> BTreeSet<NodeId> {
+    let mut blocked = BTreeSet::new();
+    let mut pending = vec![source];
+    while let Some(id) = pending.pop() {
+        if blocked.insert(id)
+            && let Some(index) = indices.get(id)
+        {
+            pending.extend(graph.nodes[index].inputs.values().copied());
+        }
+    }
+    blocked
+}
+
+fn wire_status(
+    source: DataType,
+    blocked: &BTreeSet<NodeId>,
+    node: NodeId,
+    spec: &InputSpec,
+) -> WireStatus {
+    if blocked.contains(&node) {
+        WireStatus::Cycle
+    } else if !spec.kind.accepts(source) {
+        WireStatus::TypeMismatch
+    } else {
+        WireStatus::Compatible
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WireTarget {
+    node: NodeId,
+    key: &'static str,
+    position: Pos2,
+    status: WireStatus,
+    linked: bool,
+}
+
+/// The nearest visible input wins, even if invalid. Never jump past an invalid
+/// socket to replace a different, compatible connection. Ties use stable IDs.
+fn nearest_wire_target(
+    p: &Project,
+    rect: Rect,
+    pointer: Pos2,
+    source: DataType,
+    blocked: &BTreeSet<NodeId>,
+) -> Option<WireTarget> {
+    if !rect.contains(pointer) {
+        return None;
+    }
+    let radius = (12. * p.zoom).max(16.);
+    let mut nearest: Option<(f32, WireTarget)> = None;
+    for node in &p.graph.nodes {
+        let bounds = Rect::from_min_size(
+            to_screen(node.position, rect, p.pan, p.zoom),
+            node_size(node) * p.zoom,
+        );
+        if !bounds.expand(radius).contains(pointer) {
+            continue;
+        }
+        for (index, spec) in node.kind.spec().inputs.iter().enumerate() {
+            let position = input_pos(node, index, rect, p.pan, p.zoom);
+            if !rect.contains(position) {
+                continue;
+            }
+            let distance = (position - pointer).length_sq();
+            if distance > radius * radius {
+                continue;
+            }
+            let target = WireTarget {
+                node: node.id,
+                key: spec.key,
+                position,
+                status: wire_status(source, blocked, node.id, spec),
+                linked: node.inputs.contains_key(spec.key),
+            };
+            if nearest.is_none_or(|(best, previous)| {
+                distance < best
+                    || (distance == best
+                        && (target.node, target.key) < (previous.node, previous.key))
+            }) {
+                nearest = Some((distance, target));
+            }
+        }
+    }
+    nearest.map(|(_, target)| target)
+}
+
+/// Insert a relay only on the exact live edge; a failed edit preserves both
+/// its previous connection and the next ID (so it creates no undo entry).
+fn insert_reroute(
+    graph: &mut Graph,
+    from: NodeId,
+    to: NodeId,
+    key: &str,
+    position: [f32; 2],
+) -> Result<NodeId, String> {
+    if graph.node(to).and_then(|n| n.inputs.get(key)) != Some(&from) {
+        return Err("配線が変更されたため、中継点を追加できません。".into());
+    }
+    let next_id = graph.next_id;
+    let id = graph.add(NodeKind::Reroute, position)?;
+    if let Err(error) = graph
+        .connect(from, id, "value")
+        .and_then(|()| graph.connect(id, to, key))
+    {
+        graph.remove(id);
+        graph.next_id = next_id;
+        return Err(error);
+    }
+    Ok(id)
+}
+
 impl GraphCanvas {
     /// Discard gestures that refer to a previous graph snapshot.
     pub fn restore_graph(&mut self, graph: &nodes::model::Graph) {
@@ -518,6 +649,13 @@ impl GraphCanvas {
             self.fit_requested = false;
         }
         let pointer = ui.input(|i| i.pointer.hover_pos());
+        // Cancel before processing any release in the same frame.
+        let cancel_wire = ui.input(|i| i.key_pressed(egui::Key::Escape));
+        if cancel_wire {
+            self.connecting = None;
+            self.wire_drag = false;
+            self.box_start = None;
+        }
         let map_rect = (!self.hide_minimap
             && p.graph.nodes.len() >= 10
             && rect.width() >= 340.
@@ -610,7 +748,7 @@ impl GraphCanvas {
         });
         self.draw_groups(ui, &painter, p, rect);
         self.draw_notes(ui, &painter, p, rect);
-        if response.clicked() && !card_under {
+        if response.clicked() && !card_under && !self.wire_drag {
             if !ui.input(|i| i.modifiers.shift) {
                 self.selected.clear();
             }
@@ -618,7 +756,12 @@ impl GraphCanvas {
                 self.box_start = None;
             }
         }
-        if response.drag_started_by(egui::PointerButton::Primary) && !card_under && !pan_active {
+        if response.drag_started_by(egui::PointerButton::Primary)
+            && !card_under
+            && !pan_active
+            && self.connecting.is_none()
+            && !cancel_wire
+        {
             self.box_start = pointer;
             self.box_base = if ui.input(|i| i.modifiers.shift) {
                 self.selected.clone()
@@ -720,6 +863,23 @@ impl GraphCanvas {
                 }
             }
         }
+        // The source snapshot belongs to the gesture already in progress, not
+        // an output that might be clicked later during this frame's card loop.
+        let active_source = self
+            .connecting
+            .and_then(|id| self.node_indices.get(id))
+            .map(|index| &p.graph.nodes[index])
+            .map(|node| (node.id, node.kind.spec().output));
+        let blocked = active_source.map_or_else(BTreeSet::new, |(id, _)| {
+            wire_ancestors(&p.graph, &self.node_indices, id)
+        });
+        let wire_target = if !over_map && !pan_active {
+            active_source.and_then(|(_, source)| {
+                pointer.and_then(|pos| nearest_wire_target(p, rect, pos, source, &blocked))
+            })
+        } else {
+            None
+        };
         // Avoid cloning invisible nodes, including potentially large script strings.
         let cards: Vec<_> = p
             .graph
@@ -802,7 +962,12 @@ impl GraphCanvas {
                 body.on_hover_text("リルート点 · ドラッグで移動 · Delete で削除");
                 let linked = n.inputs.contains_key("value");
                 let ip = input_pos(n, 0, rect, p.pan, p.zoom);
-                let port_col = theme::port_color(nodes::model::DataType::Any);
+                let can = active_source.map(|_| !blocked.contains(&n.id));
+                let port_col = match can {
+                    Some(true) => theme::teal(),
+                    Some(false) => theme::muted(),
+                    None => theme::port_color(DataType::Any),
+                };
                 melt::port_marker(
                     &painter,
                     ip,
@@ -817,10 +982,10 @@ impl GraphCanvas {
                     Id::new(("in", n.id, "value")),
                     Sense::click_and_drag(),
                 );
-                if !over_map
-                    && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
-                    && self.connecting.is_some()
-                {
+                if can == Some(true) {
+                    painter.circle_stroke(ip, 8. * p.zoom, Stroke::new(1.4_f32, theme::teal()));
+                }
+                if !over_map && !self.wire_drag && pr.clicked() && active_source.is_some() {
                     to_connect = self.connecting.take().map(|from| (from, n.id, "value"));
                 }
                 if pr.secondary_clicked() && linked && !over_map {
@@ -841,10 +1006,10 @@ impl GraphCanvas {
                     Id::new(("out", n.id)),
                     Sense::click_and_drag(),
                 );
-                if !over_map && (or.clicked() || or.drag_started()) {
+                if !over_map && !cancel_wire && (or.clicked() || or.drag_started()) {
                     self.connecting = Some(n.id);
                 }
-                if !over_map && or.drag_started() {
+                if !over_map && !cancel_wire && or.drag_started() {
                     self.wire_drag = true;
                 }
                 continue;
@@ -1077,11 +1242,9 @@ impl GraphCanvas {
             for (index, spec) in n.kind.spec().inputs.iter().enumerate() {
                 let ip = input_pos(n, index, rect, p.pan, p.zoom);
                 let linked = n.inputs.contains_key(spec.key);
-                let can = self
-                    .connecting
-                    .and_then(|id| self.node_indices.get(id))
-                    .map(|i| &p.graph.nodes[i])
-                    .map(|v| v.id != n.id && spec.kind.accepts(v.kind.spec().output));
+                let status = active_source
+                    .map(|(_, source)| wire_status(source, &blocked, n.id, spec));
+                let can = status.map(|status| status == WireStatus::Compatible);
                 let port_col = if can == Some(false) {
                     theme::muted()
                 } else if can == Some(true) {
@@ -1109,10 +1272,7 @@ impl GraphCanvas {
                     Id::new(("in", n.id, spec.key)),
                     Sense::click_and_drag(),
                 );
-                if !over_map
-                    && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
-                    && self.connecting.is_some()
-                {
+                if !over_map && !self.wire_drag && pr.clicked() && active_source.is_some() {
                     to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
                 }
                 if !over_map {
@@ -1129,12 +1289,11 @@ impl GraphCanvas {
                     "{} · {}{}{}",
                     spec.label,
                     spec.kind.label(),
-                    if can == Some(false) {
-                        "\n現在の出力と型が合わないか、同じノードです。"
-                    } else if can == Some(true) {
-                        "\n接続候補（循環の有無は接続時に確認）"
-                    } else {
-                        ""
+                    match status {
+                        Some(WireStatus::Compatible) => "\n接続できます",
+                        Some(WireStatus::Cycle) => "\n循環する接続はできません。",
+                        Some(WireStatus::TypeMismatch) => "\n入力と出力の型が合いません。",
+                        None => "",
                     },
                     if linked {
                         "\n右クリックで切断"
@@ -1251,10 +1410,10 @@ impl GraphCanvas {
                 Id::new(("out", n.id)),
                 Sense::click_and_drag(),
             );
-            if !over_map && (or.clicked() || or.drag_started()) {
+            if !over_map && !cancel_wire && (or.clicked() || or.drag_started()) {
                 self.connecting = Some(n.id);
             }
-            if !over_map && or.drag_started() {
+            if !over_map && !cancel_wire && or.drag_started() {
                 self.wire_drag = true;
             }
             let shape = evaluation
@@ -1308,6 +1467,28 @@ impl GraphCanvas {
                 .on_hover_text(message);
             }
         }
+        // egui captures the pointer for the output widget during a drag, so
+        // Response::hovered on the target is not a reliable release test.
+        if self.wire_drag && !ui.input(|i| i.pointer.primary_down()) {
+            self.wire_drag = false;
+            if let Some(from) = self.connecting.take()
+                && ui.input(|i| i.pointer.primary_released())
+                && !pan_active
+                && !over_map
+            {
+                if let Some(target) = wire_target {
+                    if target.status == WireStatus::Compatible {
+                        to_connect = Some((from, target.node, target.key));
+                    } else {
+                        out.error = Some(target.status.message().into());
+                    }
+                } else if !card_under
+                    && let Some(at) = pointer.filter(|pos| rect.contains(*pos))
+                {
+                    out.drop_wire = Some((from, to_world(at, rect, p.pan, p.zoom)));
+                }
+            }
+        }
         if let Some((from, to, key)) = to_connect
             && let Err(e) = p.graph.connect(from, to, key)
         {
@@ -1319,45 +1500,45 @@ impl GraphCanvas {
         if let Some((from, to, key, at)) = to_insert {
             let world = to_world(at, rect, p.pan, p.zoom);
             let position = [world[0] - DOT_W / 2., world[1] - DOT_H / 2.];
-            match p.graph.add(NodeKind::Reroute, position) {
-                Ok(id) => {
-                    let linked = p
-                        .graph
-                        .connect(from, id, "value")
-                        .and_then(|()| p.graph.connect(id, to, &key));
-                    match linked {
-                        Ok(()) => self.select_only(id),
-                        Err(e) => {
-                            p.graph.nodes.retain(|m| m.id != id);
-                            out.error = Some(e);
-                        }
-                    }
-                }
+            match insert_reroute(&mut p.graph, from, to, &key, position) {
+                Ok(id) => self.select_only(id),
                 Err(e) => out.error = Some(e),
-            }
-        }
-        // A wire released on empty canvas (not on a port or a card) opens the node search,
-        // and the chosen node gets connected to the wire's source.
-        if self.wire_drag && !ui.input(|i| i.pointer.primary_down()) {
-            self.wire_drag = false;
-            let source = self.connecting.take();
-            if !card_under
-                && let Some(at) = pointer.filter(|pos| rect.contains(*pos))
-                && let Some(from) = source
-            {
-                out.drop_wire = Some((from, to_world(at, rect, p.pan, p.zoom)));
             }
         }
         if let (Some(id), Some(pointer)) = (self.connecting, pointer)
             && let Some(index) = self.node_indices.get(id)
         {
             let n = &p.graph.nodes[index];
+            let target = wire_target.filter(|_| active_source.is_some_and(|(from, _)| from == id));
+            let end = target.map_or(pointer, |target| target.position);
+            let color = target.map_or_else(theme::teal, |target| {
+                if target.status == WireStatus::Compatible {
+                    theme::teal()
+                } else {
+                    theme::error()
+                }
+            });
             bezier(
                 &painter,
                 output_pos(n, rect, p.pan, p.zoom),
-                pointer,
-                Stroke::new(2_f32, theme::teal()),
+                end,
+                Stroke::new(2_f32, color),
             );
+            if let Some(target) = target {
+                painter.circle_stroke(end, 10., Stroke::new(2_f32, color));
+                let hint = if target.status == WireStatus::Compatible && target.linked {
+                    "接続を置き換えます"
+                } else {
+                    target.status.message()
+                };
+                painter.text(
+                    end + egui::vec2(12., 12.),
+                    Align2::LEFT_TOP,
+                    hint,
+                    FontId::proportional(12.),
+                    color,
+                );
+            }
             painter.text(
                 pointer + egui::vec2(12., -10.),
                 Align2::LEFT_BOTTOM,
@@ -1365,10 +1546,6 @@ impl GraphCanvas {
                 FontId::proportional(12.),
                 theme::port_color(n.kind.spec().output),
             );
-        }
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            self.connecting = None;
-            self.box_start = None;
         }
         if !ui.input(|i| i.pointer.primary_down()) {
             self.dragging = None;
@@ -1423,7 +1600,7 @@ impl GraphCanvas {
             );
         }
         let hint = if self.connecting.is_some() {
-            "入力の丸をクリックして接続  ·  Esc で中止  ·  空いた所で離すと検索して追加"
+            "入力へドラッグして接続  ·  Esc で中止  ·  空いた所で離すと検索して追加"
         } else {
             "ドラッグで移動  ·  ホイールで拡大  ·  中ボタンでパン  ·  線: 細=1個  二重=リスト  点線=ツリー  ·  ? でノード検索"
         };
@@ -1990,6 +2167,82 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
 #[cfg(test)]
 mod premium_tests {
     use super::*;
+
+    #[test]
+    fn wire_candidates_reject_ancestors_and_type_mismatches() {
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let middle = graph.add(NodeKind::Add, [260., 0.]).unwrap();
+        let end = graph.add(NodeKind::Add, [520., 0.]).unwrap();
+        let other = graph.add(NodeKind::Add, [780., 0.]).unwrap();
+        graph.connect(source, middle, "a").unwrap();
+        graph.connect(middle, end, "a").unwrap();
+        let mut indices = NodeIndices::default();
+        indices.update(&graph.nodes);
+        let blocked = wire_ancestors(&graph, &indices, end);
+        assert_eq!(blocked, BTreeSet::from([source, middle, end]));
+        let number_input = &NodeKind::Add.spec().inputs[0];
+        assert_eq!(
+            wire_status(DataType::Number, &blocked, middle, number_input),
+            WireStatus::Cycle
+        );
+        assert_eq!(
+            wire_status(DataType::Mesh, &blocked, other, number_input),
+            WireStatus::TypeMismatch
+        );
+        assert_eq!(
+            wire_status(DataType::Number, &blocked, other, number_input),
+            WireStatus::Compatible
+        );
+    }
+
+    #[test]
+    fn wire_target_is_screen_space_nearest_and_stable() {
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Sphere, [0., 0.]).unwrap();
+        let first = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        let second = graph.add(NodeKind::Reroute, [302., 44.]).unwrap();
+        let mut p = Project::new("wire targeting", graph);
+        p.pan = [0., 0.];
+        p.zoom = 1.;
+        let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(700., 400.));
+        let point = input_pos(p.graph.node(first).unwrap(), 0, rect, p.pan, p.zoom);
+        let blocked = BTreeSet::from([source]);
+        let find = |p: &Project, pos| {
+            nearest_wire_target(p, rect, pos, DataType::Mesh, &blocked)
+        };
+        let target = find(&p, point).unwrap();
+        assert_eq!(target.node, first);
+        assert_eq!(target.key, "a");
+        assert_eq!(target.status, WireStatus::TypeMismatch);
+        // The compatible relay two points away must not steal the invalid socket.
+        let point = input_pos(p.graph.node(second).unwrap(), 0, rect, p.pan, p.zoom);
+        assert_eq!(find(&p, point).unwrap().node, second);
+        p.graph.nodes.reverse();
+        assert_eq!(find(&p, point).unwrap().node, second);
+        assert!(find(&p, egui::pos2(-1., 20.)).is_none());
+        assert!(find(&p, egui::pos2(650., 350.)).is_none());
+    }
+
+    #[test]
+    fn reroute_insertion_keeps_edge_and_id_on_failure() {
+        let mut graph = Graph::default();
+        let from = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let to = graph.add(NodeKind::Add, [400., 0.]).unwrap();
+        graph.connect(from, to, "a").unwrap();
+        let before = graph.clone();
+        assert!(insert_reroute(&mut graph, from, to, "b", [200., 0.]).is_err());
+        assert_eq!(graph, before);
+        assert!(insert_reroute(&mut graph, from, to, "a", [f32::NAN, 0.]).is_err());
+        assert_eq!(graph, before);
+        let relay = insert_reroute(&mut graph, from, to, "a", [200., 0.]).unwrap();
+        assert_eq!(graph.node(relay).unwrap().inputs.get("value"), Some(&from));
+        assert_eq!(graph.node(to).unwrap().inputs.get("a"), Some(&relay));
+        assert!(graph.validate().is_ok());
+        let before = graph.clone();
+        assert!(insert_reroute(&mut graph, from, to, "a", [220., 0.]).is_err());
+        assert_eq!(graph, before);
+    }
 
     #[test]
     fn mixed_card_and_reroute_alignment_uses_visible_bounds() {
