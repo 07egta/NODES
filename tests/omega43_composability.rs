@@ -19,12 +19,18 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
     let abs = g.add(K::Abs, [0.; 2]).unwrap();
     let add = g.add(K::Add, [0.; 2]).unwrap();
     let length = g.add(K::ListLength, [0.; 2]).unwrap();
-    g.node_mut(radius).unwrap().params.insert("value".into(), 10.);
+    g.node_mut(radius)
+        .unwrap()
+        .params
+        .insert("value".into(), 10.);
     g.node_mut(circle)
         .unwrap()
         .params
         .insert("segments".into(), 8.);
-    g.node_mut(array).unwrap().params.insert("count".into(), 13.);
+    g.node_mut(array)
+        .unwrap()
+        .params
+        .insert("count".into(), 13.);
     g.node_mut(add).unwrap().params.insert("b".into(), 1.);
     g.connect(radius, circle, "radius").unwrap();
     g.connect(point, array, "geometry").unwrap();
@@ -34,9 +40,11 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
     g.connect(flatten, reroute, "value").unwrap();
     g.connect(reroute, attractor, "point").unwrap();
     g.connect(circle, attractor, "curve").unwrap();
-    g.connect(attractor, abs, K::Abs.spec().inputs[0].key).unwrap();
+    g.connect(attractor, abs, K::Abs.spec().inputs[0].key)
+        .unwrap();
     g.connect(abs, add, "a").unwrap();
-    g.connect(add, length, K::ListLength.spec().inputs[0].key).unwrap();
+    g.connect(add, length, K::ListLength.spec().inputs[0].key)
+        .unwrap();
 
     let mut evaluator = Evaluator::default();
     for segments in [8., 64.] {
@@ -58,7 +66,13 @@ fn exact_circle_array_and_attractor_are_preview_independent() {
             };
             assert!((p[0].hypot(p[1]) - 10.).abs() < 1e-8);
         }
-        for value in result.outputs[&add].as_ref().unwrap().branches.values().flatten() {
+        for value in result.outputs[&add]
+            .as_ref()
+            .unwrap()
+            .branches
+            .values()
+            .flatten()
+        {
             assert!((value.number().unwrap() - 1.).abs() < 1e-5);
         }
         assert_eq!(
