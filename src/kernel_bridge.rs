@@ -870,7 +870,10 @@ pub fn torus(major: f64, minor: f64, stop: Stop) -> R<BrepValue> {
     stopped(stop)?;
     let (major, minor) = (positive("大半径", major)?, positive("小半径", minor)?);
     if major - minor <= tol::ABS || major + minor > limits::MAX_COORDINATE {
-        return Err("トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。".into());
+        return Err(
+            "トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。"
+                .into(),
+        );
     }
     let body = kernel("トーラス", stop, || sk::torus(Vec3::ZERO, major, minor))?;
     brep(body, stop)
