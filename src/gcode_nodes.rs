@@ -91,7 +91,13 @@ pub fn spec(kind: K) -> &'static NodeSpec {
                 n("bed_z", "ベッド高さ（0=機種の値）", 0., 0., 1000., 1.),
                 n("filament_d", "フィラメント径（0=既定）", 0., 0., 100., 0.05),
                 n("nozzle_d", "ノズル径（0=既定）", 0., 0., 20., 0.05),
-                i("m600_confirmed", "Marlin M600 実機対応確認（1=許可）", 0., 0., 1.)
+                i(
+                    "m600_confirmed",
+                    "Marlin M600 実機対応確認（1=許可）",
+                    0.,
+                    0.,
+                    1.
+                )
             ]
         ),
         K::GcodeSlice => spec!(
