@@ -105,7 +105,10 @@ fn gear_pitch_limits_and_periodicity() {
     let p = &c.points;
     assert_eq!(p.len() % 24, 0);
     let per_tooth = p.len() / 24;
-    let min = p.iter().map(|v| v[0].hypot(v[1])).fold(f64::INFINITY, f64::min);
+    let min = p
+        .iter()
+        .map(|v| v[0].hypot(v[1]))
+        .fold(f64::INFINITY, f64::min);
     let max = p.iter().map(|v| v[0].hypot(v[1])).fold(0., f64::max);
     close(min, 21.5);
     close(max, 26.);

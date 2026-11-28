@@ -189,11 +189,14 @@ fn gear_profile(p: &[f64], stop: &dyn Fn() -> bool) -> Result<Vec<[f64; 3]>, Str
     let pitch = TAU / z;
     let t0 = ((root.max(base) / base).powi(2) - 1.).max(0.).sqrt();
     let t1 = ((tip / base).powi(2) - 1.).sqrt();
-    let half = |t: f64| PI / (2. * z) - thinning / (2. * pitch_r) + involute(alpha.tan()) - involute(t);
+    let half =
+        |t: f64| PI / (2. * z) - thinning / (2. * pitch_r) + involute(alpha.tan()) - involute(t);
     let h0 = half(t0);
     let h1 = half(t1);
     if h1 <= TOL || h0 >= pitch / 2. - TOL {
-        return Err("歯先または歯元の隙間が消失します。歯厚減少・歯数・圧力角を見直してください。".into());
+        return Err(
+            "歯先または歯元の隙間が消失します。歯厚減少・歯数・圧力角を見直してください。".into(),
+        );
     }
     let radial_root = root < base * (1. - TOL);
     let mut points = Vec::with_capacity(z as usize * (2 * steps + 12));
