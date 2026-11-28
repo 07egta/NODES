@@ -118,6 +118,15 @@ fn rename(graph: &mut Graph, id: NodeId, name: &str) {
     }
 }
 
+/// Construct a catalog entry without substituting an unrelated or empty project.
+/// Use this at user-facing load/export boundaries so a failure is visible.
+pub fn create_checked(index: usize) -> Result<Project, String> {
+    let template = TEMPLATES
+        .get(index)
+        .ok_or_else(|| format!("作品例が見つかりません（番号: {index}）"))?;
+    build(index).map_err(|error| format!("作品例「{}」を作成できません: {error}", template.name))
+}
+
 pub fn create(index: usize) -> Project {
     match build(index) {
         Ok(project) => project,
