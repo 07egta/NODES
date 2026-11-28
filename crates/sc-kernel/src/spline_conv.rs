@@ -62,3 +62,10 @@ pub(crate) fn tensor_face(s: &NurbsSurface) -> Result<mt::Face> {
     let wire: mt::Wire = vec![bottom, right, top.inverse(), left.inverse()].into();
     mt::Face::try_new(vec![wire], surface(s)?).map_err(fail)
 }
+
+/// A clamped tensor-product NURBS surface as a single open B-rep face.
+/// No T-mesh, local knot inference, or T-spline refinement is involved.
+pub fn nurbs_sheet(s: &NurbsSurface) -> Result<crate::Body> {
+    let clamped = s.clamped().map_err(fail)?;
+    crate::guard("NURBS sheet", || Ok(crate::surfaces::surface_body(vec![tensor_face(&clamped)?])))
+}
