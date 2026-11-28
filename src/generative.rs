@@ -5,6 +5,8 @@ use crate::model::*;
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 
+mod ornament;
+
 const GEOMETRY: InputSpec = g("geometry", "形状", DataType::Geometry);
 const POINTS: InputSpec = g("points", "点リスト", DataType::Point);
 const GRID: &[InputSpec] = &[
@@ -121,7 +123,7 @@ static MULTIATTRACTOR: NodeSpec = NodeSpec {
 static CURVEATTRACTOR: NodeSpec = NodeSpec {
     label: "曲線アトラクター",
     category: "数値",
-    description: "点から折れ線の各線分への最短距離を計算します。閉曲線の最後の辺も含みます。",
+    description: "精密曲線は最近接パラメータの数値探索、折れ線は各線分への最短距離を計算します。",
     keywords: "curve attractor closest distance 曲線 引力 距離",
     inputs: &[
         g("point", "点", DataType::Point),
@@ -235,7 +237,7 @@ static POPULATE_MESH: NodeSpec = NodeSpec {
 static CURVE_ARRAY: NodeSpec = NodeSpec {
     label: "曲線に沿った配列",
     category: "配列",
-    description: "折れ線の弧長に沿って等間隔に形状を平行移動します。閉曲線の終点重複はありません。方向は変えません。",
+    description: "精密曲線または折れ線の弧長に沿って等間隔に形状を平行移動します。閉曲線の終点重複はありません。方向は変えません。",
     keywords: "curve array length arc distribute 配列 曲線 等間隔",
     inputs: &[
         GEOMETRY,
@@ -299,6 +301,7 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         CurveArray => &CURVE_ARRAY,
         NoiseField => &NOISE_FIELD,
         LifeGrid => &LIFE_GRID,
+        k if ornament::is_kind(k) => ornament::spec(k),
         _ => unreachable!("not a generative node"),
     }
 }
@@ -328,7 +331,7 @@ pub(crate) fn is_kind(kind: NodeKind) -> bool {
             | NodeKind::CurveArray
             | NodeKind::NoiseField
             | NodeKind::LifeGrid
-    )
+    ) || ornament::is_kind(kind)
 }
 pub(crate) fn is_list(kind: NodeKind) -> bool {
     matches!(
@@ -339,6 +342,8 @@ pub(crate) fn is_list(kind: NodeKind) -> bool {
             | NodeKind::MultiAttractor
             | NodeKind::PointArray
             | NodeKind::Delaunay2d
+            | NodeKind::PowerDiagram2d
+            | NodeKind::LloydRelax2d
     )
 }
 
@@ -400,6 +405,9 @@ fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// Predict the expensive item outputs before the engine allocates them.
 pub(crate) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), String> {
     use NodeKind::*;
+    if ornament::is_kind(kind) {
+        return ornament::estimate(kind, a);
+    }
     let n = match kind {
         RectGrid | TriangularGrid | HexGrid | HexPanels | GridArray => count(
             a,
@@ -465,6 +473,9 @@ pub(crate) fn run_item(
 ) -> Result<Vec<Value>, String> {
     use NodeKind::*;
     cancelled(cancel)?;
+    if ornament::is_kind(kind) {
+        return ornament::run_item(kind, a, cancel);
+    }
     match kind {
         RectGrid | TriangularGrid | HexGrid | HexPanels | TriPanels => {
             let nx = count(a, 0, 64)?;
@@ -607,6 +618,11 @@ pub(crate) fn run_item(
             let Some(Value::Curve(c)) = a.get(1) else {
                 return Err("曲線が必要です。".into());
             };
+            if let Some(geometry) = &c.geometry {
+                let t = geometry.closest_parameter(p, cancel)?;
+                let distance = crate::curve_geometry::norm(sub(geometry.point(t)?, p));
+                return Ok(vec![Value::Number(distance)]);
+            }
             if c.points.is_empty() {
                 return Err("曲線に点がありません。".into());
             }
@@ -736,6 +752,9 @@ pub(crate) fn run_list(
     use NodeKind::*;
     cancelled(cancel)?;
     let input = points(list(lists, 0)?)?;
+    if ornament::is_kind(kind) {
+        return ornament::run_list(kind, &input, lists, cancel);
+    }
     if kind == PointArray && list(lists, 1)?.len() != 1 {
         return Err("点配置にはブランチごとに元形状が 1 個必要です。".into());
     }
@@ -1013,6 +1032,26 @@ fn curve_array(
     cancel: &dyn Fn() -> bool,
 ) -> Result<Vec<Value>, String> {
     array_budget(source, n)?;
+    if let Some(geometry) = &c.geometry {
+        let table = geometry.length_table(cancel)?;
+        let total = table.total();
+        if total <= 1e-12 || !total.is_finite() {
+            return Err("曲線の長さがありません。".into());
+        }
+        let divisor = if geometry.closed()? {
+            n
+        } else {
+            n.saturating_sub(1).max(1)
+        };
+        let mut out = Vec::with_capacity(n);
+        for i in 0..n {
+            cancelled(cancel)?;
+            let distance = total * (i as f64 / divisor as f64);
+            let t = table.parameter(geometry, distance, cancel)?;
+            out.push(translated(source, geometry.point(t)?, cancel)?);
+        }
+        return Ok(out);
+    }
     if c.points.len() < 2 {
         return Err("曲線に点が足りません。".into());
     }

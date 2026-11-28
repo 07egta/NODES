@@ -40,6 +40,14 @@ fn curve_and_generation_ports_describe_their_actual_adapters() {
         (NodeKind::CurvePolyline, &[A::List, A::FirstItem]),
         (NodeKind::CurveShatter, &[A::List, A::List, A::FirstItem]),
         (NodeKind::Voronoi2d, &[A::List, A::FirstItem, A::FirstItem]),
+        (
+            NodeKind::PowerDiagram2d,
+            &[A::List, A::List, A::FirstItem, A::FirstItem],
+        ),
+        (
+            NodeKind::LloydRelax2d,
+            &[A::List, A::FirstItem, A::FirstItem, A::FirstItem],
+        ),
         (NodeKind::MultiAttractor, &[A::List, A::List]),
         (NodeKind::PointArray, &[A::List, A::SingleItem]),
         (NodeKind::MeshConstruct, &[A::List, A::List]),

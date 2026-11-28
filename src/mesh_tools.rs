@@ -612,7 +612,9 @@ pub fn remesh(m: &Mesh, target: f64, iterations: usize, stop: Stop) -> Result<Me
     if area / (0.433 * l * l) > MAX_TRIANGLES as f64 / 2. {
         return Err("辺の長さが短すぎて面が多くなりすぎます。長くしてください。".into());
     }
-    let grid = TriGrid::new(m, l * 2., stop)?;
+    // A cell far larger than the input's own edges would put every triangle in a few
+    // cells and make each projection scan them all (quadratic time).
+    let grid = TriGrid::new(m, (l * 2.).min(mean * 16.), stop)?;
     let (hi, lo) = (l * 4. / 3., l * 4. / 5.);
     let mut v = m.vertices.clone();
     let mut f = m.triangles.clone();

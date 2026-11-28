@@ -22,6 +22,8 @@ Windows では `target/release/nodes-cli.exe`、Linux/macOS では `target/relea
 | `nodes-cli build REQUEST.json OUTPUT.morph` | API v1 の編集要求から新しいグラフを作り、全ノードの評価成功後に保存する |
 | `nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph` | 既存作品に編集要求を適用し、評価成功後に保存する |
 | `nodes-cli export-stl PROJECT.morph OUTPUT.stl` | 明示的な Output ノードのメッシュを、ミリメートル単位のバイナリ STL として保存する |
+| `nodes-cli inspect-ghx INPUT.ghx REPORT.json` | GHX の構造・接続・未対応ノード・元の XML を実行せずにレポートへ保存する |
+| `nodes-cli convert-ghx INPUT.ghx OUTPUT.morph` | 対応範囲のみを変換し、制限付き評価が成功した後に保存する |
 
 `--help`、`-h`、`help` または引数なしではヘルプを表示します。それ以外のコマンドでは成功・失敗とも標準出力に JSON 文書を 1 件返します。パスに空白がある場合はシェル側で引用してください。日本語のファイル名にも対応するため、パスは OS ネイティブ文字列のまま扱います。
 
@@ -74,6 +76,16 @@ nodes-cli diagnose examples/01.morph
 長い評価メッセージは UTF-8 の文字境界を保って最大 8,192 バイトに抑え、`message_truncated` で省略の有無を示します。通常のエラー文はそのまま保持します。
 
 各診断コマンドは新しい評価器を使うので、通常 `cached_count` は `0` です。`hotspots[].elapsed_ms` は入力準備・キャッシュ処理・形状計算などを含むノード処理の経過時間、`share_percent` は対象ノードの計測時間合計に対する比率です。CPU 使用率、GUI のフレーム時間、最適化後の予測時間としては扱わないでください。
+
+## Grasshopper からの移行（限定対応）
+
+```sh
+nodes-cli inspect-ghx examples/interop/scalar-point.ghx report.json
+nodes-cli convert-ghx examples/interop/scalar-point.ghx imported.morph
+nodes-cli evaluate imported.morph
+```
+
+最初に検査レポートで未対応ノードや接続を確認します。レポートには元の XML やスクリプト文字列が含まれるので、秘密情報がないか確認せずに共有しないでください。変換は未対応のノード・接続・データ設定を黙って削除せず拒否します。評価成功前に既存の出力ファイルを書き換えません。GH バイナリと完全な Grasshopper 互換は未対応です。詳細は [GRAPH_INTEROPERABILITY.md](GRAPH_INTEROPERABILITY.md)。
 
 ## 編集例
 

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "name": "GENESIS sculpture",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "genesis_scopes",
+        "name": "形状文法・領域分割",
+        "position": [
+          0,
+          0
+        ],
+        "params": {
+          "width": 120,
+          "height": 80,
+          "depth": 5,
+          "minimum": 5,
+          "x_weight": 0.5,
+          "jitter": 0.3,
+          "seed": 29,
+          "region": 0,
+          "region_seed": 19,
+          "limit": 1024
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "genesis_relief",
+        "name": "形状文法・立体パネル",
+        "position": [
+          300,
+          0
+        ],
+        "params": {
+          "height": 2,
+          "tall_height": 35,
+          "weight": 0.8,
+          "margin": 0.06,
+          "seed": 29
+        },
+        "inputs": {
+          "scope": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          600,
+          0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "genesis_scope_ids",
+        "name": "形状文法・領域ID",
+        "position": [
+          0,
+          400
+        ],
+        "params": {
+          "width": 120,
+          "height": 80,
+          "depth": 5,
+          "minimum": 5,
+          "x_weight": 0.5,
+          "jitter": 0.3,
+          "seed": 29,
+          "region": 0,
+          "region_seed": 19,
+          "limit": 1024
+        },
+        "inputs": {},
+        "preview": false
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    32,
+    100
+  ],
+  "zoom": 1
+}

@@ -20,7 +20,7 @@ use eframe::egui::{
 use nodes::model::{Curve, Mesh, Tree, Value};
 use nodes::persistence::{self, ExportReport};
 use nodes::print_info::{self, Printer};
-use nodes::raster::{Frame, Vertex as RasterVertex};
+use nodes::raster::{Frame, Vertex as RasterVertex, sample_key};
 
 type V3 = [f64; 3];
 
@@ -232,26 +232,26 @@ impl Scene {
 struct PickTriangle {
     p: [Pos2; 3],
     node_id: u64,
-    depth: f64,
+    keys: [f32; 3],
 }
 
 struct PickSegment {
     a: Pos2,
     b: Pos2,
     node_id: u64,
-    depth: f64,
 }
 
 struct PickPoint {
     p: Pos2,
     node_id: u64,
-    depth: f64,
 }
 
 struct Projection {
     hash: u64,
     /// `true` when the solid surfaces are in `image`, not in `under`.
     raster: bool,
+    rect: Rect,
+    raster_size: [usize; 2],
     image: Option<egui::ColorImage>,
     /// Drawn before the surfaces: background grid, bed, shadow, sorted surfaces.
     under: Vec<Shape>,
@@ -1164,6 +1164,7 @@ impl Viewport {
                 (rect.height() * scale).round().max(1.0) as usize,
             )
         });
+        let raster_size = frame.as_ref().map_or([0, 0], Frame::size);
         let mut surface = egui::Mesh::default();
         if !raster_on {
             surface.vertices.reserve(projected.len() * 3);
@@ -1171,7 +1172,8 @@ impl Viewport {
         }
         let mut triangles = Vec::with_capacity(projected.len());
         let mut wires = Vec::new();
-        for (triangle, p, depth) in projected {
+        for (triangle, p, _) in projected {
+            let keys = triangle.p.map(|v| camera.key(v) as f32);
             let kind = if overhang_on
                 && !triangle.plate
                 && print_info::is_overhang_face(triangle.face, limit)
@@ -1200,15 +1202,18 @@ impl Viewport {
             }
             match frame.as_mut() {
                 Some(frame) => {
-                    let vertices: [RasterVertex; 3] = std::array::from_fn(|i| RasterVertex {
-                        x: (p[i].x - rect.min.x) * scale,
-                        y: (p[i].y - rect.min.y) * scale,
-                        key: camera.key(triangle.p[i]) as f32,
-                        rgb: [
-                            f32::from(colors[i].r()),
-                            f32::from(colors[i].g()),
-                            f32::from(colors[i].b()),
-                        ],
+                    let vertices: [RasterVertex; 3] = std::array::from_fn(|i| {
+                        let pos = raster_position(rect, raster_size, p[i]);
+                        RasterVertex {
+                            x: pos.x,
+                            y: pos.y,
+                            key: keys[i],
+                            rgb: [
+                                f32::from(colors[i].r()),
+                                f32::from(colors[i].g()),
+                                f32::from(colors[i].b()),
+                            ],
+                        }
                     });
                     frame.triangle(vertices);
                 }
@@ -1229,7 +1234,7 @@ impl Viewport {
             triangles.push(PickTriangle {
                 p,
                 node_id: triangle.node_id,
-                depth,
+                keys,
             });
             if self.wireframe && wires.len() < 24_000 {
                 let color = if triangle.selected {
@@ -1277,7 +1282,6 @@ impl Viewport {
                 a,
                 b,
                 node_id: segment.node_id,
-                depth: (camera.depth(segment.a) + camera.depth(segment.b)) * 0.5,
             });
         }
         let mut points = Vec::with_capacity(self.scene.points.len());
@@ -1313,12 +1317,13 @@ impl Viewport {
             points.push(PickPoint {
                 p,
                 node_id: point.node_id,
-                depth: camera.depth(point.p),
             });
         }
         Projection {
             hash,
             raster: raster_on,
+            rect,
+            raster_size,
             image,
             under,
             over,
@@ -1330,27 +1335,61 @@ impl Viewport {
 
     fn pick(&self, point: Pos2) -> Option<u64> {
         let projection = self.projected.as_ref()?;
-        let mut closest: Option<(f64, u64)> = None;
-        let mut consider = |depth: f64, node_id: u64| {
-            if closest.is_none_or(|(old, _)| depth > old) {
-                closest = Some((depth, node_id));
-            }
-        };
-        for triangle in &projection.triangles {
-            if in_triangle(point, triangle.p) {
-                consider(triangle.depth, triangle.node_id);
-            }
+        if !projection.rect.contains(point) {
+            return None;
         }
-        for segment in &projection.segments {
-            if segment_distance(point, segment.a, segment.b) < 6.0 {
-                consider(segment.depth, segment.node_id);
-            }
-        }
-        for p in &projection.points {
+        // Points and curves are deliberately drawn on top of solid surfaces.
+        // Reverse their paint order, keeping the existing hit tolerance.
+        for p in projection.points.iter().rev() {
             if p.p.distance(point) < 8.0 {
-                consider(p.depth, p.node_id);
+                return Some(p.node_id);
             }
         }
+        for segment in projection.segments.iter().rev() {
+            if segment_distance(point, segment.a, segment.b) < 6.0 {
+                return Some(segment.node_id);
+            }
+        }
+        if !projection.raster {
+            // The fallback painter sorts surfaces back-to-front. The last
+            // covering triangle is the topmost layer, even in wireframe mode.
+            return projection
+                .triangles
+                .iter()
+                .rev()
+                .find(|t| in_triangle(point, t.p))
+                .map(|t| t.node_id);
+        }
+
+        // Use the centre of the actual texture pixel under the pointer. This
+        // accounts for high DPI, raster budget scaling and dimension rounding.
+        let pos = raster_position(projection.rect, projection.raster_size, point);
+        if pos.x < 0.0
+            || pos.y < 0.0
+            || pos.x >= projection.raster_size[0] as f32
+            || pos.y >= projection.raster_size[1] as f32
+        {
+            return None;
+        }
+        let sample = Pos2::new(pos.x.floor() + 0.5, pos.y.floor() + 0.5);
+        let mut closest: Option<(f32, u64)> = None;
+        for triangle in &projection.triangles {
+            let vertices: [RasterVertex; 3] = std::array::from_fn(|i| {
+                let p = raster_position(projection.rect, projection.raster_size, triangle.p[i]);
+                RasterVertex {
+                    x: p.x,
+                    y: p.y,
+                    key: triangle.keys[i],
+                    rgb: [0.0; 3],
+                }
+            });
+            if let Some(key) = sample_key(vertices, sample.x, sample.y)
+                && closest.is_none_or(|(old, _)| key > old)
+            {
+                closest = Some((key, triangle.node_id));
+            }
+        }
+        // Equal keys retain the first triangle, just like Frame::triangle.
         closest.map(|(_, id)| id)
     }
 
@@ -1754,6 +1793,15 @@ fn segment(shapes: &mut Vec<Shape>, camera: Camera, a: V3, b: V3, stroke: Stroke
     ));
 }
 
+/// Map egui points to the actual texture dimensions, not the pre-rounding
+/// scale. The texture is painted across the entire viewport rectangle.
+fn raster_position(rect: Rect, size: [usize; 2], p: Pos2) -> Pos2 {
+    Pos2::new(
+        (p.x - rect.min.x) * (size[0] as f32 / rect.width()),
+        (p.y - rect.min.y) * (size[1] as f32 / rect.height()),
+    )
+}
+
 /// Supersampling scale for the z-buffer: the screen's pixel density, lowered
 /// when the window is so large that the pixel budget would be exceeded.
 fn raster_scale(rect: Rect, pixels_per_point: f32) -> f32 {
@@ -1878,6 +1926,107 @@ fn normalize(a: V3) -> V3 {
         mul(a, 1.0 / l)
     } else {
         [0.0, 0.0, 1.0]
+    }
+}
+
+#[cfg(test)]
+mod rendering_tests {
+    use super::*;
+
+    fn camera(perspective: bool) -> Camera {
+        Camera {
+            right: [1.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            eye: [0.0, 0.0, 1.0],
+            target: [0.0; 3],
+            scale: 1.0,
+            center: Pos2::new(50.0, 50.0),
+            perspective,
+            distance: 100.0,
+        }
+    }
+
+    fn triangle(camera: Camera, depths: [f64; 3], node_id: u64) -> WorldTriangle {
+        let screen = [[10.0, 10.0], [90.0, 10.0], [10.0, 90.0]];
+        let p = std::array::from_fn(|i| {
+            let z = depths[i];
+            let scale = camera.scale_at([0.0, 0.0, z]);
+            [
+                (screen[i][0] - f64::from(camera.center.x)) / scale,
+                (f64::from(camera.center.y) - screen[i][1]) / scale,
+                z,
+            ]
+        });
+        WorldTriangle {
+            p,
+            normals: [[0.0, 0.0, 1.0]; 3],
+            face: [0.0, 0.0, 1.0],
+            plate: false,
+            node_id,
+            selected: node_id == 1,
+        }
+    }
+
+    #[test]
+    fn intersecting_surfaces_pick_the_rendered_front_face() {
+        for perspective in [false, true] {
+            let camera = camera(perspective);
+            let mut viewport = Viewport::default();
+            // Same screen triangle, but the slanted face crosses the flat
+            // face. Its average world depth is always farther away.
+            viewport.scene.triangles = vec![
+                triangle(camera, [60.0, 0.0, 0.0], 1),
+                triangle(camera, [25.0; 3], 2),
+            ];
+            let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(100.0, 100.0));
+            for scale in [0.73, 1.0, 1.375] {
+                viewport.projected = Some(viewport.project(camera, rect, scale, true, 0));
+                let projection = viewport.projected.as_ref().unwrap();
+                let image = projection.image.as_ref().unwrap();
+                for (point, expected) in [(Pos2::new(15.0, 15.0), 1), (Pos2::new(75.0, 15.0), 2)] {
+                    let p = raster_position(rect, projection.raster_size, point);
+                    let index = p.y.floor() as usize * image.size[0] + p.x.floor() as usize;
+                    let pixel = image.pixels[index];
+                    assert_eq!(pixel.a(), 255);
+                    // Selected face is green-dominant; unselected is blue-dominant.
+                    assert_eq!(pixel.g() > pixel.b(), expected == 1);
+                    assert_eq!(viewport.pick(point), Some(expected));
+                }
+                assert_eq!(viewport.pick(Pos2::new(95.0, 95.0)), None);
+            }
+
+            // Fallback painter displays the flat face last at both locations.
+            viewport.accurate_depth = false;
+            viewport.projected = Some(viewport.project(camera, rect, 1.0, true, 0));
+            assert_eq!(viewport.pick(Pos2::new(15.0, 15.0)), Some(2));
+        }
+    }
+
+    #[test]
+    fn visible_overlays_take_priority_over_surfaces_in_paint_order() {
+        let camera = camera(false);
+        let mut viewport = Viewport::default();
+        viewport
+            .scene
+            .triangles
+            .push(triangle(camera, [25.0; 3], 1));
+        viewport.scene.segments.push(WorldSegment {
+            a: [-40.0, 30.0, -50.0],
+            b: [30.0, 30.0, -50.0],
+            node_id: 2,
+            selected: false,
+            color: None,
+        });
+        viewport.scene.points.push(WorldPoint {
+            p: [-30.0, 30.0, -80.0],
+            node_id: 3,
+            selected: false,
+        });
+        let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(100.0, 100.0));
+        viewport.projected = Some(viewport.project(camera, rect, 1.0, true, 0));
+        assert_eq!(viewport.pick(Pos2::new(20.0, 20.0)), Some(3));
+        assert_eq!(viewport.pick(Pos2::new(40.0, 20.0)), Some(2));
+        assert_eq!(viewport.pick(Pos2::new(40.0, 40.0)), Some(1));
     }
 }
 

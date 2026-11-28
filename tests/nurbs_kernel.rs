@@ -320,3 +320,149 @@ fn curved_cup_is_shelled() {
     let expected = PI * 400. * 40. - PI * 18. * 18. * 38.;
     assert!(rel(v, expected) < 2e-2, "cup volume {v} vs {expected}");
 }
+
+// ---- Constrained sketch, analysis, diagnostics, IGES ----
+
+#[test]
+fn constrained_sketch_solves_to_exact_profiles() {
+    let text = "長方形 r 0 0 50 30\n固定 r.p0\n長さ r.b 60\n長さ r.l 40\n円 c 30 20 5\n半径 c 8\n";
+    let tree = nodes::sketch_nodes::run(text, 0, &go).unwrap();
+    let curves: Vec<_> = tree.branches.values().flatten().collect();
+    assert!(
+        curves.len() >= 2,
+        "outer and hole expected, got {}",
+        curves.len()
+    );
+    let nodes::model::Value::Curve(outer) = curves[0] else {
+        panic!("not a curve")
+    };
+    let solid = kb::extrude(outer, &[], 10., &go).unwrap();
+    let v = solid.volume().unwrap();
+    assert!(
+        rel(v, 60. * 40. * 10.) < 1e-6 || rel(v, PI * 64. * 10.) < 1e-6,
+        "volume {v}"
+    );
+    // Unknown commands and conflicts give Japanese errors, not panics.
+    assert!(nodes::sketch_nodes::run("ふしぎ x 1", 0, &go).is_err());
+    let conflict = "線 l 0 0 10 0\n長さ l 10\n距離 l.start l.end 20\n";
+    assert!(nodes::sketch_nodes::run(conflict, 1, &go).is_err());
+}
+
+#[test]
+fn zebra_and_diagnostics_on_a_filleted_box() {
+    let b = kb::fillet(&kb::box_solid(40., 30., 20., &go).unwrap(), 4., &[], &go).unwrap();
+    let z = nodes::kernel_ops::zebra(&b, 10., 0, &go).unwrap();
+    assert!(!z.triangles.is_empty());
+    let d = nodes::kernel_ops::diagnose(&b, &go).unwrap();
+    assert_eq!(d[0], 1.);
+    assert!(d[1] > 6.);
+    let draft = nodes::kernel_ops::draft_analysis(&b, 2., &go).unwrap();
+    assert!(!draft.triangles.is_empty());
+}
+
+#[test]
+fn iges_round_trip_keeps_a_cylinder() {
+    let c = kb::cylinder([0., 0., 0.], [0., 0., 1.], 10., 20., &go).unwrap();
+    let text = kb::iges_export(&[&c], &go).unwrap();
+    let back = kb::iges_import(&text, &go).unwrap();
+    assert_eq!(back.len(), 1);
+    assert!(back[0].is_closed());
+    assert!(rel(back[0].volume().unwrap(), PI * 100. * 20.) < 1e-3);
+}
+
+// ---- T-spline patches with T-junctions ----
+
+#[test]
+fn tspline_patch_local_refinement_keeps_the_surface_and_converts() {
+    use nodes::subd::{EditOp, edits_text};
+    let patch = Cage::tspline_patch(80., 60., 6, 5, 12., &go).unwrap();
+    let before = patch.tspline().unwrap().clone();
+    // Refine one inner face (face 7 of the 6 × 5 net spans s 1..2, t 1..2): points are added
+    // (T-junctions), the surface stays the same.
+    let inner = 7;
+    let refined = patch
+        .apply_edits(&edits_text(&[EditOp::Refine { faces: vec![inner] }]), &go)
+        .unwrap();
+    let after = refined.tspline().unwrap();
+    assert!(refined.vertices().len() > patch.vertices().len());
+    assert!(
+        !after.mesh().is_regular(),
+        "a local refinement leaves T-junctions"
+    );
+    let [[s0, s1], [t0, t1]] = before.domain();
+    let mut worst = 0f64;
+    for i in 0..=10 {
+        for j in 0..=10 {
+            let (s, t) = (
+                s0 + (s1 - s0) * i as f64 / 10.,
+                t0 + (t1 - t0) * j as f64 / 10.,
+            );
+            worst = worst.max(before.eval(s, t).unwrap().dist(after.eval(s, t).unwrap()));
+        }
+    }
+    assert!(worst < 1e-9, "refinement moved the surface by {worst}");
+    // Moving a new point changes the surface locally; the T-spline converts to NURBS faces.
+    let moved = refined
+        .apply_edits(
+            &edits_text(&[EditOp::Move {
+                verts: vec![refined.vertices().len() - 1],
+                d: [0., 0., 5.],
+                sym: None,
+            }]),
+            &go,
+        )
+        .unwrap();
+    let sheet = moved.to_brep(false, &go).unwrap();
+    assert!(!sheet.is_closed());
+    assert!(sheet.face_count() >= 1);
+    let solid = nodes::kernel_ops::thicken(&sheet, 2., false, &go).unwrap();
+    assert!(solid.is_closed(), "thickened patch is not closed");
+}
+
+#[test]
+fn closed_mesh_volume_is_translation_stable() {
+    let triangles = vec![
+        [0, 2, 1],
+        [0, 3, 2],
+        [4, 5, 6],
+        [4, 6, 7],
+        [0, 1, 5],
+        [0, 5, 4],
+        [1, 2, 6],
+        [1, 6, 5],
+        [2, 3, 7],
+        [2, 7, 6],
+        [3, 0, 4],
+        [3, 4, 7],
+    ];
+    let corners = [
+        [0., 0., 0.],
+        [1., 0., 0.],
+        [1., 1., 0.],
+        [0., 1., 0.],
+        [0., 0., 1.],
+        [1., 0., 1.],
+        [1., 1., 1.],
+        [0., 1., 1.],
+    ];
+    for side in [1.0_f64, 0.125, 0.015625, 0.001953125] {
+        for offset in [0., 500_000., -500_000., 999_999.] {
+            let mut vertices = vec![[1_000_000., -1_000_000., 1_000_000.]];
+            vertices.extend(corners.map(|p| p.map(|v| offset + side * v)));
+            let mut mesh = Mesh {
+                vertices,
+                triangles: triangles.iter().map(|t| t.map(|i| i + 1)).collect(),
+            };
+            let expected = side.powi(3);
+            assert!(kb::is_watertight(&mesh));
+            assert!(
+                rel(kb::mesh_volume(&mesh), expected) < 1e-12,
+                "side={side}, offset={offset}"
+            );
+            for t in &mut mesh.triangles {
+                t.swap(1, 2);
+            }
+            assert!(rel(kb::mesh_volume(&mesh), -expected) < 1e-12);
+        }
+    }
+}

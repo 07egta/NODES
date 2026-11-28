@@ -423,7 +423,10 @@ impl GraphCanvas {
         if axis > 1 || edge > 2 || self.selected.len() < 2 {
             return;
         }
-        let size_of = |n: &Node| if axis == 0 { WIDTH } else { height(n) };
+        let size_of = |n: &Node| {
+            let size = node_size(n);
+            if axis == 0 { size.x } else { size.y }
+        };
         let cards: Vec<(NodeId, f32)> = p
             .graph
             .nodes
@@ -1987,6 +1990,36 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
 #[cfg(test)]
 mod premium_tests {
     use super::*;
+
+    #[test]
+    fn mixed_card_and_reroute_alignment_uses_visible_bounds() {
+        for axis in 0..=1 {
+            for edge in 0..=2 {
+                let mut graph = nodes::model::Graph::default();
+                let card = graph.add(NodeKind::Number, [10., 20.]).unwrap();
+                let dot = graph.add(NodeKind::Reroute, [300., 200.]).unwrap();
+                let mut project = Project::new("alignment regression", graph);
+                let mut canvas = GraphCanvas::default();
+                canvas.select_only(card);
+                canvas.selected.insert(dot);
+                canvas.align_selected_edge(&mut project, axis, edge);
+                let bound = |id, size: f32| {
+                    let position = project.graph.node(id).unwrap().position[axis];
+                    position + size * f32::from(edge) / 2.
+                };
+                // Independent visible widths: regular card 218, reroute 34.
+                let (card_size, dot_size) = if axis == 0 {
+                    (218., 34.)
+                } else {
+                    (height(project.graph.node(card).unwrap()), 26.)
+                };
+                assert!(
+                    (bound(card, card_size) - bound(dot, dot_size)).abs() < 0.001,
+                    "axis {axis}, edge {edge}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn restored_graph_discards_transient_gestures_and_invalid_selection() {

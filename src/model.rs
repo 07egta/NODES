@@ -385,6 +385,7 @@ pub enum NodeKind {
     MeshConstruct,
     MeshSelfContact,
     MeshThicknessSample,
+    MeshBedFit,
     MeshCompact,
     MeshNonManifold,
     // Mathematical curve nodes: appended to preserve legacy serde names.
@@ -540,6 +541,20 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    // Mathematical and biomorphic patterns (append-only IDs).
+    Phyllotaxis,
+    FibonacciSphere,
+    RoseCurve,
+    SuperformulaCurve,
+    TorusKnot,
+    Lissajous3d,
+    HilbertCurve,
+    KochSnowflake,
+    SierpinskiCells,
+    ReactionDiffusion,
+    PoissonDisk2d,
+    GcodeColorChange,
+    GcodeColorGradient,
     // More exact NURBS / SubD nodes (`nurbs_nodes`), appended.
     SubdCageEdit,
     ExactTrimPlane,
@@ -589,6 +604,39 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
+    // Ornament nodes: append-only serialized identifiers.
+    TruchetPattern,
+    AsanohaPattern,
+    ShippoPattern,
+    PowerDiagram2d,
+    LloydRelax2d,
+    // Mathematical surfaces (analytic formulas, mesh outputs).
+    Catenoid,
+    Helicoid,
+    EnneperSurface,
+    MobiusStrip,
+    KleinBottle,
+    DiniSurface,
+    // GENESIS: append-only stable serialized IDs.
+    GenesisScopes,
+    GenesisScopeIds,
+    GenesisRelief,
+    ExactTorus,
+    OrigamiMiura,
+    OrigamiMiuraCreases,
+    // BioMorph growth (append-only serialized IDs).
+    BioSpaceColonization,
+    BioCoiledShell,
+    ExactSketch,
+    ExactZebra,
+    ExactDraftAnalysis,
+    ExactDiagnose,
+    SubdTsplinePatch,
+    ExactThicken,
     MeshBoundaryLoops,
     MeshIslands,
     MeshTopologyStats,
@@ -831,6 +879,7 @@ impl NodeKind {
             Self::MeshConstruct,
             Self::MeshSelfContact,
             Self::MeshThicknessSample,
+            Self::MeshBedFit,
             Self::MeshCompact,
             Self::MeshNonManifold,
             Self::CurveLine,
@@ -978,6 +1027,19 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::Phyllotaxis,
+            Self::FibonacciSphere,
+            Self::RoseCurve,
+            Self::SuperformulaCurve,
+            Self::TorusKnot,
+            Self::Lissajous3d,
+            Self::HilbertCurve,
+            Self::KochSnowflake,
+            Self::SierpinskiCells,
+            Self::ReactionDiffusion,
+            Self::PoissonDisk2d,
+            Self::GcodeColorChange,
+            Self::GcodeColorGradient,
             Self::SubdCageEdit,
             Self::ExactTrimPlane,
             Self::ExactFilletVariable,
@@ -1023,6 +1085,35 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
+            Self::TruchetPattern,
+            Self::AsanohaPattern,
+            Self::ShippoPattern,
+            Self::PowerDiagram2d,
+            Self::LloydRelax2d,
+            Self::Catenoid,
+            Self::Helicoid,
+            Self::EnneperSurface,
+            Self::MobiusStrip,
+            Self::KleinBottle,
+            Self::DiniSurface,
+            Self::GenesisScopes,
+            Self::GenesisScopeIds,
+            Self::GenesisRelief,
+            Self::ExactTorus,
+            Self::OrigamiMiura,
+            Self::OrigamiMiuraCreases,
+            Self::BioSpaceColonization,
+            Self::BioCoiledShell,
+            Self::ExactSketch,
+            Self::ExactZebra,
+            Self::ExactDraftAnalysis,
+            Self::ExactDiagnose,
+            Self::SubdTsplinePatch,
+            Self::ExactThicken,
             Self::MeshBoundaryLoops,
             Self::MeshIslands,
             Self::MeshTopologyStats,
@@ -1634,6 +1725,7 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::OrigamiMiura | Self::OrigamiMiuraCreases => crate::origami::spec(self),
             Self::Reroute => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "リルート点",
@@ -1653,7 +1745,10 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::bio_patterns::is_kind(other) => crate::bio_patterns::spec(other),
+            other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
+            other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
@@ -1678,13 +1773,18 @@ impl NodeKind {
             | Self::MeshConstruct
             | Self::MeshSelfContact
             | Self::MeshThicknessSample
+            | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold
             | Self::MeshBoundaryLoops
             | Self::MeshIslands
             | Self::MeshTopologyStats => crate::mesh_fabrication::spec(self),
+            other if crate::mathematical_surfaces::is_kind(other) => {
+                crate::mathematical_surfaces::spec(other)
+            }
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::biomorph::spec(other))
                 .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))

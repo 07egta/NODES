@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "name": "精密円の等弧長配列と距離検証",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "number",
+        "name": "半径",
+        "position": [
+          20,
+          60
+        ],
+        "params": {
+          "value": 10
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "circle",
+        "name": "精密円",
+        "position": [
+          20,
+          240
+        ],
+        "params": {
+          "segments": 8
+        },
+        "inputs": {
+          "radius": 0
+        },
+        "preview": true
+      },
+      {
+        "id": 2,
+        "kind": "point",
+        "name": "配置する点",
+        "position": [
+          20,
+          420
+        ],
+        "params": {},
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "curve_array",
+        "name": "等弧長配列",
+        "position": [
+          280,
+          60
+        ],
+        "params": {
+          "count": 13
+        },
+        "inputs": {
+          "geometry": 2,
+          "curve": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "graft",
+        "name": "枝分け",
+        "position": [
+          540,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "flatten",
+        "name": "フラット化",
+        "position": [
+          800,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "reroute",
+        "name": "配線整理",
+        "position": [
+          1060,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "value": 5
+        },
+        "preview": false
+      },
+      {
+        "id": 7,
+        "kind": "curve_attractor",
+        "name": "円への距離",
+        "position": [
+          1320,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "point": 6,
+          "curve": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "abs",
+        "name": "絶対値",
+        "position": [
+          1580,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "value": 7
+        },
+        "preview": false
+      },
+      {
+        "id": 9,
+        "kind": "add",
+        "name": "誤差+1",
+        "position": [
+          1840,
+          60
+        ],
+        "params": {
+          "b": 1
+        },
+        "inputs": {
+          "a": 8
+        },
+        "preview": false
+      },
+      {
+        "id": 10,
+        "kind": "list_length",
+        "name": "個数",
+        "position": [
+          2100,
+          60
+        ],
+        "params": {},
+        "inputs": {
+          "list": 9
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 11
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.7
+}

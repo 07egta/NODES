@@ -123,6 +123,8 @@ fn console_help_catalog_and_usage_have_real_stdout_and_exit_codes() {
         "build",
         "apply",
         "export-stl",
+        "inspect-ghx",
+        "convert-ghx",
     ] {
         assert!(help_text.contains(command));
     }
@@ -602,4 +604,58 @@ fn fifo_projects_return_json_errors_without_waiting_for_a_writer() {
         assert_eq!(report["error"]["code"], "invalid_project");
         assert_eq!(report["error"]["message"], "project must be a regular file");
     }
+}
+
+#[test]
+fn ghx_console_inspects_and_converts_without_modifying_source() {
+    let temporary = TemporaryDirectory::new();
+    let input = temporary.path("移行.ghx");
+    let report = temporary.path("report.json");
+    let output = temporary.path("converted.morph");
+    let bytes = include_bytes!("../examples/interop/scalar-point.ghx");
+    fs::write(&input, bytes).unwrap();
+
+    let inspected = successful("inspect-ghx", &[&input, &report]);
+    assert_eq!(inspected["evaluation_performed"], false);
+    let details: Json = serde_json::from_slice(&fs::read(&report).unwrap()).unwrap();
+    assert_eq!(details["objects"].as_array().unwrap().len(), 2);
+    assert_eq!(details["connections"].as_array().unwrap().len(), 1);
+    assert_eq!(details["source_xml"], std::str::from_utf8(bytes).unwrap());
+
+    let converted = successful("convert-ghx", &[&input, &output]);
+    assert_eq!(converted["project"]["node_count"], 2);
+    let project = persistence::load(&output).unwrap();
+    let evaluation = graph_api::evaluate(&project.graph, &|| false).unwrap();
+    assert_eq!(
+        evaluation.outputs[&project.graph.nodes[1].id]
+            .as_ref()
+            .unwrap()
+            .branches
+            .values()
+            .flatten()
+            .next(),
+        Some(&Value::Point([7., 2., 3.]))
+    );
+    assert_eq!(fs::read(&input).unwrap(), bytes);
+}
+
+#[test]
+fn ghx_console_rejects_unsupported_graph_without_overwriting_output() {
+    let temporary = TemporaryDirectory::new();
+    let input = temporary.path("unknown.ghx");
+    let report = temporary.path("report.json");
+    let output = temporary.path("existing.morph");
+    let bytes = include_str!("../examples/interop/scalar-point.ghx").replace(
+        "3581f42a-9592-4549-bd6b-1c0fc39d067b",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    );
+    fs::write(&input, &bytes).unwrap();
+    fs::write(&output, b"keep existing destination").unwrap();
+    successful("inspect-ghx", &[&input, &report]);
+    assert_eq!(
+        failed("convert-ghx", &[&input, &output])["code"],
+        "ghx_conversion_failed"
+    );
+    assert_eq!(fs::read(&output).unwrap(), b"keep existing destination");
+    assert_eq!(fs::read_to_string(&input).unwrap(), bytes);
 }

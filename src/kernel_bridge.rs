@@ -153,6 +153,10 @@ impl BrepValue {
     pub fn is_closed(&self) -> bool {
         self.closed
     }
+    /// Whether the display/STL mesh itself is watertight.
+    pub fn mesh_is_watertight(&self) -> bool {
+        is_watertight(&self.preview)
+    }
     pub fn face_count(&self) -> usize {
         self.body.face_count()
     }
@@ -171,14 +175,28 @@ impl BrepValue {
         }
         match sk::guard("体積", || sk::measure_mass(&self.body)) {
             Ok(m) if m.volume.is_finite() => Some(m.volume.abs()),
-            _ => Some(mesh_volume(&self.preview).abs()),
+            _ => {
+                let volume = mesh_volume(&self.preview).abs();
+                volume.is_finite().then_some(volume)
+            }
         }
     }
 }
 
 /// Signed volume of a closed triangle mesh (mm³).
+///
+/// Translate to a referenced vertex before taking determinants. For a closed
+/// surface the integral is translation invariant, but world-coordinate
+/// determinants can lose all significant digits for small distant solids.
 pub fn mesh_volume(m: &Mesh) -> f64 {
-    let mut v = 0.;
+    let Some(origin) = m
+        .triangles
+        .iter()
+        .find_map(|t| m.vertices.get(t[0] as usize).copied())
+    else {
+        return 0.0;
+    };
+    let (mut sum, mut correction) = (0.0, 0.0);
     for t in &m.triangles {
         let (Some(a), Some(b), Some(c)) = (
             m.vertices.get(t[0] as usize),
@@ -187,9 +205,13 @@ pub fn mesh_volume(m: &Mesh) -> f64 {
         ) else {
             continue;
         };
-        v += dot(*a, cross(*b, *c)) / 6.;
+        let term = dot(sub(*a, origin), cross(sub(*b, origin), sub(*c, origin))) / 6.0;
+        let adjusted = term - correction;
+        let next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
     }
-    v
+    sum
 }
 
 /// Whether every undirected edge is used by exactly two triangles in opposite directions.
@@ -865,6 +887,19 @@ pub fn sphere(center: P3, radius: f64, stop: Stop) -> R<BrepValue> {
     brep(body, stop)
 }
 
+/// Exact ring torus about the Z axis, with dimensions in millimetres.
+pub fn torus(major: f64, minor: f64, stop: Stop) -> R<BrepValue> {
+    stopped(stop)?;
+    let (major, minor) = (positive("大半径", major)?, positive("小半径", minor)?);
+    if major - minor <= tol::ABS || major + minor > limits::MAX_COORDINATE {
+        return Err(
+            "トーラスは大半径を小半径より十分大きくし、外半径を座標上限以下にしてください。".into(),
+        );
+    }
+    let body = kernel("トーラス", stop, || sk::torus(Vec3::ZERO, major, minor))?;
+    brep(body, stop)
+}
+
 /// Extrude a closed planar curve (with optional holes) by `height` along its plane normal
 /// (the normal faces +Z where it can).
 pub fn extrude(outer: &Curve, holes: &[&Curve], height: f64, stop: Stop) -> R<BrepValue> {
@@ -1391,6 +1426,58 @@ pub fn step_export(bodies: &[&BrepValue], stop: Stop) -> R<String> {
         return Err("STEP が大きすぎます。".into());
     }
     Ok(text)
+}
+
+/// IGES 5.3 text for the bodies (through SolidCraft's STEP → IGES writer).
+pub fn iges_export(bodies: &[&BrepValue], stop: Stop) -> R<String> {
+    if bodies.is_empty() {
+        return Err("書き出す B-rep がありません。".into());
+    }
+    let list: Vec<sk::ExportBody> = bodies
+        .iter()
+        .enumerate()
+        .map(|(i, b)| sk::ExportBody {
+            name: format!("Body{}", i + 1),
+            body: b.body(),
+            color: None,
+        })
+        .collect();
+    let header = sk::StepHeader {
+        file_name: "NODES".into(),
+        time_stamp: String::new(),
+        author: String::new(),
+        organization: String::new(),
+        description: "NODES model".into(),
+    };
+    let text = kernel("IGES 書き出し", stop, || {
+        sk::iges_export_bodies(&list, &header)
+    })?;
+    if text.len() > limits::MAX_STEP_BYTES {
+        return Err("IGES が大きすぎます。".into());
+    }
+    Ok(text)
+}
+
+/// Bodies read from IGES text.
+pub fn iges_import(text: &str, stop: Stop) -> R<Vec<BrepValue>> {
+    if text.len() > limits::MAX_STEP_BYTES {
+        return Err(format!(
+            "IGES ファイルが大きすぎます（上限 {} MB）。",
+            limits::MAX_STEP_BYTES >> 20
+        ));
+    }
+    let import = kernel("IGES 読み込み", stop, || sk::iges_import(text))?;
+    if import.bodies.is_empty() {
+        return Err(
+            "IGES に読み込める立体がありませんでした（面だけのファイルは未対応のことがあります）。"
+                .into(),
+        );
+    }
+    import
+        .bodies
+        .into_iter()
+        .map(|b| brep(b.body, stop))
+        .collect()
 }
 
 /// Bodies read from STEP text.

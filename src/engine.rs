@@ -165,6 +165,7 @@ impl Evaluator {
                 for n in &graph.nodes {
                     out.outputs.insert(n.id, Err(e.clone()));
                 }
+                out.cancelled = stop();
                 out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
                 return out;
             }
@@ -197,6 +198,10 @@ impl Evaluator {
             // Phase 1 (sequential): disabled nodes, cache keys and cache hits.
             let mut slots: Vec<Slot> = Vec::with_capacity(level.len());
             for node in level {
+                if stop() {
+                    out.cancelled = true;
+                    break 'levels;
+                }
                 let id = node.id;
                 let node_start = Instant::now();
                 // Disabled node: empty output, never cached; revision 0 marks "off" for children.
@@ -346,6 +351,9 @@ impl Evaluator {
                     .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
             }
         }
+        // Cache-only, disabled-only and empty graphs may never execute a kernel.
+        // Observe cancellation before returning even when no fresh slot was missing.
+        out.cancelled |= stop();
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
@@ -500,6 +508,19 @@ pub(crate) fn evaluate_node(
         let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
         return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
     }
+    // 拘束スケッチ: the sketch text is in `script` (see `sketch_nodes`).
+    if node.kind == NodeKind::ExactSketch {
+        let mode = inputs
+            .first()
+            .and_then(|t| t.branches.values().flatten().next())
+            .map(Value::number)
+            .transpose()?
+            .unwrap_or(0.);
+        return checked_tree(
+            crate::sketch_nodes::run(&node.script, mode as usize, cancel)?,
+            cancel,
+        );
+    }
     // ケージ編集: the edit list is in `script` (see `nurbs_nodes::run_cage_edit`).
     if node.kind == NodeKind::SubdCageEdit {
         return checked_tree(
@@ -631,6 +652,13 @@ pub(crate) fn evaluate_node(
                 )?
             } else if crate::math_nodes::is_list_kind(node.kind) {
                 crate::math_nodes::run_list(node.kind, &lists, cancel)?
+            } else if node.kind == NodeKind::BioSpaceColonization {
+                crate::biomorph::run_colonization(
+                    &lists,
+                    (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
+                    MAX_ITEMS.saturating_sub(total_items),
+                    cancel,
+                )?
             } else if crate::generative::is_list(node.kind) {
                 crate::generative::run_list(node.kind, &lists, cancel)?
             } else if node.kind == NodeKind::MeshConstruct {
@@ -778,7 +806,17 @@ fn preflight_run(
         }
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
+        k if crate::mathematical_surfaces::is_kind(k) => {
+            crate::mathematical_surfaces::estimate(k, args)?
+        }
+        k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
+        NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
+        NodeKind::OrigamiMiura | NodeKind::OrigamiMiuraCreases => {
+            crate::origami::estimate(kind, args)?
+        }
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
+        k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::estimate(k, args)?,
+        k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
     };
@@ -837,10 +875,20 @@ pub(crate) fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>
 fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     use NodeKind::*;
     match kind {
+        k if crate::mathematical_surfaces::is_kind(k) => {
+            crate::mathematical_surfaces::run(k, a, cancel)
+        }
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
+        k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::run_item(k, a, cancel),
+        k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        GenesisScopes | GenesisScopeIds | GenesisRelief => {
+            crate::genesis::run_item(kind, a, cancel)
+        }
+        OrigamiMiura | OrigamiMiuraCreases => crate::origami::run(kind, a, cancel),
+        BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
@@ -1167,7 +1215,8 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         RectGrid | TriangularGrid | HexGrid | RadialGrid | HexPanels | TriPanels | Voronoi2d
         | ConvexHull2d | ClosestPoint | MultiAttractor | CurveAttractor | GridArray
         | PointArray | Rotate3d | Shear | Taper | FractalTree | CylinderWrap | Delaunay2d
-        | PopulateMesh | CurveArray | NoiseField | LifeGrid => {
+        | PopulateMesh | CurveArray | NoiseField | LifeGrid | TruchetPattern | AsanohaPattern
+        | ShippoPattern | PowerDiagram2d | LloydRelax2d => {
             crate::generative::run_item(kind, a, cancel)
         }
         Random | Populate | Noise | NoiseDeform | Shell | OverhangCheck | Distance
@@ -1214,7 +1263,10 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshVertices | MeshFaces | MeshNormals | MeshEdges | MeshBoundary | MeshClosest
         | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
         | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
-        | MeshCompact | MeshNonManifold | MeshBoundaryLoops | MeshIslands | MeshTopologyStats => {
+        | MeshBedFit | MeshCompact | MeshNonManifold => {
+            crate::mesh_fabrication::run_item(kind, a, cancel)
+        }
+        MeshBoundaryLoops | MeshIslands | MeshTopologyStats => {
             crate::mesh_fabrication::run_item(kind, a, cancel)
         }
         MeshConstruct | Loft | Merge | Flatten | Graft | Output | Reroute | Script | Cluster
@@ -1556,7 +1608,7 @@ fn mirror(
         }
     }
 }
-fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
+pub(crate) fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
     let (x, y) = (w / 2., d / 2.);
     Mesh {
         vertices: vec![

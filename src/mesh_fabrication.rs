@@ -670,6 +670,7 @@ specs! {
     MeshDeleteFace => ("メッシュ面削除","0始まりの面番号を1枚削除します。穴が開く可能性があります。","mesh delete face cull 面削除",Mesh,[M,i("index","面番号",0.,0.,499999.)]);
     MeshSelfContact => ("メッシュ自己接触候補","共有頂点のない面同士の接触ペア数。近似判定。隣接面の重なりは未検査。上限超過はエラー。","mesh self intersection contact 自己交差",Number,[M]);
     MeshThicknessSample => ("肉厚サンプル推定","面中心から内向き法線に沿った出口距離の最小サンプル値と実サンプル数。真の最小肉厚ではありません。","mesh thickness thin wall sample 肉厚",Number,[M,i("samples","サンプル数",64.,1.,512.)]);
+    MeshBedFit => ("ベッド収まり確認","メッシュの外接箱の大きさ（いまの向きのまま）を機種のベッドと比べ、[はみ出し X, Y, Z (mm。収まる軸は 0), 収まるなら 1・収まらないなら 0] を出力。機種 0=Bambu A1 mini（角）1=同（中心）2=FlashForge Creator 5 3=粘土 4=Marlin 汎用。ベッド寸法は仮の値で、実機の仕様は未確認です。ベッドの XYZ を 0 より大きくすると機種の値の代わりに使います。","mesh bed fit build volume overflow print ベッド はみ出し 範囲 収まり 印刷",Number,[M,i("preset","機種（0〜4）",0.,0.,4.),n("bed_x","ベッドX（0=機種の値）",0.,0.,1000.,1.),n("bed_y","ベッドY（0=機種の値）",0.,0.,1000.,1.),n("bed_z","ベッド高さ（0=機種の値）",0.,0.,1000.,1.)]);
     MeshCompact => ("未使用頂点削除","面が参照しない頂点を削除して面番号を更新します。","mesh compact cull unused vertices 整理",Mesh,[M]);
     MeshNonManifold => ("メッシュ非多様体辺","3枚以上の面が共有する辺を線分で出力（8192本まで）。","mesh non manifold edges 非多様体 辺",Curve,[M]);
     MeshBoundaryLoops => ("メッシュ境界ループ","向きのそろった多様体メッシュの開境界を、面の向きに沿った閉じたポリラインとして出力。分岐・退化・重複面はエラー。","mesh boundary loops naked edge ring 境界 輪郭",Curve,[M]);
@@ -850,6 +851,26 @@ pub fn run_item(
             let (w, n) =
                 crate::mesh_geometry_checks::sampled_thickness(m, num(a, 1)? as usize, stop)?;
             Ok(numbers([w, n as f64]))
+        }
+        MeshBedFit => {
+            let preset = crate::gcode_job::Preset::from_index(num(a, 1)? as i64)
+                .ok_or("機種は 0〜4 で指定してください。")?;
+            let mut bed = preset.bed();
+            for (axis, slot) in bed.iter_mut().enumerate() {
+                let v = num(a, 2 + axis)?;
+                if v > 0. {
+                    *slot = v;
+                }
+            }
+            let (lo, hi) = bounds(m)?;
+            let size = sub(hi, lo);
+            let over: Vec<f64> = (0..3).map(|k| (size[k] - bed[k]).max(0.)).collect();
+            let fits = if over.iter().all(|v| *v <= 1e-9) {
+                1.
+            } else {
+                0.
+            };
+            Ok(numbers([over[0], over[1], over[2], fits]))
         }
         MeshCompact => {
             let mut used = vec![false; m.vertices.len()];

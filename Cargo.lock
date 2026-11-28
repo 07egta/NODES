@@ -1465,6 +1465,7 @@ dependencies = [
  "serde_json",
  "solidcraft-geom",
  "solidcraft-kernel",
+ "solidcraft-sketch",
  "xml-rs 1.0.0",
 ]
 
@@ -2414,6 +2415,16 @@ dependencies = [
  "truck-stepio",
  "truck-topology",
  "web-time",
+]
+
+[[package]]
+name = "solidcraft-sketch"
+version = "0.26.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "solidcraft-geom",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

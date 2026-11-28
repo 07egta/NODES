@@ -61,6 +61,13 @@ pub const KINDS: &[K] = &[
     K::ExactContinuity,
     K::ExactCurvatureComb,
     K::ExactOffsetCurve,
+    K::ExactTorus,
+    K::ExactSketch,
+    K::ExactZebra,
+    K::ExactDraftAnalysis,
+    K::ExactDiagnose,
+    K::SubdTsplinePatch,
+    K::ExactThicken,
 ];
 
 pub fn is_kind(kind: K) -> bool {
@@ -115,6 +122,16 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "sphere brep solid 球 厳密",
             Brep,
             [n("radius", "半径", 20., 0.01, 1e5, 0.5)]
+        ),
+        K::ExactTorus => spec!(
+            "厳密トーラス",
+            "Z 軸まわりのリング状 B-rep。大半径は管の中心まで、小半径は管の半径（mm）。大半径 > 小半径。",
+            "torus ring donut brep solid トーラス ドーナツ 厳密",
+            Brep,
+            [
+                n("major", "大半径", 30., 0.01, 1e5, 1.),
+                n("minor", "小半径", 8., 0.01, 1e5, 0.5)
+            ]
         ),
         K::ExactExtrude => spec!(
             "押し出して立体",
@@ -299,15 +316,15 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::ExactStepExport => spec!(
             "STEP 書き出し",
-            "入力の B-rep を STEP (AP242) に変換し、バイト数を出力します。保存先は「STEP を保存」から選べます。",
-            "step stp export 書き出し cad",
+            "入力の B-rep を STEP (AP242) に変換し、バイト数を出力します。保存先は「STEP を保存」から選べます。拡張子を .igs / .iges にすると IGES で保存します。",
+            "step stp iges igs export 書き出し cad",
             Number,
             [g("breps", "B-rep（リスト）", D::Brep)]
         ),
         K::ExactStepImport => spec!(
             "STEP 読み込み",
-            "選んだ .step または .stp ファイルの立体を B-rep として読み込みます。",
-            "step stp import 読み込み cad",
+            "選んだ .step / .stp / .iges / .igs ファイルの立体を B-rep として読み込みます。",
+            "step stp iges igs import 読み込み cad",
             Brep,
             []
         ),
@@ -518,6 +535,62 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             Curve,
             [C, n("distance", "距離", 5., -1e5, 1e5, 0.5)]
         ),
+        K::ExactSketch => spec!(
+            "拘束スケッチ",
+            "文章で書いた線・円・弧に拘束（水平・一致・接する…）と寸法を付けて解き、厳密な曲線にします。例: 「長方形 r 0 0 60 40」「円 c 30 20 8」「半径 c 10」。出力 0 = 閉じた領域の輪郭、1 = 各曲線。",
+            "sketch constraint solver dimension 拘束 スケッチ 寸法 2d",
+            Curve,
+            [i("mode", "出力 (0=輪郭,1=各曲線)", 0., 0., 1.)]
+        ),
+        K::ExactZebra => spec!(
+            "ゼブラ（連続性の表示）",
+            "B-rep に縞模様（等照線）を重ねて表示します。縞が面の境目で折れたり切れたりすると、そこはなめらかにつながっていません。",
+            "zebra isophote continuity analysis ゼブラ 縞 解析",
+            Mesh,
+            [
+                B,
+                n("stripes", "縞の本数", 12., 1., 200., 1.),
+                i("axis", "向き (0=X,1=Y,2=Z)", 0., 0., 2.)
+            ]
+        ),
+        K::ExactDraftAnalysis => spec!(
+            "抜き勾配の解析",
+            "上向き (+Z) に対して、指定角度より立っている面（抜き勾配が足りない面）をメッシュで示します。",
+            "draft angle analysis 抜き勾配 解析 ドラフト",
+            Mesh,
+            [B, n("angle", "必要な角度（度）", 2., 0., 89., 0.5)]
+        ),
+        K::ExactDiagnose => spec!(
+            "B-rep 診断（トレランス）",
+            "B-rep の状態を数値で出します: [閉じている, 面数, 稜線数, シェル数, メッシュの開いた辺, メッシュ水密, 交差した面ループ, メッシュ化できなかった面, 体積, 表示の弦誤差 mm, 同一点の許容差 mm]。",
+            "check diagnose tolerance validity brep 診断 トレランス 確認",
+            Number,
+            [B]
+        ),
+        K::SubdTsplinePatch => spec!(
+            "T-spline パッチケージ",
+            "四角い T-spline 面の制御ケージ。「ケージ編集」の局所細分で、選んだ面だけ点を増やせます（T 字の接合。形は変わりません）。",
+            "tspline t-spline patch local refine t-junction パッチ 局所細分",
+            Cage,
+            [
+                n("width", "幅", 80., 0.01, 1e5, 1.),
+                n("depth", "奥行", 60., 0.01, 1e5, 1.),
+                i("nu", "U の点数", 6., 4., 64.),
+                i("nv", "V の点数", 5., 4., 64.),
+                n("bulge", "膨らみ", 12., -1e5, 1e5, 1.)
+            ]
+        ),
+        K::ExactThicken => spec!(
+            "厚みをつける",
+            "開いた面（シート）に厚みをつけて閉じた立体にします。負の値で裏側へ。両側にすると半分ずつ。",
+            "thicken offset solid offsetsrf solid 厚み 立体化",
+            Brep,
+            [
+                B,
+                n("thickness", "厚み", 2., -1e4, 1e4, 0.2),
+                i("both", "両側 (1=はい)", 0., 0., 1.)
+            ]
+        ),
         _ => spec!("不明なノード", "不明なノードです。", "unknown", Any, []),
     }
 }
@@ -566,6 +639,7 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         )?),
         K::ExactSphere => out(kb::sphere([0.; 3], num(a, 0)?, stop)?),
+        K::ExactTorus => out(kb::torus(num(a, 0)?, num(a, 1)?, stop)?),
         K::ExactExtrude => out(kb::extrude(curve(a, 0)?, &[], num(a, 1)?, stop)?),
         K::ExactRevolve => out(kb::revolve(
             curve(a, 0)?,
@@ -723,6 +797,29 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         )?))]),
         K::SubdCageEdit => out_cage(cage(a, 0)?.as_ref().clone()),
+        K::SubdTsplinePatch => out_cage(Cage::tspline_patch(
+            num(a, 0)?,
+            num(a, 1)?,
+            num(a, 2)? as usize,
+            num(a, 3)? as usize,
+            num(a, 4)?,
+            stop,
+        )?),
+        K::ExactThicken => out(ko::thicken(
+            brep(a, 0)?,
+            num(a, 1)?,
+            num(a, 2)? != 0.,
+            stop,
+        )?),
+        K::ExactZebra => as_mesh(
+            ko::zebra(brep(a, 0)?, num(a, 1)?, num(a, 2)? as usize, stop)?,
+            stop,
+        ),
+        K::ExactDraftAnalysis => as_mesh(ko::draft_analysis(brep(a, 0)?, num(a, 1)?, stop)?, stop),
+        K::ExactDiagnose => Ok(ko::diagnose(brep(a, 0)?, stop)?
+            .into_iter()
+            .map(Value::Number)
+            .collect()),
         _ => Err("このノードはリスト評価が必要です。".into()),
     }
 }
@@ -781,16 +878,40 @@ pub(crate) fn step_text(inputs: &[Tree], stop: &dyn Fn() -> bool) -> Result<Stri
     kb::step_export(&bodies, stop)
 }
 
+pub(crate) fn iges_text(inputs: &[Tree], stop: &dyn Fn() -> bool) -> Result<String, String> {
+    let bodies: Vec<&BrepValue> = inputs
+        .iter()
+        .flat_map(|t| t.branches.values())
+        .flatten()
+        .filter_map(|value| match value {
+            Value::Brep(brep) => Some(brep.as_ref()),
+            _ => None,
+        })
+        .collect();
+    kb::iges_export(&bodies, stop)
+}
+
 fn check_step_extension(path: &Path) -> Result<(), String> {
     if path
         .extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("step") || ext.eq_ignore_ascii_case("stp"))
+        .is_some_and(|ext| {
+            ["step", "stp", "iges", "igs"]
+                .iter()
+                .any(|e| ext.eq_ignore_ascii_case(e))
+        })
     {
         Ok(())
     } else {
-        Err("拡張子が .step / .stp のファイルを指定してください。".into())
+        Err("拡張子が .step / .stp / .iges / .igs のファイルを指定してください。".into())
     }
+}
+
+/// Whether the path names an IGES file (by extension).
+fn is_iges(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("iges") || ext.eq_ignore_ascii_case("igs"))
 }
 
 /// Saves a STEP export node using its evaluated upstream data. The caller confirms
@@ -802,7 +923,11 @@ pub fn write_step(path: &Path, node: &Node, evaluation: &Evaluation) -> Result<u
     check_step_extension(path)?;
     let stop = || false;
     let inputs = node_inputs(node, &evaluation.outputs, &stop)?;
-    let text = step_text(&inputs, &stop)?;
+    let text = if is_iges(path) {
+        iges_text(&inputs, &stop)?
+    } else {
+        step_text(&inputs, &stop)?
+    };
     crate::persistence::atomic_write(path, |file| file.write_all(text.as_bytes()))?;
     Ok(text.len())
 }
@@ -828,7 +953,11 @@ pub(crate) fn read_step(path: &str, stop: &dyn Fn() -> bool) -> Result<Tree, Str
     File::open(path)
         .and_then(|file| file.take(max_bytes + 1).read_to_string(&mut text))
         .map_err(|e| format!("STEP ファイルを読めません（{e}）。"))?;
-    let bodies = kb::step_import(&text, stop)?;
+    let bodies = if is_iges(path) {
+        kb::iges_import(&text, stop)?
+    } else {
+        kb::step_import(&text, stop)?
+    };
     Ok(Tree {
         branches: BTreeMap::from([(
             vec![0],

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "name": "なめらかな半径制御の花器",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "vase",
+        "name": "花器",
+        "position": [
+          300,
+          30
+        ],
+        "params": {
+          "amplitude": 0.18,
+          "height": 104,
+          "layers": 40,
+          "lobes": 7,
+          "radius": 32,
+          "segments": 72,
+          "thickness": 2.4
+        },
+        "inputs": {
+          "radius": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "twist",
+        "name": "ねじり",
+        "position": [
+          570,
+          30
+        ],
+        "params": {
+          "angle": 110
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          820,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 3,
+        "kind": "expression",
+        "name": "なめらかな半径",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "x": 0.5,
+          "y": 0,
+          "z": 0,
+          "w": 0
+        },
+        "inputs": {},
+        "preview": true,
+        "script": "lerp(20,45,smoothstep(x,0,1))"
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

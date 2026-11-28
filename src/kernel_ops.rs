@@ -426,22 +426,16 @@ pub fn linear_array(b: &BrepValue, step: P3, count: usize, stop: Stop) -> R<Vec<
     if b.weight().saturating_mul(count) > 40_000_000 {
         return Err("配列が大きすぎます。個数を減らしてください。".into());
     }
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        stopped(stop)?;
-        if i == 0 {
-            out.push(b.clone());
-            continue;
-        }
-        let t = scale(step, i as f64);
-        let body = kernel("配列", stop, || {
-            sk::transform_matrix(
-                b.body(),
-                matrix([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]], t),
+    let mats: Vec<[[f64; 4]; 4]> = (1..count)
+        .map(|i| {
+            matrix(
+                [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+                scale(step, i as f64),
             )
-        })?;
-        out.push(brep(body, stop)?);
-    }
+        })
+        .collect();
+    let mut out = vec![b.clone()];
+    out.extend(transformed_copies(b, &mats, "配列", stop)?);
     Ok(out)
 }
 
@@ -459,22 +453,60 @@ pub fn polar_array(b: &BrepValue, count: usize, angle_deg: f64, stop: Stop) -> R
     } else {
         count - 1
     };
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
+    let mats: Vec<[[f64; 4]; 4]> = (1..count)
+        .map(|i| {
+            let a = (angle_deg * i as f64 / steps as f64).to_radians();
+            let (s, c) = a.sin_cos();
+            matrix([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]], [0.; 3])
+        })
+        .collect();
+    let mut out = vec![b.clone()];
+    out.extend(transformed_copies(b, &mats, "円形配列", stop)?);
+    Ok(out)
+}
+
+/// Worker threads for independent copies (the machine's cores, at most 8).
+fn workers() -> usize {
+    std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .clamp(1, 8)
+}
+
+/// Transformed copies of a body, meshed in parallel: one batch per core, the cancel flag
+/// checked between batches (a kernel call itself cannot be interrupted).
+pub fn transformed_copies(
+    b: &BrepValue,
+    mats: &[[[f64; 4]; 4]],
+    what: &str,
+    stop: Stop,
+) -> R<Vec<BrepValue>> {
+    let never = || false;
+    let mut out = Vec::with_capacity(mats.len());
+    for batch in mats.chunks(workers()) {
         stopped(stop)?;
-        if i == 0 {
-            out.push(b.clone());
-            continue;
+        let results: Vec<R<BrepValue>> = std::thread::scope(|scope| {
+            let handles: Vec<_> = batch
+                .iter()
+                .map(|m| {
+                    let never = &never;
+                    scope.spawn(move || {
+                        let body = kernel(what, never, || sk::transform_matrix(b.body(), *m))?;
+                        brep(body, never)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| {
+                    h.join().unwrap_or_else(|_| {
+                        Err(format!("{what}: 計算中に内部エラーが起きました。"))
+                    })
+                })
+                .collect()
+        });
+        for r in results {
+            out.push(r?);
         }
-        let a = (angle_deg * i as f64 / steps as f64).to_radians();
-        let (s, c) = a.sin_cos();
-        let body = kernel("円形配列", stop, || {
-            sk::transform_matrix(
-                b.body(),
-                matrix([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]], [0.; 3]),
-            )
-        })?;
-        out.push(brep(body, stop)?);
     }
     Ok(out)
 }
@@ -696,4 +728,186 @@ pub fn offset_curve(c: &Curve, distance: f64, stop: Stop) -> R<Curve> {
         pts.push(first);
     }
     fit_points(&pts, stop)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Analysis meshes and diagnostics
+// ---------------------------------------------------------------------------------------------
+
+/// Area-weighted vertex normals of a triangle mesh.
+fn vertex_normals(m: &crate::model::Mesh) -> Vec<P3> {
+    let mut n = vec![[0.; 3]; m.vertices.len()];
+    for t in &m.triangles {
+        let p = |i: u32| m.vertices.get(i as usize).copied().unwrap_or([0.; 3]);
+        let f = cross(sub(p(t[1]), p(t[0])), sub(p(t[2]), p(t[0])));
+        for &i in t {
+            if let Some(slot) = n.get_mut(i as usize) {
+                *slot = add(*slot, f);
+            }
+        }
+    }
+    n.into_iter()
+        .map(|v| unit(v).unwrap_or([0., 0., 1.]))
+        .collect()
+}
+
+/// The parts of each triangle where the linear scalar `f` (given at its corners) lies in a band
+/// `[k, k + 0.5)` for an integer k (Sutherland–Hodgman clipping against the band's levels).
+fn bands(m: &crate::model::Mesh, f: &[f64], stop: Stop) -> R<crate::model::Mesh> {
+    let mut out = crate::model::Mesh::default();
+    for t in &m.triangles {
+        stopped(stop)?;
+        let poly: Vec<(P3, f64)> = t
+            .iter()
+            .map(|&i| {
+                (
+                    m.vertices.get(i as usize).copied().unwrap_or([0.; 3]),
+                    f.get(i as usize).copied().unwrap_or(0.),
+                )
+            })
+            .collect();
+        let lo = poly.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
+        let hi = poly.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+        if !(lo.is_finite() && hi.is_finite()) || hi - lo > 1e4 {
+            continue;
+        }
+        let mut k = lo.floor();
+        while k <= hi {
+            let clip = |poly: Vec<(P3, f64)>, level: f64, keep_above: bool| -> Vec<(P3, f64)> {
+                let inside = |v: f64| if keep_above { v >= level } else { v < level };
+                let mut res = Vec::with_capacity(poly.len() + 2);
+                for i in 0..poly.len() {
+                    let (Some(&a), Some(&b)) = (poly.get(i), poly.get((i + 1) % poly.len())) else {
+                        continue;
+                    };
+                    if inside(a.1) {
+                        res.push(a);
+                    }
+                    if inside(a.1) != inside(b.1) && (b.1 - a.1).abs() > 1e-300 {
+                        let s = (level - a.1) / (b.1 - a.1);
+                        res.push((add(a.0, scale(sub(b.0, a.0), s)), level));
+                    }
+                }
+                res
+            };
+            let piece = clip(clip(poly.clone(), k, true), k + 0.5, false);
+            if piece.len() >= 3 {
+                let base = out.vertices.len() as u32;
+                out.vertices.extend(piece.iter().map(|p| p.0));
+                for j in 1..piece.len() as u32 - 1 {
+                    out.triangles.push([base, base + j, base + j + 1]);
+                }
+            }
+            k += 1.;
+        }
+        if out.triangles.len() > kb::limits::MAX_TRIANGLES {
+            return Err("縞が細かすぎます。本数を減らしてください。".into());
+        }
+    }
+    Ok(out)
+}
+
+/// Zebra stripes (isophotes): the dark stripes of the reflection of parallel light bars along
+/// `axis` (0 = X, 1 = Y, 2 = Z), as a mesh lifted slightly off the surface. Stripes that break
+/// or kink across an edge show where the surfaces are not G1 or G2.
+pub fn zebra(b: &BrepValue, stripes: f64, axis: usize, stop: Stop) -> R<crate::model::Mesh> {
+    if !(stripes.is_finite() && (1. ..=200.).contains(&stripes)) || axis > 2 {
+        return Err("縞の本数は 1〜200、向きは 0〜2 にしてください。".into());
+    }
+    let m = b.preview();
+    let normals = vertex_normals(m);
+    let mut dir = [0.; 3];
+    if let Some(d) = dir.get_mut(axis) {
+        *d = 1.;
+    }
+    let f: Vec<f64> = normals
+        .iter()
+        .map(|n| stripes * dot(*n, dir).clamp(-1., 1.).acos() / std::f64::consts::PI)
+        .collect();
+    let lift = tol::chord(b.body().size()) * 0.5;
+    let lifted = crate::model::Mesh {
+        vertices: m
+            .vertices
+            .iter()
+            .zip(&normals)
+            .map(|(p, n)| add(*p, scale(*n, lift)))
+            .collect(),
+        triangles: m.triangles.clone(),
+    };
+    bands(&lifted, &f, stop)
+}
+
+/// The surface that is steeper than `angle_deg` from the pull direction +Z (walls that would
+/// need a draft for a mould, or overhangs for printing when negative angles are wanted).
+pub fn draft_analysis(b: &BrepValue, angle_deg: f64, stop: Stop) -> R<crate::model::Mesh> {
+    if !angle_deg.is_finite() || !(0. ..=89.).contains(&angle_deg) {
+        return Err("角度は 0〜89° にしてください。".into());
+    }
+    let m = b.preview();
+    let limit = angle_deg.to_radians().sin();
+    let mut out = crate::model::Mesh::default();
+    for t in &m.triangles {
+        stopped(stop)?;
+        let p = |i: u32| m.vertices.get(i as usize).copied().unwrap_or([0.; 3]);
+        let Some(n) = unit(cross(sub(p(t[1]), p(t[0])), sub(p(t[2]), p(t[0])))) else {
+            continue;
+        };
+        // Draft angle of a face: its tilt from the pull direction, asin(|n·z|).
+        if n[2].abs() < limit {
+            let base = out.vertices.len() as u32;
+            out.vertices.extend([p(t[0]), p(t[1]), p(t[2])]);
+            out.triangles.push([base, base + 1, base + 2]);
+        }
+    }
+    if out.triangles.is_empty() {
+        return Err(format!("抜き勾配 {angle_deg}° 未満の面はありません。"));
+    }
+    Ok(out)
+}
+
+/// Tolerance and validity check of a B-rep: [closed (1/0), faces, edges, shells, open mesh edges,
+/// mesh watertight (1/0), crossed face loops, faces that did not mesh, volume (mm³, 0 if open),
+/// chord tolerance used (mm), linear tolerance (mm)].
+pub fn diagnose(b: &BrepValue, stop: Stop) -> R<Vec<f64>> {
+    let body = b.body();
+    let crossed = kernel("診断", stop, || body.crossed_face_loops()).unwrap_or(usize::MAX);
+    let open = kb::boundary_edges(b.preview()).len();
+    Ok(vec![
+        f64::from(u8::from(b.is_closed())),
+        b.face_count() as f64,
+        b.edge_count() as f64,
+        body.shell_count() as f64,
+        open as f64,
+        f64::from(u8::from(b.mesh_is_watertight())),
+        if crossed == usize::MAX {
+            -1.
+        } else {
+            crossed as f64
+        },
+        body.unmeshed_faces() as f64,
+        b.volume().unwrap_or(0.),
+        tol::chord(body.size()),
+        tol::ABS,
+    ])
+}
+
+/// A sheet thickened into a closed solid (SolidCraft `thicken`: planes and cylinders exactly,
+/// other faces fitted within 0.01 mm).
+pub fn thicken(b: &BrepValue, thickness: f64, both: bool, stop: Stop) -> R<BrepValue> {
+    if !thickness.is_finite()
+        || thickness.abs() <= tol::ABS
+        || thickness.abs() > kb::limits::MAX_COORDINATE
+    {
+        return Err("厚みは 0 以外の有限な値にしてください。".into());
+    }
+    if b.is_closed() {
+        return Err(
+            "閉じた立体には厚みをつけられません。中空にするときは「シェル」を使ってください。"
+                .into(),
+        );
+    }
+    let body = kernel("厚みをつける", stop, || {
+        sk::thicken(b.body(), thickness, both)
+    })?;
+    brep(body, stop)
 }
