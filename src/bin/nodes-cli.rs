@@ -106,6 +106,20 @@ fn read_request(path: &Path) -> Result<Request, CliError> {
     graph_api::parse_request(&bytes).map_err(|message| problem("invalid_request", message))
 }
 
+// Request JSON is an input artifact, unlike a project explicitly edited in place.
+fn protect_request(request: &Path, destination: &Path) -> Result<(), CliError> {
+    if request == destination
+        || matches!((fs::canonicalize(request), fs::canonicalize(destination)),
+            (Ok(source), Ok(target)) if source == target)
+    {
+        return Err(problem(
+            "invalid_destination",
+            "Project output must differ from the input request.",
+        ));
+    }
+    Ok(())
+}
+
 fn checked_evaluate(project: &Project) -> Result<Evaluation, CliError> {
     let result = graph_api::evaluate(&project.graph, &|| false)
         .map_err(|message| problem("invalid_graph", message))?;
@@ -394,12 +408,14 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             Ok(json!(report))
         }
         "build" => {
+            protect_request(Path::new(&arguments[0]), Path::new(&arguments[1]))?;
             let request = read_request(Path::new(&arguments[0]))?;
             let project =
                 graph_api::build(&request).map_err(|message| problem("build_failed", message))?;
             save_evaluated(&project, Path::new(&arguments[1]))
         }
         "apply" => {
+            protect_request(Path::new(&arguments[1]), Path::new(&arguments[2]))?;
             let mut project = load_project(Path::new(&arguments[0]))?;
             let request = read_request(Path::new(&arguments[1]))?;
             let aliases = graph_api::apply(&mut project.graph, &request)
