@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "name": "平歯車・近似インボリュート素材",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "spur_gear_profile",
+        "name": "歯数とモジュール",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "teeth": 24,
+          "module": 2
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "歯幅",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "height": 6,
+          "layers": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

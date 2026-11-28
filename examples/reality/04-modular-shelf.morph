@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "name": "パラメトリック家具・棚の組立模型",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "棚板",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 60,
+          "depth": 30,
+          "height": 3
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "grid_array3d",
+        "name": "棚板の段数",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "nx": 1,
+          "ny": 1,
+          "nz": 3,
+          "dx": 0,
+          "dy": 0,
+          "dz": 25
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "box",
+        "name": "側板",
+        "position": [
+          20,
+          340
+        ],
+        "params": {
+          "width": 3,
+          "depth": 30,
+          "height": 53
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "grid_array3d",
+        "name": "左右の側板",
+        "position": [
+          280,
+          340
+        ],
+        "params": {
+          "nx": 2,
+          "ny": 1,
+          "nz": 1,
+          "dx": 63,
+          "dy": 0,
+          "dz": 0
+        },
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "move",
+        "name": "側板を中央へ",
+        "position": [
+          540,
+          340
+        ],
+        "params": {
+          "x": -31.5,
+          "y": 0,
+          "z": 0
+        },
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "concat_list",
+        "name": "部品をまとめる",
+        "position": [
+          800,
+          150
+        ],
+        "params": {},
+        "inputs": {
+          "a": 1,
+          "b": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1580,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 5
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 7
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

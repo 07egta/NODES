@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "name": "数学的立体・トーラス結び目",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "torus_knot",
+        "name": "互いに素な p,q",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "major": 27,
+          "minor": 9,
+          "p": 2,
+          "q": 3,
+          "samples": 384
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "pipe",
+        "name": "厚み付きパイプ",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "radius": 1.1,
+          "sides": 12,
+          "caps": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "name": "フラクタル彫刻・コッホ雪片レリーフ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "koch_snowflake",
+        "name": "再帰輪郭",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "size": 60,
+          "depth": 2
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "レリーフ厚み",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "height": 3,
+          "layers": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

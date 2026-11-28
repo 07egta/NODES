@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "name": "3Dプリント用アクセサリー・リング",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "torus",
+        "name": "リング断面",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "major": 10.5,
+          "minor": 2.5,
+          "segments": 96,
+          "tube": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "move",
+        "name": "底を Z=0 に",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "x": 0,
+          "y": 0,
+          "z": 2.5
+        },
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

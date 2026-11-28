@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "name": "格子構造・六角セルフレーム",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "hex_panels",
+        "name": "六角セル",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 4,
+          "ny": 4,
+          "size": 7,
+          "fill": 0.8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "pipe",
+        "name": "厚み付きパイプ",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "radius": 0.65,
+          "sides": 12,
+          "caps": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "name": "らせん立体・両端閉鎖チューブ",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "helix",
+        "name": "らせん",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "height": 90,
+          "radius": 20,
+          "segments": 192,
+          "turns": 3
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "pipe",
+        "name": "厚み付きパイプ",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "radius": 1.6,
+          "sides": 12,
+          "caps": 1
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          540,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 3
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

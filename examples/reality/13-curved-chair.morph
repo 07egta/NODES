@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "name": "曲面椅子・座面背面一体シェル模型",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "rectangle",
+        "name": "断面",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 44,
+          "depth": 3
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "長手方向の分割",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "height": 85,
+          "layers": 48
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "bend",
+        "name": "座面と背面の曲げ",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "axis": 0,
+          "angle": 105
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          800,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}
