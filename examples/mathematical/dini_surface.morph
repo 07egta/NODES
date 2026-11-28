@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "name": "ディニ曲面 — 螺旋状の負曲率シェル",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "dini_surface",
+        "name": "ディニ曲面",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "scale": 20,
+          "twist": 0.2,
+          "turns": 2,
+          "v_min": 0.2,
+          "v_max": 1.35,
+          "u_segments": 96,
+          "v_segments": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}

@@ -5,6 +5,8 @@ use crate::model::*;
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 
+mod ornament;
+
 const GEOMETRY: InputSpec = g("geometry", "形状", DataType::Geometry);
 const POINTS: InputSpec = g("points", "点リスト", DataType::Point);
 const GRID: &[InputSpec] = &[
@@ -299,6 +301,7 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         CurveArray => &CURVE_ARRAY,
         NoiseField => &NOISE_FIELD,
         LifeGrid => &LIFE_GRID,
+        k if ornament::is_kind(k) => ornament::spec(k),
         _ => unreachable!("not a generative node"),
     }
 }
@@ -328,7 +331,7 @@ pub(crate) fn is_kind(kind: NodeKind) -> bool {
             | NodeKind::CurveArray
             | NodeKind::NoiseField
             | NodeKind::LifeGrid
-    )
+    ) || ornament::is_kind(kind)
 }
 pub(crate) fn is_list(kind: NodeKind) -> bool {
     matches!(
@@ -339,6 +342,8 @@ pub(crate) fn is_list(kind: NodeKind) -> bool {
             | NodeKind::MultiAttractor
             | NodeKind::PointArray
             | NodeKind::Delaunay2d
+            | NodeKind::PowerDiagram2d
+            | NodeKind::LloydRelax2d
     )
 }
 
@@ -400,6 +405,9 @@ fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// Predict the expensive item outputs before the engine allocates them.
 pub(crate) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), String> {
     use NodeKind::*;
+    if ornament::is_kind(kind) {
+        return ornament::estimate(kind, a);
+    }
     let n = match kind {
         RectGrid | TriangularGrid | HexGrid | HexPanels | GridArray => count(
             a,
@@ -465,6 +473,9 @@ pub(crate) fn run_item(
 ) -> Result<Vec<Value>, String> {
     use NodeKind::*;
     cancelled(cancel)?;
+    if ornament::is_kind(kind) {
+        return ornament::run_item(kind, a, cancel);
+    }
     match kind {
         RectGrid | TriangularGrid | HexGrid | HexPanels | TriPanels => {
             let nx = count(a, 0, 64)?;
@@ -736,6 +747,9 @@ pub(crate) fn run_list(
     use NodeKind::*;
     cancelled(cancel)?;
     let input = points(list(lists, 0)?)?;
+    if ornament::is_kind(kind) {
+        return ornament::run_list(kind, &input, lists, cancel);
+    }
     if kind == PointArray && list(lists, 1)?.len() != 1 {
         return Err("点配置にはブランチごとに元形状が 1 個必要です。".into());
     }

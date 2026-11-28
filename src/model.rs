@@ -592,6 +592,23 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
+    // Ornament nodes: append-only serialized identifiers.
+    TruchetPattern,
+    AsanohaPattern,
+    ShippoPattern,
+    PowerDiagram2d,
+    LloydRelax2d,
+    // Mathematical surfaces (analytic formulas, mesh outputs).
+    Catenoid,
+    Helicoid,
+    EnneperSurface,
+    MobiusStrip,
+    KleinBottle,
+    DiniSurface,
     // GENESIS: append-only stable serialized IDs.
     GenesisScopes,
     GenesisScopeIds,
@@ -602,10 +619,6 @@ pub enum NodeKind {
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
-    MatterRotatingSquares,
-    MatterExpansionRatio,
-    MatterPlateContact,
-    MatterInverseAngle,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1040,6 +1053,21 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
+            Self::TruchetPattern,
+            Self::AsanohaPattern,
+            Self::ShippoPattern,
+            Self::PowerDiagram2d,
+            Self::LloydRelax2d,
+            Self::Catenoid,
+            Self::Helicoid,
+            Self::EnneperSurface,
+            Self::MobiusStrip,
+            Self::KleinBottle,
+            Self::DiniSurface,
             Self::GenesisScopes,
             Self::GenesisScopeIds,
             Self::GenesisRelief,
@@ -1048,10 +1076,6 @@ impl NodeKind {
             Self::OrigamiMiuraCreases,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
-            Self::MatterRotatingSquares,
-            Self::MatterExpansionRatio,
-            Self::MatterPlateContact,
-            Self::MatterInverseAngle,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1710,6 +1734,9 @@ impl NodeKind {
             | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            other if crate::mathematical_surfaces::is_kind(other) => {
+                crate::mathematical_surfaces::spec(other)
+            }
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| crate::biomorph::spec(other))

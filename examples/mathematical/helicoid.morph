@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "name": "ヘリコイド — 螺旋階段状の曲面",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "helicoid",
+        "name": "ヘリコイド",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "radius": 30,
+          "pitch": 25,
+          "turns": 1.5,
+          "u_segments": 96,
+          "v_segments": 24
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}
