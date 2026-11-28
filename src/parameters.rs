@@ -159,6 +159,44 @@ fn has_variable(expression: &Expr) -> bool {
     }
 }
 
+/// Parse a constant expression for an existing numeric port, in its native
+/// display unit. Bare numbers and unitless expressions use that unit. Explicit
+/// units must resolve to the target dimension; scalar results from unit-bearing
+/// expressions are accepted only for scalar ports. No graph references or scripts.
+pub fn parse_numeric_input(text: &str, target: Unit) -> Result<f64, String> {
+    if text.len() > expr::MAX_EXPR_LEN * 4 || text.chars().count() > expr::MAX_EXPR_LEN {
+        return Err("数値の式が長すぎます。".into());
+    }
+    // Preserve binary64 round trips and the sign bit of zero.
+    let direct = text.trim().replace('−', "-");
+    if let Ok(value) = direct.parse::<f64>() {
+        return if value.is_finite() {
+            Ok(value)
+        } else {
+            Err("有限の数値を入力してください。".into())
+        };
+    }
+    let expression = expr::parse_with_literal_units(text, |name| {
+        let unit = match name {
+            "mm" => Unit::Mm,
+            "cm" => Unit::Cm,
+            "m" => Unit::M,
+            "in" | "inch" => Unit::Inch,
+            "rad" => Unit::Rad,
+            "deg" => Unit::Deg,
+            _ => return None,
+        };
+        let index = if unit.dimension() == LENGTH { 0 } else { 1 };
+        Some((index, unit.scale()))
+    })?;
+    if !has_variable(&expression) {
+        return expression.eval([0.0; 4]);
+    }
+    let actual = expression_dimension(&expression, &[LENGTH, ANGLE])?;
+    same_dimension(actual, target.dimension())?;
+    target.display(expression.eval([1.0, 1.0, 0.0, 0.0])?)
+}
+
 struct Formula {
     expression: Expr,
     references: Vec<String>,
@@ -477,5 +515,79 @@ impl ParameterTable {
         }
         *graph = candidate;
         Ok(values)
+    }
+}
+
+#[cfg(test)]
+mod numeric_input_tests {
+    use super::{Unit, parse_numeric_input};
+
+    #[test]
+    fn direct_precision_and_constant_arithmetic() {
+        let precise = 30.123_456_789_012_344_f64;
+        assert_eq!(
+            parse_numeric_input(&precise.to_string(), Unit::Mm)
+                .unwrap()
+                .to_bits(),
+            precise.to_bits()
+        );
+        assert_eq!(
+            parse_numeric_input("−0", Unit::Scalar).unwrap().to_bits(),
+            (-0.0_f64).to_bits()
+        );
+        assert_eq!(parse_numeric_input("20*3", Unit::Mm).unwrap(), 60.0);
+        assert_eq!(parse_numeric_input("1e-3", Unit::Scalar).unwrap(), 0.001);
+        assert_eq!(
+            parse_numeric_input("pi/4", Unit::Rad).unwrap(),
+            std::f64::consts::FRAC_PI_4
+        );
+    }
+
+    #[test]
+    fn explicit_units_are_dimension_checked() {
+        for (text, target, expected) in [
+            ("10mm", Unit::Mm, 10.0),
+            ("2 cm + 5 mm", Unit::Mm, 25.0),
+            ("1e-3m", Unit::Mm, 1.0),
+            ("2inch", Unit::Mm, 50.8),
+            ("sin(30deg)", Unit::Scalar, 0.5),
+            ("90deg", Unit::Rad, std::f64::consts::FRAC_PI_2),
+            ("1rad", Unit::Deg, 180.0 / std::f64::consts::PI),
+            ("10mm/2mm", Unit::Scalar, 5.0),
+            ("sqrt(4mm^2)", Unit::Mm, 4.0),
+        ] {
+            let actual = parse_numeric_input(text, target).unwrap();
+            assert!((actual - expected).abs() < 1e-12, "{text}: {actual}");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_or_unbounded_input_and_keeps_expression_syntax() {
+        for text in [
+            "NaN",
+            "Infinity",
+            "1/0",
+            "sqrt(-1)",
+            "1e308m",
+            "10mm+2deg",
+            "2mm+3",
+            "2deg",
+            "x",
+            "x*1mm",
+            "unknown(1)",
+            "1 2",
+            "1mm^2",
+        ] {
+            assert!(parse_numeric_input(text, Unit::Mm).is_err(), "{text}");
+        }
+        assert!(parse_numeric_input(&"(".repeat(300), Unit::Scalar).is_err());
+        assert!(crate::expr::parse("2cm").is_err());
+        assert_eq!(
+            crate::expr::parse("x*2")
+                .unwrap()
+                .eval([3.0, 0.0, 0.0, 0.0])
+                .unwrap(),
+            6.0
+        );
     }
 }

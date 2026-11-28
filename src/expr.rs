@@ -221,7 +221,10 @@ fn tokenize(chars: &[char]) -> Result<Vec<Tok>, String> {
     Ok(toks)
 }
 
+type LiteralUnit = fn(&str) -> Option<(usize, f64)>;
+
 struct Parser {
+    literal_units: Option<LiteralUnit>,
     toks: Vec<Tok>,
     pos: usize,
     nodes: usize,
@@ -309,7 +312,23 @@ impl Parser {
         let tok = self.peek().cloned().ok_or(SYNTAX)?;
         self.pos += 1;
         match tok {
-            Tok::Num(v) => self.make(Expr::Num(v)),
+            Tok::Num(v) => {
+                // Only the precision editor enables unit suffixes. Their canonical
+                // values share the existing AST and dimensional checker.
+                if let (Some(unit), Some(Tok::Ident(name))) = (self.literal_units, self.peek())
+                    && let Some((index, scale)) = unit(name)
+                {
+                    self.pos += 1;
+                    let canonical = v * scale;
+                    if !canonical.is_finite() || (v != 0.0 && canonical == 0.0) {
+                        return Err("単位変換で数値の表現範囲を超えました。".into());
+                    }
+                    let value = self.make(Expr::Num(canonical))?;
+                    let dimension = self.make(Expr::Var(index))?;
+                    return self.bin(Op::Mul, value, dimension);
+                }
+                self.make(Expr::Num(v))
+            }
             Tok::LParen => {
                 let inner = self.additive(depth + 1)?;
                 self.expect_close()?;
@@ -344,6 +363,9 @@ impl Parser {
                     return self.make(Expr::Call(func, args));
                 }
                 match name.as_str() {
+                    "x" | "y" | "z" | "w" if self.literal_units.is_some() => {
+                        Err("直接入力では変数を使用できません。".into())
+                    }
                     "x" => self.make(Expr::Var(0)),
                     "y" => self.make(Expr::Var(1)),
                     "z" => self.make(Expr::Var(2)),
@@ -370,12 +392,23 @@ impl Parser {
 
 /// Parses an expression. Every failure is a Japanese message; nothing here can panic.
 pub fn parse(src: &str) -> Result<Expr, String> {
+    parse_inner(src, None)
+}
+
+/// Opt-in numeric literal suffixes. Ordinary Expression nodes retain their
+/// original syntax; direct entry cannot access graph variables.
+pub(crate) fn parse_with_literal_units(src: &str, unit: LiteralUnit) -> Result<Expr, String> {
+    parse_inner(src, Some(unit))
+}
+
+fn parse_inner(src: &str, literal_units: Option<LiteralUnit>) -> Result<Expr, String> {
     let chars = normalise(src)?;
     let toks = tokenize(&chars)?;
     if toks.is_empty() {
         return Err("式が空です。例: x * 2 + y".into());
     }
     let mut parser = Parser {
+        literal_units,
         toks,
         pos: 0,
         nodes: 0,

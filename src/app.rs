@@ -2003,7 +2003,11 @@ impl NodesApp {
                             if let Some(n) = self.project.graph.node_mut(id) {
                                 let mut value = n.params.get(input.key).copied().unwrap_or(default);
                                 let before = value.to_bits();
-                                parameter_editor(ui, &mut value, input);
+                                parameter_editor(ui, &mut value, input)
+                                    .on_hover_text("数式入力: pi/4, 20*3, sin(30deg)");
+                                if ui.small_button("↺").on_hover_text("既定値に戻す").clicked() {
+                                    value = default;
+                                }
                                 if value.to_bits() != before {
                                     n.params.insert(input.key.into(), value);
                                 }
@@ -3327,12 +3331,7 @@ fn parameter_binding<'a>(
 }
 
 fn parse_parameter_number(text: &str) -> Option<f64> {
-    let text: String = text
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .map(|c| if c == '−' { '-' } else { c })
-        .collect();
-    text.parse::<f64>().ok().filter(|number| number.is_finite())
+    nodes::parameters::parse_numeric_input(text, nodes::parameters::Unit::Scalar).ok()
 }
 
 pub(crate) fn parameter_slider<'a>(value: &'a mut f64, spec: &InputSpec) -> egui::Slider<'a> {
