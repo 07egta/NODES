@@ -911,3 +911,241 @@ pub fn thicken(b: &BrepValue, thickness: f64, both: bool, stop: Stop) -> R<BrepV
     })?;
     brep(body, stop)
 }
+
+// ---------------------------------------------------------------------------------------------
+// Blend / match surfaces, trimming by any plane, seam analysis, curvature map
+// ---------------------------------------------------------------------------------------------
+
+/// A whole-number input (an edge or face number) as an index.
+fn whole(name: &str, v: f64) -> R<usize> {
+    if v.is_finite() && (0. ..1e9).contains(&v) {
+        Ok(v as usize)
+    } else {
+        Err(format!("{name}は 0 以上の整数にしてください。"))
+    }
+}
+
+/// 0 → G0 (position), 1 → G1 (tangent plane), 2 or more → G2 (curvature).
+fn grade(v: f64) -> sk::Continuity {
+    if v < 0.5 {
+        sk::Continuity::G0
+    } else if v < 1.5 {
+        sk::Continuity::G1
+    } else {
+        sk::Continuity::G2
+    }
+}
+
+/// A point on edge number `edge` (its middle), the way the kernel picks an edge again.
+fn edge_point(b: &BrepValue, edge: f64, stop: Stop) -> R<Vec3> {
+    let index = whole("稜線番号", edge)?;
+    let edges = kernel("稜線の取得", stop, || {
+        b.body().edges(tol::chord(b.body().size()))
+    })?;
+    edges.get(index).map(|e| e.mid).ok_or_else(|| {
+        format!(
+            "稜線番号 {index} はありません（0〜{}）。",
+            edges.len().saturating_sub(1)
+        )
+    })
+}
+
+/// A blend surface between edge `edge_a` of `a` and edge `edge_b` of `b`. `grades` are 0 (G0),
+/// 1 (G1) or 2 (G2) for each side; `crown` is how full the middle is.
+pub fn blend_surface(
+    a: &BrepValue,
+    edge_a: f64,
+    b: &BrepValue,
+    edge_b: f64,
+    grades: (f64, f64),
+    crown: f64,
+    stop: Stop,
+) -> R<BrepValue> {
+    if !crown.is_finite() || crown.abs() > 10. {
+        return Err("ふくらみは -10〜10 の範囲にしてください。".into());
+    }
+    let pa = edge_point(a, edge_a, stop)?;
+    let pb = edge_point(b, edge_b, stop)?;
+    let (body, _gap) = kernel("ブレンド曲面", stop, || {
+        sk::blend_between(
+            a.body(),
+            &[pa],
+            b.body(),
+            &[pb],
+            [grade(grades.0), grade(grades.1)],
+            [crown, crown],
+            None,
+            None,
+            33,
+            false,
+        )
+    })?;
+    brep(body, stop)
+}
+
+/// Rebuild face `face` of the sheet so that its edge nearest `edge` of `target` takes that edge's
+/// place and continues the target's surface up to `order` (0 = G0, 1 = G1, 2 = G2).
+pub fn match_sheet(
+    sheet: &BrepValue,
+    face: f64,
+    target: &BrepValue,
+    edge: f64,
+    order: f64,
+    stop: Stop,
+) -> R<BrepValue> {
+    if sheet.is_closed() {
+        return Err(
+            "曲面のマッチは開いた面（シート）に使います。閉じた立体では「面を外す」などで開いてください。"
+                .into(),
+        );
+    }
+    let index = whole("面番号", face)?;
+    let faces = kernel("面の取得", stop, || {
+        sheet.body().faces(tol::chord(sheet.body().size()))
+    })?;
+    let at = faces.get(index).map(|f| f.centroid).ok_or_else(|| {
+        format!(
+            "面番号 {index} はありません（0〜{}）。",
+            faces.len().saturating_sub(1)
+        )
+    })?;
+    let on_target = edge_point(target, edge, stop)?;
+    let body = kernel("曲面のマッチ", stop, || {
+        sk::match_surface(sheet.body(), &[at], target.body(), &[on_target], grade(order))
+    })?;
+    brep(body, stop)
+}
+
+/// Cut by the plane through `origin` with normal `normal`; keep the normal's side (`keep_normal`)
+/// or the other side. The cut face is the exact plane.
+pub fn trim_by_any_plane(
+    b: &BrepValue,
+    origin: P3,
+    normal: P3,
+    keep_normal: bool,
+    stop: Stop,
+) -> R<BrepValue> {
+    if origin
+        .iter()
+        .any(|v| !v.is_finite() || v.abs() > kb::limits::MAX_COORDINATE)
+    {
+        return Err("平面の点が無効です。".into());
+    }
+    let n = unit(normal).ok_or("平面の法線が 0 です。X・Y・Z のどれかを 0 以外にしてください。")?;
+    let plane = Plane::from_normal(v3(origin), v3(n)).ok_or("平面を作れません。")?;
+    let (part, _tool) = kernel("平面で切る", stop, || {
+        sk::half_space(b.body(), &plane, keep_normal)
+    })?;
+    match part {
+        Some(body) => brep(body, stop),
+        None => Err(format!(
+            "平面の{}に残る部分がありません。平面の位置か向きを変えてください。",
+            if keep_normal { "法線側" } else { "反対側" }
+        )),
+    }
+}
+
+/// Measure every two-sided seam between faces. Returns `[seams, smooth, curvature jump, sharp,
+/// gap, worst gap mm, worst normal angle deg, worst curvature difference 1/mm, skipped,
+/// unmeasured]`; `tolerances` is `[gap mm, angle deg, curvature 1/mm]`.
+pub fn seam_report(b: &BrepValue, samples: f64, tolerances: [f64; 3], stop: Stop) -> R<Vec<f64>> {
+    if !samples.is_finite() || !(3. ..=257.).contains(&samples) {
+        return Err("測定点は 3〜257 にしてください。".into());
+    }
+    let report = kernel("連続性の解析", stop, || {
+        sk::seam_diagnostics(
+            b.body(),
+            &[],
+            samples as usize,
+            sk::ContinuityTolerances {
+                gap_mm: tolerances[0],
+                angle_deg: tolerances[1],
+                curvature_per_mm: tolerances[2],
+            },
+        )
+    })?;
+    let count = |v: sk::SeamVerdict| report.seams.iter().filter(|s| s.verdict == v).count() as f64;
+    Ok(vec![
+        report.seams.len() as f64,
+        count(sk::SeamVerdict::Smooth),
+        count(sk::SeamVerdict::CurvatureJump),
+        count(sk::SeamVerdict::Sharp),
+        count(sk::SeamVerdict::Gap),
+        report.seams.iter().map(|s| s.gap_mm.value).fold(0., f64::max),
+        report.seams.iter().map(|s| s.normal_angle_deg.value).fold(0., f64::max),
+        report.seams.iter().map(|s| s.curvature_jump_per_mm.value).fold(0., f64::max),
+        report.skipped as f64,
+        report.unmeasured as f64,
+    ])
+}
+
+/// Per-vertex Gaussian curvature of the display mesh (angle defect over a third of the
+/// surrounding triangle area; open boundary vertices are 0).
+fn gaussian_curvature(m: &crate::model::Mesh) -> Vec<f64> {
+    let n = m.vertices.len();
+    let mut angles = vec![0.; n];
+    let mut area = vec![0.; n];
+    let mut boundary = vec![false; n];
+    let mut edge_use: std::collections::HashMap<(u32, u32), u32> = Default::default();
+    for t in &m.triangles {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            *edge_use.entry((a.min(b), a.max(b))).or_insert(0) += 1;
+        }
+    }
+    for (&(a, b), &c) in &edge_use {
+        if c == 1 {
+            for v in [a, b] {
+                if let Some(f) = boundary.get_mut(v as usize) {
+                    *f = true;
+                }
+            }
+        }
+    }
+    let pt = |i: u32| m.vertices.get(i as usize).copied().unwrap_or([0.; 3]);
+    for t in &m.triangles {
+        let tri_area = 0.5 * norm(cross(sub(pt(t[1]), pt(t[0])), sub(pt(t[2]), pt(t[0]))));
+        for k in 0..3 {
+            let (i, j, l) = (t[k], t[(k + 1) % 3], t[(k + 2) % 3]);
+            let (u, w) = (sub(pt(j), pt(i)), sub(pt(l), pt(i)));
+            let denom = norm(u) * norm(w);
+            if denom > 1e-300 {
+                if let Some(a) = angles.get_mut(i as usize) {
+                    *a += (dot(u, w) / denom).clamp(-1., 1.).acos();
+                }
+            }
+            if let Some(a) = area.get_mut(i as usize) {
+                *a += tri_area / 3.;
+            }
+        }
+    }
+    (0..n)
+        .map(|i| {
+            let (a, s, edge) = (
+                angles.get(i).copied().unwrap_or(0.),
+                area.get(i).copied().unwrap_or(0.),
+                boundary.get(i).copied().unwrap_or(true),
+            );
+            if edge || s <= 1e-300 {
+                0.
+            } else {
+                (2. * std::f64::consts::PI - a) / s
+            }
+        })
+        .collect()
+}
+
+/// Bands of equal Gaussian curvature (`K · size² · gain`) over the display mesh.
+pub fn curvature_map(b: &BrepValue, gain: f64, stop: Stop) -> R<crate::model::Mesh> {
+    if !gain.is_finite() || gain <= 0. || gain > 1e3 {
+        return Err("感度は 0 より大きく 1000 以下にしてください。".into());
+    }
+    let m = b.preview();
+    let size = b.body().size();
+    let k = gaussian_curvature(m);
+    let f: Vec<f64> = k
+        .iter()
+        .map(|v| (v * size * size * gain).clamp(-50., 50.))
+        .collect();
+    bands(m, &f, stop)
+}

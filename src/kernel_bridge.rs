@@ -132,6 +132,9 @@ impl BrepValue {
                 limits::MAX_FACES
             ));
         }
+        // Keep the meshes the body makes: listing its edges or faces (picks for fillets, blends,
+        // trims) asks for the same tessellation again and reuses the one made for display.
+        let body = body.keeping_meshes();
         let preview = Arc::new(display_mesh(&body, stop)?);
         let closed = is_watertight(&preview);
         Ok(Self {
