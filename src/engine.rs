@@ -795,6 +795,7 @@ fn preflight_run(
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
         NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
+        k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
     };
@@ -857,6 +858,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        GenesisScopes | GenesisScopeIds | GenesisRelief => {
+            crate::genesis::run_item(kind, a, cancel)
+        }
         BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
@@ -1571,7 +1575,7 @@ fn mirror(
         }
     }
 }
-fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
+pub(crate) fn box_mesh(w: f64, d: f64, h: f64) -> Mesh {
     let (x, y) = (w / 2., d / 2.);
     Mesh {
         vertices: vec![
