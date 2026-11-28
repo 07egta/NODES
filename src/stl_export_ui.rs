@@ -89,6 +89,7 @@ pub struct StlExportUi {
     last_files: Vec<PathBuf>,
     status: Option<(String, bool)>,
     notice: Option<(String, bool)>,
+    completed_output_stl: bool,
 }
 
 impl Default for StlExportUi {
@@ -112,6 +113,7 @@ impl StlExportUi {
             last_files: Vec::new(),
             status: None,
             notice: None,
+            completed_output_stl: false,
         }
     }
 
@@ -127,6 +129,17 @@ impl StlExportUi {
     /// A message for the app's toast line. Taken once.
     pub fn take_notice(&mut self) -> Option<(String, bool)> {
         self.notice.take()
+    }
+
+    /// A successful write of the project's Output nodes in either STL format.
+    pub fn take_completed_output_stl(&mut self) -> bool {
+        std::mem::take(&mut self.completed_output_stl)
+    }
+
+    pub fn open_lesson_export(&mut self) {
+        self.mode = SourceMode::Output;
+        self.options.format = OutputFormat::StlBinary;
+        self.open_dialog();
     }
 
     pub fn set_slicer(&mut self, path: PathBuf) {
@@ -268,6 +281,9 @@ impl StlExportUi {
                         summary.files.len()
                     ),
                 };
+                self.completed_output_stl = self.mode == SourceMode::Output
+                    && matches!(self.options.format, OutputFormat::StlBinary | OutputFormat::StlAscii)
+                    && !summary.files.is_empty();
                 self.last_files = summary.files;
                 self.say(text, false);
             }
