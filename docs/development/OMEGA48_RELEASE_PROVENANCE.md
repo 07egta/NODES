@@ -1,0 +1,3 @@
+# OMEGA 48 — Release provenance and reproducible archives
+
+Base: `c1213c885647c2e708017a63f6b7bdc8f9b66620` (2026-11-28 JST). AGENTS.md and CONTRIBUTING.md read. Existing draft [#105](https://github.com/07egta/NODES/pull/105) owns shared staging, CLI smoke tests and workflow ZIP fixes; do not edit the same workflow or supersede that work. This PR focuses on a deterministic packaging helper, per-file SHA-256, archive checksum, and accurate provenance for development distributions. Existing Python tooling is permitted for build-only use; no application runtime or Rust dependency is added. No release publishing or merge to main. Initial status: implementation and validation pending.
