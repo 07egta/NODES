@@ -117,7 +117,7 @@ def main():
     for p in prs:
         n = p["number"]
         rows = list(pages(args.repo, f"pulls/{n}/files", token))
-        if len(rows) != p["changed_files"] or len(rows) >= 3000:
+        if (p.get("changed_files") is not None and len(rows) != p["changed_files"]) or len(rows) >= 3000:
             raise RuntimeError(f"PR {n} file listing incomplete or changed")
         files[n] = [path for row in rows for path in
                     (row["filename"], row.get("previous_filename")) if path]
