@@ -23,6 +23,7 @@ pub mod mesh_geometry_checks;
 pub mod mesh_tools;
 pub mod model;
 pub mod node_access;
+pub mod node_package;
 pub mod nodes_shape;
 mod number_aggregates;
 mod number_interpolation;
