@@ -88,6 +88,13 @@ const CATEGORY_GLYPHS: &[(&str, Glyph)] = &[
 /// One icon per node kind. Kinds not listed here fall back to their category.
 const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     (
+        NodeKind::ExactTorus,
+        &[
+            Part::Ring([0.5, 0.5, 0.4]),
+            Part::Ring([0.5, 0.5, 0.18]),
+        ],
+    ),
+    (
         NodeKind::PhysSpringRelax,
         &[
             Part::Line(&[
