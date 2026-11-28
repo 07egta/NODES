@@ -1131,10 +1131,8 @@ fn gaussian_curvature(m: &crate::model::Mesh) -> Vec<f64> {
             let (i, j, l) = (t[k], t[(k + 1) % 3], t[(k + 2) % 3]);
             let (u, w) = (sub(pt(j), pt(i)), sub(pt(l), pt(i)));
             let denom = norm(u) * norm(w);
-            if denom > 1e-300 {
-                if let Some(a) = angles.get_mut(i as usize) {
-                    *a += (dot(u, w) / denom).clamp(-1., 1.).acos();
-                }
+            if let (true, Some(a)) = (denom > 1e-300, angles.get_mut(i as usize)) {
+                *a += (dot(u, w) / denom).clamp(-1., 1.).acos();
             }
             if let Some(a) = area.get_mut(i as usize) {
                 *a += tri_area / 3.;
