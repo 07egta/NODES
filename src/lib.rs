@@ -18,6 +18,7 @@ pub mod import;
 pub mod kernel_bridge;
 pub mod kernel_ops;
 pub mod latest_channel;
+mod mathematical_surfaces;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod mesh_tools;

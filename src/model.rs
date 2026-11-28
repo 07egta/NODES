@@ -569,6 +569,13 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // Mathematical surfaces (analytic formulas, mesh outputs).
+    Catenoid,
+    Helicoid,
+    EnneperSurface,
+    MobiusStrip,
+    KleinBottle,
+    DiniSurface,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -982,6 +989,12 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::Catenoid,
+            Self::Helicoid,
+            Self::EnneperSurface,
+            Self::MobiusStrip,
+            Self::KleinBottle,
+            Self::DiniSurface,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1625,6 +1638,9 @@ impl NodeKind {
             | Self::MeshThicknessSample
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            other if crate::mathematical_surfaces::is_kind(other) => {
+                crate::mathematical_surfaces::spec(other)
+            }
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| {
