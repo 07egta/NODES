@@ -596,6 +596,10 @@ pub enum NodeKind {
     MobiusStrip,
     KleinBottle,
     DiniSurface,
+    // GENESIS: append-only stable serialized IDs.
+    GenesisScopes,
+    GenesisScopeIds,
+    GenesisRelief,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -1036,6 +1040,9 @@ impl NodeKind {
             Self::MobiusStrip,
             Self::KleinBottle,
             Self::DiniSurface,
+            Self::GenesisScopes,
+            Self::GenesisScopeIds,
+            Self::GenesisRelief,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
@@ -1666,6 +1673,7 @@ impl NodeKind {
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
+            other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter

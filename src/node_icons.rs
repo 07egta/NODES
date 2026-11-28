@@ -579,6 +579,26 @@ const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     ),
     (NodeKind::Box, BOX),
     (
+        NodeKind::GenesisScopes,
+        &[
+            Part::Line(&[[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9], [0.1, 0.1]]),
+            Part::Line(&[[0.45, 0.1], [0.45, 0.9]]),
+            Part::Line(&[[0.45, 0.58], [0.9, 0.58]]),
+            Part::Line(&[[0.1, 0.38], [0.45, 0.38]]),
+        ],
+    ),
+    (
+        NodeKind::GenesisScopeIds,
+        &[
+            Part::Line(&[[0.5, 0.15], [0.25, 0.48], [0.12, 0.82]]),
+            Part::Line(&[[0.25, 0.48], [0.38, 0.82]]),
+            Part::Line(&[[0.5, 0.15], [0.75, 0.48], [0.62, 0.82]]),
+            Part::Line(&[[0.75, 0.48], [0.88, 0.82]]),
+            Part::Dot([0.5, 0.15]),
+        ],
+    ),
+    (NodeKind::GenesisRelief, BOX),
+    (
         NodeKind::Cylinder,
         &[
             Part::Line(&[
