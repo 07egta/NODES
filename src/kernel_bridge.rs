@@ -171,14 +171,28 @@ impl BrepValue {
         }
         match sk::guard("体積", || sk::measure_mass(&self.body)) {
             Ok(m) if m.volume.is_finite() => Some(m.volume.abs()),
-            _ => Some(mesh_volume(&self.preview).abs()),
+            _ => {
+                let volume = mesh_volume(&self.preview).abs();
+                volume.is_finite().then_some(volume)
+            }
         }
     }
 }
 
 /// Signed volume of a closed triangle mesh (mm³).
+///
+/// Translate to a referenced vertex before taking determinants. For a closed
+/// surface the integral is translation invariant, but world-coordinate
+/// determinants can lose all significant digits for small distant solids.
 pub fn mesh_volume(m: &Mesh) -> f64 {
-    let mut v = 0.;
+    let Some(origin) = m
+        .triangles
+        .iter()
+        .find_map(|t| m.vertices.get(t[0] as usize).copied())
+    else {
+        return 0.0;
+    };
+    let (mut sum, mut correction) = (0.0, 0.0);
     for t in &m.triangles {
         let (Some(a), Some(b), Some(c)) = (
             m.vertices.get(t[0] as usize),
@@ -187,9 +201,13 @@ pub fn mesh_volume(m: &Mesh) -> f64 {
         ) else {
             continue;
         };
-        v += dot(*a, cross(*b, *c)) / 6.;
+        let term = dot(sub(*a, origin), cross(sub(*b, origin), sub(*c, origin))) / 6.0;
+        let adjusted = term - correction;
+        let next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
     }
-    v
+    sum
 }
 
 /// Whether every undirected edge is used by exactly two triangles in opposite directions.

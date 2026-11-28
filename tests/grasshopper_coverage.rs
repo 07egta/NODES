@@ -349,3 +349,45 @@ fn new_standard_components_evaluate_in_a_graph() {
         other => panic!("unexpected {other:?}"),
     }
 }
+
+#[test]
+fn standard_logic_gates_validate_both_operands() {
+    for kind in [NodeKind::GateNand, NodeKind::GateNor, NodeKind::GateXnor] {
+        for valid in [0., 1.] {
+            for invalid in [-1., 0.5, 2.] {
+                let valid = Value::Number(valid);
+                let invalid = Value::Number(invalid);
+                assert!(nodes::gh_gaps::run_item(kind, &[&valid, &invalid], &|| false).is_err());
+                assert!(nodes::gh_gaps::run_item(kind, &[&invalid, &valid], &|| false).is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn standard_polygon_area_and_centroid_survive_large_translation() {
+    for offset in [0., 1e9, -1e9] {
+        for reversed in [false, true] {
+            let mut points = vec![
+                [offset, offset, 0.],
+                [offset + 4., offset, 0.],
+                [offset + 4., offset + 2., 0.],
+                [offset, offset + 2., 0.],
+            ];
+            if reversed {
+                points.reverse();
+            }
+            let curve = Value::Curve(std::sync::Arc::new(nodes::model::Curve {
+                points,
+                closed: true,
+                geometry: None,
+            }));
+            let area = nodes::gh_gaps::run_item(NodeKind::CurveArea, &[&curve], &|| false).unwrap();
+            assert_eq!(area, vec![Value::Number(8.)]);
+            let centroid =
+                nodes::gh_gaps::run_item(NodeKind::CurveAreaCentroid, &[&curve], &|| false)
+                    .unwrap();
+            assert_eq!(centroid, vec![Value::Point([offset + 2., offset + 1., 0.])]);
+        }
+    }
+}

@@ -590,6 +590,9 @@ pub enum NodeKind {
     MeshThicken,
     MeshOffset,
     ExactTorus,
+    // BioMorph growth (append-only serialized IDs).
+    BioSpaceColonization,
+    BioCoiledShell,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1022,6 +1025,8 @@ impl NodeKind {
             Self::MeshThicken,
             Self::MeshOffset,
             Self::ExactTorus,
+            Self::BioSpaceColonization,
+            Self::BioCoiledShell,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1678,6 +1683,7 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::biomorph::spec(other))
                 .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
@@ -1690,6 +1696,46 @@ impl NodeKind {
     }
 }
 
+/// Reject duplicate serialized map keys instead of silently retaining the last value.
+fn deserialize_unique_map<'de, D, V>(deserializer: D) -> Result<BTreeMap<String, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    V: Deserialize<'de>,
+{
+    struct UniqueMap<V>(std::marker::PhantomData<V>);
+
+    impl<'de, V: Deserialize<'de>> serde::de::Visitor<'de> for UniqueMap<V> {
+        type Value = BTreeMap<String, V>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a map with unique keys")
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut map: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut values = BTreeMap::new();
+            while let Some((key, value)) = map.next_entry::<String, V>()? {
+                match values.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(value);
+                    }
+                    std::collections::btree_map::Entry::Occupied(entry) => {
+                        return Err(serde::de::Error::custom(format_args!(
+                            "duplicate node map key: {}",
+                            entry.key()
+                        )));
+                    }
+                }
+            }
+            Ok(values)
+        }
+    }
+
+    deserializer.deserialize_map(UniqueMap(std::marker::PhantomData))
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Node {
@@ -1697,7 +1743,9 @@ pub struct Node {
     pub kind: NodeKind,
     pub name: String,
     pub position: [f32; 2],
+    #[serde(deserialize_with = "deserialize_unique_map")]
     pub params: BTreeMap<String, f64>,
+    #[serde(deserialize_with = "deserialize_unique_map")]
     pub inputs: BTreeMap<String, NodeId>,
     pub preview: bool,
     /// Script source of a `Script` node. Empty (and not saved) for other nodes.
