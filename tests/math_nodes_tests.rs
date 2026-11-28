@@ -150,8 +150,46 @@ fn graph_error_propagation_and_seed_repeatability() {
     let ev = Evaluator::default().evaluate(&g, &|| false);
     assert!(ev.outputs[&a].is_err());
     assert!(ev.outputs[&b].is_err());
-    assert_eq!(ev.outputs[&r], ev.outputs[&s]);
+    let expected = ev.outputs[&r].as_ref().unwrap();
+    assert_eq!(expected.item_count(), 16);
+    assert!(
+        expected
+            .branches
+            .values()
+            .flatten()
+            .all(|v| v.number().is_some_and(f64::is_finite))
+    );
+    assert_eq!(expected, ev.outputs[&s].as_ref().unwrap());
     g.node_mut(s).unwrap().params.insert("seed".into(), 43.0);
     let ev = Evaluator::default().evaluate(&g, &|| false);
-    assert_ne!(ev.outputs[&r], ev.outputs[&s]);
+    let changed = ev.outputs[&s].as_ref().unwrap();
+    assert_eq!(changed.item_count(), 16);
+    assert_ne!(ev.outputs[&r].as_ref().unwrap(), changed);
+}
+
+#[test]
+fn normal_zero_sigma_is_exactly_the_requested_mean() {
+    let mut g = Graph::default();
+    let id = node(
+        &mut g,
+        RandomNormal,
+        &[
+            ("count", 5.0),
+            ("mean", -7.25),
+            ("sigma", 0.0),
+            ("seed", 42.0),
+        ],
+    );
+    let mut evaluator = Evaluator::default();
+    let first = evaluator.evaluate(&g, &|| false);
+    assert_eq!(
+        first.outputs[&id].as_ref().unwrap().branches[&vec![0]],
+        vec![Value::Number(-7.25); 5]
+    );
+    g.node_mut(id).unwrap().params.insert("mean".into(), 3.5);
+    let second = evaluator.evaluate(&g, &|| false);
+    assert_eq!(
+        second.outputs[&id].as_ref().unwrap().branches[&vec![0]],
+        vec![Value::Number(3.5); 5]
+    );
 }
