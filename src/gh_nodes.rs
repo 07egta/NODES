@@ -207,7 +207,7 @@ static GRAPH_PROFILE: NodeSpec = NodeSpec {
 static SHELL: NodeSpec = NodeSpec {
     label: "厚みをつける",
     category: "変形",
-    description: "メッシュの面を内側へ厚みの分だけずらした内面を作り、縁をつないで印刷できる壁にします。近似の計算なので、厚みが形の細い部分より大きいと壁が交差します。",
+    description: "メッシュの面を内側へずらし、縁をつないで壁を作ります。近似の計算で、反転や自己接触の候補があればエラーにします。厳密な肉厚・印刷可能性の保証ではありません。",
     keywords: "shell thicken offset wall solid print 厚み 肉厚 壁 オフセット 印刷",
     inputs: &[
         g("geometry", "メッシュ", DataType::Mesh),
@@ -843,8 +843,8 @@ fn graph_profile(
 // ------------------------------------------------------------------ shell
 
 /// Offsets the surface inwards (against the face normals) by `thickness`, keeps the
-/// original as the outside and stitches every open edge with a rim. An approximation:
-/// it does not detect where the offset surface crosses itself.
+/// original as the outside and stitches every open edge with a rim. Approximate
+/// normal offset with conservative local and nonadjacent contact diagnostics.
 pub fn shell(m: &Mesh, thickness: f64, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
     if !(thickness.is_finite() && thickness > 0.) {
         return Err("厚みは 0 より大きくしてください。".into());
@@ -853,23 +853,7 @@ pub fn shell(m: &Mesh, thickness: f64, cancel: &dyn Fn() -> bool) -> Result<Mesh
     if nv < 3 || m.triangles.is_empty() {
         return Err("厚みをつけるメッシュに面がありません。".into());
     }
-    // A wall thicker than the part itself folds through; refuse the obvious cases.
-    for axis in 0..3 {
-        let lo = m
-            .vertices
-            .iter()
-            .map(|p| p[axis])
-            .fold(f64::INFINITY, f64::min);
-        let hi = m
-            .vertices
-            .iter()
-            .map(|p| p[axis])
-            .fold(f64::NEG_INFINITY, f64::max);
-        let extent = hi - lo;
-        if extent > 1e-9 && extent <= thickness * 2. {
-            return Err("厚みが形の大きさに対して大きすぎます。厚みを小さくしてください。".into());
-        }
-    }
+    crate::mesh_geometry_checks::guard_offset_source(m, cancel)?;
     // Directed edges: each must appear once; an undirected edge may have at most 2 faces.
     let mut directed = std::collections::BTreeSet::new();
     for (k, t) in m.triangles.iter().enumerate() {
@@ -928,14 +912,20 @@ pub fn shell(m: &Mesh, thickness: f64, cancel: &dyn Fn() -> bool) -> Result<Mesh
         }
         out.vertices.push(q);
     }
+    crate::mesh_geometry_checks::guard_offset_sweep(m, &out.vertices[nv..], cancel)?;
     let o = nv as u32;
     out.triangles
         .extend(m.triangles.iter().map(|t| [t[0] + o, t[2] + o, t[1] + o]));
     for (a, b) in boundary {
         out.triangles.extend([[b, a, a + o], [b, a + o, b + o]]);
     }
-    orient_outward(&mut out);
-    validate_mesh(&out, cancel)?;
+    // Use the translation-stable integral rather than world-coordinate determinants.
+    if crate::mesh_fabrication::signed_volume(&out, cancel)? < 0.0 {
+        for t in &mut out.triangles {
+            t.swap(1, 2);
+        }
+    }
+    crate::mesh_geometry_checks::guard_closed_shell(&out, cancel)?;
     Ok(out)
 }
 
