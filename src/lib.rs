@@ -38,6 +38,7 @@ pub mod script;
 pub mod stl_export;
 pub mod subd;
 pub mod templates;
+pub mod visual_color;
 
 pub mod curve_geometry;
 pub mod curve_nodes;
