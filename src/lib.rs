@@ -30,6 +30,7 @@ pub mod polygon_triangulation;
 pub mod print_info;
 pub mod raster;
 pub mod script;
+pub mod sketch_nodes;
 pub mod stl_export;
 pub mod subd;
 pub mod templates;

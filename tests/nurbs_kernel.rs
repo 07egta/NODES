@@ -320,3 +320,52 @@ fn curved_cup_is_shelled() {
     let expected = PI * 400. * 40. - PI * 18. * 18. * 38.;
     assert!(rel(v, expected) < 2e-2, "cup volume {v} vs {expected}");
 }
+
+// ---- Constrained sketch, analysis, diagnostics, IGES ----
+
+#[test]
+fn constrained_sketch_solves_to_exact_profiles() {
+    let text = "長方形 r 0 0 50 30\n固定 r.p0\n長さ r.b 60\n長さ r.l 40\n円 c 30 20 5\n半径 c 8\n";
+    let tree = nodes::sketch_nodes::run(text, 0, &go).unwrap();
+    let curves: Vec<_> = tree.branches.values().flatten().collect();
+    assert!(
+        curves.len() >= 2,
+        "outer and hole expected, got {}",
+        curves.len()
+    );
+    let nodes::model::Value::Curve(outer) = curves[0] else {
+        panic!("not a curve")
+    };
+    let solid = kb::extrude(outer, &[], 10., &go).unwrap();
+    let v = solid.volume().unwrap();
+    assert!(
+        rel(v, 60. * 40. * 10.) < 1e-6 || rel(v, PI * 64. * 10.) < 1e-6,
+        "volume {v}"
+    );
+    // Unknown commands and conflicts give Japanese errors, not panics.
+    assert!(nodes::sketch_nodes::run("ふしぎ x 1", 0, &go).is_err());
+    let conflict = "線 l 0 0 10 0\n長さ l 10\n距離 l.start l.end 20\n";
+    assert!(nodes::sketch_nodes::run(conflict, 1, &go).is_err());
+}
+
+#[test]
+fn zebra_and_diagnostics_on_a_filleted_box() {
+    let b = kb::fillet(&kb::box_solid(40., 30., 20., &go).unwrap(), 4., &[], &go).unwrap();
+    let z = nodes::kernel_ops::zebra(&b, 10., 0, &go).unwrap();
+    assert!(!z.triangles.is_empty());
+    let d = nodes::kernel_ops::diagnose(&b, &go).unwrap();
+    assert_eq!(d[0], 1.);
+    assert!(d[1] > 6.);
+    let draft = nodes::kernel_ops::draft_analysis(&b, 2., &go).unwrap();
+    assert!(!draft.triangles.is_empty());
+}
+
+#[test]
+fn iges_round_trip_keeps_a_cylinder() {
+    let c = kb::cylinder([0., 0., 0.], [0., 0., 1.], 10., 20., &go).unwrap();
+    let text = kb::iges_export(&[&c], &go).unwrap();
+    let back = kb::iges_import(&text, &go).unwrap();
+    assert_eq!(back.len(), 1);
+    assert!(back[0].is_closed());
+    assert!(rel(back[0].volume().unwrap(), PI * 100. * 20.) < 1e-3);
+}

@@ -47,6 +47,7 @@ Cargo の情報形式: [公式 cargo metadata ドキュメント](https://doc.ru
 |---|---|---|---|
 | `crates/sc-geom`（package `solidcraft-geom`） | SolidCraft `crates/geom`（https://github.com/tangency-labs/solidcraft、owner の melt3D fork 経由） | MIT OR Apache-2.0、© SolidCraft contributors, © 07egta | `crates/sc-geom/LICENSE-MIT`, `LICENSE-APACHE` |
 | `crates/sc-kernel`（package `solidcraft-kernel`） | SolidCraft `crates/kernel` | MIT OR Apache-2.0、同上 | `crates/sc-kernel/LICENSE-MIT`, `LICENSE-APACHE` |
+| `crates/sc-sketch`（package `solidcraft-sketch`） | SolidCraft `crates/sketch`（文字の組版とフォントを除く） | MIT OR Apache-2.0、© SolidCraft contributors, © 07egta | `crates/sc-sketch/LICENSE-MIT`, `LICENSE-APACHE` |
 | `vendor/truck-geometry` 0.5.0, `truck-meshalgo` 0.4.0, `truck-shapeops` 0.4.0, `truck-stepio` 0.3.0, `matext4cgmath` 0.1.0 | truck（https://github.com/ricosjp/truck）を SolidCraft が修正したもの。変更点は `vendor/README.md` | Apache-2.0、© RICOS Co. Ltd. | 各フォルダの `LICENSE` |
 
 変更記録: [SOLIDCRAFT_CHANGES.md](SOLIDCRAFT_CHANGES.md)。GPL / LGPL / AGPL のコードは含めず、参照もしていません。

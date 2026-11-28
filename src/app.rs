@@ -1971,6 +1971,9 @@ impl NodesApp {
         if matches!(node.kind, NodeKind::ImportMesh | NodeKind::ExactStepImport) {
             self.import_panel(ui, &node);
         }
+        if node.kind == NodeKind::ExactSketch {
+            crate::sketch_ui::editor(ui, &mut self.project.graph, id);
+        }
         if node.kind == NodeKind::SubdCageEdit {
             self.cage_edit
                 .panel(ui, &mut self.project.graph, id, self.evaluation.as_ref());

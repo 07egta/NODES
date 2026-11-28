@@ -153,6 +153,10 @@ impl BrepValue {
     pub fn is_closed(&self) -> bool {
         self.closed
     }
+    /// Whether the display/STL mesh itself is watertight.
+    pub fn mesh_is_watertight(&self) -> bool {
+        is_watertight(&self.preview)
+    }
     pub fn face_count(&self) -> usize {
         self.body.face_count()
     }
@@ -1391,6 +1395,58 @@ pub fn step_export(bodies: &[&BrepValue], stop: Stop) -> R<String> {
         return Err("STEP が大きすぎます。".into());
     }
     Ok(text)
+}
+
+/// IGES 5.3 text for the bodies (through SolidCraft's STEP → IGES writer).
+pub fn iges_export(bodies: &[&BrepValue], stop: Stop) -> R<String> {
+    if bodies.is_empty() {
+        return Err("書き出す B-rep がありません。".into());
+    }
+    let list: Vec<sk::ExportBody> = bodies
+        .iter()
+        .enumerate()
+        .map(|(i, b)| sk::ExportBody {
+            name: format!("Body{}", i + 1),
+            body: b.body(),
+            color: None,
+        })
+        .collect();
+    let header = sk::StepHeader {
+        file_name: "NODES".into(),
+        time_stamp: String::new(),
+        author: String::new(),
+        organization: String::new(),
+        description: "NODES model".into(),
+    };
+    let text = kernel("IGES 書き出し", stop, || {
+        sk::iges_export_bodies(&list, &header)
+    })?;
+    if text.len() > limits::MAX_STEP_BYTES {
+        return Err("IGES が大きすぎます。".into());
+    }
+    Ok(text)
+}
+
+/// Bodies read from IGES text.
+pub fn iges_import(text: &str, stop: Stop) -> R<Vec<BrepValue>> {
+    if text.len() > limits::MAX_STEP_BYTES {
+        return Err(format!(
+            "IGES ファイルが大きすぎます（上限 {} MB）。",
+            limits::MAX_STEP_BYTES >> 20
+        ));
+    }
+    let import = kernel("IGES 読み込み", stop, || sk::iges_import(text))?;
+    if import.bodies.is_empty() {
+        return Err(
+            "IGES に読み込める立体がありませんでした（面だけのファイルは未対応のことがあります）。"
+                .into(),
+        );
+    }
+    import
+        .bodies
+        .into_iter()
+        .map(|b| brep(b.body, stop))
+        .collect()
 }
 
 /// Bodies read from STEP text.

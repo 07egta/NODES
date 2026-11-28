@@ -500,6 +500,19 @@ pub(crate) fn evaluate_node(
         let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
         return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
     }
+    // 拘束スケッチ: the sketch text is in `script` (see `sketch_nodes`).
+    if node.kind == NodeKind::ExactSketch {
+        let mode = inputs
+            .first()
+            .and_then(|t| t.branches.values().flatten().next())
+            .map(Value::number)
+            .transpose()?
+            .unwrap_or(0.);
+        return checked_tree(
+            crate::sketch_nodes::run(&node.script, mode as usize, cancel)?,
+            cancel,
+        );
+    }
     // ケージ編集: the edit list is in `script` (see `nurbs_nodes::run_cage_edit`).
     if node.kind == NodeKind::SubdCageEdit {
         return checked_tree(

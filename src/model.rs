@@ -556,6 +556,10 @@ pub enum NodeKind {
     ExactContinuity,
     ExactCurvatureComb,
     ExactOffsetCurve,
+    ExactSketch,
+    ExactZebra,
+    ExactDraftAnalysis,
+    ExactDiagnose,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -957,6 +961,10 @@ impl NodeKind {
             Self::ExactContinuity,
             Self::ExactCurvatureComb,
             Self::ExactOffsetCurve,
+            Self::ExactSketch,
+            Self::ExactZebra,
+            Self::ExactDraftAnalysis,
+            Self::ExactDiagnose,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
