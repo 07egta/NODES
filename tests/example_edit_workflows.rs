@@ -400,7 +400,10 @@ fn verify_reality_build(project: &Project, original: &Evaluation, fixture: Fixtu
         "{}: rebuilt graph differs from saved example",
         fixture.path
     );
-    verify_reality_mesh(original.outputs[&fixture.terminal].as_ref().unwrap(), fixture);
+    verify_reality_mesh(
+        original.outputs[&fixture.terminal].as_ref().unwrap(),
+        fixture,
+    );
 }
 
 fn verify_reality_mesh(tree: &Tree, fixture: Fixture) {

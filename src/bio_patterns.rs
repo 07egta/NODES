@@ -431,7 +431,11 @@ fn reaction(args: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, St
 // Standard full-depth 20-degree external spur gear. Involute flanks are
 // sampled in radius; below the base circle use a radial root connector.
 // Root/tip arcs are sampled too. This is a design blank, not a gear cutter.
-fn spur_gear_profile(teeth: usize, module: f64, cancel: &dyn Fn() -> bool) -> Result<Value, String> {
+fn spur_gear_profile(
+    teeth: usize,
+    module: f64,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Value, String> {
     let pressure = 20_f64.to_radians();
     let pitch_radius = module * teeth as f64 / 2.;
     let base = pitch_radius * pressure.cos();
@@ -638,7 +642,11 @@ pub(crate) fn run_item(
             }
             Ok(out)
         }
-        SpurGearProfile => Ok(vec![spur_gear_profile(count(args, 0)?, num(args, 1)?, cancel)?]),
+        SpurGearProfile => Ok(vec![spur_gear_profile(
+            count(args, 0)?,
+            num(args, 1)?,
+            cancel,
+        )?]),
         ReactionDiffusion => reaction(args, cancel),
         PoissonDisk2d => poisson(args, cancel),
         _ => Err("生成デザインの種類が無効です。".into()),
