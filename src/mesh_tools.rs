@@ -401,11 +401,15 @@ pub fn taubin(
     } else {
         vec![false; m.vertices.len()]
     };
+    // Adjacency and boundary flags own their data; the edge map is no longer needed.
+    drop(edges);
     let mut v = m.vertices.clone();
+    // Both buffers start with the original fixed/isolated vertices. Every other
+    // vertex is overwritten on each pass, so neither buffer needs a full copy.
+    let mut next = v.clone();
     for _ in 0..iterations {
         for factor in [lambda, mu] {
             cancelled(stop)?;
-            let mut next = v.clone();
             for (i, ns) in nb.iter().enumerate() {
                 tick(i, stop)?;
                 if ns.is_empty() || fixed[i] {
@@ -417,9 +421,10 @@ pub fn taubin(
                 );
                 next[i] = add(v[i], mul(sub(avg, v[i]), factor));
             }
-            v = next;
+            std::mem::swap(&mut v, &mut next);
         }
     }
+    drop(next);
     Ok(Mesh {
         vertices: v,
         triangles: m.triangles.clone(),
@@ -1097,6 +1102,74 @@ mod tests {
         assert_eq!(t.vertices[6], g.vertices[6]);
         assert!(taubin(&g, 0, 0.5, true, GO).is_err());
     }
+    // Frozen pre-optimization loop: compare exact floating-point output, not a
+    // loose geometric tolerance that could hide a change in summation order.
+    fn taubin_reference(m: &Mesh, iterations: usize, strength: f64, fix_boundary: bool) -> Mesh {
+        let edges = edge_map(&m.triangles, GO).unwrap();
+        let nb = neighbours(m.vertices.len(), &edges);
+        let fixed = if fix_boundary {
+            boundary_flags(m.vertices.len(), &edges)
+        } else {
+            vec![false; m.vertices.len()]
+        };
+        let mut v = m.vertices.clone();
+        for _ in 0..iterations {
+            for factor in [strength, 1. / (0.1 - 1. / strength)] {
+                let mut next = v.clone();
+                for (i, ns) in nb.iter().enumerate() {
+                    if ns.is_empty() || fixed[i] {
+                        continue;
+                    }
+                    let avg = mul(
+                        ns.iter().fold([0.; 3], |s, &j| add(s, at(&v, j))),
+                        1. / ns.len() as f64,
+                    );
+                    next[i] = add(v[i], mul(sub(avg, v[i]), factor));
+                }
+                v = next;
+            }
+        }
+        Mesh {
+            vertices: v,
+            triangles: m.triangles.clone(),
+        }
+    }
+
+    #[test]
+    fn taubin_reused_buffers_match_reference_bits() {
+        let mut g = grid(8, 1.);
+        g.vertices[0][2] = -0.0;
+        g.vertices[40][2] = 0.75;
+        g.vertices.push([17., -0.0, 3.]);
+        for fix_boundary in [false, true] {
+            for iterations in [1, 2, 20, 200] {
+                for strength in [0.01, 0.5, 0.95] {
+                    let expected = taubin_reference(&g, iterations, strength, fix_boundary);
+                    let actual = taubin(&g, iterations, strength, fix_boundary, GO).unwrap();
+                    assert_eq!(actual.triangles, expected.triangles);
+                    assert_eq!(actual.vertices.len(), expected.vertices.len());
+                    for (a, b) in actual.vertices.iter().zip(&expected.vertices) {
+                        assert_eq!(a.map(f64::to_bits), b.map(f64::to_bits));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn taubin_cancels_during_smoothing() {
+        use std::cell::Cell;
+        let g = grid(8, 1.);
+        let calls = Cell::new(0usize);
+        // raw_check: 2 calls; edge_map: 1 call; each smoothing pass: 2.
+        let result = taubin(&g, 20, 0.5, true, &|| {
+            calls.set(calls.get() + 1);
+            calls.get() >= 6
+        });
+        assert!(result.is_err());
+        assert_eq!(calls.get(), 6);
+    }
+
     #[test]
     fn fill_holes_restores_a_missing_triangle_and_ear_clips_a_ring() {
         let g = grid(4, 1.);
