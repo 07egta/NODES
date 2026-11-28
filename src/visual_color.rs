@@ -4,7 +4,11 @@
 pub type Rgb = [f64; 3];
 
 fn unit(x: f64) -> f64 {
-    if x.is_finite() { x.clamp(0.0, 1.0) } else { 0.0 }
+    if x.is_finite() {
+        x.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 pub fn srgb_to_linear(x: f64) -> f64 {
@@ -27,7 +31,11 @@ pub fn linear_to_srgb(x: f64) -> f64 {
 
 /// Hue is measured in turns, including negative or wrapped values.
 pub fn hsv(h: f64, s: f64, v: f64) -> Rgb {
-    let h = if h.is_finite() { h.rem_euclid(1.0) } else { 0.0 };
+    let h = if h.is_finite() {
+        h.rem_euclid(1.0)
+    } else {
+        0.0
+    };
     let s = unit(s);
     let v = unit(v);
     let k = |n: f64| (n + h * 6.0).rem_euclid(6.0);
