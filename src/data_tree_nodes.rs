@@ -21,6 +21,15 @@ pub fn validate_parameter(kind: NodeKind, key: &str, value: f64) -> Result<bool,
         dt::PortTransform::from_number(value)?;
         return Ok(true);
     }
+    if let Some(port) = key.strip_prefix(dt::WIRE_PREFIX) {
+        if !kind.spec().inputs.iter().any(|s| s.key == port) {
+            return Err("ワイヤ表示のポートが無効です。".into());
+        }
+        if !matches!(value, 0. | 1. | 2.) {
+            return Err("ワイヤ表示の値が無効です。".into());
+        }
+        return Ok(true);
+    }
     Ok(false)
 }
 

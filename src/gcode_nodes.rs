@@ -13,8 +13,8 @@
 use crate::engine::cancelled;
 use crate::gcode;
 use crate::gcode_job::{
-    ColorBy, GcodeJob, MAX_POINTS, Nonplanar, PathKind, PathSeg, Preset, Preview, Printer, Script,
-    ScriptMode, Slice, Texture, dist3, validate_script,
+    ColorBy, GcodeJob, MAX_COLOR_CHANGES, MAX_POINTS, Nonplanar, PathKind, PathSeg, Preset,
+    Preview, Printer, Script, ScriptMode, Slice, Texture, dist3, gradient_layers, validate_script,
 };
 use crate::model::{
     DataType as D, InputSpec, Mesh, Node, NodeKind as K, NodeSpec, Tree, Value, g, i, n,
@@ -45,6 +45,8 @@ pub const KINDS: &[K] = &[
     K::GcodePreview,
     K::GcodeEstimate,
     K::GcodeSafety,
+    K::GcodeColorChange,
+    K::GcodeColorGradient,
 ];
 
 pub fn is_kind(kind: K) -> bool {
@@ -349,10 +351,34 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::GcodeEstimate => spec!(
             "時間・材料見積り",
-            "経路から数値を計算します。出す値 0=印刷時間（分）1=フィラメント長（m）2=重さ（g・PLA 1.24 g/cm³）3=層数 4=印刷距離（m）5=体積（cm³）。加減速と加熱待ちは含まない目安です。",
+            "経路から数値を計算します。出す値 0=印刷時間（分）1=フィラメント長（m）2=重さ（g・PLA 1.24 g/cm³）3=層数 4=印刷距離（m）5=体積（cm³）6=色替え回数。加減速と加熱待ちは含まない目安です。",
             "estimate time material weight filament 見積り 時間 材料 重さ gcode",
             Number,
-            [JOB, i("item", "出す値（0〜5）", 0., 0., 5.)]
+            [JOB, i("item", "出す値（0〜6）", 0., 0., 6.)]
+        ),
+        K::GcodeColorChange => spec!(
+            "色替え（M600）",
+            "指定した層の直前に、フィラメント交換の指令 M600 を入れます。層番号は 0 が 1 層目で、0 は無視されます。2 回以上入れるときは「くり返し」に間隔を入れます（0=1 回だけ）。交換中の待ち時間は見積りに入りません。M600 に対応するファームウェアが必要で、実機では未確認です。",
+            "color change filament swap m600 multicolor 色替え フィラメント交換 多色 gcode",
+            Gcode,
+            [
+                JOB,
+                i("layer", "色替えする層（0 が 1 層目）", 10., 1., 100000.),
+                i("every", "くり返しの間隔（0=1 回だけ）", 0., 0., 100000.),
+                i("times", "回数（くり返すとき）", 1., 1., 256.)
+            ]
+        ),
+        K::GcodeColorGradient => spec!(
+            "グラデーション層",
+            "はじめの層から終わりの層まで、色替え M600 を等間隔に入れます（最初と最後の層にも入る）。色の数だけ交換が必要なので、フィラメントを順に並べて使います。色の見た目は実機で確認してください。",
+            "gradient color change layers filament m600 グラデーション 色替え 層 多色 gcode",
+            Gcode,
+            [
+                JOB,
+                i("from_layer", "はじめの層（0 が 1 層目）", 10., 1., 100000.),
+                i("to_layer", "終わりの層", 100., 1., 100000.),
+                i("count", "色替えの回数", 5., 1., 256.)
+            ]
         ),
         K::GcodeSafety => spec!(
             "安全チェック",
@@ -456,7 +482,8 @@ pub fn run(node: &Node, inputs: &[Tree], cancel: &dyn Fn() -> bool) -> Result<Tr
                     3 => f64::from(stats.layers),
                     4 => stats.print_mm / 1000.0,
                     5 => stats.volume_cm3,
-                    _ => return Err("出す値は 0〜5 で指定してください。".into()),
+                    6 => stats.color_changes as f64,
+                    _ => return Err("出す値は 0〜6 で指定してください。".into()),
                 };
                 values.push(Value::Number(v));
             }
@@ -618,6 +645,29 @@ fn apply(
                 show_travel: index_of(inputs, 2)? == 1,
             });
         }
+        K::GcodeColorChange => {
+            require_paths(&job)?;
+            let layer = index_of(inputs, 1)?.clamp(0, 100_000) as u32;
+            let every = index_of(inputs, 2)?.clamp(0, 100_000) as u32;
+            let times = if every == 0 {
+                1
+            } else {
+                index_of(inputs, 3)?.clamp(1, MAX_COLOR_CHANGES as i64) as u32
+            };
+            let layers: Vec<u32> = (0..times)
+                .map(|k| layer.saturating_add(k.saturating_mul(every)))
+                .collect();
+            job.add_color_changes(&layers)?;
+        }
+        K::GcodeColorGradient => {
+            require_paths(&job)?;
+            let layers = gradient_layers(
+                index_of(inputs, 1)?.clamp(0, 100_000) as u32,
+                index_of(inputs, 2)?.clamp(0, 100_000) as u32,
+                index_of(inputs, 3)?.clamp(0, 100_000) as u32,
+            )?;
+            job.add_color_changes(&layers)?;
+        }
         K::GcodeSafety => {
             job.notes = job.check(cancel)?;
             if index_of(inputs, 1)? == 1 && job.notes.iter().any(|n| n.error) {
@@ -702,6 +752,13 @@ fn append(job: &mut GcodeJob, other: &GcodeJob, layer_shift: &mut u32) {
         p.layer = p.layer.saturating_add(*layer_shift);
         job.paths.push(p);
     }
+    let shifted: Vec<u32> = other
+        .color_changes
+        .iter()
+        .map(|l| l.saturating_add(*layer_shift))
+        .collect();
+    // Past the limit the extra changes are dropped; the safety check still sees the rest.
+    let _ = job.add_color_changes(&shifted);
     *layer_shift = layer_shift.saturating_add(other.layer_count());
 }
 
@@ -1254,7 +1311,7 @@ mod tests {
                 "{kind:?}"
             );
         }
-        assert_eq!(KINDS.len(), 21);
+        assert_eq!(KINDS.len(), 23);
     }
 
     #[test]
@@ -1383,6 +1440,39 @@ mod tests {
                 .unwrap()
                 > 0.0
         );
+    }
+
+    #[test]
+    fn color_change_nodes_put_m600_in_the_written_file() {
+        let mut g = Graph::default();
+        let cube = g.add(K::Box, [0., 0.]).unwrap();
+        let printer = g.add(K::GcodePrinter, [0., 0.]).unwrap();
+        let slice = g.add(K::GcodeSlice, [0., 0.]).unwrap();
+        g.connect(cube, slice, "mesh").unwrap();
+        g.connect(printer, slice, "job").unwrap();
+        let contour = g.add(K::GcodeContour, [0., 0.]).unwrap();
+        g.connect(slice, contour, "job").unwrap();
+        let gradient = g.add(K::GcodeColorGradient, [0., 0.]).unwrap();
+        g.connect(contour, gradient, "job").unwrap();
+        g.node_mut(gradient).unwrap().params.extend([
+            ("from_layer".to_string(), 5.),
+            ("to_layer".to_string(), 25.),
+            ("count".to_string(), 3.),
+        ]);
+        let change = g.add(K::GcodeColorChange, [0., 0.]).unwrap();
+        g.connect(gradient, change, "job").unwrap();
+        g.node_mut(change)
+            .unwrap()
+            .params
+            .extend([("layer".to_string(), 30.)]);
+        let tree = eval(&g, change).unwrap();
+        let Some(Value::Gcode(job)) = tree.branches.values().flatten().next() else {
+            panic!("no job");
+        };
+        assert_eq!(job.color_changes, vec![5, 15, 25, 30]);
+        let (text, stats) = job.render(&never).unwrap();
+        assert_eq!(text.matches("M600").count(), 4);
+        assert_eq!(stats.color_changes, 4);
     }
 
     #[test]

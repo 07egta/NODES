@@ -4,6 +4,7 @@ use nodes::diagnostics::{self, DiagnosticReport};
 use nodes::engine::Evaluation;
 use nodes::graph_api::{self, Request};
 use nodes::model::{NodeKind, Tree, Value};
+use nodes::node_package::Package;
 use nodes::persistence::{self, Project};
 use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
@@ -25,20 +26,27 @@ Usage:
   nodes-cli validate PROJECT.morph
   nodes-cli evaluate PROJECT.morph
   nodes-cli diagnose PROJECT.morph
+  nodes-cli diff BEFORE.morph AFTER.morph
+  nodes-cli diff-content BEFORE.morph AFTER.morph
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
+  nodes-cli pack-part MANIFEST.json PART.morphpart OUTPUT.nodespkg
+  nodes-cli inspect-package PACKAGE.nodespkg
+  nodes-cli unpack-part PACKAGE.nodespkg OUTPUT.morphpart
   nodes-cli --help
 
 Commands return one JSON document on stdout, including operational errors.
 Exit codes: 0 success, 1 project/evaluation/I/O failure, 2 invalid command usage.
 validate checks structure and the restricted capability policy without evaluation.
 diagnose evaluates once and reports root failure candidates and measured node costs.
+diff compares native files without evaluating them; diff-content ignores presentation and metadata.
 Evaluation failures also include error.diagnostics; exit code remains 1.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
 export-stl requires explicit, enabled, nonempty Output nodes containing only Mesh.
-Scripts, expressions, imports, clusters and external plugins are unavailable.
+Scripts, expressions, imports, clusters and external plugins are unavailable for Graph API evaluation.
+Package commands inspect or copy data-only Cluster parts without evaluating them.
 Request limit: 1 MiB. Project limit: 8 MiB. Parent output directories must exist.
 ";
 
@@ -101,6 +109,20 @@ fn read_request(path: &Path) -> Result<Request, CliError> {
         return Err(problem("request_size", "Request exceeds the 1 MiB limit."));
     }
     graph_api::parse_request(&bytes).map_err(|message| problem("invalid_request", message))
+}
+
+// Request JSON is an input artifact, unlike a project explicitly edited in place.
+fn protect_request(request: &Path, destination: &Path) -> Result<(), CliError> {
+    if request == destination
+        || matches!((fs::canonicalize(request), fs::canonicalize(destination)),
+            (Ok(source), Ok(target)) if source == target)
+    {
+        return Err(problem(
+            "invalid_destination",
+            "Project output must differ from the input request.",
+        ));
+    }
+    Ok(())
 }
 
 fn checked_evaluate(project: &Project) -> Result<Evaluation, CliError> {
@@ -349,9 +371,9 @@ fn export_stl(project_path: &Path, destination: &Path) -> Result<Json, CliError>
 fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
-        "validate" | "evaluate" | "diagnose" => 1,
-        "build" | "export-stl" => 2,
-        "apply" => 3,
+        "validate" | "evaluate" | "diagnose" | "inspect-package" => 1,
+        "build" | "export-stl" | "diff" | "diff-content" | "unpack-part" => 2,
+        "apply" | "pack-part" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
     if arguments.len() != expected {
@@ -381,13 +403,24 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
                 "diagnostics": diagnostics::diagnose(&project.graph, &evaluation)
             }))
         }
+        "diff" | "diff-content" => {
+            let before = persistence::load(Path::new(&arguments[0]))
+                .map_err(|message| problem("invalid_project", message))?;
+            let after = persistence::load(Path::new(&arguments[1]))
+                .map_err(|message| problem("invalid_project", message))?;
+            let report = nodes::project_diff::compare(&before, &after, command == "diff-content")
+                .map_err(|message| problem("diff_failed", message))?;
+            Ok(json!(report))
+        }
         "build" => {
+            protect_request(Path::new(&arguments[0]), Path::new(&arguments[1]))?;
             let request = read_request(Path::new(&arguments[0]))?;
             let project =
                 graph_api::build(&request).map_err(|message| problem("build_failed", message))?;
             save_evaluated(&project, Path::new(&arguments[1]))
         }
         "apply" => {
+            protect_request(Path::new(&arguments[1]), Path::new(&arguments[2]))?;
             let mut project = load_project(Path::new(&arguments[0]))?;
             let request = read_request(Path::new(&arguments[1]))?;
             let aliases = graph_api::apply(&mut project.graph, &request)
@@ -395,6 +428,24 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
             let mut result = save_evaluated(&project, Path::new(&arguments[2]))?;
             result["node_ids"] = json!(aliases);
             Ok(result)
+        }
+        "pack-part" => {
+            let package = Package::pack_files(Path::new(&arguments[0]), Path::new(&arguments[1]))
+                .map_err(|message| problem("invalid_package", message))?;
+            package
+                .save(Path::new(&arguments[2]))
+                .map_err(|message| problem("package_io", message))?;
+            Ok(json!({"package": package.info()}))
+        }
+        "inspect-package" | "unpack-part" => {
+            let package = Package::load(Path::new(&arguments[0]))
+                .map_err(|message| problem("invalid_package", message))?;
+            if command == "unpack-part" {
+                package
+                    .unpack_part(Path::new(&arguments[1]))
+                    .map_err(|message| problem("package_io", message))?;
+            }
+            Ok(json!({"package": package.info()}))
         }
         "export-stl" => export_stl(Path::new(&arguments[0]), Path::new(&arguments[1])),
         _ => unreachable!(),

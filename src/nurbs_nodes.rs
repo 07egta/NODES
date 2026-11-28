@@ -61,6 +61,7 @@ pub const KINDS: &[K] = &[
     K::ExactContinuity,
     K::ExactCurvatureComb,
     K::ExactOffsetCurve,
+    K::ExactTorus,
     K::ExactSketch,
     K::ExactZebra,
     K::ExactDraftAnalysis,
@@ -121,6 +122,16 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             "sphere brep solid 球 厳密",
             Brep,
             [n("radius", "半径", 20., 0.01, 1e5, 0.5)]
+        ),
+        K::ExactTorus => spec!(
+            "厳密トーラス",
+            "Z 軸まわりのリング状 B-rep。大半径は管の中心まで、小半径は管の半径（mm）。大半径 > 小半径。",
+            "torus ring donut brep solid トーラス ドーナツ 厳密",
+            Brep,
+            [
+                n("major", "大半径", 30., 0.01, 1e5, 1.),
+                n("minor", "小半径", 8., 0.01, 1e5, 0.5)
+            ]
         ),
         K::ExactExtrude => spec!(
             "押し出して立体",
@@ -628,6 +639,7 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         )?),
         K::ExactSphere => out(kb::sphere([0.; 3], num(a, 0)?, stop)?),
+        K::ExactTorus => out(kb::torus(num(a, 0)?, num(a, 1)?, stop)?),
         K::ExactExtrude => out(kb::extrude(curve(a, 0)?, &[], num(a, 1)?, stop)?),
         K::ExactRevolve => out(kb::revolve(
             curve(a, 0)?,

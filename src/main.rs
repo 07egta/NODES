@@ -16,6 +16,7 @@ mod script_ui;
 mod sketch_ui;
 mod stl_export_ui;
 mod theme;
+mod tutorial;
 mod ui_polish;
 mod viewport;
 

@@ -418,3 +418,51 @@ fn tspline_patch_local_refinement_keeps_the_surface_and_converts() {
     let solid = nodes::kernel_ops::thicken(&sheet, 2., false, &go).unwrap();
     assert!(solid.is_closed(), "thickened patch is not closed");
 }
+
+#[test]
+fn closed_mesh_volume_is_translation_stable() {
+    let triangles = vec![
+        [0, 2, 1],
+        [0, 3, 2],
+        [4, 5, 6],
+        [4, 6, 7],
+        [0, 1, 5],
+        [0, 5, 4],
+        [1, 2, 6],
+        [1, 6, 5],
+        [2, 3, 7],
+        [2, 7, 6],
+        [3, 0, 4],
+        [3, 4, 7],
+    ];
+    let corners = [
+        [0., 0., 0.],
+        [1., 0., 0.],
+        [1., 1., 0.],
+        [0., 1., 0.],
+        [0., 0., 1.],
+        [1., 0., 1.],
+        [1., 1., 1.],
+        [0., 1., 1.],
+    ];
+    for side in [1.0_f64, 0.125, 0.015625, 0.001953125] {
+        for offset in [0., 500_000., -500_000., 999_999.] {
+            let mut vertices = vec![[1_000_000., -1_000_000., 1_000_000.]];
+            vertices.extend(corners.map(|p| p.map(|v| offset + side * v)));
+            let mut mesh = Mesh {
+                vertices,
+                triangles: triangles.iter().map(|t| t.map(|i| i + 1)).collect(),
+            };
+            let expected = side.powi(3);
+            assert!(kb::is_watertight(&mesh));
+            assert!(
+                rel(kb::mesh_volume(&mesh), expected) < 1e-12,
+                "side={side}, offset={offset}"
+            );
+            for t in &mut mesh.triangles {
+                t.swap(1, 2);
+            }
+            assert!(rel(kb::mesh_volume(&mesh), -expected) < 1e-12);
+        }
+    }
+}

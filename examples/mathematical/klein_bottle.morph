@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "クラインの壺 — 自己交差する8の字の壺",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "klein_bottle",
+        "name": "クラインの壺",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "scale": 10,
+          "major_ratio": 3,
+          "u_segments": 96,
+          "v_segments": 48
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}
