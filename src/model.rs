@@ -589,6 +589,7 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    ExactTorus,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1020,6 +1021,7 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::ExactTorus,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
