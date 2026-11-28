@@ -614,6 +614,8 @@ pub enum NodeKind {
     GenesisScopeIds,
     GenesisRelief,
     ExactTorus,
+    OrigamiMiura,
+    OrigamiMiuraCreases,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -1070,6 +1072,8 @@ impl NodeKind {
             Self::GenesisScopeIds,
             Self::GenesisRelief,
             Self::ExactTorus,
+            Self::OrigamiMiura,
+            Self::OrigamiMiuraCreases,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
@@ -1680,6 +1684,7 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::OrigamiMiura | Self::OrigamiMiuraCreases => crate::origami::spec(self),
             Self::Reroute => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "リルート点",

@@ -34,6 +34,7 @@ pub mod nodes_shape;
 mod number_aggregates;
 mod number_interpolation;
 pub mod nurbs_nodes;
+mod origami;
 pub mod parameters;
 pub mod persistence;
 pub mod physics;
