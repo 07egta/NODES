@@ -8,7 +8,14 @@ use std::{collections::BTreeMap, path::Path};
 const CASES: &[(NodeKind, &str, usize, usize, usize, i64)] = &[
     (NodeKind::Catenoid, "catenoid", 2112, 4096, 128, 0),
     (NodeKind::Helicoid, "helicoid", 2425, 4608, 240, 1),
-    (NodeKind::EnneperSurface, "enneper_surface", 4225, 8192, 256, 1),
+    (
+        NodeKind::EnneperSurface,
+        "enneper_surface",
+        4225,
+        8192,
+        256,
+        1,
+    ),
     (NodeKind::MobiusStrip, "mobius_strip", 1632, 3072, 192, 0),
     (NodeKind::KleinBottle, "klein_bottle", 4608, 9216, 0, 0),
     (NodeKind::DiniSurface, "dini_surface", 3201, 6144, 256, 1),
@@ -55,7 +62,11 @@ fn mathematical_examples_roundtrip_and_have_expected_topology() {
         let tree = evaluation.outputs[&1].as_ref().unwrap();
         assert_eq!(tree.item_count(), 1);
         let m = mesh(tree.branches.values().flatten().next().unwrap());
-        assert_eq!((m.vertices.len(), m.triangles.len()), (vertices, faces), "{id}");
+        assert_eq!(
+            (m.vertices.len(), m.triangles.len()),
+            (vertices, faces),
+            "{id}"
+        );
         let (actual_boundary, actual_euler, conflicts) = topology(m);
         assert_eq!((actual_boundary, actual_euler), (boundary, euler), "{id}");
         assert_eq!(
@@ -96,6 +107,9 @@ fn incompatible_parameter_combinations_are_rejected() {
         let id = graph.add(kind, [0., 0.]).unwrap();
         graph.node_mut(id).unwrap().params.insert(key.into(), value);
         let evaluation = Evaluator::default().evaluate(&graph, &|| false);
-        assert!(evaluation.outputs.get(&id).is_none_or(Result::is_err), "{kind:?}");
+        assert!(
+            evaluation.outputs.get(&id).is_none_or(Result::is_err),
+            "{kind:?}"
+        );
     }
 }
