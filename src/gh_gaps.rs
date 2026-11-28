@@ -647,12 +647,7 @@ mod tests {
         for values in [[2., 1., 1.], [1., 2., 1.], [1., 1., 2.]] {
             assert!(run(NodeKind::GateMajority, &nums(&values)).is_err());
         }
-        assert!(run_item(
-            NodeKind::MathSinc,
-            &[&Value::Number(0.)],
-            &|| true
-        )
-        .is_err());
+        assert!(run_item(NodeKind::MathSinc, &[&Value::Number(0.)], &|| true).is_err());
     }
 
     #[test]
