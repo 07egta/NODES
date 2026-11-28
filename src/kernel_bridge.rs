@@ -224,11 +224,9 @@ pub fn is_watertight(m: &Mesh) -> bool {
     }
     let mut directed: HashMap<(u32, u32), u32> = HashMap::with_capacity(m.triangles.len() * 3);
     for t in &m.triangles {
-        if t.iter().any(|&i| {
-            m.vertices
-                .get(i as usize)
-                .is_none_or(|p| !finite(*p))
-        }) {
+        if t.iter()
+            .any(|&i| m.vertices.get(i as usize).is_none_or(|p| !finite(*p)))
+        {
             return false;
         }
         for k in 0..3 {
