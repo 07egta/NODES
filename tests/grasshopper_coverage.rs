@@ -382,8 +382,7 @@ fn standard_polygon_area_and_centroid_survive_large_translation() {
                 closed: true,
                 geometry: None,
             }));
-            let area =
-                nodes::gh_gaps::run_item(NodeKind::CurveArea, &[&curve], &|| false).unwrap();
+            let area = nodes::gh_gaps::run_item(NodeKind::CurveArea, &[&curve], &|| false).unwrap();
             assert_eq!(area, vec![Value::Number(8.)]);
             let centroid =
                 nodes::gh_gaps::run_item(NodeKind::CurveAreaCentroid, &[&curve], &|| false)
