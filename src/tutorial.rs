@@ -3,7 +3,8 @@
 
 use crate::{theme, ui_polish};
 use eframe::egui::{self, RichText};
-use nodes::model::Graph;
+use nodes::model::{Graph, NodeId};
+use std::collections::BTreeSet;
 
 /// Settings-file key that remembers the guide was finished or skipped.
 const SETTING_KEY: &str = "tutorial";
@@ -23,11 +24,11 @@ pub const STEPS: [(&str, &str); 3] = [
     ),
 ];
 
-/// What the guide can see of the graph: how many nodes and wires, and a fingerprint of the numbers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// What the guide can see: node count, exact wire identities, and a fingerprint of numbers.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Stats {
     pub nodes: usize,
-    pub wires: usize,
+    pub wires: BTreeSet<(NodeId, String, NodeId)>,
     pub values: u64,
 }
 
@@ -37,9 +38,13 @@ impl Stats {
         let mut mix = |x: u64| {
             values = (values ^ x).wrapping_mul(0x0100_0000_01b3);
         };
-        let mut wires = 0;
+        let mut wires = BTreeSet::new();
         for node in &graph.nodes {
-            wires += node.inputs.len();
+            wires.extend(
+                node.inputs
+                    .iter()
+                    .map(|(port, &source)| (node.id, port.clone(), source)),
+            );
             for (key, value) in &node.params {
                 for byte in key.bytes() {
                     mix(u64::from(byte));
@@ -89,13 +94,15 @@ impl Tutorial {
         if !self.active || self.step >= STEPS.len() {
             return false;
         }
-        let Some(base) = self.base else {
+        let Some(base) = self.base.as_ref() else {
             self.base = Some(now);
             return false;
         };
         let done = match self.step {
             0 => now.nodes > base.nodes,
-            1 => now.wires > base.wires,
+            // Replacing an occupied input creates a new wire without increasing the count.
+            // Disconnecting an existing wire alone is not a successful connection.
+            1 => !now.wires.is_subset(&base.wires),
             _ => now.values != base.values,
         };
         if done {
@@ -111,11 +118,12 @@ impl Tutorial {
         let _ = ui_polish::save_setting_line(&format!("{SETTING_KEY}=done"));
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, now: Stats) -> Option<Action> {
+    pub fn show(&mut self, ctx: &egui::Context, graph: &Graph) -> Option<Action> {
         if !self.active {
             return None;
         }
-        self.observe(now);
+        // Do not scan or allocate wire identities after the guide has been dismissed.
+        self.observe(Stats::of(graph));
         let mut action = None;
         let mut close = false;
         let finished = self.step >= STEPS.len();
@@ -224,6 +232,45 @@ mod tests {
     }
 
     #[test]
+    fn replacing_an_occupied_input_advances_connection_step() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let output = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        graph.connect(a, output, "a").unwrap();
+        let mut t = guide();
+        assert!(!t.observe(Stats::of(&graph)));
+        let b = graph.add(NodeKind::Number, [0., 100.]).unwrap();
+        assert!(t.observe(Stats::of(&graph)));
+        assert_eq!(t.step, 1);
+        let before = Stats::of(&graph);
+        graph.connect(b, output, "a").unwrap();
+        let after = Stats::of(&graph);
+        assert_eq!(before.wires.len(), after.wires.len());
+        assert!(t.observe(after));
+        assert_eq!(t.step, 2);
+    }
+
+    #[test]
+    fn disconnecting_or_repeating_an_existing_wire_does_not_advance() {
+        let mut graph = Graph::default();
+        let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let b = graph.add(NodeKind::Number, [0., 100.]).unwrap();
+        let output = graph.add(NodeKind::Add, [300., 0.]).unwrap();
+        graph.connect(a, output, "a").unwrap();
+        graph.connect(b, output, "b").unwrap();
+        let mut t = guide();
+        t.step = 1;
+        assert!(!t.observe(Stats::of(&graph)));
+        graph.connect(a, output, "a").unwrap();
+        assert!(!t.observe(Stats::of(&graph)));
+        graph.disconnect(output, "b");
+        assert!(!t.observe(Stats::of(&graph)));
+        graph.connect(b, output, "a").unwrap();
+        assert!(t.observe(Stats::of(&graph)));
+        assert_eq!(t.step, 2);
+    }
+
+    #[test]
     fn moving_a_node_does_not_count_as_changing_a_number() {
         let mut graph = Graph::default();
         let a = graph.add(NodeKind::Number, [0., 0.]).unwrap();
@@ -239,7 +286,7 @@ mod tests {
         let mut t = Tutorial::default();
         assert!(!t.observe(Stats {
             nodes: 1,
-            wires: 0,
+            wires: BTreeSet::new(),
             values: 0
         }));
     }

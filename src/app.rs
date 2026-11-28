@@ -2961,8 +2961,9 @@ impl eframe::App for NodesApp {
         self.persist_shelf_lists();
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
-        let stats = crate::tutorial::Stats::of(&self.project.graph);
-        if let Some(crate::tutorial::Action::Examples) = self.tutorial.show(ctx, stats) {
+        if let Some(crate::tutorial::Action::Examples) =
+            self.tutorial.show(ctx, &self.project.graph)
+        {
             self.template_open = true;
         }
         self.gcode_dialog(ctx);
