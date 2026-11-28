@@ -7,6 +7,10 @@ rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 description = "An independent Japanese-first desktop node geometry studio"
 
+# Research-only switch; do not enable in release builds before IP review.
+[features]
+experimental-tspline = []
+
 [dependencies]
 eframe = { version = "=0.33.3", default-features = false, features = ["default_fonts", "glow", "x11"] }
 serde = { version = "1", features = ["derive", "rc"] }
