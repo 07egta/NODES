@@ -890,3 +890,24 @@ pub fn diagnose(b: &BrepValue, stop: Stop) -> R<Vec<f64>> {
         tol::ABS,
     ])
 }
+
+/// A sheet thickened into a closed solid (SolidCraft `thicken`: planes and cylinders exactly,
+/// other faces fitted within 0.01 mm).
+pub fn thicken(b: &BrepValue, thickness: f64, both: bool, stop: Stop) -> R<BrepValue> {
+    if !thickness.is_finite()
+        || thickness.abs() <= tol::ABS
+        || thickness.abs() > kb::limits::MAX_COORDINATE
+    {
+        return Err("厚みは 0 以外の有限な値にしてください。".into());
+    }
+    if b.is_closed() {
+        return Err(
+            "閉じた立体には厚みをつけられません。中空にするときは「シェル」を使ってください。"
+                .into(),
+        );
+    }
+    let body = kernel("厚みをつける", stop, || {
+        sk::thicken(b.body(), thickness, both)
+    })?;
+    brep(body, stop)
+}

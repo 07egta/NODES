@@ -65,6 +65,8 @@ pub const KINDS: &[K] = &[
     K::ExactZebra,
     K::ExactDraftAnalysis,
     K::ExactDiagnose,
+    K::SubdTsplinePatch,
+    K::ExactThicken,
 ];
 
 pub fn is_kind(kind: K) -> bool {
@@ -554,6 +556,30 @@ pub fn spec(kind: K) -> &'static NodeSpec {
             Number,
             [B]
         ),
+        K::SubdTsplinePatch => spec!(
+            "T-spline パッチケージ",
+            "四角い T-spline 面の制御ケージ。「ケージ編集」の局所細分で、選んだ面だけ点を増やせます（T 字の接合。形は変わりません）。",
+            "tspline t-spline patch local refine t-junction パッチ 局所細分",
+            Cage,
+            [
+                n("width", "幅", 80., 0.01, 1e5, 1.),
+                n("depth", "奥行", 60., 0.01, 1e5, 1.),
+                i("nu", "U の点数", 6., 4., 64.),
+                i("nv", "V の点数", 5., 4., 64.),
+                n("bulge", "膨らみ", 12., -1e5, 1e5, 1.)
+            ]
+        ),
+        K::ExactThicken => spec!(
+            "厚みをつける",
+            "開いた面（シート）に厚みをつけて閉じた立体にします。負の値で裏側へ。両側にすると半分ずつ。",
+            "thicken offset solid offsetsrf solid 厚み 立体化",
+            Brep,
+            [
+                B,
+                n("thickness", "厚み", 2., -1e4, 1e4, 0.2),
+                i("both", "両側 (1=はい)", 0., 0., 1.)
+            ]
+        ),
         _ => spec!("不明なノード", "不明なノードです。", "unknown", Any, []),
     }
 }
@@ -759,6 +785,20 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             stop,
         )?))]),
         K::SubdCageEdit => out_cage(cage(a, 0)?.as_ref().clone()),
+        K::SubdTsplinePatch => out_cage(Cage::tspline_patch(
+            num(a, 0)?,
+            num(a, 1)?,
+            num(a, 2)? as usize,
+            num(a, 3)? as usize,
+            num(a, 4)?,
+            stop,
+        )?),
+        K::ExactThicken => out(ko::thicken(
+            brep(a, 0)?,
+            num(a, 1)?,
+            num(a, 2)? != 0.,
+            stop,
+        )?),
         K::ExactZebra => as_mesh(
             ko::zebra(brep(a, 0)?, num(a, 1)?, num(a, 2)? as usize, stop)?,
             stop,

@@ -40,6 +40,9 @@ pub struct Cage {
     faces: Vec<Vec<u32>>,
     creases: BTreeSet<(u32, u32)>,
     grid: Option<Grid>,
+    /// A T-spline patch cage: the control points are this T-spline's, in its vertex order, and
+    /// the surface is the T-spline itself (exact, with T-junctions).
+    ts: Option<Arc<TSpline>>,
     preview: Arc<Mesh>,
 }
 
@@ -95,6 +98,7 @@ impl Cage {
             faces,
             creases,
             grid,
+            ts: None,
             preview: Arc::new(Mesh::default()),
         };
         let mesh = match grid {
@@ -257,6 +261,7 @@ impl Cage {
     fn subdivided_mesh(&self, stop: Stop) -> R<Mesh> {
         let mut level = Cage {
             grid: None,
+            ts: None,
             preview: Arc::new(Mesh::default()),
             ..self.clone()
         };
@@ -405,6 +410,7 @@ impl Cage {
             faces,
             creases,
             grid: None,
+            ts: None,
             preview: Arc::new(Mesh::default()),
         })
     }
@@ -412,6 +418,10 @@ impl Cage {
     /// One refinement step: exact knot insertion for grid cages (same surface, twice the
     /// control points each way), one Catmull-Clark step for general cages.
     pub fn subdivide(&self, stop: Stop) -> R<Cage> {
+        if self.ts.is_some() {
+            let all: Vec<usize> = (0..self.faces.len()).collect();
+            return self.refine_faces(&all, stop);
+        }
         match self.grid {
             Some(g) => {
                 let (v, g2) = refine_grid(&self.vertices, g)?;
@@ -500,6 +510,11 @@ impl Cage {
     /// (SolidCraft `tspline_sheet`), split in two halves around, sewn, and capped top and bottom
     /// into a closed solid when `cap` is set.
     pub fn to_brep(&self, cap: bool, stop: Stop) -> R<BrepValue> {
+        if let Some(ts) = &self.ts {
+            // An open patch: exact NURBS faces (Bézier elements around T-junctions).
+            let sheet = kb::tspline_body(ts, stop)?;
+            return kb::brep(sheet, stop);
+        }
         let Some(g) = self.grid else {
             return self.acc_brep(stop);
         };
@@ -697,6 +712,15 @@ pub const MAX_ACC_PATCHES: usize = 4096;
 impl Cage {
     /// Rebuild the cage after its points moved, keeping its kind (grid or general) and creases.
     fn with_vertices(&self, vertices: Vec<P3>, stop: Stop) -> R<Cage> {
+        if let Some(ts) = &self.ts {
+            let pts: Vec<Vec3> = vertices
+                .iter()
+                .map(|p| Vec3::new(p[0], p[1], p[2]))
+                .collect();
+            let moved = TSpline::new(ts.mesh().clone(), ts.degree(), &pts, &ts.weights())
+                .map_err(|e| format!("T-spline を作り直せませんでした（{e}）。"))?;
+            return Self::from_tspline(moved, stop);
+        }
         Self::build(
             vertices,
             self.faces.clone(),
@@ -935,6 +959,10 @@ impl Cage {
                 }
                 self.with_vertices(v, stop)
             }
+            EditOp::Refine { faces } => self.refine_faces(faces, stop),
+            EditOp::Extrude { .. } | EditOp::Crease { .. } if self.ts.is_some() => Err(
+                "T-spline パッチケージでは面の押し出し・折り目は使えません（局所細分と移動が使えます）。".into(),
+            ),
             EditOp::Extrude { faces, d } => {
                 let mut cage = self.clone();
                 let mut seen = BTreeSet::new();
@@ -985,6 +1013,9 @@ pub enum EditOp {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sym: Option<u8>,
     },
+    /// Refine faces locally (T-spline patch cages): each face is cut through its middle both
+    /// ways, inserting T-junctions; the surface does not change.
+    Refine { faces: Vec<usize> },
     /// Scale points about their centre.
     Scale { verts: Vec<usize>, s: f64 },
     /// Push faces out along their normals.
@@ -1002,6 +1033,7 @@ impl EditOp {
         match self {
             Self::Move { .. } => "移動",
             Self::Scale { .. } => "拡大縮小",
+            Self::Refine { .. } => "局所細分",
             Self::Extrude { .. } => "面の押し出し",
             Self::Crease { .. } => "折り目",
             Self::Uncrease => "折り目を消す",
@@ -1026,4 +1058,185 @@ pub fn parse_edits(text: &str) -> R<Vec<EditOp>> {
 
 pub fn edits_text(ops: &[EditOp]) -> String {
     serde_json::to_string(ops).unwrap_or_default()
+}
+
+// -------------------------------------------------------------------------------------------
+// T-spline patch cages (T-junctions, local refinement)
+// -------------------------------------------------------------------------------------------
+
+/// Most evaluation points per direction for a T-spline preview.
+const TS_PREVIEW: usize = 64;
+
+impl Cage {
+    /// A T-spline patch: a bicubic plane `width × depth` on `nu × nv` control points, the middle
+    /// raised by `bulge` (mm). The control net can then be refined locally (T-junctions).
+    pub fn tspline_patch(
+        width: f64,
+        depth: f64,
+        nu: usize,
+        nv: usize,
+        bulge: f64,
+        stop: Stop,
+    ) -> R<Cage> {
+        for (v, name) in [(width, "幅"), (depth, "奥行")] {
+            if !(v.is_finite() && v > kb::tol::ABS && v <= kb::limits::MAX_COORDINATE) {
+                return Err(format!("{name}は 0 より大きい値にしてください。"));
+            }
+        }
+        if !(4..=64).contains(&nu)
+            || !(4..=64).contains(&nv)
+            || !bulge.is_finite()
+            || bulge.abs() > 1e5
+        {
+            return Err("点の数は 4〜64、膨らみは有限な値にしてください。".into());
+        }
+        let mut pts = Vec::with_capacity(nu * nv);
+        for j in 0..nv {
+            for i in 0..nu {
+                let (u, v) = (i as f64 / (nu - 1) as f64, j as f64 / (nv - 1) as f64);
+                let z = bulge * (std::f64::consts::PI * u).sin() * (std::f64::consts::PI * v).sin();
+                pts.push(Vec3::new((u - 0.5) * width, (v - 0.5) * depth, z));
+            }
+        }
+        let s = NurbsSurface::new(
+            [3, 3],
+            [clamped_uniform(nu), clamped_uniform(nv)],
+            &pts,
+            &vec![1.; pts.len()],
+        )
+        .map_err(|e| format!("NURBS 曲面を作れませんでした（{e}）。"))?;
+        let ts = TSpline::from_nurbs(&s)
+            .map_err(|e| format!("T-spline への変換に失敗しました（{e}）。"))?;
+        Self::from_tspline(ts, stop)
+    }
+
+    /// A cage showing a T-spline's control net (faces of its T-mesh, T-junction points on their
+    /// sides), with the exact surface as preview.
+    pub fn from_tspline(ts: TSpline, stop: Stop) -> R<Cage> {
+        let mesh = ts.mesh();
+        let vertices: Vec<P3> = ts.points().iter().map(|p| [p.x, p.y, p.z]).collect();
+        if vertices.len() > MAX_CAGE_VERTICES {
+            return Err(format!(
+                "ケージの点が多すぎます（上限 {MAX_CAGE_VERTICES}）。"
+            ));
+        }
+        let mut faces = Vec::new();
+        for r in mesh.faces() {
+            let mut poly: Vec<u32> = Vec::new();
+            let mut push = |i: usize, j: usize| {
+                if let Some(v) = mesh.vertex_at(i, j)
+                    && poly.last() != Some(&(v as u32))
+                {
+                    poly.push(v as u32);
+                }
+            };
+            for i in r.i0..r.i1 {
+                push(i, r.j0);
+            }
+            for j in r.j0..r.j1 {
+                push(r.i1, j);
+            }
+            for i in (r.i0 + 1..=r.i1).rev() {
+                push(i, r.j1);
+            }
+            for j in (r.j0 + 1..=r.j1).rev() {
+                push(r.i0, j);
+            }
+            if poly.first() == poly.last() && poly.len() > 1 {
+                poly.pop();
+            }
+            if poly.len() >= 3 {
+                faces.push(poly);
+            }
+        }
+        // The exact surface, sampled on its domain.
+        let [[s0, s1], [t0, t1]] = ts.domain();
+        let n = TS_PREVIEW;
+        let mut pv = Vec::with_capacity((n + 1) * (n + 1));
+        for j in 0..=n {
+            kb_stop(stop)?;
+            for i in 0..=n {
+                let (s, t) = (
+                    s0 + (s1 - s0) * i as f64 / n as f64,
+                    t0 + (t1 - t0) * j as f64 / n as f64,
+                );
+                let p = ts
+                    .eval(s, t)
+                    .map_err(|e| format!("T-spline の評価に失敗しました（{e}）。"))?;
+                pv.push([p.x, p.y, p.z]);
+            }
+        }
+        let mut triangles = Vec::with_capacity(n * n * 2);
+        for j in 0..n {
+            for i in 0..n {
+                let a = (j * (n + 1) + i) as u32;
+                let (b, c, d) = (a + 1, a + 1 + (n + 1) as u32, a + (n + 1) as u32);
+                triangles.push([a, b, c]);
+                triangles.push([a, c, d]);
+            }
+        }
+        Ok(Cage {
+            vertices,
+            faces,
+            creases: BTreeSet::new(),
+            grid: None,
+            ts: Some(Arc::new(ts)),
+            preview: Arc::new(Mesh {
+                vertices: pv,
+                triangles,
+            }),
+        })
+    }
+
+    pub fn tspline(&self) -> Option<&TSpline> {
+        self.ts.as_deref()
+    }
+
+    /// Local refinement of the listed faces (T-spline patch cages only).
+    pub fn refine_faces(&self, faces: &[usize], stop: Stop) -> R<Cage> {
+        let ts = self
+            .ts
+            .as_ref()
+            .ok_or("局所細分は T-spline パッチケージで使えます。")?;
+        let mesh = ts.mesh();
+        let rects = mesh.faces();
+        let [[s0, s1], [t0, t1]] = ts.domain();
+        let (sk, tk) = (mesh.s_knots(), mesh.t_knots());
+        let mut cuts = Vec::new();
+        for &f in faces {
+            // Faces are numbered as `faces()` lists them (frame faces included).
+            let r = rects.get(f).ok_or_else(|| {
+                format!(
+                    "面番号 {f} はありません（0〜{}）。",
+                    rects.len().saturating_sub(1)
+                )
+            })?;
+            let (Some(&a0), Some(&a1), Some(&b0), Some(&b1)) =
+                (sk.get(r.i0), sk.get(r.i1), tk.get(r.j0), tk.get(r.j1))
+            else {
+                continue;
+            };
+            let (a0, a1, b0, b1) = (a0.max(s0), a1.min(s1), b0.max(t0), b1.min(t1));
+            if !(a1 - a0 > 1e-9 && b1 - b0 > 1e-9) {
+                continue; // a frame face outside the domain: nothing to cut
+            }
+            cuts.push(solidcraft_geom::tspline::Cut::S {
+                s: (a0 + a1) / 2.,
+                t0: b0,
+                t1: b1,
+            });
+            cuts.push(solidcraft_geom::tspline::Cut::T {
+                t: (b0 + b1) / 2.,
+                s0: a0,
+                s1: a1,
+            });
+        }
+        if cuts.is_empty() {
+            return Err("細分できる面がありません（外周の枠の面は細分できません）。内側の面を選んでください。".into());
+        }
+        let refined = ts
+            .refine(&cuts)
+            .map_err(|e| format!("局所細分に失敗しました（{e}）。"))?;
+        Self::from_tspline(refined, stop)
+    }
 }

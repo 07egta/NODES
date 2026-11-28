@@ -369,3 +369,52 @@ fn iges_round_trip_keeps_a_cylinder() {
     assert!(back[0].is_closed());
     assert!(rel(back[0].volume().unwrap(), PI * 100. * 20.) < 1e-3);
 }
+
+// ---- T-spline patches with T-junctions ----
+
+#[test]
+fn tspline_patch_local_refinement_keeps_the_surface_and_converts() {
+    use nodes::subd::{EditOp, edits_text};
+    let patch = Cage::tspline_patch(80., 60., 6, 5, 12., &go).unwrap();
+    let before = patch.tspline().unwrap().clone();
+    // Refine one inner face (face 7 of the 6 × 5 net spans s 1..2, t 1..2): points are added
+    // (T-junctions), the surface stays the same.
+    let inner = 7;
+    let refined = patch
+        .apply_edits(&edits_text(&[EditOp::Refine { faces: vec![inner] }]), &go)
+        .unwrap();
+    let after = refined.tspline().unwrap();
+    assert!(refined.vertices().len() > patch.vertices().len());
+    assert!(
+        !after.mesh().is_regular(),
+        "a local refinement leaves T-junctions"
+    );
+    let [[s0, s1], [t0, t1]] = before.domain();
+    let mut worst = 0f64;
+    for i in 0..=10 {
+        for j in 0..=10 {
+            let (s, t) = (
+                s0 + (s1 - s0) * i as f64 / 10.,
+                t0 + (t1 - t0) * j as f64 / 10.,
+            );
+            worst = worst.max(before.eval(s, t).unwrap().dist(after.eval(s, t).unwrap()));
+        }
+    }
+    assert!(worst < 1e-9, "refinement moved the surface by {worst}");
+    // Moving a new point changes the surface locally; the T-spline converts to NURBS faces.
+    let moved = refined
+        .apply_edits(
+            &edits_text(&[EditOp::Move {
+                verts: vec![refined.vertices().len() - 1],
+                d: [0., 0., 5.],
+                sym: None,
+            }]),
+            &go,
+        )
+        .unwrap();
+    let sheet = moved.to_brep(false, &go).unwrap();
+    assert!(!sheet.is_closed());
+    assert!(sheet.face_count() >= 1);
+    let solid = nodes::kernel_ops::thicken(&sheet, 2., false, &go).unwrap();
+    assert!(solid.is_closed(), "thickened patch is not closed");
+}
