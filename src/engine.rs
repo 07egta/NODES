@@ -165,6 +165,7 @@ impl Evaluator {
                 for n in &graph.nodes {
                     out.outputs.insert(n.id, Err(e.clone()));
                 }
+                out.cancelled = stop();
                 out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
                 return out;
             }
@@ -197,6 +198,10 @@ impl Evaluator {
             // Phase 1 (sequential): disabled nodes, cache keys and cache hits.
             let mut slots: Vec<Slot> = Vec::with_capacity(level.len());
             for node in level {
+                if stop() {
+                    out.cancelled = true;
+                    break 'levels;
+                }
                 let id = node.id;
                 let node_start = Instant::now();
                 // Disabled node: empty output, never cached; revision 0 marks "off" for children.
@@ -346,6 +351,9 @@ impl Evaluator {
                     .insert(id, NodeTiming::spent(base + phase3.elapsed(), is_cached));
             }
         }
+        // Cache-only, disabled-only and empty graphs may never execute a kernel.
+        // Observe cancellation before returning even when no fresh slot was missing.
+        out.cancelled |= stop();
         out.elapsed_ms = start.elapsed().as_secs_f64() * 1000.;
         out
     }
@@ -487,7 +495,7 @@ pub(crate) fn evaluate_node(
         }?;
         return checked_tree(result, cancel);
     }
-    if node.kind == NodeKind::Output {
+    if node.kind == NodeKind::Output || node.kind == NodeKind::Reroute {
         return checked_tree(
             inputs.into_iter().next().ok_or("形状がありません。")?,
             cancel,
@@ -631,6 +639,13 @@ pub(crate) fn evaluate_node(
                 )?
             } else if crate::math_nodes::is_list_kind(node.kind) {
                 crate::math_nodes::run_list(node.kind, &lists, cancel)?
+            } else if node.kind == NodeKind::BioSpaceColonization {
+                crate::biomorph::run_colonization(
+                    &lists,
+                    (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
+                    MAX_ITEMS.saturating_sub(total_items),
+                    cancel,
+                )?
             } else if crate::generative::is_list(node.kind) {
                 crate::generative::run_list(node.kind, &lists, cancel)?
             } else if node.kind == NodeKind::MeshConstruct {
@@ -781,6 +796,7 @@ fn preflight_run(
         k if crate::mathematical_surfaces::is_kind(k) => {
             crate::mathematical_surfaces::estimate(k, args)?
         }
+        NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
@@ -823,7 +839,7 @@ pub(crate) fn as_mesh(mesh: Mesh, cancel: &dyn Fn() -> bool) -> Result<Vec<Value
     validate_mesh(&mesh, cancel)?;
     Ok(vec![Value::Mesh(Arc::new(mesh))])
 }
-fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
+pub(crate) fn as_curve(points: Vec<[f64; 3]>, closed: bool) -> Result<Vec<Value>, String> {
     if points.iter().any(|p| !finite_point(*p)) {
         return Err("曲線の座標が大きすぎます。".into());
     }
@@ -844,8 +860,10 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
             crate::mathematical_surfaces::run(k, a, cancel)
         }
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
+        k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
@@ -1220,13 +1238,13 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshFlip | MeshWeldExact | MeshUnweld | MeshUnify | MeshSmooth | MeshSubdivide
         | MeshCatmullClark | MeshOnBed | MeshDeleteFace | MeshSelfContact | MeshThicknessSample
         | MeshCompact | MeshNonManifold => crate::mesh_fabrication::run_item(kind, a, cancel),
-        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Script | Cluster | ListItem
-        | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList | SubList
-        | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree | TrimTree
-        | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree | PathMapper
-        | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth | CullIndex
-        | DuplicateData | RepeatData | MassAddition | MassMultiplication | ReplaceItems
-        | InsertItems | MemberIndex | RandomReduce | Jitter => {
+        MeshConstruct | Loft | Merge | Flatten | Graft | Output | Reroute | Script | Cluster
+        | ListItem | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList
+        | SubList | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree
+        | TrimTree | PruneTree | MergeTree | EntwineTree | FlipMatrix | UnflattenTree
+        | PathMapper | PartitionList | TreeBranch | TreeItem | TreeStatistics | CullNth
+        | CullIndex | DuplicateData | RepeatData | MassAddition | MassMultiplication
+        | ReplaceItems | InsertItems | MemberIndex | RandomReduce | Jitter => {
             Err("このノードはリスト評価が必要です。".into())
         }
         other => crate::math_nodes::run_item(other, a, cancel),
