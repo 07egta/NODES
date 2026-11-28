@@ -50,10 +50,18 @@ pub fn step(
         || !(0.0..=1.0).contains(&cfg.friction)
         || !finite(cfg.gravity)
         || cfg.floor.is_some_and(|z| !z.is_finite() || z.abs() > 1e9)
-        || weights.iter().any(|w| !w.is_finite() || !(0.0..=1e9).contains(w))
-        || state.positions.iter().chain(&state.velocities).any(|p| !finite(*p))
+        || weights
+            .iter()
+            .any(|w| !w.is_finite() || !(0.0..=1e9).contains(w))
+        || state
+            .positions
+            .iter()
+            .chain(&state.velocities)
+            .any(|p| !finite(*p))
         || constraints.iter().any(|c| {
-            c.a >= n || c.b >= n || c.a == c.b
+            c.a >= n
+                || c.b >= n
+                || c.a == c.b
                 || !(0.0..=1e9).contains(&c.rest)
                 || !(0.0..=1e9).contains(&c.compliance)
         })
@@ -84,9 +92,8 @@ pub fn step(
             if j % 1024 == 0 && stop() {
                 return Err("Simulation cancelled".into());
             }
-            let d = std::array::from_fn::<_, 3, _>(|k| {
-                next.positions[c.a][k] - next.positions[c.b][k]
-            });
+            let d =
+                std::array::from_fn::<_, 3, _>(|k| next.positions[c.a][k] - next.positions[c.b][k]);
             let length = d.iter().map(|x| x * x).sum::<f64>().sqrt();
             let (wa, wb) = (weights[c.a], weights[c.b]);
             if wa + wb == 0.0 {
@@ -131,7 +138,12 @@ pub fn step(
     if stop() {
         return Err("Simulation cancelled".into());
     }
-    if next.positions.iter().chain(&next.velocities).any(|p| !finite(*p)) {
+    if next
+        .positions
+        .iter()
+        .chain(&next.velocities)
+        .any(|p| !finite(*p))
+    {
         return Err("XPBD diverged".into());
     }
     next.frame = frame;
@@ -165,10 +177,15 @@ mod tests {
     #[test]
     fn hard_distance_and_pin() {
         let mut s = initial();
-        let c = Distance { a: 0, b: 1, rest: 1.0, compliance: 0.0 };
+        let c = Distance {
+            a: 0,
+            b: 1,
+            rest: 1.0,
+            compliance: 0.0,
+        };
         step(&mut s, &[0.0, 1.0], &[c], settings(), &|| false).unwrap();
         assert_eq!(s.positions[0], [0.0; 3]);
-        let l = s.positions[1].iter().map(|x| x*x).sum::<f64>().sqrt();
+        let l = s.positions[1].iter().map(|x| x * x).sum::<f64>().sqrt();
         assert!((l - 1.0).abs() < 1e-10);
         assert_eq!(s.frame, 1);
     }
