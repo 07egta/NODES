@@ -637,6 +637,9 @@ pub enum NodeKind {
     ExactDiagnose,
     SubdTsplinePatch,
     ExactThicken,
+    MeshBoundaryLoops,
+    MeshIslands,
+    MeshTopologyStats,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1111,6 +1114,9 @@ impl NodeKind {
             Self::ExactDiagnose,
             Self::SubdTsplinePatch,
             Self::ExactThicken,
+            Self::MeshBoundaryLoops,
+            Self::MeshIslands,
+            Self::MeshTopologyStats,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1769,7 +1775,10 @@ impl NodeKind {
             | Self::MeshThicknessSample
             | Self::MeshBedFit
             | Self::MeshCompact
-            | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            | Self::MeshNonManifold
+            | Self::MeshBoundaryLoops
+            | Self::MeshIslands
+            | Self::MeshTopologyStats => crate::mesh_fabrication::spec(self),
             other if crate::mathematical_surfaces::is_kind(other) => {
                 crate::mathematical_surfaces::spec(other)
             }

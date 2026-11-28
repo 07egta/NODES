@@ -1266,6 +1266,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         | MeshBedFit | MeshCompact | MeshNonManifold => {
             crate::mesh_fabrication::run_item(kind, a, cancel)
         }
+        MeshBoundaryLoops | MeshIslands | MeshTopologyStats => {
+            crate::mesh_fabrication::run_item(kind, a, cancel)
+        }
         MeshConstruct | Loft | Merge | Flatten | Graft | Output | Reroute | Script | Cluster
         | ListItem | ListLength | ReverseList | SortList | CullPattern | ShiftList | ConcatList
         | SubList | Bounds | Remap | Expression | GraphProfile | ImportMesh | SimplifyTree
