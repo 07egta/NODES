@@ -2,6 +2,8 @@
 //! Curves are sampled polylines, not NURBS. All coordinates are in model units.
 use crate::engine::{cancelled, cross, dot, finite_point, length, map_shape, num, shape, sub};
 use crate::model::*;
+use crate::robust_geometry::{incircle2d, orient2d};
+use std::cmp::Ordering;
 use std::f64::consts::{PI, TAU};
 use std::sync::Arc;
 
@@ -914,25 +916,33 @@ fn voronoi(
     }
     Ok(out)
 }
+fn orientation(a: P2, b: P2, c: P2) -> Result<Ordering, String> {
+    orient2d(a, b, c)
+        .map(|result| result.sign)
+        .ok_or_else(|| "方向判定の座標が有限値ではありません。".into())
+}
+
 fn hull(input: &[[f64; 3]], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
-    let mut p: Vec<P2> = input.iter().map(|p| [p[0], p[1]]).collect();
+    // Signed zero represents the same geometric coordinate. Canonicalize
+    // before total_cmp so all equal X coordinates share one Y ordering.
+    let mut p: Vec<P2> = input
+        .iter()
+        .map(|p| [p[0], p[1]].map(|x| if x == 0. { 0. } else { x }))
+        .collect();
     p.sort_by(|a, b| a[0].total_cmp(&b[0]).then(a[1].total_cmp(&b[1])));
     p.dedup();
     if p.len() < 3 {
         return Err("凸包には異なる 3 点以上が必要です。".into());
     }
-    let span = (p[p.len() - 1][0] - p[0][0]).max(
-        p.iter().map(|q| q[1]).fold(f64::NEG_INFINITY, f64::max)
-            - p.iter().map(|q| q[1]).fold(f64::INFINITY, f64::min),
-    );
-    let eps = span * span * 1e-12;
     let mut lo: Vec<P2> = Vec::new();
     let mut hi: Vec<P2> = Vec::new();
     for (k, &q) in p.iter().enumerate() {
         if k % 128 == 0 {
             cancelled(cancel)?;
         }
-        while lo.len() >= 2 && side(lo[lo.len() - 2], lo[lo.len() - 1], q) <= eps {
+        while lo.len() >= 2
+            && orientation(lo[lo.len() - 2], lo[lo.len() - 1], q)? != Ordering::Greater
+        {
             lo.pop();
         }
         lo.push(q);
@@ -941,7 +951,9 @@ fn hull(input: &[[f64; 3]], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, Str
         if k % 128 == 0 {
             cancelled(cancel)?;
         }
-        while hi.len() >= 2 && side(hi[hi.len() - 2], hi[hi.len() - 1], q) <= eps {
+        while hi.len() >= 2
+            && orientation(hi[hi.len() - 2], hi[hi.len() - 1], q)? != Ordering::Greater
+        {
             hi.pop();
         }
         hi.push(q);
@@ -950,7 +962,7 @@ fn hull(input: &[[f64; 3]], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, Str
     hi.pop();
     lo.extend(hi);
     if lo.len() < 3 {
-        return Err("点がほぼ同一直線上にあります。".into());
+        return Err("点が同一直線上にあります。".into());
     }
     Ok(vec![curve(
         lo.into_iter().map(|p| [p[0], p[1], 0.]).collect(),
@@ -1092,15 +1104,14 @@ fn curve_array(
     }
     Ok(out)
 }
-fn incircle(a: P2, b: P2, c: P2, p: P2) -> f64 {
-    let (ax, ay) = (a[0] - p[0], a[1] - p[1]);
-    let (bx, by) = (b[0] - p[0], b[1] - p[1]);
-    let (cx, cy) = (c[0] - p[0], c[1] - p[1]);
-    (ax * ax + ay * ay) * (bx * cy - by * cx) - (bx * bx + by * by) * (ax * cy - ay * cx)
-        + (cx * cx + cy * cy) * (ax * by - ay * bx)
+fn incircle(a: P2, b: P2, c: P2, p: P2) -> Result<Ordering, String> {
+    incircle2d(a, b, c, p)
+        .map(|result| result.sign)
+        .ok_or_else(|| "円内外判定の座標が有限値ではありません。".into())
 }
-/// Incremental Bowyer-Watson on normalized planar coordinates. Reject ambiguous
-/// degeneracies rather than return a mesh with missing sites or invalid triangles.
+
+/// Incremental Bowyer-Watson with certified signs on original coordinates.
+/// Reject unresolved degeneracies rather than return an invalid triangulation.
 fn delaunay(input: &[[f64; 3]], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     // A finite supertriangle can suppress a true hull triangle near collinearity.
     // Retry a bounded number of larger enclosures only when the hull audit fails.
@@ -1139,13 +1150,16 @@ fn delaunay_enclosed(
     }
     let center = [(lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5];
     let mut p: Vec<P2> = Vec::new();
+    let mut normalized: Vec<P2> = Vec::new();
     let mut vertices = Vec::new();
-    // Stable insertion order also makes co-circular tie selection deterministic.
+    // Retain the existing nearby-site merge policy, but do not use rounded
+    // normalized coordinates for topology. Stable insertion order breaks ties.
     for q in input {
         cancelled(cancel)?;
         let r = [(q[0] - center[0]) / scale, (q[1] - center[1]) / scale];
-        if !p.iter().any(|s| d2(*s, r) <= 1e-18) {
-            p.push(r);
+        if !normalized.iter().any(|s| d2(*s, r) <= 1e-18) {
+            normalized.push(r);
+            p.push([q[0], q[1]]);
             vertices.push([q[0], q[1], 0.]);
         }
     }
@@ -1153,19 +1167,22 @@ fn delaunay_enclosed(
     if n < 3 {
         return Err("異なる 3 点以上が必要です。".into());
     }
-    p.extend([
-        [-extent, -extent * 0.5],
-        [extent, -extent * 0.5],
-        [0., extent],
-    ]);
+    p.extend(
+        [
+            [-extent, -extent * 0.5],
+            [extent, -extent * 0.5],
+            [0., extent],
+        ]
+        .map(|q| [center[0] + q[0] * scale, center[1] + q[1] * scale]),
+    );
     let mut tris = vec![[n, n + 1, n + 2]];
     for i in 0..n {
         cancelled(cancel)?;
         let mut keep = Vec::new();
         let mut boundary = std::collections::BTreeMap::<(usize, usize), usize>::new();
         for t in tris {
-            let det = incircle(p[t[0]], p[t[1]], p[t[2]], p[i]);
-            if det > 0. {
+            let sign = incircle(p[t[0]], p[t[1]], p[t[2]], p[i])?;
+            if sign == Ordering::Greater {
                 for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
                     *boundary.entry((a.min(b), a.max(b))).or_default() += 1;
                 }
@@ -1183,11 +1200,10 @@ fn delaunay_enclosed(
             if count != 1 {
                 continue;
             }
-            let sign = side(p[a], p[b], p[i]);
-            if sign > 1e-14 {
-                keep.push([a, b, i]);
-            } else if sign < -1e-14 {
-                keep.push([b, a, i]);
+            match orientation(p[a], p[b], p[i])? {
+                Ordering::Greater => keep.push([a, b, i]),
+                Ordering::Less => keep.push([b, a, i]),
+                Ordering::Equal => {}
             }
         }
         if keep.len() > MAX_SITES * 8 {
@@ -1215,9 +1231,14 @@ fn delaunay_enclosed(
         for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
             *edges.entry((a.min(b), a.max(b))).or_default() += 1;
         }
-        // Check empty circumcircle on normalized positions, with a small roundoff allowance.
+        // Check the actual output vertices, not rounded normalized positions.
+        if orientation(p[t[0]], p[t[1]], p[t[2]])? != Ordering::Greater {
+            return Err("ドロネー分割の三角形の向きが不正です。".into());
+        }
         for (k, &q) in p[..n].iter().enumerate() {
-            if !t.contains(&k) && incircle(p[t[0]], p[t[1]], p[t[2]], q) > 1e-12 {
+            if !t.contains(&k)
+                && incircle(p[t[0]], p[t[1]], p[t[2]], q)? == Ordering::Greater
+            {
                 return Err("ドロネー条件を満たせません。点の間隔を調整してください。".into());
             }
         }
@@ -1234,10 +1255,14 @@ fn delaunay_enclosed(
     for t in &tris {
         cancelled(cancel)?;
         for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
-            if edges[&(a.min(b), a.max(b))] == 1
-                && p[..n].iter().any(|&q| side(p[a], p[b], q) < -1e-12)
-            {
-                return Err("凸包境界を完全に分割できません。点の間隔を広げてください。".into());
+            if edges[&(a.min(b), a.max(b))] == 1 {
+                for &q in &p[..n] {
+                    if orientation(p[a], p[b], q)? == Ordering::Less {
+                        return Err(
+                            "凸包境界を完全に分割できません。点の間隔を広げてください。".into(),
+                        );
+                    }
+                }
             }
         }
     }
@@ -1303,6 +1328,42 @@ mod tests {
         assert!((area_xy(&v[0]) - 4.).abs() < 1e-10);
         assert!(hull(&[[0.; 3], [1., 0., 0.], [2., 0., 0.]], &|| false).is_err());
     }
+    #[test]
+    fn hull_preserves_a_shallow_extreme_vertex() {
+        let p = [
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [2., 1e-13, 0.],
+            [2., 1., 0.],
+            [0., 1., 0.],
+        ];
+        let values = hull(&p, &|| false).unwrap();
+        let ring = &c(&values[0]).points;
+        assert_eq!(ring.len(), 5);
+        assert!(ring.contains(&p[1]));
+        for (a, b) in ring.iter().zip(ring.iter().cycle().skip(1)) {
+            for q in p {
+                assert_ne!(
+                    orientation([a[0], a[1]], [b[0], b[1]], [q[0], q[1]]).unwrap(),
+                    Ordering::Less
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hull_signed_zero_does_not_change_geometric_order() {
+        let p = [
+            [-0., 1., 0.],
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [1., 1., 0.],
+        ];
+        let values = hull(&p, &|| false).unwrap();
+        assert_eq!(c(&values[0]).points.len(), 4);
+        assert_eq!(area_xy(&values[0]), 1.);
+    }
+
     #[test]
     fn nearest_ties_are_stable_and_attractor_distances_match() {
         let candidates = [Value::Point([-1., 0., 0.]), Value::Point([1., 0., 0.])];
@@ -1422,6 +1483,27 @@ mod extra_tests {
         assert!((total - 16.).abs() < 1e-9);
         assert!(delaunay(&[[0.; 3], [1., 0., 0.], [2., 0., 0.]], &|| false).is_err());
     }
+    #[test]
+    fn delaunay_near_cocircular_uses_the_correct_diagonal() {
+        let p = [
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [1., 1., 0.],
+            [0., 1_f64.next_down(), 0.],
+        ];
+        let values = delaunay(&p, &|| false).unwrap();
+        let Value::Mesh(mesh) = &values[0] else {
+            panic!("mesh required")
+        };
+        assert_eq!(mesh.triangles.len(), 2);
+        assert!(
+            mesh.triangles
+                .iter()
+                .all(|t| t.contains(&1) && t.contains(&3))
+        );
+        assert_eq!(delaunay(&p, &|| false).unwrap(), values);
+    }
+
     #[test]
     fn mesh_population_reproducible_and_inside_triangle() {
         let m = Mesh {
