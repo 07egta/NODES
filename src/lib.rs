@@ -11,6 +11,7 @@ pub mod gcode;
 pub mod gcode_job;
 pub mod gcode_nodes;
 pub mod generative;
+pub mod gh_gaps;
 pub mod gh_nodes;
 pub mod ghx;
 pub mod graph_api;
@@ -45,3 +46,5 @@ pub mod math_nodes;
 pub mod surface_curvature;
 pub mod surface_kernel;
 pub mod surface_nodes;
+
+pub mod xpbd;

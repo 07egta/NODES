@@ -15,6 +15,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 const WIDTH: f32 = 218.0;
 const HEADER: f32 = 43.0;
 const ROW: f32 = 28.0;
+/// Size of a reroute dot, which is drawn small instead of as a full card.
+const DOT_W: f32 = 34.0;
+const DOT_H: f32 = 26.0;
 /// Snap grid in world units (matches the dot grid drawn at zoom 1).
 pub const GRID: f32 = 24.0;
 /// How many numeric inputs of a card are drawn as sliders.
@@ -122,10 +125,7 @@ impl MinimapDrawing {
         options: TessellationOptions,
     ) -> Option<Self> {
         let bounds = nodes.iter().fold(Rect::NOTHING, |bounds, node| {
-            bounds.union(Rect::from_min_size(
-                node.position.into(),
-                egui::vec2(WIDTH, height(node)),
-            ))
+            bounds.union(Rect::from_min_size(node.position.into(), node_size(node)))
         });
         if !bounds.is_positive() {
             return None;
@@ -149,7 +149,8 @@ impl MinimapDrawing {
         let mut mesh = egui::Mesh::default();
         for node in nodes {
             let start = drawing.project(node.position.into());
-            let size = egui::vec2((WIDTH * scale).max(1.), (height(node) * scale).max(1.));
+            let full = node_size(node);
+            let size = egui::vec2((full.x * scale).max(1.), (full.y * scale).max(1.));
             let color = if selected.contains(&node.id) {
                 theme::teal()
             } else {
@@ -197,7 +198,7 @@ fn group_rect(p: &Project, indices: &NodeIndices, members: &[NodeId], rect: Rect
             let n = &p.graph.nodes[index];
             bounds = bounds.union(Rect::from_min_size(
                 to_screen(n.position, rect, p.pan, p.zoom),
-                egui::vec2(WIDTH, height(n)) * p.zoom,
+                node_size(n) * p.zoom,
             ));
         }
     }
@@ -220,7 +221,18 @@ fn note_fill() -> Color32 {
 }
 
 fn height(node: &Node) -> f32 {
+    if node.kind == NodeKind::Reroute {
+        return DOT_H;
+    }
     HEADER + ROW * node.kind.spec().inputs.len() as f32 + 27.0
+}
+
+fn node_size(node: &Node) -> Vec2 {
+    if node.kind == NodeKind::Reroute {
+        egui::vec2(DOT_W, DOT_H)
+    } else {
+        egui::vec2(WIDTH, height(node))
+    }
 }
 
 fn parameter_number(
@@ -264,6 +276,14 @@ fn to_world(screen: Pos2, rect: Rect, pan: [f32; 2], zoom: f32) -> [f32; 2] {
     [p.x, p.y]
 }
 fn output_pos(n: &Node, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
+    if n.kind == NodeKind::Reroute {
+        return to_screen(
+            [n.position[0] + DOT_W, n.position[1] + DOT_H / 2.],
+            rect,
+            pan,
+            zoom,
+        );
+    }
     to_screen(
         [n.position[0] + WIDTH, n.position[1] + HEADER + 14.],
         rect,
@@ -272,6 +292,9 @@ fn output_pos(n: &Node, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
     )
 }
 fn input_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Pos2 {
+    if n.kind == NodeKind::Reroute {
+        return to_screen([n.position[0], n.position[1] + DOT_H / 2.], rect, pan, zoom);
+    }
     to_screen(
         [
             n.position[0],
@@ -284,6 +307,19 @@ fn input_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Po
 }
 
 impl GraphCanvas {
+    /// Discard gestures that refer to a previous graph snapshot.
+    pub fn restore_graph(&mut self, graph: &nodes::model::Graph) {
+        self.selected.retain(|id| graph.node(*id).is_some());
+        self.connecting = None;
+        self.dragging = None;
+        self.wire_drag = false;
+        self.box_start = None;
+        self.box_base.clear();
+        self.editing_note = None;
+        self.note_focus = false;
+        self.fit_selection_requested = false;
+    }
+
     pub fn center_for_add(&self, p: &Project) -> [f32; 2] {
         self.last_rect
             .map(|r| to_world(r.center(), r, p.pan, p.zoom))
@@ -325,7 +361,7 @@ impl GraphCanvas {
             }
             bounds = bounds.union(Rect::from_min_size(
                 egui::pos2(n.position[0], n.position[1]),
-                egui::vec2(WIDTH, height(n)),
+                node_size(n),
             ));
         }
         if bounds.is_positive() {
@@ -387,7 +423,10 @@ impl GraphCanvas {
         if axis > 1 || edge > 2 || self.selected.len() < 2 {
             return;
         }
-        let size_of = |n: &Node| if axis == 0 { WIDTH } else { height(n) };
+        let size_of = |n: &Node| {
+            let size = node_size(n);
+            if axis == 0 { size.x } else { size.y }
+        };
         let cards: Vec<(NodeId, f32)> = p
             .graph
             .nodes
@@ -439,7 +478,7 @@ impl GraphCanvas {
                 (
                     n.id,
                     n.position[axis],
-                    if axis == 0 { WIDTH } else { height(n) },
+                    if axis == 0 { node_size(n).x } else { height(n) },
                 )
             })
             .collect();
@@ -532,7 +571,7 @@ impl GraphCanvas {
             card_under |= p.graph.nodes.iter().any(|n| {
                 Rect::from_min_size(
                     to_screen(n.position, rect, p.pan, zoom),
-                    egui::vec2(WIDTH, height(n)) * zoom,
+                    node_size(n) * zoom,
                 )
                 .expand(12.)
                 .contains(pos)
@@ -605,7 +644,7 @@ impl GraphCanvas {
                 for n in &p.graph.nodes {
                     let nr = Rect::from_min_size(
                         to_screen(n.position, rect, p.pan, zoom),
-                        egui::vec2(WIDTH, height(n)) * zoom,
+                        node_size(n) * zoom,
                     );
                     if box_rect.intersects(nr) {
                         self.selected.insert(n.id);
@@ -617,6 +656,7 @@ impl GraphCanvas {
         }
         let mut to_connect = None;
         let mut to_disconnect = None;
+        let mut to_insert: Option<(NodeId, NodeId, String, Pos2)> = None;
         for n in &p.graph.nodes {
             for (key, from) in &n.inputs {
                 if let (Some(source_index), Some(index)) = (
@@ -656,6 +696,27 @@ impl GraphCanvas {
                         color
                     };
                     wire(&painter, a, b, shape, color, selected, p.zoom);
+                    // Hovering the middle of a wire offers a reroute dot at that spot.
+                    if self.connecting.is_none()
+                        && !over_map
+                        && let Some(pos) = pointer
+                    {
+                        let mid = a.lerp(b, 0.5);
+                        if pos.distance(mid) < 14. {
+                            painter.circle_stroke(mid, 6., Stroke::new(1.4_f32, theme::teal()));
+                            painter.circle_filled(mid, 2., theme::teal());
+                            let hit = ui
+                                .interact(
+                                    Rect::from_center_size(mid, egui::vec2(18., 18.)),
+                                    Id::new(("wire_dot", n.id, key.as_str())),
+                                    Sense::click(),
+                                )
+                                .on_hover_text("クリックで中継点（リルート点）を置く");
+                            if hit.clicked() {
+                                to_insert = Some((*from, n.id, key.clone(), mid));
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -668,7 +729,7 @@ impl GraphCanvas {
             .filter_map(|(index, n)| {
                 let bounds = Rect::from_min_size(
                     to_screen(n.position, rect, p.pan, p.zoom),
-                    egui::vec2(WIDTH, height(n)) * p.zoom,
+                    node_size(n) * p.zoom,
                 );
                 bounds
                     .expand(28.)
@@ -687,6 +748,107 @@ impl GraphCanvas {
                 .filter(|_| !stale && !n.off)
                 .and_then(|e| e.outputs.get(&n.id))
                 .and_then(|r| r.as_ref().err());
+            if n.kind == NodeKind::Reroute {
+                // A reroute dot: a small pill with an input on the left and an output on the right.
+                let centre = nr.center();
+                let ring = if selected {
+                    theme::teal()
+                } else if error.is_some() {
+                    theme::error()
+                } else {
+                    theme::card_border()
+                };
+                painter.rect_filled(nr, 13, theme::card_bg());
+                painter.rect_stroke(
+                    nr,
+                    13,
+                    Stroke::new(if selected { 2. } else { 1_f32 }, ring),
+                    egui::StrokeKind::Inside,
+                );
+                painter.circle_filled(centre, 4.4 * p.zoom, col);
+                let body = ui.interact(
+                    Rect::from_center_size(centre, egui::vec2(DOT_W - 14., DOT_H) * p.zoom),
+                    Id::new(("node_header", n.id)),
+                    Sense::click_and_drag(),
+                );
+                if body.clicked() && !over_map {
+                    if ui.input(|i| i.modifiers.shift) {
+                        if !self.selected.remove(&n.id) {
+                            self.selected.insert(n.id);
+                        }
+                    } else {
+                        self.select_only(n.id);
+                    }
+                }
+                if body.drag_started() && !pan_active && !over_map {
+                    if !selected {
+                        self.select_only(n.id);
+                    }
+                    self.dragging = Some(n.id);
+                }
+                if body.dragged() && self.dragging == Some(n.id) && !pan_active && !over_map {
+                    let d = ui.input(|i| i.pointer.delta()) / p.zoom;
+                    for id in &self.selected {
+                        if let Some(index) = self.node_indices.get(*id) {
+                            let m = &mut p.graph.nodes[index];
+                            m.position[0] = (m.position[0] + d.x).clamp(-1e6, 1e6);
+                            m.position[1] = (m.position[1] + d.y).clamp(-1e6, 1e6);
+                        }
+                    }
+                }
+                if body.drag_stopped() && self.dragging == Some(n.id) && self.snap {
+                    self.snap_selected(p);
+                }
+                body.on_hover_text("リルート点 · ドラッグで移動 · Delete で削除");
+                let linked = n.inputs.contains_key("value");
+                let ip = input_pos(n, 0, rect, p.pan, p.zoom);
+                let port_col = theme::port_color(nodes::model::DataType::Any);
+                melt::port_marker(
+                    &painter,
+                    ip,
+                    4. * p.zoom,
+                    nodes::model::DataType::Any,
+                    if linked { port_col } else { theme::card_bg() },
+                    port_col,
+                    1.4,
+                );
+                let pr = ui.interact(
+                    Rect::from_center_size(ip, egui::vec2(16., 24.) * p.zoom.max(0.6)),
+                    Id::new(("in", n.id, "value")),
+                    Sense::click_and_drag(),
+                );
+                if !over_map
+                    && (pr.clicked() || pr.hovered() && ui.input(|i| i.pointer.primary_released()))
+                    && self.connecting.is_some()
+                {
+                    to_connect = self.connecting.take().map(|from| (from, n.id, "value"));
+                }
+                if pr.secondary_clicked() && linked && !over_map {
+                    to_disconnect = Some((n.id, "value"));
+                }
+                let op = output_pos(n, rect, p.pan, p.zoom);
+                melt::port_marker(
+                    &painter,
+                    op,
+                    4. * p.zoom,
+                    nodes::model::DataType::Any,
+                    port_col,
+                    port_col,
+                    1.0,
+                );
+                let or = ui.interact(
+                    Rect::from_center_size(op, egui::vec2(16., 24.) * p.zoom.max(0.6)),
+                    Id::new(("out", n.id)),
+                    Sense::click_and_drag(),
+                );
+                if !over_map && (or.clicked() || or.drag_started()) {
+                    self.connecting = Some(n.id);
+                }
+                if !over_map && or.drag_started() {
+                    self.wire_drag = true;
+                }
+                continue;
+            }
             painter.rect_filled(
                 nr.translate(egui::vec2(0., 3.)),
                 9,
@@ -998,13 +1160,14 @@ impl GraphCanvas {
                 {
                     // The first numeric inputs have a track and a direct-entry field.
                     let m = &mut p.graph.nodes[*node_index];
-                    let value = m.params.entry(spec.key.into()).or_insert(default);
+                    let mut value = m.params.get(spec.key).copied().unwrap_or(default);
+                    let before = value.to_bits();
                     let track = Rect::from_min_size(
                         ip + egui::vec2(88., -9.) * p.zoom,
                         egui::vec2(60., 18.) * p.zoom,
                     );
                     let width = 60. * p.zoom;
-                    let slider = crate::app::parameter_slider(value, spec)
+                    let slider = crate::app::parameter_slider(&mut value, spec)
                         .show_value(false)
                         .trailing_fill(true);
                     ui.scope_builder(
@@ -1018,7 +1181,10 @@ impl GraphCanvas {
                         ip + egui::vec2(153., -10.) * p.zoom,
                         egui::vec2(48., 22.) * p.zoom,
                     );
-                    parameter_number(ui, number, n.id, spec, value, p.zoom);
+                    parameter_number(ui, number, n.id, spec, &mut value, p.zoom);
+                    if value.to_bits() != before {
+                        m.params.insert(spec.key.into(), value);
+                    }
                 } else if p.zoom > 0.62
                     && let Some(default) = spec.default
                 {
@@ -1059,8 +1225,12 @@ impl GraphCanvas {
                         );
                     } else {
                         let m = &mut p.graph.nodes[*node_index];
-                        let value = m.params.entry(spec.key.into()).or_insert(default);
-                        parameter_number(ui, vr, n.id, spec, value, p.zoom);
+                        let mut value = m.params.get(spec.key).copied().unwrap_or(default);
+                        let before = value.to_bits();
+                        parameter_number(ui, vr, n.id, spec, &mut value, p.zoom);
+                        if value.to_bits() != before {
+                            m.params.insert(spec.key.into(), value);
+                        }
                     }
                 }
             }
@@ -1145,6 +1315,26 @@ impl GraphCanvas {
         }
         if let Some((to, key)) = to_disconnect {
             p.graph.disconnect(to, key);
+        }
+        if let Some((from, to, key, at)) = to_insert {
+            let world = to_world(at, rect, p.pan, p.zoom);
+            let position = [world[0] - DOT_W / 2., world[1] - DOT_H / 2.];
+            match p.graph.add(NodeKind::Reroute, position) {
+                Ok(id) => {
+                    let linked = p
+                        .graph
+                        .connect(from, id, "value")
+                        .and_then(|()| p.graph.connect(id, to, &key));
+                    match linked {
+                        Ok(()) => self.select_only(id),
+                        Err(e) => {
+                            p.graph.nodes.retain(|m| m.id != id);
+                            out.error = Some(e);
+                        }
+                    }
+                }
+                Err(e) => out.error = Some(e),
+            }
         }
         // A wire released on empty canvas (not on a port or a card) opens the node search,
         // and the chosen node gets connected to the wire's source.
@@ -1800,6 +1990,69 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
 #[cfg(test)]
 mod premium_tests {
     use super::*;
+
+    #[test]
+    fn mixed_card_and_reroute_alignment_uses_visible_bounds() {
+        for axis in 0..=1 {
+            for edge in 0..=2 {
+                let mut graph = nodes::model::Graph::default();
+                let card = graph.add(NodeKind::Number, [10., 20.]).unwrap();
+                let dot = graph.add(NodeKind::Reroute, [300., 200.]).unwrap();
+                let mut project = Project::new("alignment regression", graph);
+                let mut canvas = GraphCanvas::default();
+                canvas.select_only(card);
+                canvas.selected.insert(dot);
+                canvas.align_selected_edge(&mut project, axis, edge);
+                let bound = |id, size: f32| {
+                    let position = project.graph.node(id).unwrap().position[axis];
+                    position + size * f32::from(edge) / 2.
+                };
+                // Independent visible widths: regular card 218, reroute 34.
+                let (card_size, dot_size) = if axis == 0 {
+                    (218., 34.)
+                } else {
+                    (height(project.graph.node(card).unwrap()), 26.)
+                };
+                assert!(
+                    (bound(card, card_size) - bound(dot, dot_size)).abs() < 0.001,
+                    "axis {axis}, edge {edge}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn restored_graph_discards_transient_gestures_and_invalid_selection() {
+        let mut graph = nodes::model::Graph::default();
+        let kept = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let removed = graph.add(NodeKind::Number, [300., 0.]).unwrap();
+        let mut canvas = GraphCanvas {
+            selected: BTreeSet::from([kept, removed]),
+            connecting: Some(removed),
+            dragging: Some(kept),
+            wire_drag: true,
+            box_start: Some(Pos2::ZERO),
+            box_base: BTreeSet::from([removed]),
+            editing_note: Some(0),
+            note_focus: true,
+            fit_selection_requested: true,
+            snap: true,
+            hide_grid: true,
+            ..Default::default()
+        };
+        graph.remove(removed);
+        canvas.restore_graph(&graph);
+        assert_eq!(canvas.selected, BTreeSet::from([kept]));
+        assert!(canvas.connecting.is_none());
+        assert!(canvas.dragging.is_none());
+        assert!(!canvas.wire_drag);
+        assert!(canvas.box_start.is_none());
+        assert!(canvas.box_base.is_empty());
+        assert!(canvas.editing_note.is_none());
+        assert!(!canvas.note_focus);
+        assert!(!canvas.fit_selection_requested);
+        assert!(canvas.snap && canvas.hide_grid);
+    }
 
     #[test]
     fn fit_is_finite_for_narrow_and_large_graphs() {

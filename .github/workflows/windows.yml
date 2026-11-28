@@ -74,6 +74,8 @@ jobs:
         run: cargo clippy --all-targets --locked -- -D warnings
       - name: Test all targets
         run: cargo test --all-targets --locked
+      - name: Print evaluator timings (informational, dev profile)
+        run: cargo test --locked --test engine_perf_tests -- --nocapture --test-threads=1
       - name: Build Linux desktop and console applications
         run: cargo build --release --locked --bins
       - name: Prepare Linux development artifact
