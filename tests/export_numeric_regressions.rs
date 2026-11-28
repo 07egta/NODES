@@ -73,3 +73,30 @@ fn obj_preserves_large_coordinates_and_small_offsets_together() {
         [100_000_050., -99_999_999.75, -4e-10],
     ]);
 }
+
+
+#[test]
+fn binary_stl_normal_matches_quantized_vertices() {
+    let temp = TempDir::new();
+    let path = temp.0.join("normal.stl");
+    let mesh = Mesh {
+        vertices: vec![
+            [100_000_000., 0., 0.],
+            [100_000_009., 1., 0.],
+            [100_000_000., 0., 10.],
+        ],
+        triangles: vec![[0, 1, 2]],
+    };
+    persistence::export_stl(&path, &[Tree::single(Value::Mesh(Arc::new(mesh)))]).unwrap();
+    let bytes = fs::read(path).unwrap();
+    let read = |at: usize| f64::from(f32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()));
+    let n: [f64; 3] = std::array::from_fn(|axis| read(84 + axis * 4));
+    let a: [f64; 3] = std::array::from_fn(|axis| read(96 + axis * 4));
+    let b: [f64; 3] = std::array::from_fn(|axis| read(108 + axis * 4));
+    let c: [f64; 3] = std::array::from_fn(|axis| read(120 + axis * 4));
+    for p in [b, c] {
+        let projection: f64 = (0..3).map(|axis| n[axis] * (p[axis] - a[axis])).sum();
+        assert!(projection.abs() < 1.0e-6);
+    }
+    assert!((n.iter().map(|v| v * v).sum::<f64>() - 1.).abs() < 1.0e-6);
+}

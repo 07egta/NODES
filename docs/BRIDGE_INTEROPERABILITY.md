@@ -65,3 +65,12 @@ References:
 - https://github.com/3MFConsortium/spec_core
 - https://docs.rs/miniz_oxide/0.9.1/miniz_oxide/inflate/fn.decompress_to_vec_with_limit.html
 - https://github.com/3MFConsortium/lib3mf (BSD-2-Clause, possible independent future validator; not integrated)
+
+## STL hardening
+
+ASCII STL now uses a facet/loop state machine: a facet must contain exactly
+three vertices and finish before the next facet, and geometry after endsolid
+is rejected unless a new solid begins. UTF-8 BOM, whitespace and multiple
+solids are accepted. The raw facet count is bounded even when degenerate
+faces are dropped. Binary STL normals are calculated from the quantized f32
+vertices actually written to the file. Regression tests cover both changes.
