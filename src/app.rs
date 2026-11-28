@@ -110,6 +110,32 @@ enum PendingAction {
     Exit,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WorkspaceMode {
+    Easy,
+    Advanced,
+    Expert,
+}
+
+impl WorkspaceMode {
+    const ALL: [Self; 3] = [Self::Easy, Self::Advanced, Self::Expert];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Easy => "かんたん",
+            Self::Advanced => "標準",
+            Self::Expert => "詳細",
+        }
+    }
+
+    fn panels(self) -> (bool, bool) {
+        match self {
+            Self::Easy => (false, true),
+            Self::Advanced | Self::Expert => (true, true),
+        }
+    }
+}
+
 /// Preview items kept between frames: the viewport would otherwise get a deep copy of every
 /// shown tree each frame and hash it again.
 struct PreviewCache {
@@ -147,6 +173,7 @@ pub struct NodesApp {
     library_filter: u8,
     favorites: BTreeSet<NodeKind>,
     show_library: bool,
+    workspace_mode: WorkspaceMode,
     show_workspace: bool,
     clipboard: Vec<Node>,
     palette_open: bool,
@@ -272,6 +299,7 @@ impl NodesApp {
             library_filter: 0,
             favorites: favorites.iter().copied().collect(),
             show_library: true,
+            workspace_mode: WorkspaceMode::Advanced,
             show_workspace: true,
             clipboard: Vec::new(),
             category: "すべて".into(),
@@ -684,7 +712,10 @@ impl NodesApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
-                    FileTask::ExportStl | FileTask::ExportObj | FileTask::ExportThreeMf => {
+                    FileTask::ExportStl
+                    | FileTask::ExportObj
+                    | FileTask::ExportPly
+                    | FileTask::ExportThreeMf => {
                         let sources = self.stl_sources();
                         self.stl_export.export_to(&sources, &path);
                         self.flush_stl_notice();
@@ -1391,6 +1422,18 @@ impl NodesApp {
                             }
                         });
                         ui.menu_button("表示", |ui| {
+                            ui.label("操作モード");
+                            for mode in WorkspaceMode::ALL {
+                                if ui
+                                    .selectable_label(self.workspace_mode == mode, mode.label())
+                                    .clicked()
+                                {
+                                    self.workspace_mode = mode;
+                                    (self.show_library, self.show_workspace) = mode.panels();
+                                    ui.close();
+                                }
+                            }
+                            ui.separator();
                             ui.checkbox(&mut self.show_library, "ノードライブラリ");
                             ui.checkbox(&mut self.show_workspace, "3D と設定");
                             if ui.button("診断と処理時間").clicked() {
@@ -2282,6 +2325,21 @@ impl NodesApp {
                     .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("キャンバス").size(13.).strong());
+                            if self.workspace_mode == WorkspaceMode::Easy {
+                                if ui.small_button("作品例から作る").clicked() {
+                                    self.template_open = true;
+                                }
+                                if ui.small_button("3ステップガイド").clicked() {
+                                    self.tutorial.start();
+                                }
+                            } else if self.workspace_mode == WorkspaceMode::Expert {
+                                if ui.small_button("値を見る").clicked() {
+                                    self.values_open = true;
+                                }
+                                if ui.small_button("処理時間・診断").clicked() {
+                                    self.diagnostics_window.open = true;
+                                }
+                            }
                             if ui
                                 .small_button("＋")
                                 .on_hover_text("ノード追加 · Tab")
@@ -2885,7 +2943,9 @@ impl eframe::App for NodesApp {
             self.keyboard(ctx);
         }
         self.topbar(ctx);
-        self.shelf_panel(ctx);
+        if self.workspace_mode != WorkspaceMode::Easy {
+            self.shelf_panel(ctx);
+        }
         self.statusbar(ctx);
         if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
             self.library(ctx);
@@ -3350,6 +3410,13 @@ mod viewport_cache_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn workspace_modes_keep_the_preview_accessible() {
+        assert_eq!(WorkspaceMode::Easy.panels(), (false, true));
+        assert_eq!(WorkspaceMode::Advanced.panels(), (true, true));
+        assert_eq!(WorkspaceMode::Expert.panels(), (true, true));
+    }
+
     #[test]
     fn japanese_and_english_search_find_real_nodes() {
         assert!(matches_search(NodeKind::Circle, "円"));
