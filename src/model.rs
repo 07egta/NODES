@@ -606,6 +606,7 @@ pub enum NodeKind {
     GenesisScopes,
     GenesisScopeIds,
     GenesisRelief,
+    ExactTorus,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -1054,6 +1055,7 @@ impl NodeKind {
             Self::GenesisScopes,
             Self::GenesisScopeIds,
             Self::GenesisRelief,
+            Self::ExactTorus,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
