@@ -400,10 +400,7 @@ fn verify_reality_build(project: &Project, original: &Evaluation, fixture: Fixtu
         "{}: rebuilt graph differs from saved example",
         fixture.path
     );
-    verify_reality_mesh(
-        original.outputs[&fixture.terminal].as_ref().unwrap(),
-        fixture,
-    );
+    verify_reality_mesh(original.outputs[&fixture.terminal].as_ref().unwrap(), fixture);
 }
 
 fn verify_reality_mesh(tree: &Tree, fixture: Fixture) {
@@ -427,14 +424,14 @@ fn verify_reality_mesh(tree: &Tree, fixture: Fixture) {
     if matches!(
         fixture.path,
         "reality/03-twisted-sculpture.morph"
-            |         "reality/06-helix.morph"
-            |         "reality/07-spur-gear.morph"
-            |         "reality/09-reaction-diffusion.morph"
-            |         "reality/11-fractal.morph"
-            |         "reality/12-precision-block.morph"
-            |         "reality/13-curved-chair.morph"
-            |         "reality/14-accessory.morph"
-            |         "reality/15-mathematical-knot.morph"
+            | "reality/06-helix.morph"
+            | "reality/07-spur-gear.morph"
+            | "reality/09-reaction-diffusion.morph"
+            | "reality/11-fractal.morph"
+            | "reality/12-precision-block.morph"
+            | "reality/13-curved-chair.morph"
+            | "reality/14-accessory.morph"
+            | "reality/15-mathematical-knot.morph"
     ) {
         assert!(
             report.is_closed(),

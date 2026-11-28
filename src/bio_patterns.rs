@@ -431,11 +431,7 @@ fn reaction(args: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, St
 // Standard full-depth 20-degree external spur gear. Involute flanks are
 // sampled in radius; below the base circle use a radial root connector.
 // Root/tip arcs are sampled too. This is a design blank, not a gear cutter.
-fn spur_gear_profile(
-    teeth: usize,
-    module: f64,
-    cancel: &dyn Fn() -> bool,
-) -> Result<Value, String> {
+fn spur_gear_profile(teeth: usize, module: f64, cancel: &dyn Fn() -> bool) -> Result<Value, String> {
     let pressure = 20_f64.to_radians();
     let pitch_radius = module * teeth as f64 / 2.;
     let base = pitch_radius * pressure.cos();
@@ -657,8 +653,8 @@ mod reality_gear_tests {
     fn gear_profile_has_expected_tip_root_and_bounded_sampling() {
         for teeth in [18, 24, 64] {
             let module = 2.;
-            let Value::Curve(profile) = spur_gear_profile(teeth, module, &|| false).unwrap()
-            else {
+            let value = spur_gear_profile(teeth, module, &|| false).unwrap();
+            let Value::Curve(profile) = value else {
                 panic!("expected a curve");
             };
             assert!(profile.closed);
