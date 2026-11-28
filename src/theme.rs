@@ -21,15 +21,25 @@ pub enum Mode {
     Melt,
     Dark,
     Light,
+    Oled,
+    HighContrast,
 }
 
 impl Mode {
-    pub const ALL: [Mode; 3] = [Mode::Melt, Mode::Dark, Mode::Light];
+    pub const ALL: [Mode; 5] = [
+        Mode::Melt,
+        Mode::Dark,
+        Mode::Light,
+        Mode::Oled,
+        Mode::HighContrast,
+    ];
     pub fn label(self) -> &'static str {
         match self {
             Mode::Melt => "Melt（標準）",
             Mode::Dark => "ダーク（従来）",
             Mode::Light => "ライト",
+            Mode::Oled => "OLED ダーク",
+            Mode::HighContrast => "ハイコントラスト",
         }
     }
     /// The value after `theme=` in the settings file.
@@ -38,6 +48,8 @@ impl Mode {
             Mode::Melt => "melt",
             Mode::Dark => "dark",
             Mode::Light => "light",
+            Mode::Oled => "oled",
+            Mode::HighContrast => "high-contrast",
         }
     }
     pub fn parse(text: &str) -> Option<Mode> {
@@ -45,6 +57,8 @@ impl Mode {
             "melt" => Some(Mode::Melt),
             "dark" => Some(Mode::Dark),
             "light" => Some(Mode::Light),
+            "oled" => Some(Mode::Oled),
+            "high-contrast" => Some(Mode::HighContrast),
             _ => None,
         }
     }
@@ -53,6 +67,8 @@ impl Mode {
             Mode::Melt => 0,
             Mode::Dark => 1,
             Mode::Light => 2,
+            Mode::Oled => 3,
+            Mode::HighContrast => 4,
         }
     }
 }
@@ -66,10 +82,12 @@ pub fn mode() -> Mode {
     match MODE.load(Ordering::Relaxed) {
         1 => Mode::Dark,
         2 => Mode::Light,
+        3 => Mode::Oled,
+        4 => Mode::HighContrast,
         _ => Mode::Melt,
     }
 }
-/// True for both dark themes.
+/// True for every dark theme.
 pub fn is_dark() -> bool {
     mode() != Mode::Light
 }
@@ -83,7 +101,7 @@ fn pick(light: Color32, dark: Color32) -> Color32 {
 fn pick3(light: Color32, dark: Color32, melt: Color32) -> Color32 {
     match mode() {
         Mode::Melt => melt,
-        Mode::Dark => dark,
+        Mode::Dark | Mode::Oled | Mode::HighContrast => dark,
         Mode::Light => light,
     }
 }
@@ -112,52 +130,116 @@ pub const BTN_DOWN: Color32 = c(36, 36, 38);
 
 /// Body text on the current surfaces.
 pub fn ink() -> Color32 {
-    pick3(INK, c(218, 228, 224), MELT_TEXT)
+    match mode() {
+        Mode::Oled => c(240, 240, 240),
+        Mode::HighContrast => Color32::WHITE,
+        _ => pick3(INK, c(218, 228, 224), MELT_TEXT),
+    }
 }
 pub fn muted() -> Color32 {
-    pick3(MUTED, c(140, 158, 160), MELT_DIM)
+    match mode() {
+        Mode::Oled => c(180, 180, 180),
+        Mode::HighContrast => c(224, 224, 224),
+        _ => pick3(MUTED, c(140, 158, 160), MELT_DIM),
+    }
 }
 pub fn teal() -> Color32 {
-    pick3(TEAL, c(96, 200, 174), MELT_ACCENT)
+    match mode() {
+        Mode::Oled => c(91, 210, 157),
+        Mode::HighContrast => c(116, 220, 255),
+        _ => pick3(TEAL, c(96, 200, 174), MELT_ACCENT),
+    }
 }
 pub fn line() -> Color32 {
-    pick3(LINE, c(62, 72, 74), c(58, 58, 60))
+    match mode() {
+        Mode::Oled => c(75, 75, 80),
+        Mode::HighContrast => c(180, 180, 180),
+        _ => pick3(LINE, c(62, 72, 74), c(58, 58, 60)),
+    }
 }
 pub fn canvas_bg() -> Color32 {
-    pick3(CANVAS, c(22, 26, 28), MELT_PANEL_DARK)
+    match mode() {
+        Mode::Oled => Color32::BLACK,
+        Mode::HighContrast => Color32::BLACK,
+        _ => pick3(CANVAS, c(22, 26, 28), MELT_PANEL_DARK),
+    }
 }
 pub fn grid_dot() -> Color32 {
-    pick3(c(205, 214, 207), c(52, 60, 62), c(48, 48, 50))
+    match mode() {
+        Mode::Oled => c(38, 38, 42),
+        Mode::HighContrast => c(78, 78, 78),
+        _ => pick3(c(205, 214, 207), c(52, 60, 62), c(48, 48, 50)),
+    }
 }
 pub fn panel_bg() -> Color32 {
-    pick3(c(249, 251, 247), c(30, 35, 37), MELT_PANEL)
+    match mode() {
+        Mode::Oled => c(12, 12, 14),
+        Mode::HighContrast => c(16, 16, 16),
+        _ => pick3(c(249, 251, 247), c(30, 35, 37), MELT_PANEL),
+    }
 }
 pub fn workspace_bg() -> Color32 {
-    pick3(c(251, 253, 249), c(32, 37, 39), MELT_PANEL)
+    match mode() {
+        Mode::Oled => c(12, 12, 14),
+        Mode::HighContrast => c(16, 16, 16),
+        _ => pick3(c(251, 253, 249), c(32, 37, 39), MELT_PANEL),
+    }
 }
 pub fn toolbar_bg() -> Color32 {
-    pick3(c(253, 254, 250), c(36, 41, 43), MELT_PANEL)
+    match mode() {
+        Mode::Oled => c(18, 18, 20),
+        Mode::HighContrast => c(24, 24, 24),
+        _ => pick3(c(253, 254, 250), c(36, 41, 43), MELT_PANEL),
+    }
 }
 pub fn status_bg() -> Color32 {
-    pick3(c(237, 242, 234), c(24, 28, 30), MELT_PANEL_DARK)
+    match mode() {
+        Mode::Oled => Color32::BLACK,
+        Mode::HighContrast => Color32::BLACK,
+        _ => pick3(c(237, 242, 234), c(24, 28, 30), MELT_PANEL_DARK),
+    }
 }
 pub fn card_bg() -> Color32 {
-    pick3(c(253, 254, 251), c(41, 47, 49), MELT_CARD)
+    match mode() {
+        Mode::Oled => c(24, 24, 27),
+        Mode::HighContrast => c(32, 32, 32),
+        _ => pick3(c(253, 254, 251), c(41, 47, 49), MELT_CARD),
+    }
 }
 pub fn card_off_bg() -> Color32 {
-    pick3(c(234, 236, 232), c(31, 35, 37), c(34, 34, 35))
+    match mode() {
+        Mode::Oled => c(16, 16, 18),
+        Mode::HighContrast => c(20, 20, 20),
+        _ => pick3(c(234, 236, 232), c(31, 35, 37), c(34, 34, 35)),
+    }
 }
 pub fn card_border() -> Color32 {
-    pick3(c(211, 220, 211), c(68, 78, 80), MELT_BORDER)
+    match mode() {
+        Mode::Oled => c(90, 90, 96),
+        Mode::HighContrast => c(200, 200, 200),
+        _ => pick3(c(211, 220, 211), c(68, 78, 80), MELT_BORDER),
+    }
 }
 pub fn wire_idle() -> Color32 {
-    pick3(c(156, 180, 169), c(108, 136, 126), c(104, 104, 110))
+    match mode() {
+        Mode::Oled => c(145, 145, 153),
+        Mode::HighContrast => c(220, 220, 220),
+        _ => pick3(c(156, 180, 169), c(108, 136, 126), c(104, 104, 110)),
+    }
 }
 pub fn error() -> Color32 {
-    pick3(ERROR, c(255, 153, 143), MELT_ERROR)
+    match mode() {
+        Mode::Oled => c(255, 148, 155),
+        Mode::HighContrast => c(255, 178, 126),
+        _ => pick3(ERROR, c(255, 153, 143), MELT_ERROR),
+    }
 }
 pub fn error_fill() -> Color32 {
-    pick3(c(252, 231, 224), c(78, 46, 42), c(72, 38, 42))
+    match mode() {
+        Mode::Oled => c(55, 24, 30),
+        Mode::HighContrast => c(65, 30, 18),
+        _ => pick3(c(252, 231, 224), c(78, 46, 42), c(72, 38, 42)),
+    }
 }
 
 pub fn configure(ctx: &egui::Context, mode: Mode) {
@@ -182,6 +264,10 @@ pub fn configure(ctx: &egui::Context, mode: Mode) {
 pub fn apply_style(ctx: &egui::Context) {
     if is_melt() {
         apply_melt(ctx);
+        return;
+    }
+    if matches!(mode(), Mode::Oled | Mode::HighContrast) {
+        apply_accessible_dark(ctx);
         return;
     }
     let dark = is_dark();
@@ -243,6 +329,70 @@ pub fn apply_style(ctx: &egui::Context) {
     style
         .text_styles
         .insert(TextStyle::Heading, FontId::proportional(20.0));
+    ctx.set_style(style);
+}
+
+/// Flat, high-legibility dark surfaces. Uses the same semantic tokens as the canvas.
+fn apply_accessible_dark(ctx: &egui::Context) {
+    let mut style = (*ctx.style()).clone();
+    let high = mode() == Mode::HighContrast;
+    let mut v = Visuals::dark();
+    v.panel_fill = panel_bg();
+    v.window_fill = panel_bg();
+    v.extreme_bg_color = canvas_bg();
+    v.faint_bg_color = card_bg();
+    v.override_text_color = Some(ink());
+    v.hyperlink_color = teal();
+    v.selection.bg_fill = c(24, 65, 78);
+    v.selection.stroke = Stroke::new(2.0, teal());
+    v.window_stroke = Stroke::new(1.0, line());
+    v.window_corner_radius = egui::CornerRadius::same(8);
+    v.menu_corner_radius = egui::CornerRadius::same(6);
+    for w in [
+        &mut v.widgets.noninteractive,
+        &mut v.widgets.inactive,
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+        &mut v.widgets.open,
+    ] {
+        w.corner_radius = egui::CornerRadius::same(5);
+        w.expansion = 0.0;
+        w.bg_fill = card_bg();
+        w.weak_bg_fill = card_bg();
+        w.bg_stroke = Stroke::new(1.0, line());
+        w.fg_stroke = Stroke::new(1.0, ink());
+    }
+    for w in [
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+        &mut v.widgets.open,
+    ] {
+        w.bg_fill = c(42, 48, 52);
+        w.weak_bg_fill = w.bg_fill;
+        w.bg_stroke = Stroke::new(2.0, teal());
+    }
+    v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, muted());
+    v.window_shadow = egui::Shadow::NONE;
+    v.popup_shadow = egui::Shadow::NONE;
+    style.visuals = v;
+    style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+    style.spacing.button_padding = egui::vec2(9.0, 5.0);
+    style.spacing.interact_size = egui::vec2(40.0, if high { 30.0 } else { 26.0 });
+    style.spacing.slider_width = 120.0;
+    style.spacing.menu_margin = egui::Margin::same(6);
+    style.animation_time = 0.0;
+    style
+        .text_styles
+        .insert(TextStyle::Body, FontId::proportional(if high { 14.0 } else { 13.0 }));
+    style
+        .text_styles
+        .insert(TextStyle::Button, FontId::proportional(if high { 14.0 } else { 13.0 }));
+    style
+        .text_styles
+        .insert(TextStyle::Small, FontId::proportional(if high { 12.0 } else { 11.0 }));
+    style
+        .text_styles
+        .insert(TextStyle::Heading, FontId::proportional(18.0));
     ctx.set_style(style);
 }
 
@@ -319,7 +469,9 @@ fn apply_melt(ctx: &egui::Context) {
 }
 
 pub fn small(text: impl Into<String>) -> RichText {
-    RichText::new(text).size(11.0).color(muted())
+    RichText::new(text)
+        .size(if mode() == Mode::HighContrast { 12.0 } else { 11.0 })
+        .color(muted())
 }
 
 /// Category colour, used for the card header tint, the pill and the library labels.
