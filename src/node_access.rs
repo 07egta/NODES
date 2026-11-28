@@ -74,7 +74,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
     let access = match kind {
         Script | Cluster => Custom,
         ImportMesh => FirstItem,
-        Output | Flatten | Graft => Tree,
+        Output | Reroute | Flatten | Graft => Tree,
         k if crate::gcode_nodes::is_kind(k) => Tree,
         MergeTree | EntwineTree | UnflattenTree => Tree,
         TreeBranch | TreeItem if index == 0 => Tree,
