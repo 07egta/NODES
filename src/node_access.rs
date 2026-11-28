@@ -75,7 +75,15 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         Script | Cluster => Custom,
         ImportMesh => FirstItem,
         Output | Reroute | Flatten | Graft => Tree,
-        k if crate::gcode_nodes::is_kind(k) => Tree,
+        // G-code adapters preserve geometry/job trees but scalar settings read
+        // only the first value across the entire input tree.
+        k if crate::gcode_nodes::is_kind(k) => {
+            if k.spec().inputs[index].kind == crate::model::DataType::Number {
+                FirstItem
+            } else {
+                Tree
+            }
+        }
         MergeTree | EntwineTree | UnflattenTree => Tree,
         TreeBranch | TreeItem if index == 0 => Tree,
         TreeBranch | TreeItem if index == 1 => List,
