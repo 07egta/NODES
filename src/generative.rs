@@ -339,7 +339,6 @@ pub(crate) fn is_kind(kind: NodeKind) -> bool {
             | NodeKind::ShapeMorph
             | NodeKind::InsetCell
             | NodeKind::MeshFacePanels
-    )
     ) || ornament::is_kind(kind)
 }
 pub(crate) fn is_list(kind: NodeKind) -> bool {
