@@ -23,6 +23,9 @@ const MIN_CROSS: f64 = 1.0e-12;
 const STL_HEADER_BYTES: usize = 84;
 const STL_RECORD_BYTES: usize = 50;
 const CHECK_INTERVAL: usize = 4_096;
+// A per-face limit alone permits expensive work to accumulate over many OBJ faces.
+const MAX_OBJ_PREDICATES: usize = 64_000_000;
+const TOO_MANY_BYTES: &str = "ファイルが大きすぎます（上限 64 MiB）。";
 
 const NO_FILE: &str =
     "ファイルが選ばれていません。「ファイルを選ぶ」で STL または OBJ を選んでください。";
@@ -65,6 +68,7 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
     }
     let format = format_of(Path::new(path))
         .ok_or("STL または OBJ 以外のファイルは読み込めません。拡張子を確認してください。")?;
+    cancelled(cancel)?;
     let meta = std::fs::metadata(path).map_err(|_| {
         "ファイルを開けませんでした。移動・削除されていないか確認してください。".to_string()
     })?;
@@ -72,16 +76,24 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
         return Err("フォルダーではなくファイルを選んでください。".into());
     }
     if meta.len() > MAX_IMPORT_BYTES {
-        return Err("ファイルが大きすぎます（上限 64 MiB）。".into());
+        return Err(TOO_MANY_BYTES.into());
     }
     let file = File::open(path).map_err(|_| "ファイルを開けませんでした。".to_string())?;
+    // Check the opened handle too; a path can change after the first metadata lookup.
+    let opened = file
+        .metadata()
+        .map_err(|_| "ファイルの情報を読み込めませんでした。".to_string())?;
+    if !opened.is_file() {
+        return Err("フォルダーではなくファイルを選んでください。".into());
+    }
+    if opened.len() > MAX_IMPORT_BYTES {
+        return Err(TOO_MANY_BYTES.into());
+    }
     let mut bytes = Vec::new();
     file.take(MAX_IMPORT_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "ファイルを読み込めませんでした。".to_string())?;
-    if bytes.len() as u64 > MAX_IMPORT_BYTES {
-        return Err("ファイルが大きすぎます（上限 64 MiB）。".into());
-    }
+    check_import_size(bytes.len())?;
     cancelled(cancel)?;
     match format {
         Format::Stl => parse_stl(&bytes, cancel),
@@ -89,9 +101,17 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
     }
 }
 
+fn check_import_size(len: usize) -> Result<(), String> {
+    if len as u64 > MAX_IMPORT_BYTES {
+        return Err(TOO_MANY_BYTES.into());
+    }
+    Ok(())
+}
+
 /// Parses binary or ASCII STL. A file is binary when its size equals 84 + 50 × count
 /// (whatever its header says); otherwise a file that starts with "solid" is read as ASCII.
 pub fn parse_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    check_import_size(bytes.len())?;
     if let Some(count) = binary_stl_count(bytes) {
         return parse_binary_stl(bytes, count, cancel);
     }
@@ -185,6 +205,15 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
 /// Negative indices count back from the last vertex defined so far. Other lines
 /// (vt, vn, g, usemtl...) are ignored. Holes in a single face are unsupported.
 pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    parse_obj_with_budget(bytes, cancel, MAX_OBJ_PREDICATES)
+}
+
+fn parse_obj_with_budget(
+    bytes: &[u8],
+    cancel: &dyn Fn() -> bool,
+    mut remaining: usize,
+) -> Result<Mesh, String> {
+    check_import_size(bytes.len())?;
     let text = String::from_utf8_lossy(bytes);
     let mut raw: Vec<[f64; 3]> = Vec::new();
     let mut builder = Builder::default();
@@ -227,8 +256,17 @@ pub fn parse_obj(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String
                         .ok_or("面が存在しない頂点を参照しています。")?;
                     corners.push(point);
                 }
-                let triangles = crate::polygon_triangulation::triangulate(&corners, cancel)
-                    .map_err(|error| format!("OBJ の {} 行目: {error}", line_no + 1))?;
+                // A successful simple polygon yields exactly n - 2 triangles.
+                // Reject a face that cannot fit before doing expensive triangulation.
+                if corners.len().saturating_sub(2) > MAX_TRIANGLES - builder.triangles.len() {
+                    return Err(TOO_MANY_TRIANGLES.into());
+                }
+                let triangles = crate::polygon_triangulation::triangulate_with_budget(
+                    &corners,
+                    cancel,
+                    &mut remaining,
+                )
+                .map_err(|error| format!("OBJ の {} 行目: {error}", line_no + 1))?;
                 for triangle in triangles {
                     let before = builder.triangles.len();
                     builder.triangle(triangle.map(|index| corners[index]))?;
@@ -378,4 +416,45 @@ pub fn place(mesh: &mut Mesh, scale: f64, center: bool, bed: bool) -> Result<(),
         return Err("倍率や位置が大きすぎて座標の範囲を超えます。倍率を見直してください。".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod security_tests {
+    use super::*;
+
+    #[test]
+    fn in_memory_imports_enforce_the_file_byte_limit() {
+        let oversized = vec![b' '; MAX_IMPORT_BYTES as usize + 1];
+        assert_eq!(
+            parse_stl(&oversized, &|| false).unwrap_err(),
+            TOO_MANY_BYTES
+        );
+        assert_eq!(
+            parse_obj(&oversized, &|| false).unwrap_err(),
+            TOO_MANY_BYTES
+        );
+        assert!(check_import_size(MAX_IMPORT_BYTES as usize).is_ok());
+    }
+
+    #[test]
+    fn obj_predicate_budget_is_shared_across_faces() {
+        let single = b"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+        let double = b"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\nf 1 3 2\n";
+        assert_eq!(
+            parse_obj_with_budget(single, &|| false, 5)
+                .unwrap()
+                .triangles
+                .len(),
+            1
+        );
+        let error = parse_obj_with_budget(double, &|| false, 9).unwrap_err();
+        assert!(error.contains("計算量上限"));
+        assert_eq!(
+            parse_obj_with_budget(double, &|| false, 10)
+                .unwrap()
+                .triangles
+                .len(),
+            2
+        );
+    }
 }

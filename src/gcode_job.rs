@@ -1101,10 +1101,18 @@ impl GcodeJob {
             }
         }
         if self.start.mode != ScriptMode::Auto {
+            t.line(
+                "; 注意: ユーザーの開始 G-code の動作・座標オフセット・機種固有設定は未検証です。",
+            )?;
             t.line("; ---- ユーザーの開始 G-code ----")?;
             push_script(&mut t, &self.start.text)?;
             t.line("; ---- ここまで ----")?;
         }
+        // Body coordinates are absolute millimeters. A custom start script may
+        // leave the printer in inches or relative XYZ mode. Restore both before
+        // selecting E mode, since G90 can also affect E on some firmware.
+        t.line("G21 ; 単位は mm")?;
+        t.line("G90 ; 座標は絶対値")?;
         // The extruder mode is always set here, whatever the script did.
         t.line(if pf.relative_e {
             "M83 ; 押し出し量は相対値"
@@ -1221,6 +1229,7 @@ impl GcodeJob {
             t.line("M84 ; モーター停止")?;
         }
         if self.end.mode != ScriptMode::Auto {
+            t.line("; 注意: ユーザーの終了 G-code の動作は未検証です。")?;
             t.line("; ---- ユーザーの終了 G-code ----")?;
             push_script(&mut t, &self.end.text)?;
             t.line("; ---- ここまで ----")?;
@@ -1905,14 +1914,14 @@ mod tests {
     }
 
     #[test]
-    fn render_always_sets_extruder_mode_and_resets_e() {
+    fn render_always_sets_body_units_xyz_and_extruder_mode() {
         for relative in [false, true] {
             for mode in [ScriptMode::Auto, ScriptMode::AutoPlus, ScriptMode::Custom] {
                 let mut job = job_with(vec![square(0.2, 0, PathKind::Outer)]);
                 job.profile.relative_e = relative;
                 job.start = Script {
                     mode,
-                    text: "M83\nM82\nG28".into(),
+                    text: "G28\nG20\nG91\nM83\nM82".into(),
                 };
                 let (text, _) = job.render(&never).unwrap();
                 let wanted = if relative { "M83" } else { "M82" };
@@ -1926,7 +1935,18 @@ mod tests {
                     last_mode.starts_with(wanted),
                     "{mode:?} {relative}: {last_mode}"
                 );
-                assert!(head.contains("G92 E0"));
+                let units = head.rfind("G21").unwrap();
+                let xyz = head.rfind("G90").unwrap();
+                let extrusion = head.rfind(wanted).unwrap();
+                let reset = head.rfind("G92 E0").unwrap();
+                assert!(units < xyz && xyz < extrusion && extrusion < reset);
+                if mode != ScriptMode::Auto {
+                    assert!(head.rfind("G20").unwrap() < units);
+                    assert!(head.rfind("G91").unwrap() < xyz);
+                } else {
+                    assert!(!head.contains("G20"));
+                    assert!(!head.contains("G91"));
+                }
             }
         }
     }
