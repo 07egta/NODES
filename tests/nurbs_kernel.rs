@@ -543,3 +543,17 @@ fn blend_surface_joins_two_boxes() {
     // A solid is not a sheet that can be matched.
     assert!(nodes::kernel_ops::match_sheet(&a, 0., &b, 0., 1., &go).is_err());
 }
+
+#[test]
+fn star_point_refinement_approaches_the_limit_surface() {
+    let cage = Cage::box_cage(40., 40., 40., &go).unwrap();
+    let volume = |levels| {
+        cage.to_brep_refined(true, levels, &go)
+            .unwrap()
+            .volume()
+            .unwrap()
+    };
+    let limit = volume(3);
+    assert!((volume(2) - limit).abs() <= (volume(0) - limit).abs());
+    assert!(cage.to_brep_refined(true, 1, &go).unwrap().is_closed());
+}

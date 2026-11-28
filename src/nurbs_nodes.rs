@@ -384,10 +384,14 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::SubdToBrep => spec!(
             "T-spline → B-rep",
-            "円柱ケージの滑らかな面を厳密な NURBS 面の B-rep にし、上下をふさいで立体にします。",
-            "tspline subd to brep nurbs convert 変換",
+            "ケージの滑らかな面を厳密な NURBS 面の B-rep にします（円柱ケージは上下をふさいで立体に）。箱などのケージは星点（価数 3・5 の点）のまわりが近似なので、「星点まわりの細分」を 1〜2 にすると極限曲面に近づきます（面の数は 1 回で 4 倍）。",
+            "tspline subd to brep nurbs convert 変換 星点",
             Brep,
-            [CAGE, i("cap", "ふさぐ (1=はい)", 1., 0., 1.)]
+            [
+                CAGE,
+                i("cap", "ふさぐ (1=はい)", 1., 0., 1.),
+                i("refine", "星点まわりの細分 (0〜3)", 0., 0., 3.)
+            ]
         ),
         K::SubdToMesh => spec!(
             "SubD → メッシュ",
@@ -798,7 +802,11 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
         K::SubdExtrudeFace => {
             out_cage(cage(a, 0)?.extrude_face(num(a, 1)? as usize, num(a, 2)?, stop)?)
         }
-        K::SubdToBrep => out(cage(a, 0)?.to_brep(num(a, 1)? != 0., stop)?),
+        K::SubdToBrep => out(cage(a, 0)?.to_brep_refined(
+            num(a, 1)? != 0.,
+            num(a, 2).unwrap_or(0.).max(0.) as usize,
+            stop,
+        )?),
         K::SubdToMesh => as_mesh(cage(a, 0)?.preview().as_ref().clone(), stop),
         K::ExactTrimPlane => out(ko::trim_by_plane(
             brep(a, 0)?,
