@@ -65,7 +65,7 @@ pub use profiles::{
     without_text_counters,
 };
 pub use shape::{Shape, intersections, intersections_within, nearest_crossing, nearest_curve_intersection};
-pub use solver::solve_after_edit_with_analysis;
+pub use solver::{NumericalOutcome, current_rank_profile, solve_after_edit_with_analysis};
 pub use solver::{
     Analysis, CONSISTENT, DrivingValues, Hold, MAX_COMPONENT_VARS, SolveReport, SolveStatus, constraint_residual, determined_by, fillets_kept,
     flips_from_stored, measure_dimension, move_line_towards, move_point_towards, solve, solve_after_edit, solve_after_link_move,
