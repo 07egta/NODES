@@ -780,6 +780,7 @@ fn preflight_run(
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
+        k if crate::mechanism_nodes::is_kind(k) => crate::mechanism_nodes::estimate(k, args)?,
         _ => (0, 1),
     };
     if weight > remaining_weight || items > remaining_items {
@@ -840,6 +841,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        k if crate::mechanism_nodes::is_kind(k) => crate::mechanism_nodes::run(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;

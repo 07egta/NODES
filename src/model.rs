@@ -569,6 +569,15 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // Computational mechanism design, appended for stable saved identifiers.
+    MechSpurGearProfile,
+    MechGearAngle,
+    MechRackTravel,
+    MechFourBar,
+    MechSliderCrank,
+    MechArm2r,
+    MechArm2rInverse,
+    MechJacobian2r,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -982,6 +991,14 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MechSpurGearProfile,
+            Self::MechGearAngle,
+            Self::MechRackTravel,
+            Self::MechFourBar,
+            Self::MechSliderCrank,
+            Self::MechArm2r,
+            Self::MechArm2rInverse,
+            Self::MechJacobian2r,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1627,6 +1644,7 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::mechanism_nodes::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
                 })

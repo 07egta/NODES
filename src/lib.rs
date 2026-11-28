@@ -21,6 +21,7 @@ pub mod latest_channel;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod mesh_tools;
+pub mod mechanism_nodes;
 pub mod model;
 pub mod node_access;
 pub mod nodes_shape;
