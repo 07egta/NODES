@@ -637,6 +637,15 @@ pub enum NodeKind {
     ExactDiagnose,
     SubdTsplinePatch,
     ExactThicken,
+    // Computational mechanism design, appended for stable saved identifiers.
+    MechSpurGearProfile,
+    MechGearAngle,
+    MechRackTravel,
+    MechFourBar,
+    MechSliderCrank,
+    MechArm2r,
+    MechArm2rInverse,
+    MechJacobian2r,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1111,6 +1120,14 @@ impl NodeKind {
             Self::ExactDiagnose,
             Self::SubdTsplinePatch,
             Self::ExactThicken,
+            Self::MechSpurGearProfile,
+            Self::MechGearAngle,
+            Self::MechRackTravel,
+            Self::MechFourBar,
+            Self::MechSliderCrank,
+            Self::MechArm2r,
+            Self::MechArm2rInverse,
+            Self::MechJacobian2r,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1775,6 +1792,7 @@ impl NodeKind {
             }
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::mechanism_nodes::spec(other))
                 .or_else(|| crate::biomorph::spec(other))
                 .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {

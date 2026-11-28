@@ -24,6 +24,7 @@ pub mod kernel_ops;
 pub mod latest_channel;
 mod mathematical_surfaces;
 pub mod matter;
+pub mod mechanism_nodes;
 pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod mesh_tools;

@@ -818,6 +818,7 @@ fn preflight_run(
         k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::estimate(k, args)?,
         k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
+        k if crate::mechanism_nodes::is_kind(k) => crate::mechanism_nodes::estimate(k, args)?,
         _ => (0, 1),
     };
     if weight > remaining_weight || items > remaining_items {
@@ -884,6 +885,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::bio_patterns::is_kind(k) => crate::bio_patterns::run_item(k, a, cancel),
         k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        k if crate::mechanism_nodes::is_kind(k) => crate::mechanism_nodes::run(k, a, cancel),
         GenesisScopes | GenesisScopeIds | GenesisRelief => {
             crate::genesis::run_item(kind, a, cancel)
         }
