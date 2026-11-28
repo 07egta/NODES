@@ -69,7 +69,7 @@ Undo/Redo は最大 64 回分の作品スナップショット。新たな編集
 - 部品ごと: 頂点を共有する三角形で連結成分を分け、`名前_01.stl` などに書き分ける。
 - 3MF: 単一オブジェクト、`unit="millimeter"`、無圧縮（stored）の ZIP を手組みで作成。CRC32 は自前実装。
 - スライサー連携: 既定の場所（Bambu Studio・OrcaSlicer・PrusaSlicer）を探し、見つからなければ exe を一度選んで記憶する。起動は `Command` で exe に 1 引数（ファイル）を渡すだけで、シェルは使わない。
-- すぐ書き出し（Ctrl+Shift+E）: 前回と同じファイルへ上書きする。スライサーの再読み込み用。
+- すぐ書き出し（Ctrl+Shift+E）: 現在の作品で直前に使った保存先に上書きする。別の作品を開いた直後やアプリの再起動後は、保存先を選ぶ。
 - 設定の保存先: Windows は `%APPDATA%\NODES\stl_export.json`、それ以外は `$XDG_CONFIG_HOME` または `~/.config` 配下。
 - 既定の保存名の時刻は JST 固定（`<作品名>_<YYYYMMDD-HHMM>`）。
 
