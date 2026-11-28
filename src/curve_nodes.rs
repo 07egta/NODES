@@ -52,6 +52,8 @@ pub fn is_curve_kind(k: NodeKind) -> bool {
             | CurveTangent
             | CurveCurvature
             | CurveDomain
+            | CurveReparameterize
+            | CurveEvaluateDomain
             | CurveClosed
             | CurveDivide
             | CurveDivideLength
@@ -274,6 +276,24 @@ pub fn spec(k: NodeKind) -> &'static NodeSpec {
             "基底の向き付きパラメータ区間の2端を返す。評価ノードの入力は正規化0〜1。",
             Number,
             [C]
+        ),
+        CurveReparameterize => spec!(
+            "曲線の区間を変更",
+            "curve reparameterize normalize remap domain",
+            "完全な NURBS のノット区間だけを変更。形状は保持し、弧長では再パラメータ化しない。",
+            Curve,
+            [
+                C,
+                n("start", "区間の始点", 0., -1000000., 1000000., 0.1),
+                n("end", "区間の終点", 1., -1000000., 1000000., 0.1)
+            ]
+        ),
+        CurveEvaluateDomain => spec!(
+            "曲線の実区間で評価",
+            "curve evaluate native domain parameter",
+            "元の区間内のパラメータを使用する。正規化評価や弧長評価とは異なる。",
+            Point,
+            [C, n("t", "実区間のパラメータ", 0.5, -1000000., 1000000., 0.1)]
         ),
         CurveClosed => spec!(
             "閉曲線判定",
@@ -735,6 +755,21 @@ pub fn run_item(k: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> R<Vec<V
         CurveLineLine => return line_line(curve(a, 0)?, curve(a, 1)?, num(a, 2)?),
         CurveLinePlane => return line_plane(curve(a, 0)?, arg(a, 1)?, arg(a, 2)?, num(a, 3)?),
         CurveOffsetPreview => offset(curve(a, 0)?, num(a, 1)?, cancel)?,
+        CurveReparameterize => {
+            let c = curve(a, 0)?;
+            let g = c.geometry.as_ref().ok_or("数学的な NURBS 曲線が必要です。")?;
+            let mapped = g.reparameterized(num(a, 1)?, num(a, 2)?)?;
+            cancelled(cancel)?;
+            Value::Curve(Arc::new(Curve {
+                points: c.points.clone(),
+                closed: c.closed,
+                geometry: Some(mapped),
+            }))
+        }
+        CurveEvaluateDomain => {
+            let c = curve(a, 0)?;
+            Value::Point(geometry(c)?.point_in_domain(num(a, 1)?)?)
+        }
         CurveReverse => {
             let c = curve(a, 0)?;
             let mut pts = c.points.clone();
