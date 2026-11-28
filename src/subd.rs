@@ -23,6 +23,9 @@ use solidcraft_geom::tspline::TSpline;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
+mod sculpt;
+pub use sculpt::{BrushAction, BrushEdit, Falloff};
+
 type P3 = [f64; 3];
 
 pub const MAX_CAGE_VERTICES: usize = 50_000;
@@ -896,6 +899,7 @@ impl Cage {
     /// Apply one edit.
     pub fn edit(&self, op: &EditOp, stop: Stop) -> R<Cage> {
         match op {
+            EditOp::Brush { brush } => self.apply_brush(brush, stop),
             EditOp::Move { verts, d, sym } => {
                 if d.iter()
                     .any(|x| !x.is_finite() || x.abs() > kb::limits::MAX_COORDINATE)
@@ -1006,6 +1010,8 @@ pub const MAX_EDITS: usize = 2000;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum EditOp {
+    /// Connected, non-destructive control-point brush with a topology guard.
+    Brush { brush: BrushEdit },
     /// Move points by `d` (mm). With `sym` (0 = X, 1 = Y, 2 = Z) the mirror points move mirrored.
     Move {
         verts: Vec<usize>,
@@ -1031,6 +1037,7 @@ pub enum EditOp {
 impl EditOp {
     pub fn label(&self) -> &'static str {
         match self {
+            Self::Brush { .. } => "ソフト選択ブラシ",
             Self::Move { .. } => "移動",
             Self::Scale { .. } => "拡大縮小",
             Self::Refine { .. } => "局所細分",

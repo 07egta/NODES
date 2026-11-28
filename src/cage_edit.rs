@@ -8,7 +8,7 @@ use crate::theme;
 use eframe::egui::{self, Color32, Pos2, Response, RichText, Shape, Stroke};
 use nodes::engine::Evaluation;
 use nodes::model::{Graph, NodeId, NodeKind, Value};
-use nodes::subd::{Cage, EditOp, edits_text, parse_edits};
+use nodes::subd::{BrushAction, BrushEdit, Cage, EditOp, Falloff, edits_text, parse_edits};
 use std::collections::BTreeSet;
 
 type V3 = [f64; 3];
@@ -210,6 +210,9 @@ pub struct CageEdit {
     offset: V3,
     dragging: bool,
     move_by: V3,
+    brush_radius: f64,
+    brush_falloff: Falloff,
+    brush_strength: f64,
     extrude: f64,
     scale: f64,
     message: Option<String>,
@@ -363,6 +366,8 @@ impl CageEdit {
                     node: Some(id),
                     extrude: 10.,
                     scale: 1.2,
+                    brush_radius: 20.,
+                    brush_strength: 0.35,
                     ..CageEdit::default()
                 };
             }
@@ -501,6 +506,74 @@ impl CageEdit {
                 self.selected.clear();
             }
         });
+        if let Some(cage) = output_cage(evaluation, id) {
+            ui.separator();
+            ui.label(RichText::new("ソフト選択ブラシ").strong());
+            if cage.tspline().is_some() {
+                ui.label(theme::small("通常の SubD・格子ケージ専用です。"));
+            } else {
+                ui.add(
+                    egui::DragValue::new(&mut self.brush_radius)
+                        .range(0.001..=1e6)
+                        .speed(0.5)
+                        .prefix("半径 mm "),
+                );
+                ui.horizontal(|ui| {
+                    for (f, label) in [
+                        (Falloff::Linear, "直線"),
+                        (Falloff::Smooth, "滑らか"),
+                        (Falloff::Gaussian, "ガウス"),
+                    ] {
+                        ui.selectable_value(&mut self.brush_falloff, f, label);
+                    }
+                });
+                ui.add(
+                    egui::DragValue::new(&mut self.brush_strength)
+                        .range(0.0..=1.0)
+                        .speed(0.01)
+                        .prefix("緩和強度 "),
+                );
+                let seeds: Vec<_> = self.moving_points(&cage).into_iter().collect();
+                let enabled = !seeds.is_empty() && self.symmetry.is_none();
+                let mut action = None;
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(enabled, egui::Button::new("ソフト移動"))
+                        .clicked()
+                    {
+                        action = Some(BrushAction::Move {
+                            delta: self.move_by,
+                        });
+                    }
+                    if ui.add_enabled(enabled, egui::Button::new("緩和")).clicked() {
+                        action = Some(BrushAction::Relax {
+                            strength: self.brush_strength,
+                        });
+                    }
+                });
+                if self.symmetry.is_some() {
+                    ui.label(theme::small("ブラシを使うには対称編集を解除してください。"));
+                }
+                if let Some(action) = action {
+                    self.push(
+                        graph,
+                        EditOp::Brush {
+                            brush: BrushEdit {
+                                topology: cage.brush_topology_key(),
+                                seeds,
+                                pinned: Vec::new(),
+                                radius: self.brush_radius,
+                                falloff: self.brush_falloff,
+                                action,
+                            },
+                        },
+                    );
+                }
+                ui.label(theme::small(
+                    "選択点を中心に、上の XYZ 移動量または緩和を適用します。",
+                ));
+            }
+        }
         if let Some(node) = graph.node(id) {
             let count = parse_edits(&node.script).map(|o| o.len()).unwrap_or(0);
             ui.label(theme::small(format!("記録された編集: {count} 件")));

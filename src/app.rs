@@ -2109,8 +2109,12 @@ impl NodesApp {
             crate::sketch_ui::editor(ui, &mut self.project.graph, id);
         }
         if node.kind == NodeKind::SubdCageEdit {
-            self.cage_edit
-                .panel(ui, &mut self.project.graph, id, self.evaluation.as_ref());
+            if self.stale() {
+                ui.label("ケージの更新を待っています。");
+            } else {
+                self.cage_edit
+                    .panel(ui, &mut self.project.graph, id, self.evaluation.as_ref());
+            }
         }
         if node.kind == NodeKind::ExactStepExport {
             let ready = !node.off
@@ -2264,9 +2268,12 @@ impl NodesApp {
                 let available = ui.available_width();
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                    self.viewport.cage_overlay = self
-                        .cage_edit
-                        .overlay(&self.project.graph, self.evaluation.as_ref());
+                    self.viewport.cage_overlay = if items.is_some() {
+                        self.cage_edit
+                            .overlay(&self.project.graph, self.evaluation.as_ref())
+                    } else {
+                        None
+                    };
                     let picked = if let Some(items) = &items {
                         let picked = self.viewport.show_shared(ui, items);
                         self.preview_revision = Some(self.result_revision);
@@ -2275,7 +2282,7 @@ impl NodesApp {
                         self.viewport.show_previous(ui)
                     };
                     let events = std::mem::take(&mut self.viewport.cage_events);
-                    if !events.is_empty() {
+                    if items.is_some() && !events.is_empty() {
                         self.cage_edit.handle(
                             events,
                             &mut self.project.graph,
