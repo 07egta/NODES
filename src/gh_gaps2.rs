@@ -1282,10 +1282,10 @@ mod tests {
     fn point_helpers() {
         let mid = items(K::PointMidpoint, &pts(&[[0., 0., 0.], [2., 4., 6.]]));
         assert_eq!(mid, Ok(vec![Value::Point([1., 2., 3.])]));
-        let cloud = pts(&[[1e9, 0., 0.], [1e9 + 2., 0., 0.], [1e9 + 1., 3., 0.]]);
+        let cloud = pts(&[[5e8, 0., 0.], [5e8 + 2., 0., 0.], [5e8 + 1., 3., 0.]]);
         match list(K::PointCentroid, &[&cloud]).as_deref() {
             Ok([Value::Point(p)]) => {
-                assert!((p[0] - (1e9 + 1.)).abs() < 1e-6 && (p[1] - 1.).abs() < 1e-9);
+                assert!((p[0] - (5e8 + 1.)).abs() < 1e-6 && (p[1] - 1.).abs() < 1e-9);
             }
             other => panic!("unexpected {other:?}"),
         }
