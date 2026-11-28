@@ -178,7 +178,10 @@ impl SketchSession {
             .iter()
             .chain(&report.folded)
             .filter(|id| seen.insert(id.as_str()))
-            .filter_map(|id| self.source_line(id).map(|line| format!("{line} 行目 ({id})")))
+            .filter_map(|id| {
+                self.source_line(id)
+                    .map(|line| format!("{line} 行目 ({id})"))
+            })
             .collect();
         format!(
             "拘束を満たせませんでした（{}; 最大残差 {:.3e}; 反復 {} 回）。確認候補: {}。",

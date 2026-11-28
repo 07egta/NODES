@@ -166,8 +166,12 @@ fn parse_with_sources(text: &str) -> R<(Sketch, BTreeMap<String, usize>)> {
                 let c = point(&sk, a(2), line)?;
                 let m = point(&sk, a(3), line)?;
                 let r = num(a(4), "短半径", line)?;
-                let center = sk.point(c).ok_or_else(|| err(line, "中心点がありません。"))?;
-                let major = sk.point(m).ok_or_else(|| err(line, "長軸点がありません。"))?;
+                let center = sk
+                    .point(c)
+                    .ok_or_else(|| err(line, "中心点がありません。"))?;
+                let major = sk
+                    .point(m)
+                    .ok_or_else(|| err(line, "長軸点がありません。"))?;
                 if r <= 1e-9 || center.dist(major) < r {
                     return Err(err(line, "短半径は正で長半径以下にしてください。"));
                 }
@@ -204,7 +208,10 @@ fn parse_with_sources(text: &str) -> R<(Sketch, BTreeMap<String, usize>)> {
             }
             "補助線" | "construction" | "ブロック" | "block" => {
                 let ci = curve(&sk, a(1), line)?;
-                let entity = sk.curves.get_mut(ci).ok_or_else(|| err(line, "曲線がありません。"))?;
+                let entity = sk
+                    .curves
+                    .get_mut(ci)
+                    .ok_or_else(|| err(line, "曲線がありません。"))?;
                 if matches!(cmd, "補助線" | "construction") {
                     entity.construction = true;
                 } else {
@@ -268,7 +275,8 @@ fn parse_with_sources(text: &str) -> R<(Sketch, BTreeMap<String, usize>)> {
                 &mut sk,
             )?,
             "平行" | "parallel" | "直交" | "perpendicular" | "接する" | "tangent" | "等しい"
-            | "equal" | "同心" | "concentric" | "滑らか" | "smooth" | "同一直線" | "collinear" => {
+            | "equal" | "同心" | "concentric" | "滑らか" | "smooth" | "同一直線" | "collinear" =>
+            {
                 let (x, y) = (curve(&sk, a(1), line)?, curve(&sk, a(2), line)?);
                 let kind = match cmd {
                     "平行" | "parallel" => ConstraintKind::Parallel { a: x, b: y },

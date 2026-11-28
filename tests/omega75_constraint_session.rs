@@ -19,10 +19,8 @@ fn length_id(session: &SketchSession) -> String {
 
 #[test]
 fn fully_constrained_rectangle_and_dimension_edit() {
-    let mut session = SketchSession::from_text(
-        "rect r 0 0 12 8\nfix r.p0\nlength r.b 12\nlength r.l 8",
-    )
-    .unwrap();
+    let mut session =
+        SketchSession::from_text("rect r 0 0 12 8\nfix r.p0\nlength r.b 12\nlength r.l 8").unwrap();
     let first = session.solve();
     assert_eq!(first.dof(), Some(0));
     let id = length_id(&session);
@@ -49,7 +47,11 @@ fn atomic_dimension_failure_and_expression_error() {
     assert_eq!(failed.dof(), None);
     assert_eq!(session.sketch(), &before);
     assert!(session.edit_dimensions(&[(&id, f64::NAN)]).is_err());
-    assert!(session.edit_dimensions(&[(&id, 10.0), (&id, 12.0)]).is_err());
+    assert!(
+        session
+            .edit_dimensions(&[(&id, 10.0), (&id, 12.0)])
+            .is_err()
+    );
     assert!(session.edit_expressions(&[(&id, "1/0")], [0.0; 4]).is_err());
     assert_eq!(session.sketch(), &before);
     assert!(session.is_solved());
