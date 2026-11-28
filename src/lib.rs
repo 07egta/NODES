@@ -23,6 +23,7 @@ pub mod mesh_fabrication;
 pub mod mesh_geometry_checks;
 pub mod mesh_tools;
 pub mod model;
+pub mod multiscale;
 pub mod node_access;
 pub mod node_package;
 pub mod nodes_shape;
