@@ -170,13 +170,18 @@ pub fn recent_from_saved(saved: &[NodeKind]) -> ui_polish::Recent {
 
 /// Adds `kind` just right of `source` and connects `source` to the first input of `kind`.
 pub fn add_suggested(graph: &mut Graph, source: NodeId, kind: NodeKind) -> Result<NodeId, String> {
-    let at = graph
-        .node(source)
-        .map(|n| [n.position[0] + 280., n.position[1] + 40.])
-        .unwrap_or([50., 50.]);
+    let source_node = graph.node(source).ok_or("接続元が見つかりません。")?;
+    let at = [source_node.position[0] + 280., source_node.position[1] + 40.];
+    let input = kind.spec().inputs.first().ok_or("入力が見つかりません。")?;
+    let next_id = graph.next_id;
+    let original_len = graph.nodes.len();
     let id = graph.add(kind, at)?;
-    if let Some(input) = kind.spec().inputs.first() {
-        graph.connect(source, id, input.key)?;
+    if let Err(error) = graph.connect(source, id, input.key) {
+        // Graph::add appends one node; Graph::connect rolls back a failed edge.
+        // Restore the allocator as well so a rejected suggestion is not an edit.
+        graph.nodes.truncate(original_len);
+        graph.next_id = next_id;
+        return Err(error);
     }
     Ok(id)
 }
@@ -527,6 +532,37 @@ mod tests {
         assert_eq!(picks[1], NodeKind::Multiply);
         let unique: BTreeSet<&NodeKind> = picks.iter().collect();
         assert_eq!(unique.len(), picks.len());
+    }
+
+    #[test]
+    fn rejected_suggestion_leaves_the_entire_graph_unchanged() {
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let before = graph.clone();
+
+        // Number cannot connect to the geometry input of Output.
+        assert!(add_suggested(&mut graph, source, NodeKind::Output).is_err());
+        assert_eq!(graph, before);
+
+        // A stale suggestion may refer to a source that has been deleted.
+        let missing = graph.next_id;
+        assert!(add_suggested(&mut graph, missing, NodeKind::Add).is_err());
+        assert_eq!(graph, before);
+    }
+
+    #[test]
+    fn successful_suggestion_connects_and_advances_the_allocator_once() {
+        let mut graph = Graph::default();
+        let source = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let expected_id = graph.next_id;
+        let id = add_suggested(&mut graph, source, NodeKind::Add).unwrap();
+        assert_eq!(id, expected_id);
+        assert_eq!(graph.next_id, expected_id + 1);
+        assert_eq!(graph.nodes.len(), 2);
+        let node = graph.node(id).unwrap();
+        assert_eq!(node.kind, NodeKind::Add);
+        assert_eq!(node.inputs.get("a"), Some(&source));
+        graph.validate().unwrap();
     }
 
     #[test]
