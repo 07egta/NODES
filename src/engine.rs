@@ -635,6 +635,8 @@ pub(crate) fn evaluate_node(
                 crate::generative::run_list(node.kind, &lists, cancel)?
             } else if node.kind == NodeKind::MeshConstruct {
                 crate::mesh_fabrication::run_list(&lists, cancel)?
+            } else if crate::physics_nodes::is_list_kind(node.kind) {
+                crate::physics_nodes::run_list(node.kind, &lists, cancel)?
             } else if crate::nurbs_nodes::is_list_kind(node.kind) {
                 crate::nurbs_nodes::run_list(node.kind, &lists, cancel)?
             } else if crate::nodes_shape::is_list_kind(node.kind) {
@@ -837,6 +839,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
     match kind {
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
+        k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;

@@ -100,6 +100,11 @@ pub const TEMPLATES: &[Template] = &[
         description: "円柱ケージの膨らみを変えると、なめらかな NURBS の器になります。",
         tag: "T-spline / SubD",
     },
+    Template {
+        name: "ボロノイ模様",
+        description: "ばらまいた点から、点ごとの縄張りの線を作ります。個数とシードを変えると模様が変わります。",
+        tag: "くり返す",
+    },
 ];
 
 fn set_script(graph: &mut Graph, id: NodeId, text: &str) {
@@ -715,6 +720,29 @@ fn build(index: usize) -> Result<Project, String> {
             )?;
             graph.connect(cage, solid, "cage")?;
             finish(&mut graph, solid, [290.0, 300.0])?;
+        }
+        18 => {
+            let points = add(
+                &mut graph,
+                NodeKind::Populate,
+                [20.0, 30.0],
+                &[
+                    ("count", 24.0),
+                    ("width", 90.0),
+                    ("depth", 90.0),
+                    ("height", 0.0),
+                    ("seed", 5.0),
+                ],
+            )?;
+            rename(&mut graph, points, "ばらまく点");
+            let cells = add(
+                &mut graph,
+                NodeKind::Voronoi2d,
+                [290.0, 30.0],
+                &[("width", 100.0), ("height", 100.0)],
+            )?;
+            graph.connect(points, cells, "points")?;
+            finish(&mut graph, cells, [560.0, 30.0])?;
         }
         _ => {
             let base = add(
