@@ -64,6 +64,35 @@ debug-assertions = false
 opt-level = 2
 debug-assertions = false
 
+# Opt-in local iteration profiles. Keep dev/test/release defaults and kernel
+# debug-assertion compatibility unchanged; never ship release-fast implicitly.
+[profile.dev-fast]
+inherits = "dev"
+debug = 0
+incremental = true
+
+[profile.dev-fast.package."*"]
+opt-level = 1
+debug-assertions = false
+
+# Keep geometry hot paths optimized, with the same assertion policy as dev.
+[profile.dev-fast.package.solidcraft-geom]
+opt-level = 2
+debug-assertions = false
+
+[profile.dev-fast.package.solidcraft-sketch]
+opt-level = 2
+debug-assertions = false
+
+[profile.dev-fast.package.solidcraft-kernel]
+opt-level = 2
+debug-assertions = false
+
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+
 [[bin]]
 name = "NODES"
 path = "src/main.rs"
