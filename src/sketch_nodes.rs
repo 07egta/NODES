@@ -12,7 +12,7 @@
 //! 円/circle id x y r, 弧/arc id cx cy x1 y1 x2 y2, 長方形/rect id x y w h; constraints
 //! 水平/horizontal l, 垂直/vertical l, 一致/coincident p q, 平行/parallel a b, 直交/perpendicular a b,
 //! 接する/tangent a b, 等しい/equal a b, 同心/concentric a b, 中点/midpoint p l, 固定/fix p,
-//! 点on線/on p c; dimensions 距離/distance p q v, 距離x/dx, 距離y/dy, 長さ/length l v,
+//! 点on線/on p c, 対称/symmetry p q axis, 補助線/construction axis; dimensions 距離/distance p q v, 距離x/dx, 距離y/dy, 長さ/length l v,
 //! 半径/radius c v, 直径/diameter c v, 角度/angle a b deg. Points may be written as
 //! `curve.start`, `curve.end`, `curve.center`, or `origin`. `#` starts a comment.
 use crate::curve_geometry::{CurveGeometry, NurbsCurve};
@@ -178,6 +178,21 @@ pub fn parse(text: &str) -> R<Sketch> {
                 },
                 &mut sk,
             )?,
+            "対称" | "symmetry" | "symmetric" => dim(
+                ConstraintKind::Symmetric {
+                    p: point(&sk, a(1), line)?,
+                    q: point(&sk, a(2), line)?,
+                    l: curve(&sk, a(3), line)?,
+                },
+                &mut sk,
+            )?,
+            "補助線" | "construction" => {
+                let ci = curve(&sk, a(1), line)?;
+                let c = sk.curves.get_mut(ci).ok_or_else(|| {
+                    err(line, "補助線にする曲線が見つかりません。")
+                })?;
+                c.construction = true;
+            }
             "点on線" | "on" => dim(
                 ConstraintKind::PointOnCurve {
                     p: point(&sk, a(1), line)?,
@@ -271,6 +286,27 @@ pub fn solve_sketch(sk: &mut Sketch) -> R<usize> {
             "拘束を満たせませんでした（{why}）。矛盾する拘束や寸法を外すか、値を変えてください。"
         ));
     }
+    // A zero-length axis has no reflection plane in 2D. A residual of zero
+    // on a collapsed axis must not be interpreted as a satisfied symmetry.
+    for constraint in &sk.constraints {
+        if let ConstraintKind::Symmetric { l, .. } = &constraint.kind {
+            let valid = match sk.curves.get(*l).map(|c| &c.kind) {
+                Some(CurveKind::Line { a, b }) => {
+                    match (sk.point(*a), sk.point(*b)) {
+                        (Some(p), Some(q)) => p.dist(q) > kb::tol::ABS,
+                        _ => false,
+                    }
+                }
+                _ => false,
+            };
+            if !valid {
+                return Err(format!(
+                    "対称拘束 {} の軸が退化しています。軸の長さを指定してください。",
+                    constraint.id
+                ));
+            }
+        }
+    }
     Ok(report.dof)
 }
 
@@ -333,7 +369,15 @@ fn elevate(c: &[[f64; 4]]) -> Vec<[f64; 4]> {
 /// One exact NURBS curve through a chain of sketch segments (pieces raised to a common degree
 /// and joined with full-multiplicity knots).
 pub fn chain_curve(segs: &[Seg2], closed: bool, stop: &dyn Fn() -> bool) -> R<Curve> {
-    let mut all: Vec<Vec<[f64; 4]>> = segs.iter().flat_map(pieces).collect();
+    kb::stopped(stop)?;
+    let mut all: Vec<Vec<[f64; 4]>> = Vec::new();
+    for seg in segs {
+        kb::stopped(stop)?;
+        all.extend(pieces(seg));
+        if all.len() > kb::limits::MAX_PIECES {
+            return Err("曲線の区間が多すぎます。".into());
+        }
+    }
     if all.is_empty() {
         return Err("曲線が空です。".into());
     }
@@ -347,6 +391,45 @@ pub fn chain_curve(segs: &[Seg2], closed: bool, stop: &dyn Fn() -> bool) -> R<Cu
         while p.len() < degree + 1 {
             *p = elevate(p);
         }
+    }
+    // A joined B-spline shares one endpoint at each interior knot. Dropping
+    // an unrelated first control point would silently change the next piece.
+    // Only merge endpoints within the shared modelling tolerance.
+    let endpoint_gap = |a: &[f64; 4], b: &[f64; 4]| {
+        let dx = a[0] / a[3] - b[0] / b[3];
+        let dy = a[1] / a[3] - b[1] / b[3];
+        let dz = a[2] / a[3] - b[2] / b[3];
+        dx.hypot(dy).hypot(dz)
+    };
+    for pair in all.windows(2) {
+        let end = pair[0].last().ok_or("曲線区間が空です。")?;
+        let start = pair[1].first().ok_or("曲線区間が空です。")?;
+        let gap = endpoint_gap(end, start);
+        if !gap.is_finite() || gap > kb::tol::ABS {
+            return Err(format!(
+                "曲線区間がつながっていません（隙間 {gap:.9} mm）。"
+            ));
+        }
+    }
+    if closed {
+        let start = all
+            .first()
+            .and_then(|p| p.first())
+            .copied()
+            .ok_or("曲線が空です。")?;
+        let end = all
+            .last_mut()
+            .and_then(|p| p.last_mut())
+            .ok_or("曲線が空です。")?;
+        let gap = endpoint_gap(&start, end);
+        if !gap.is_finite() || gap > kb::tol::ABS {
+            return Err(format!(
+                "閉曲線の端点が離れています（隙間 {gap:.9} mm）。"
+            ));
+        }
+        // All supported segment endpoints have unit weights. Snap only the
+        // final endpoint, within tolerance, to make the closure exact.
+        *end = start;
     }
     let mut ctrl: Vec<[f64; 4]> = Vec::new();
     let mut knots = vec![0.; degree + 1];
@@ -380,6 +463,7 @@ pub fn chain_curve(segs: &[Seg2], closed: bool, stop: &dyn Fn() -> bool) -> R<Cu
 /// Evaluate the 拘束スケッチ node: `mode` 0 gives the outer loop of every closed region (for
 /// extrusion), 1 every sketch curve separately.
 pub fn run(text: &str, mode: usize, stop: &dyn Fn() -> bool) -> R<Tree> {
+    kb::stopped(stop)?;
     if text.trim().is_empty() {
         return Err(
             "スケッチが空です。ノードの文章欄に「長方形 r 0 0 60 40」のように書いてください。"
@@ -387,7 +471,10 @@ pub fn run(text: &str, mode: usize, stop: &dyn Fn() -> bool) -> R<Tree> {
         );
     }
     let mut sk = parse(text)?;
-    solve_sketch(&mut sk)?;
+    kb::stopped(stop)?;
+    let solved = solve_sketch(&mut sk);
+    kb::stopped(stop)?;
+    solved?;
     let mut out = Vec::new();
     if mode == 0 {
         for profile in find_profiles(&sk) {
@@ -408,14 +495,22 @@ pub fn run(text: &str, mode: usize, stop: &dyn Fn() -> bool) -> R<Tree> {
         }
     } else {
         for (ci, c) in sk.curves.iter().enumerate() {
+            kb::stopped(stop)?;
             if c.construction {
                 continue;
             }
-            let segs = sk.exact_segs(ci).unwrap_or_else(|| sk.segs(ci));
+            let segs = if c.kind.is_freeform() {
+                sk.exact_segs(ci).ok_or_else(|| {
+                    format!("曲線「{}」を厳密な NURBS に変換できません。", c.id)
+                })?
+            } else {
+                sk.segs(ci)
+            };
             let closed = matches!(c.kind, CurveKind::Circle { .. } | CurveKind::Ellipse { .. });
             out.push(Value::Curve(Arc::new(chain_curve(&segs, closed, stop)?)));
         }
     }
+    kb::stopped(stop)?;
     Ok(Tree {
         branches: std::collections::BTreeMap::from([(vec![0], out)]),
     })
