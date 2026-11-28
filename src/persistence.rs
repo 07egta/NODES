@@ -163,8 +163,7 @@ pub(crate) fn atomic_write(
     path: &Path,
     write: impl FnOnce(&mut BufWriter<File>) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    let file_name = path
-        .file_name()
+    path.file_name()
         .ok_or_else(|| "保存先のファイル名を指定してください。".to_string())?;
     if path.is_dir() {
         return Err("フォルダーではなく、ファイル名を指定してください。".into());
@@ -179,9 +178,12 @@ pub(crate) fn atomic_write(
     let mut temporary: Option<(PathBuf, File)> = None;
     for _ in 0..32 {
         let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let mut name = file_name.to_os_string();
-        name.push(format!(".morphlet-{}-{sequence}.tmp", std::process::id()));
-        let candidate = parent.join(name);
+        // Do not append to the destination basename: it may already be at the
+        // filesystem component-length limit. Keep the staging name short.
+        let candidate = parent.join(format!(".morphlet-{}-{sequence}.tmp", std::process::id()));
+        if candidate == path {
+            continue;
+        }
         match OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -341,11 +343,16 @@ impl ExportReport {
 }
 
 fn meshes(trees: &[Tree]) -> Result<(Vec<&Mesh>, usize), String> {
+    meshes_of(trees.iter())
+}
+
+/// Same as `meshes` for trees that are only borrowed (no copy of the tree is needed).
+fn meshes_of<'a>(trees: impl Iterator<Item = &'a Tree>) -> Result<(Vec<&'a Mesh>, usize), String> {
     let mut result = Vec::new();
     let mut skipped = 0usize;
     let mut vertices = 0usize;
     let mut triangles = 0usize;
-    for value in trees.iter().flat_map(|t| t.branches.values()).flatten() {
+    for value in trees.flat_map(|t| t.branches.values()).flatten() {
         // Exact B-reps export their welded display mesh (`kernel_bridge::display_mesh`).
         let mesh = match value {
             Value::Mesh(mesh) => Some(mesh),
@@ -374,7 +381,16 @@ fn meshes(trees: &[Tree]) -> Result<(Vec<&Mesh>, usize), String> {
 /// Counts are topological checks, not proof of printable wall thickness or absence
 /// of self-intersections. Coincident positions are quantized to 0.000001 mm.
 pub fn mesh_stats(trees: &[Tree]) -> Result<ExportReport, String> {
-    let (all_meshes, skipped) = meshes(trees)?;
+    mesh_stats_of(meshes(trees)?)
+}
+
+/// `mesh_stats` for trees that are only borrowed, e.g. the viewport's preview items.
+pub fn mesh_stats_refs<'a>(trees: impl Iterator<Item = &'a Tree>) -> Result<ExportReport, String> {
+    mesh_stats_of(meshes_of(trees)?)
+}
+
+fn mesh_stats_of(found: (Vec<&Mesh>, usize)) -> Result<ExportReport, String> {
+    let (all_meshes, skipped) = found;
     let mut report = ExportReport {
         skipped_values: skipped,
         ..ExportReport::default()
