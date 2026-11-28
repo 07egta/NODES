@@ -589,6 +589,10 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1020,6 +1024,10 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1647,6 +1655,7 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
             Self::MeshArea
             | Self::MeshVolume
