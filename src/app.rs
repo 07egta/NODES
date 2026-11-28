@@ -1028,6 +1028,31 @@ impl NodesApp {
             false,
         );
     }
+    /// Ctrl+Q: show or hide the viewport preview of the selected nodes
+    /// (Grasshopper's "Preview" toggle). The data is still computed.
+    fn toggle_preview_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        if ids.is_empty() {
+            self.notify("プレビューを切り替えるノードを選んでください", true);
+            return;
+        }
+        let show = ids
+            .iter()
+            .any(|id| self.project.graph.node(*id).is_some_and(|n| !n.preview));
+        for id in &ids {
+            if let Some(n) = self.project.graph.node_mut(*id) {
+                n.preview = show;
+            }
+        }
+        self.notify(
+            if show {
+                "選択したノードのプレビューを表示します"
+            } else {
+                "選択したノードのプレビューを隠しました（計算は続きます）· Ctrl+Q で戻せます"
+            },
+            false,
+        );
+    }
     fn make_group(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         let name = format!("グループ {}", self.project.graph.groups.len() + 1);
@@ -1134,6 +1159,9 @@ impl NodesApp {
             }
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
                 self.toggle_off_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Q)) {
+                self.toggle_preview_selected();
             }
             // Checked before Ctrl+G: a pattern without Shift also matches Ctrl+Shift+G.
             if ctx.input_mut(|i| {
@@ -1926,7 +1954,7 @@ impl NodesApp {
                             let key = format!("{PORT_PREFIX}{}", input.key);
                             let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
                             let previous = choice;
-                            let names = ["そのまま", "Flatten", "Graft", "Simplify"];
+                            let names = ["そのまま", "Flatten", "Graft", "Simplify", "Reverse"];
                             ui.label(format!(
                                 "{} · {} · {}",
                                 input.label,
@@ -1934,7 +1962,7 @@ impl NodesApp {
                                 nodes::data_tree_nodes::access_label(node.kind, index)
                             ));
                             egui::ComboBox::from_id_salt(("tree_port", id, input.key))
-                                .selected_text(names[choice.min(3)])
+                                .selected_text(names[choice.min(4)])
                                 .show_ui(ui, |ui| {
                                     for (i, name) in names.iter().enumerate() {
                                         ui.selectable_value(&mut choice, i, *name);

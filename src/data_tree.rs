@@ -7,6 +7,8 @@ pub type Path = Vec<u32>;
 pub const MAX_DEPTH: usize = 32;
 pub const MATCH_PARAM: &str = "__data_matching";
 pub const PORT_PREFIX: &str = "__tree_port:";
+/// Per-input wire drawing: 0 default, 1 faint, 2 hidden (display only).
+pub const WIRE_PREFIX: &str = "__wire:";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MatchMode {
@@ -33,6 +35,8 @@ pub enum PortTransform {
     Flatten,
     Graft,
     Simplify,
+    /// Reverse the item order inside every branch (paths stay as they are).
+    Reverse,
 }
 impl PortTransform {
     pub fn from_number(n: f64) -> Result<Self, String> {
@@ -41,6 +45,7 @@ impl PortTransform {
             1. => Ok(Self::Flatten),
             2. => Ok(Self::Graft),
             3. => Ok(Self::Simplify),
+            4. => Ok(Self::Reverse),
             _ => Err("データツリー変換が無効です。".into()),
         }
     }
@@ -150,6 +155,21 @@ pub fn graft(tree: &Tree) -> Result<Tree, String> {
             p.push(u32::try_from(i).map_err(|_| "枝番号が大きすぎます。")?);
             // Mixed-depth paths can collide: append, never overwrite.
             b.append(p, std::slice::from_ref(value))?;
+        }
+    }
+    Ok(b.finish())
+}
+
+/// Reverse the item order inside each branch. Paths and branch order stay.
+/// (Grasshopper's port "Reverse" works on each list; the exact tree-level
+/// behaviour of GH1 is not confirmed here.)
+pub fn reverse(tree: &Tree) -> Result<Tree, String> {
+    validate_topology(tree)?;
+    let mut b = Builder::default();
+    for (path, values) in &tree.branches {
+        b.append(path.clone(), &[])?;
+        for value in values.iter().rev() {
+            b.append(path.clone(), std::slice::from_ref(value))?;
         }
     }
     Ok(b.finish())
@@ -303,6 +323,7 @@ pub fn apply_transform(tree: &Tree, mode: PortTransform) -> Result<Tree, String>
         PortTransform::Flatten => flatten(tree),
         PortTransform::Graft => graft(tree),
         PortTransform::Simplify => simplify(tree),
+        PortTransform::Reverse => reverse(tree),
     }
 }
 
