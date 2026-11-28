@@ -57,7 +57,10 @@ static RELIEF: NodeSpec = NodeSpec {
 };
 
 pub(crate) fn is_kind(kind: K) -> bool {
-    matches!(kind, K::GenesisScopes | K::GenesisScopeIds | K::GenesisRelief)
+    matches!(
+        kind,
+        K::GenesisScopes | K::GenesisScopeIds | K::GenesisRelief
+    )
 }
 
 pub(crate) fn spec(kind: K) -> &'static NodeSpec {
@@ -218,7 +221,9 @@ fn relief(a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     let weight = bounded(a, 3, 0., 1.)?;
     let margin = bounded(a, 4, 0.001, 0.45)?;
     let seed = integer(a, 5, MAX_SEED)?;
-    let key = [x0, y0, x1, y1, z].into_iter().fold(0, |key, v| mix(key ^ v.to_bits()));
+    let key = [x0, y0, x1, y1, z]
+        .into_iter()
+        .fold(0, |key, v| mix(key ^ v.to_bits()));
     let height = if sample(seed, key, 3) < weight { tall } else { low };
     let mut mesh = crate::engine::box_mesh(
         (x1 - x0) * (1. - 2. * margin),
@@ -243,7 +248,11 @@ pub(crate) fn estimate(kind: K, a: &[&Value]) -> Result<(usize, usize), String> 
     Ok((if kind == K::GenesisScopes { 4 * n } else { n }, n))
 }
 
-pub(crate) fn run_item(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
+pub(crate) fn run_item(
+    kind: K,
+    a: &[&Value],
+    stop: &dyn Fn() -> bool,
+) -> Result<Vec<Value>, String> {
     if kind == K::GenesisRelief {
         return relief(a, stop);
     }
