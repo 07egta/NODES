@@ -325,7 +325,7 @@ impl FilePicker {
                                         entry.path.to_string_lossy().into_owned()
                                     });
                                     if entry.is_dir {
-                                        if double_clicked {
+                                        if clicked || double_clicked {
                                             navigate = Some(entry.path.clone());
                                         }
                                     } else if clicked || double_clicked {
@@ -356,7 +356,7 @@ impl FilePicker {
                 } else {
                     ui.label(
                         RichText::new(format!(
-                            "フォルダーはダブルクリックで開く  ·  {} ファイル",
+                            "フォルダーはクリックで開く  ·  {} ファイル",
                             self.task.filter_hint()
                         ))
                         .small()
