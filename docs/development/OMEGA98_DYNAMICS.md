@@ -1,0 +1,17 @@
+# OMEGA 98 — DYNAMICS (phase 1)
+
+Base: 09a2a546d442fea822d80fb4c756a81f067a8b00. OMEGA 03 PR #95 is merged and provides a distance-only XPBD kernel; OMEGA 88 could not be located by title. No new dependencies or proprietary code.
+
+## Implemented
+Static triangle BVH with swept AABB candidate filtering. For a sphere centre p(t), nearest point q on the triangle, gap g = |p-q|-r, and outward normal n = (p-q)/|p-q|, advance by (g-tolerance)/(-v dot n) when closing. A triangle inflated by a ball is convex; its supporting plane excludes collision before this time in exact arithmetic. Near-contact is conservative within floating-point tolerance; this is not certified interval arithmetic. Both sides, triangle edges and vertices are considered. Degenerate triangles, initial overlap, cancellation and work/iteration exhaustion return errors rather than misses. A sphere already inside a closed mesh but not touching its surface is not detected by containment.
+
+Existing PhysDrape uses this query on each free vertex before applying its displacement. Collision response stops at first contact, removes inward velocity, and discards the remaining displacement for that relaxation iteration. It is frictionless and inelastic, not a rigid-body manifold or physical time integrator. Anchors intentionally move to user-selected points as before; pinned vertices are not collision checked. The mesh's edges and faces can still penetrate between vertices. No structural safety or physical accuracy claim.
+
+## Verification
+Added analytic face/edge/vertex TOI cases, reversed motion, separation, initial penetration, cancellation, resource budget, degenerate triangle rejection, BVH earliest-hit and repeatability. Existing drape test tightened to require margin. Manual benchmark: cargo test --release --lib physics::ccd::tests::benchmark_sweeps -- --ignored --nocapture. Correctness: cargo test --lib physics::ccd; cargo test --lib physics::tests. Example: PhysDrape, horizontal triangulated table z=0, cloth grid z=2, margin 0.1, gravity 0.3. No local Rust or direct Git access in author environment; tests and timing not executed there.
+
+## Solver and geometry roadmap
+- Convex: support mapping/GJK distance and conservative advancement; rigid rotation requires angular speed bound. Concave/compound: BVH over components or triangles. NURBS: bounded tessellation error or certified parameter-domain intersection; SDF requires verified Lipschitz bound.
+- PBD: inexpensive projection, iteration/time-step dependent stiffness. XPBD: compliance scaled by dt squared; extend existing kernel rather than duplicate. Sequential impulse/PGS: rigid contact manifold, complementarity approximation and Coulomb friction. Implicit integration: nonlinear solve, useful for stiff elasticity. Barrier/IPC: feasible initialization, CCD and line search, higher computational cost. Patent/license status not researched; review before introducing third-party implementations.
+- Next: moving vertex-face and edge-edge CCD, adjacency filtering, self-contact, manifold persistence, warm starts, friction/restitution, nonlinear bending and volume constraints. Separate form-finding convergence from time integration.
+- Validation: report max penetration and residuals; compare momentum and energy only under appropriate external loads/damping. Stress suites: stacked bodies, cloth self-contact, thin shells, lattices, cable networks, rotational tunnelling, multiple simultaneous contacts. These remain unimplemented/unrun.
