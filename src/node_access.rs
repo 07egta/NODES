@@ -99,6 +99,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
             }
         }
         SubdCageEdit => Tree,
+        ExactSketch => FirstItem,
         ExactStepExport => Tree,
         CurveWeightedNurbs if index <= 2 => List,
         CurveShatter if index <= 1 => List,

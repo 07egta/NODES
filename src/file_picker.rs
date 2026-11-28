@@ -71,7 +71,10 @@ impl FileTask {
         match self {
             Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
             Self::ExportStep | Self::ImportStep => {
-                has_extension(path, "step") || has_extension(path, "stp")
+                has_extension(path, "step")
+                    || has_extension(path, "stp")
+                    || has_extension(path, "iges")
+                    || has_extension(path, "igs")
             }
             other => has_extension(path, other.extension()),
         }
@@ -85,7 +88,7 @@ impl FileTask {
             Self::ExportObj => ".obj",
             Self::SavePart | Self::LoadPart => ".morphpart",
             Self::ImportMesh => ".stl / .obj",
-            Self::ExportStep | Self::ImportStep => ".step / .stp",
+            Self::ExportStep | Self::ImportStep => ".step / .stp / .iges / .igs",
             Self::ExportGcode => ".gcode",
             Self::ExportThreeMf => ".3mf",
             Self::PickSlicer => ".exe",
