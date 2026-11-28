@@ -25,6 +25,8 @@ Usage:
   nodes-cli validate PROJECT.morph
   nodes-cli evaluate PROJECT.morph
   nodes-cli diagnose PROJECT.morph
+  nodes-cli diff BEFORE.morph AFTER.morph
+  nodes-cli diff-content BEFORE.morph AFTER.morph
   nodes-cli build REQUEST.json OUTPUT.morph
   nodes-cli apply PROJECT.morph REQUEST.json OUTPUT.morph
   nodes-cli export-stl PROJECT.morph OUTPUT.stl
@@ -34,6 +36,7 @@ Commands return one JSON document on stdout, including operational errors.
 Exit codes: 0 success, 1 project/evaluation/I/O failure, 2 invalid command usage.
 validate checks structure and the restricted capability policy without evaluation.
 diagnose evaluates once and reports root failure candidates and measured node costs.
+diff compares native files without evaluating them; diff-content ignores presentation and metadata.
 Evaluation failures also include error.diagnostics; exit code remains 1.
 build and apply evaluate every node before an atomic project save.
 apply preserves project metadata and supports saving back to the input project.
@@ -350,7 +353,7 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
     let expected = match command {
         "catalog" => 0,
         "validate" | "evaluate" | "diagnose" => 1,
-        "build" | "export-stl" => 2,
+        "build" | "export-stl" | "diff" | "diff-content" => 2,
         "apply" => 3,
         _ => return Err(problem("usage", "Unknown command. Run nodes-cli --help.")),
     };
@@ -380,6 +383,15 @@ fn run(command: &str, arguments: &[OsString]) -> Result<Json, CliError> {
                 "project": project_summary(&project),
                 "diagnostics": diagnostics::diagnose(&project.graph, &evaluation)
             }))
+        }
+        "diff" | "diff-content" => {
+            let before = persistence::load(Path::new(&arguments[0]))
+                .map_err(|message| problem("invalid_project", message))?;
+            let after = persistence::load(Path::new(&arguments[1]))
+                .map_err(|message| problem("invalid_project", message))?;
+            let report = nodes::project_diff::compare(&before, &after, command == "diff-content")
+                .map_err(|message| problem("diff_failed", message))?;
+            Ok(json!(report))
         }
         "build" => {
             let request = read_request(Path::new(&arguments[0]))?;

@@ -185,6 +185,8 @@ pub struct NodesApp {
     shelf: node_shelf::Shelf,
     /// Favourites and recent nodes as last written to the settings file.
     saved_lists: (Vec<NodeKind>, Vec<NodeKind>),
+    /// First-run guide (3 steps).
+    tutorial: crate::tutorial::Tutorial,
 }
 
 impl NodesApp {
@@ -230,6 +232,7 @@ impl NodesApp {
             }
         }
         let recent = node_shelf::recent_from_saved(&saved_recent);
+        let show_tutorial = file_path.is_none() && screenshot.is_none();
         let mut app = Self {
             edits: EditTracker::new(&project),
             project,
@@ -290,6 +293,7 @@ impl NodesApp {
             theme_mode,
             shelf: node_shelf::Shelf::new(favorites.clone()),
             saved_lists: (favorites, saved_recent),
+            tutorial: crate::tutorial::Tutorial::first_run(show_tutorial),
         };
         app.canvas.hide_grid = ui_polish::read_setting("grid").is_some_and(|v| v == "off");
         if let Some(e) = initial_error {
@@ -1028,6 +1032,31 @@ impl NodesApp {
             false,
         );
     }
+    /// Ctrl+Q: show or hide the viewport preview of the selected nodes
+    /// (Grasshopper's "Preview" toggle). The data is still computed.
+    fn toggle_preview_selected(&mut self) {
+        let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
+        if ids.is_empty() {
+            self.notify("プレビューを切り替えるノードを選んでください", true);
+            return;
+        }
+        let show = ids
+            .iter()
+            .any(|id| self.project.graph.node(*id).is_some_and(|n| !n.preview));
+        for id in &ids {
+            if let Some(n) = self.project.graph.node_mut(*id) {
+                n.preview = show;
+            }
+        }
+        self.notify(
+            if show {
+                "選択したノードのプレビューを表示します"
+            } else {
+                "選択したノードのプレビューを隠しました（計算は続きます）· Ctrl+Q で戻せます"
+            },
+            false,
+        );
+    }
     fn make_group(&mut self) {
         let ids: Vec<_> = self.canvas.selected.iter().copied().collect();
         let name = format!("グループ {}", self.project.graph.groups.len() + 1);
@@ -1134,6 +1163,9 @@ impl NodesApp {
             }
             if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::E)) {
                 self.toggle_off_selected();
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Q)) {
+                self.toggle_preview_selected();
             }
             // Checked before Ctrl+G: a pattern without Shift also matches Ctrl+Shift+G.
             if ctx.input_mut(|i| {
@@ -1346,6 +1378,10 @@ impl NodesApp {
                         ui.menu_button("作例・ヘルプ", |ui| {
                             if ui.button("作品例").clicked() {
                                 self.template_open = true;
+                                ui.close();
+                            }
+                            if ui.button("やりながら覚える（3 ステップ）").clicked() {
+                                self.tutorial.start();
                                 ui.close();
                             }
                             if ui.button("ノード辞典  F1").clicked() {
@@ -1825,7 +1861,15 @@ impl NodesApp {
                 .corner_radius(6)
                 .inner_margin(8)
                 .show(ui, |ui| {
-                    ui.label(RichText::new(message).size(12.).color(theme::error()));
+                    let friendly = nodes::friendly::explain(message);
+                    ui.label(
+                        RichText::new(format!("何が: {}", friendly.what))
+                            .size(12.)
+                            .strong()
+                            .color(theme::error()),
+                    );
+                    ui.label(RichText::new(format!("なぜ: {}", friendly.why)).size(12.));
+                    ui.label(RichText::new(format!("直し方: {}", friendly.fix)).size(12.));
                 });
         }
         ui.add_space(9.);
@@ -1926,7 +1970,7 @@ impl NodesApp {
                             let key = format!("{PORT_PREFIX}{}", input.key);
                             let mut choice = n.params.get(&key).copied().unwrap_or(0.) as usize;
                             let previous = choice;
-                            let names = ["そのまま", "Flatten", "Graft", "Simplify"];
+                            let names = ["そのまま", "Flatten", "Graft", "Simplify", "Reverse"];
                             ui.label(format!(
                                 "{} · {} · {}",
                                 input.label,
@@ -1934,7 +1978,7 @@ impl NodesApp {
                                 nodes::data_tree_nodes::access_label(node.kind, index)
                             ));
                             egui::ComboBox::from_id_salt(("tree_port", id, input.key))
-                                .selected_text(names[choice.min(3)])
+                                .selected_text(names[choice.min(4)])
                                 .show_ui(ui, |ui| {
                                     for (i, name) in names.iter().enumerate() {
                                         ui.selectable_value(&mut choice, i, *name);
@@ -2242,6 +2286,21 @@ impl NodesApp {
                                 {
                                     self.canvas.align_selected(&mut self.project, 1);
                                     ui.close();
+                                }
+                                for (label, axis, edge) in [
+                                    ("選択：右端を揃える", 0, 2),
+                                    ("選択：左右の中央を揃える", 0, 1),
+                                    ("選択：下端を揃える", 1, 2),
+                                    ("選択：上下の中央を揃える", 1, 1),
+                                ] {
+                                    if ui.add_enabled(n >= 2, egui::Button::new(label)).clicked() {
+                                        self.canvas.align_selected_edge(
+                                            &mut self.project,
+                                            axis,
+                                            edge,
+                                        );
+                                        ui.close();
+                                    }
                                 }
                                 if ui
                                     .add_enabled(
@@ -2782,6 +2841,10 @@ impl eframe::App for NodesApp {
         self.persist_shelf_lists();
         self.shortcuts_dialog(ctx);
         self.template_dialog(ctx);
+        let stats = crate::tutorial::Stats::of(&self.project.graph);
+        if let Some(crate::tutorial::Action::Examples) = self.tutorial.show(ctx, stats) {
+            self.template_open = true;
+        }
         self.gcode_dialog(ctx);
         self.stl_export_dialog(ctx);
         self.help_dialog(ctx);

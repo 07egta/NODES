@@ -64,3 +64,4 @@ SolidCraftの幾何処理など、NODESに必要な内部実装を再利用で�
 - 2026-11-27: PRはmain土台で1テーマ1PR。CI（fmt・clippy -D warnings・test）が緑になったものからマージする。古い土台や重複するPRは理由を書いて閉じる。
 - 2026-11-27: 進捗の報告は簡単な日本語で。前置きは最小限にし、作れるものから先に作る。
 - 2026-11-27: Arclet CADは対象外（中止）。
+- 2026-11-28: 操作や仕組みは「Grasshopperと同じ仕組みに似せる」。データ照合・ツリー・入力の右クリック・ワイヤ表示・ショートカットなどはGrasshopperの挙動に近づける（挙動だけを公開情報で調べ、コード・文章・アイコンは写さない）。調査表は [docs/GRASSHOPPER_MECHANICS.md](docs/GRASSHOPPER_MECHANICS.md)。
