@@ -5,7 +5,7 @@
 //!   open along the height. Their limit surface is defined *exactly* as the uniform bicubic
 //!   B-spline in u (periodic) and the clamped uniform cubic B-spline in v, so the preview,
 //!   refinement and the NURBS/B-rep conversion all describe the same surface. Refinement is
-//!   exact knot insertion (the T-spline/NURBS refine of SolidCraft's `sc-geom` is used for v).
+//!   exact tensor-product NURBS knot insertion using SolidCraft's `sc-geom` in v.
 //! - **General cages** (箱ケージ, or any cage after 面の押し出し / 折り目): Catmull-Clark
 //!   subdivision with sharp creases. They convert to a B-rep of bicubic NURBS patches, one per
 //!   quad, by Loop & Schaefer's approximate Catmull-Clark (ACC, 2008): exact where the cage is
@@ -506,9 +506,9 @@ impl Cage {
         Self::build(vertices, faces, self.creases.clone(), None, stop)
     }
 
-    /// The exact B-rep of the cage's surface. Grid cages: the bicubic surface as T-spline sheets
-    /// (SolidCraft `tspline_sheet`), split in two halves around, sewn, and capped top and bottom
-    /// into a closed solid when `cap` is set.
+    /// Grid cages: exact bicubic tensor NURBS sheets, split around, sewn and optionally capped.
+    /// General cages: approximate ACC patches, not an exact limit surface.
+    /// T-spline patches: research-only NURBS extraction.
     pub fn to_brep(&self, cap: bool, stop: Stop) -> R<BrepValue> {
         if let Some(ts) = &self.ts {
             // An open patch: exact NURBS faces (Bézier elements around T-junctions).
@@ -522,9 +522,7 @@ impl Cage {
         let halves = split_u(&s, (g.cols / 2) as f64)?;
         let mut sheets = Vec::with_capacity(2);
         for h in &halves {
-            let ts = TSpline::from_nurbs(h)
-                .map_err(|e| format!("T-spline への変換に失敗しました（{e}）。"))?;
-            sheets.push(kb::tspline_body(&ts, stop)?);
+            sheets.push(kb::nurbs_sheet_body(h, stop)?);
         }
         let tube = kb::stitch_bodies(&sheets, stop)?;
         if cap {
@@ -871,9 +869,7 @@ impl Cage {
             }
             let s = NurbsSurface::new([3, 3], [knots.clone(), knots.clone()], &pts, &[1.; 16])
                 .map_err(|e| format!("パッチを作れませんでした（{e}）。"))?;
-            let ts = TSpline::from_nurbs(&s)
-                .map_err(|e| format!("T-spline への変換に失敗しました（{e}）。"))?;
-            sheets.push(kb::tspline_body(&ts, stop)?);
+            sheets.push(kb::nurbs_sheet_body(&s, stop)?);
         }
         kb::stitch_bodies(&sheets, stop)
     }
@@ -1078,6 +1074,7 @@ impl Cage {
         bulge: f64,
         stop: Stop,
     ) -> R<Cage> {
+        kb::require_experimental_tspline()?;
         for (v, name) in [(width, "幅"), (depth, "奥行")] {
             if !(v.is_finite() && v > kb::tol::ABS && v <= kb::limits::MAX_COORDINATE) {
                 return Err(format!("{name}は 0 より大きい値にしてください。"));
@@ -1113,6 +1110,7 @@ impl Cage {
     /// A cage showing a T-spline's control net (faces of its T-mesh, T-junction points on their
     /// sides), with the exact surface as preview.
     pub fn from_tspline(ts: TSpline, stop: Stop) -> R<Cage> {
+        kb::require_experimental_tspline()?;
         let mesh = ts.mesh();
         let vertices: Vec<P3> = ts.points().iter().map(|p| [p.x, p.y, p.z]).collect();
         if vertices.len() > MAX_CAGE_VERTICES {
@@ -1194,6 +1192,7 @@ impl Cage {
 
     /// Local refinement of the listed faces (T-spline patch cages only).
     pub fn refine_faces(&self, faces: &[usize], stop: Stop) -> R<Cage> {
+        kb::require_experimental_tspline()?;
         let ts = self
             .ts
             .as_ref()
