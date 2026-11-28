@@ -52,6 +52,8 @@ UI・描画系（egui 0.36 / wgpu。NODES は egui 0.33 なので一切取り込
 例外: vendor の truck は上流 truck のコードであり、内部に panic を含みます。NODES からは
 必ず `solidcraft-kernel` の公開 API（`guard` 済み）経由で呼びます。
 
+- 2026-11-28 (OMEGA 92): `crates/sc-kernel/src/boolean_guard.rs` の交差再試行検査を追加し、`boolean_checked.rs` と `lib.rs` に型付き保守的な検証 API を追加。メッシュ計測は棄却用の近似検査であり、精密幾何証明ではない。依存・ライセンス変更なし。
+
 ## NODES側の統合
 
 - 立体ブーリアンが成功して表示メッシュに開きがある場合、NODES は SolidCraft の

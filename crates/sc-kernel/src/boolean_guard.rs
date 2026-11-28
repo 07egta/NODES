@@ -3,6 +3,8 @@
 //! A retry moves things about (the tool nudged, faces pushed apart, pieces cut off and glued
 //! back), so its result is held to what a join or a cut can do at all:
 //! - it is closed;
+//! - an intersection keeps only material inside both operands and has no new boundary away from them;
+//! - these are sampled rejection checks, not certificates of geometric validity;
 //! - a join never loses volume and a cut never gains any;
 //! - outside the tool's box nothing changes: there, the result's surface is the target's and
 //!   the target's surface is the result's. A join or a cut can only change the target where the
@@ -135,14 +137,21 @@ fn bad(op: BoolOp, what: String) -> KernelError {
 /// Check the result of a Boolean that needed a retry (see the module docs). `result` is `None`
 /// for an empty result.
 pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>) -> Result<()> {
-    if op == BoolOp::Intersect || a.is_mesh() || b.is_mesh() {
+    if a.is_mesh() || b.is_mesh() {
         return Ok(());
     }
     let Some(r) = result else {
+        // Empty intersection cannot be certified by this sampled guard. Preserve the legacy
+        // caller's empty-candidate handling; the checked API reports it as ambiguous.
+        if op == BoolOp::Intersect {
+            return Ok(());
+        }
         // Nothing left: only a cut whose tool covers the whole target (to within the meshes'
         // chords: a tool touching a round side of the target).
         let chord = a.size().max(b.size()) * 1e-3;
-        let (Ok(ma), Ok(mb)) = (a.tessellate(chord), b.tessellate(chord)) else { return Ok(()) };
+        let (Ok(ma), Ok(mb)) = (a.tessellate(chord), b.tessellate(chord)) else {
+            return Err(bad(op, "the empty result could not be checked".into()));
+        };
         let (ba, bb) = (ma.bounds(), mb.bounds());
         let tol = 2.0 * chord;
         let within = ba.min.x >= bb.min.x - tol
@@ -153,7 +162,10 @@ pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>)
             && ba.max.z <= bb.max.z + tol;
         return if op == BoolOp::Cut && within { Ok(()) } else { Err(bad(op, "it came out empty".into())) };
     };
-    if r.solid.boundaries().iter().any(|s| s.shell_condition() != truck_modeling::ShellCondition::Closed) {
+    if r.is_mesh()
+        || r.solid.boundaries().is_empty()
+        || r.solid.boundaries().iter().any(|s| s.shell_condition() != truck_modeling::ShellCondition::Closed)
+    {
         return Err(bad(op, "the result is not closed".into()));
     }
     let size = a.size().max(b.size());
@@ -175,12 +187,13 @@ pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>)
     };
     let judge = |scale: f64| -> Result<(bool, f64, f64, f64)> {
         let (va, vb, vr) = (volume(a, &ma, scale)?, volume(b, &mb, scale)?, volume(r, &mr, scale)?);
-        let slack = 2e-4 * (va.abs() + vb.abs()) + 1e-9;
-        let ok = vr.is_finite()
+        // The larger operand must not give an intersection an unlimited error budget.
+        let slack = if op == BoolOp::Intersect { 2e-4 * va.min(vb) } else { 2e-4 * (va.abs() + vb.abs()) + 1e-9 };
+        let ok = [va, vb, vr].iter().all(|v| v.is_finite() && *v > 0.0)
             && match op {
                 BoolOp::Union => vr >= va.max(vb) - slack && vr <= va + vb + slack,
                 BoolOp::Cut => vr <= va + slack && vr >= va - vb - slack,
-                BoolOp::Intersect => true,
+                BoolOp::Intersect => vr <= va.min(vb) + slack,
             };
         Ok((ok, va, vb, vr))
     };
@@ -194,9 +207,30 @@ pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>)
     if !volume_ok {
         let what = match op {
             BoolOp::Union => format!("the joined body's volume would be {vr:.4} mm³ (the target is {va:.4} mm³, the tool {vb:.4} mm³)"),
-            _ => format!("the cut body's volume would be {vr:.4} mm³ (the target is {va:.4} mm³, the tool {vb:.4} mm³)"),
+            BoolOp::Cut => format!("the cut body's volume would be {vr:.4} mm³ (the target is {va:.4} mm³, the tool {vb:.4} mm³)"),
+            BoolOp::Intersect => format!("the intersection volume would be {vr:.4} mm³ (operands {va:.4} and {vb:.4} mm³)"),
         };
         return Err(bad(op, what));
+    }
+    if op == BoolOp::Intersect {
+        // An intersection is a subset of BOTH bodies. Boxes are only a necessary condition;
+        // checking sampled boundary points against both source surfaces also detects invented faces.
+        let reach = 3.0 * t + size * 1e-5;
+        let (ba, bb, br) = (ma.bounds(), mb.bounds(), mr.bounds());
+        if !box_within(&br, &ba, reach) || !box_within(&br, &bb, reach) {
+            return Err(bad(op, "the intersection extends outside an operand's bounds".into()));
+        }
+        let (Some(near_a), Some(near_b)) = (Near::new(&ma, reach), Near::new(&mb, reach)) else {
+            return Err(bad(op, "the intersection boundary could not be checked".into()));
+        };
+        let step = mr.triangles.len().div_ceil(MAX_SAMPLES).max(1);
+        for [a, b, c] in mr.triangles.iter().step_by(step).filter_map(|tri| mr.tri(tri)) {
+            let p = (a + b + c) / 3.0;
+            if !near_a.close(p) && !near_b.close(p) {
+                return Err(bad(op, format!("intersection boundary away from both operands at ({:.3}, {:.3}, {:.3})", p.x, p.y, p.z)));
+            }
+        }
+        return Ok(());
     }
     // Outside the tool's box (with room for the meshes' chords and a nudge) the result's
     // surface and the target's must be the same.
@@ -215,4 +249,57 @@ pub(crate) fn check_retry(a: &Body, b: &Body, op: BoolOp, result: Option<&Body>)
         return Err(bad(op, format!("it would remove part of the body away from the tool, at {} (outside the tool's region)", at(p))));
     }
     Ok(())
+}
+
+/// Necessary, not sufficient, containment of finite mesh bounds.
+fn box_within(inner: &Aabb3, outer: &Aabb3, reach: f64) -> bool {
+    !inner.is_empty()
+        && !outer.is_empty()
+        && [
+            inner.min.x,
+            inner.min.y,
+            inner.min.z,
+            inner.max.x,
+            inner.max.y,
+            inner.max.z,
+            outer.min.x,
+            outer.min.y,
+            outer.min.z,
+            outer.max.x,
+            outer.max.y,
+            outer.max.z,
+            reach,
+        ]
+        .iter()
+        .all(|x| x.is_finite())
+        && inner.min.x >= outer.min.x - reach
+        && inner.min.y >= outer.min.y - reach
+        && inner.min.z >= outer.min.z - reach
+        && inner.max.x <= outer.max.x + reach
+        && inner.max.y <= outer.max.y + reach
+        && inner.max.z <= outer.max.z + reach
+}
+
+#[cfg(test)]
+mod omega92_tests {
+    use super::*;
+    use crate::box_solid;
+
+    fn bx(x: f64, y: f64, z: f64, side: f64) -> Body {
+        box_solid(Vec3::new(x, y, z), Vec3::new(x + side, y + side, z + side)).unwrap()
+    }
+
+    #[test]
+    fn intersection_retry_rejects_invalid_candidates() {
+        let a = bx(0., 0., 0., 10.);
+        let b = bx(5., 0., 0., 10.);
+        let oversized = bx(0., 0., 0., 15.);
+        let far = bx(40., 0., 0., 1.);
+        let invented = bx(6., 2., 2., 1.);
+        for candidate in [&oversized, &far, &invented] {
+            assert!(check_retry(&a, &b, BoolOp::Intersect, Some(candidate)).is_err());
+        }
+        let correct = box_solid(Vec3::new(5., 0., 0.), Vec3::new(10., 10., 10.)).unwrap();
+        assert!(check_retry(&a, &b, BoolOp::Intersect, Some(&correct)).is_ok());
+    }
 }
