@@ -170,41 +170,80 @@ fn read_point(bytes: &[u8], offset: usize) -> Result<[f64; 3], String> {
 }
 
 fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum State {
+        Outside,
+        Solid,
+        Facet,
+        Loop,
+        AfterLoop,
+    }
+
     let text = String::from_utf8_lossy(bytes);
     let mut builder = Builder::default();
     let mut corners = [[0.0f64; 3]; 3];
     let mut filled = 0usize;
-    let mut ended = false;
+    let mut state = State::Outside;
     for (line_no, line) in text.lines().enumerate() {
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
         let mut words = line.split_whitespace();
-        match words.next() {
-            Some("vertex") => {}
-            Some("endsolid") => {
-                ended = true;
-                continue;
+        let malformed = || {
+            format!(
+                "STL の {} 行目: 面または solid の構造が正しくありません。",
+                line_no + 1
+            )
+        };
+        match (state, words.next()) {
+            (_, None) => {}
+            (State::Outside, Some("solid")) => state = State::Solid,
+            (State::Solid, Some("endsolid")) => state = State::Outside,
+            (State::Solid, Some("facet")) => {
+                if words.next() != Some("normal") {
+                    return Err(malformed());
+                }
+                // Normals are not used; verify the record is syntactically valid.
+                parse_xyz(&mut words)?;
+                if words.next().is_some() {
+                    return Err(malformed());
+                }
+                filled = 0;
+                state = State::Facet;
             }
-            // A facet must hold exactly three vertices; never join vertices across facets.
-            Some("endloop" | "endfacet") if filled != 0 => return Err(BAD_FACET.into()),
-            _ => continue,
-        }
-        let point = parse_xyz(words)?;
-        if let Some(slot) = corners.get_mut(filled) {
-            *slot = point;
-        }
-        filled += 1;
-        if filled == 3 {
-            builder.triangle(corners)?;
-            filled = 0;
+            (State::Facet, Some("outer")) => {
+                if words.next() != Some("loop") || words.next().is_some() {
+                    return Err(malformed());
+                }
+                state = State::Loop;
+            }
+            (State::Loop, Some("vertex")) => {
+                let slot = corners.get_mut(filled).ok_or(BAD_FACET)?;
+                *slot = parse_xyz(&mut words)?;
+                if words.next().is_some() {
+                    return Err(malformed());
+                }
+                filled += 1;
+            }
+            (State::Loop, Some("endloop")) => {
+                if filled != 3 || words.next().is_some() {
+                    return Err(malformed());
+                }
+                state = State::AfterLoop;
+            }
+            (State::AfterLoop, Some("endfacet")) => {
+                if words.next().is_some() {
+                    return Err(malformed());
+                }
+                // Commit only after the complete facet has been validated.
+                builder.triangle(corners)?;
+                state = State::Solid;
+            }
+            _ => return Err(malformed()),
         }
     }
-    if filled != 0 || !ended {
-        return Err(
-            "STL の頂点の数が三角形になりません。ファイルが途中で切れていないか確認してください。"
-                .into(),
-        );
+    if state != State::Outside {
+        return Err("STL が途中で切れています。面または solid が閉じていません。".into());
     }
     builder.finish()
 }
@@ -445,6 +484,39 @@ mod security_tests {
             TOO_MANY_BYTES
         );
         assert!(check_import_size(MAX_IMPORT_BYTES as usize).is_ok());
+    }
+
+    #[test]
+    fn ascii_stl_rejects_vertices_outside_a_complete_facet() {
+        let vertices = "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n";
+        let valid = format!(
+            "solid x\nfacet normal 0 0 1\nouter loop\n{vertices}endloop\nendfacet\nendsolid x\n"
+        );
+        assert_eq!(
+            parse_stl(valid.as_bytes(), &|| false).unwrap().triangles.len(),
+            1
+        );
+        let second = format!("{valid}{valid}");
+        assert_eq!(
+            parse_stl(second.as_bytes(), &|| false).unwrap().triangles.len(),
+            2
+        );
+        for malformed in [
+            format!("solid x\n{vertices}endsolid x\n"),
+            format!(
+                "solid x\nfacet normal 0 0 1\nouter loop\n{vertices}{vertices}endloop\nendfacet\nendsolid x\n"
+            ),
+            valid.replace("endfacet\n", ""),
+            valid.replace("endloop\n", ""),
+            format!("{valid}{vertices}"),
+            valid.replace("outer loop\n", ""),
+            valid.replace("vertex 1 0 0", "vertex 1 0 0 extra"),
+        ] {
+            assert!(
+                parse_stl(malformed.as_bytes(), &|| false).is_err(),
+                "{malformed}"
+            );
+        }
     }
 
     #[test]
