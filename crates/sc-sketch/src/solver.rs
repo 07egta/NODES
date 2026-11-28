@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use solidcraft_geom::{Seg2, Vec2};
 
 use crate::decompose::Budget;
-use crate::linalg::{Mat, determined_vars, solve as lin_solve};
+use crate::linalg::{Mat, QR_MAX_COLS, QR_MAX_ROWS, RankProfile, damped_step, determined_vars, rank_profile, solve as lin_solve};
 use crate::model::{ConstraintKind, CurveKind, Sketch, TwoCircles};
 #[cfg(feature = "solver-profiling")]
 use crate::profiling::{self, Decision, Phase, StopReason};
@@ -90,7 +90,26 @@ pub struct SolveReport {
     pub oversized: Option<usize>,
 }
 
+/// This is deliberately not an infeasibility certificate. Failure can result from a
+/// poor initial pose, a singularity, exhausted numerical work, or contradictory constraints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NumericalOutcome {
+    Satisfied,
+    ComponentTooLarge,
+    Unresolved,
+}
+
 impl SolveReport {
+    pub fn numerical_outcome(&self) -> NumericalOutcome {
+        if self.ok() {
+            NumericalOutcome::Satisfied
+        } else if self.oversized.is_some() {
+            NumericalOutcome::ComponentTooLarge
+        } else {
+            NumericalOutcome::Unresolved
+        }
+    }
+
     pub fn ok(&self) -> bool {
         self.status == SolveStatus::Solved
     }
@@ -1102,6 +1121,27 @@ fn local_system(
     (r, j, owner)
 }
 
+/// Read-only numerical rank profile of the current sketch's linearization, without
+/// constructive elimination or changing constraints. The derivative model includes the
+/// existing opening-direction heuristic at coincident points; it need not be a true
+/// derivative there. Only bounded sketches are analyzed; this is not a global rigidity
+/// or infeasibility certificate. Call after a successful solve for pose diagnostics.
+pub fn current_rank_profile(sk: &Sketch, tolerance: f64) -> Option<RankProfile> {
+    let lay = layout(sk, &Hold::default());
+    if lay.n > QR_MAX_COLS {
+        return None;
+    }
+    let mut x = initial_x(sk, &lay);
+    let on_curve = points_on_curves(sk);
+    let (blocks, _) = build_blocks(sk, &lay, &on_curve);
+    let (r, _, _) = system(sk, &lay, &blocks, &mut x, false);
+    if r.len() > QR_MAX_ROWS || r.iter().any(|v| !v.is_finite()) {
+        return None;
+    }
+    let (_, j, _) = system(sk, &lay, &blocks, &mut x, true);
+    rank_profile(&j?, tolerance)
+}
+
 fn max_abs(v: &[f64]) -> f64 {
     v.iter().fold(0.0_f64, |m, x| if x.is_finite() { m.max(x.abs()) } else { f64::INFINITY })
 }
@@ -1218,21 +1258,33 @@ fn lm_capped_with_budget(
         // the point sliding along it.) A point held on a curve is cheaper still, so it slides
         // rather than the curve's ends moving.
         let weight: Vec<f64> = vars.iter().map(|&v| if lay.slide.get(v).copied().unwrap_or(false) { SLIDE_WEIGHT } else { 1.0 }).collect();
+        let use_qr = n <= QR_MAX_COLS && j.rows <= QR_MAX_ROWS;
         for _attempt in 0..30 {
-            let linear_work = n.saturating_mul(n).saturating_mul(n).saturating_add(evaluation_work);
+            // Charge the augmented QR work, not just the old square solve. Keep the
+            // existing dense path for larger components and preserve its work accounting.
+            let factor_work = if use_qr {
+                j.rows.saturating_add(n).saturating_mul(n).saturating_mul(n).saturating_mul(6)
+            } else {
+                n.saturating_mul(n).saturating_mul(n)
+            };
+            let linear_work = factor_work.saturating_add(evaluation_work);
             if !within_budget(&mut budget, linear_work) {
                 #[cfg(feature = "solver-profiling")]
                 profiling::finish_run(run, StopReason::WorkBudget, max_abs(&r));
                 return Some((it, max_abs(&r)));
             }
-            let mut m = a.clone();
-            for (i, w) in weight.iter().enumerate() {
-                m.add(i, i, lambda * w + 1e-12);
-            }
-            let rhs: Vec<f64> = g.iter().map(|v| -v).collect();
             #[cfg(feature = "solver-profiling")]
             let linear_timer = profiling::timer(Phase::LinearSolve);
-            let step = lin_solve(m, rhs);
+            let step = if use_qr {
+                damped_step(&j, &r, &weight, lambda)
+            } else {
+                let mut m = a.clone();
+                for (i, w) in weight.iter().enumerate() {
+                    m.add(i, i, lambda * w + 1e-12);
+                }
+                let rhs: Vec<f64> = g.iter().map(|v| -v).collect();
+                lin_solve(m, rhs)
+            };
             #[cfg(feature = "solver-profiling")]
             drop(linear_timer);
             let Some(step) = step else {
