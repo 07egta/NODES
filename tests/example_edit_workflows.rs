@@ -82,6 +82,7 @@ example_cases! {
     (fractal_tree, "generative/08-fractal-tree.morph", 0, "length", 42.0, 1, Curve, false),
     (density_wall, "generative/09-density-wall.morph", 7, "height", 7.0, 10, Mesh, false),
     (surface_lattice, "generative/10-surface-lattice.morph", 1, "radius", 38.0, 2, Curve, false),
+    (smooth_vase_radius, "math/smooth-vase-radius.morph", 3, "x", 0.9, 2, Mesh, false),
     (ornament_truchet_cylinder, "ornament/truchet-cylinder.morph", 0, "seed", 27.0, 2, Curve, false),
     (ornament_asanoha_screen, "ornament/asanoha-screen.morph", 0, "size", 15.0, 1, Curve, false),
     (ornament_shippo_jewelry, "ornament/shippo-jewelry.morph", 0, "ratio", 0.8, 1, Curve, false),
