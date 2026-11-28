@@ -103,8 +103,20 @@ fn merge_node(
     field!(off);
     field!(script);
     field!(cluster);
-    n.params = merge_map(&base.params, &left.params, &right.params, &format!("{path}/params"), conflicts)?;
-    n.inputs = merge_map(&base.inputs, &left.inputs, &right.inputs, &format!("{path}/inputs"), conflicts)?;
+    n.params = merge_map(
+        &base.params,
+        &left.params,
+        &right.params,
+        &format!("{path}/params"),
+        conflicts,
+    )?;
+    n.inputs = merge_map(
+        &base.inputs,
+        &left.inputs,
+        &right.inputs,
+        &format!("{path}/inputs"),
+        conflicts,
+    )?;
     Ok(n)
 }
 
@@ -125,7 +137,11 @@ pub fn merge(base: &Project, left: &Project, right: &Project) -> Result<MergeRes
     let ids: BTreeSet<_> = a.keys().chain(b.keys()).chain(c.keys()).copied().collect();
     let mut merged = BTreeMap::new();
     for id in ids {
-        let (x, y, z) = (a.get(&id).copied(), b.get(&id).copied(), c.get(&id).copied());
+        let (x, y, z) = (
+            a.get(&id).copied(),
+            b.get(&id).copied(),
+            c.get(&id).copied(),
+        );
         let path = format!("nodes/{id}");
         let node = match (x, y, z) {
             (Some(x), Some(y), Some(z)) => Some(merge_node(x, y, z, &mut conflicts)?),
@@ -144,21 +160,63 @@ pub fn merge(base: &Project, left: &Project, right: &Project) -> Result<MergeRes
     // Preserve ordering of surviving base nodes. Reject reordering rather than
     // silently undoing it; independently added nodes are appended in ID order.
     for graph in [&left.graph, &right.graph] {
-        let actual: Vec<_> = graph.nodes.iter().filter(|n| a.contains_key(&n.id)).map(|n| n.id).collect();
-        let expected: Vec<_> = base.graph.nodes.iter().filter(|n| actual.contains(&n.id)).map(|n| n.id).collect();
+        let actual: Vec<_> = graph
+            .nodes
+            .iter()
+            .filter(|n| a.contains_key(&n.id))
+            .map(|n| n.id)
+            .collect();
+        let expected: Vec<_> = base
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| actual.contains(&n.id))
+            .map(|n| n.id)
+            .collect();
         if actual != expected {
-            conflict(&mut conflicts, "graph/node_order", "reordering requires explicit resolution");
+            conflict(
+                &mut conflicts,
+                "graph/node_order",
+                "reordering requires explicit resolution",
+            );
         }
     }
     let mut project = base.clone();
     project.name = choose(&base.name, &left.name, &right.name, "name", &mut conflicts)?;
     project.pan = choose(&base.pan, &left.pan, &right.pan, "pan", &mut conflicts)?;
     project.zoom = choose(&base.zoom, &left.zoom, &right.zoom, "zoom", &mut conflicts)?;
-    project.graph.clusters = choose(&base.graph.clusters, &left.graph.clusters, &right.graph.clusters, "graph/clusters", &mut conflicts)?;
-    project.graph.groups = choose(&base.graph.groups, &left.graph.groups, &right.graph.groups, "graph/groups", &mut conflicts)?;
-    project.graph.notes = choose(&base.graph.notes, &left.graph.notes, &right.graph.notes, "graph/notes", &mut conflicts)?;
-    project.graph.next_id = base.graph.next_id.max(left.graph.next_id).max(right.graph.next_id);
-    project.graph.nodes = base.graph.nodes.iter().filter_map(|n| merged.remove(&n.id)).collect();
+    project.graph.clusters = choose(
+        &base.graph.clusters,
+        &left.graph.clusters,
+        &right.graph.clusters,
+        "graph/clusters",
+        &mut conflicts,
+    )?;
+    project.graph.groups = choose(
+        &base.graph.groups,
+        &left.graph.groups,
+        &right.graph.groups,
+        "graph/groups",
+        &mut conflicts,
+    )?;
+    project.graph.notes = choose(
+        &base.graph.notes,
+        &left.graph.notes,
+        &right.graph.notes,
+        "graph/notes",
+        &mut conflicts,
+    )?;
+    project.graph.next_id = base
+        .graph
+        .next_id
+        .max(left.graph.next_id)
+        .max(right.graph.next_id);
+    project.graph.nodes = base
+        .graph
+        .nodes
+        .iter()
+        .filter_map(|n| merged.remove(&n.id))
+        .collect();
     project.graph.nodes.extend(merged.into_values());
     if conflicts.is_empty() {
         if let Err(error) = project.validate() {
@@ -183,13 +241,23 @@ pub struct NodeDna {
 
 pub fn extract(project: &Project) -> Result<Vec<NodeDna>, String> {
     project.validate()?;
-    Ok(project.graph.nodes.iter().map(|n| NodeDna {
-        id: n.id,
-        kind: n.kind,
-        parameters: n.params.clone(),
-        dependencies: n.inputs.clone(),
-        seed_parameters: n.params.iter().filter(|(key, _)| key.as_str() == "seed").map(|(key, value)| (key.clone(), *value)).collect(),
-    }).collect())
+    Ok(project
+        .graph
+        .nodes
+        .iter()
+        .map(|n| NodeDna {
+            id: n.id,
+            kind: n.kind,
+            parameters: n.params.clone(),
+            dependencies: n.inputs.clone(),
+            seed_parameters: n
+                .params
+                .iter()
+                .filter(|(key, _)| key.as_str() == "seed")
+                .map(|(key, value)| (key.clone(), *value))
+                .collect(),
+        })
+        .collect())
 }
 
 /// Parameter-only revisions store sparse overrides, sharing the original
@@ -216,7 +284,13 @@ pub struct History {
 impl History {
     pub fn new(root: Project) -> Result<Self, String> {
         root.validate()?;
-        Ok(Self { root, revisions: vec![Revision { parents: vec![], edits: vec![] }] })
+        Ok(Self {
+            root,
+            revisions: vec![Revision {
+                parents: vec![],
+                edits: vec![],
+            }],
+        })
     }
 
     pub fn parents(&self, id: usize) -> Option<&[usize]> {
@@ -271,13 +345,23 @@ impl History {
 
     /// Only parameter histories are accepted. Multiple maximal common ancestors
     /// require explicit resolution instead of an arbitrary base.
-    pub fn combine(&mut self, left: usize, right: usize) -> Result<Result<usize, Vec<Conflict>>, String> {
+    pub fn combine(
+        &mut self,
+        left: usize,
+        right: usize,
+    ) -> Result<Result<usize, Vec<Conflict>>, String> {
         let a = self.ancestors(left)?;
         let b = self.ancestors(right)?;
         let common: BTreeSet<_> = a.intersection(&b).copied().collect();
         let mut nonmaximal = BTreeSet::new();
         for &id in &common {
-            nonmaximal.extend(self.revisions[id].parents.iter().filter(|p| common.contains(p)).copied());
+            nonmaximal.extend(
+                self.revisions[id]
+                    .parents
+                    .iter()
+                    .filter(|p| common.contains(p))
+                    .copied(),
+            );
         }
         let bases: Vec<_> = common.difference(&nonmaximal).copied().collect();
         let [base] = bases.as_slice() else {
@@ -293,7 +377,11 @@ impl History {
             let old = l.graph.node(node.id).ok_or("unexpected node change")?;
             for (key, value) in &node.params {
                 if old.params.get(key).map(|v| v.to_bits()) != Some(value.to_bits()) {
-                    edits.push(ParameterEdit { node: node.id, key: key.clone(), value: *value });
+                    edits.push(ParameterEdit {
+                        node: node.id,
+                        key: key.clone(),
+                        value: *value,
+                    });
                 }
             }
         }
@@ -311,8 +399,18 @@ fn apply(project: &mut Project, edits: &[ParameterEdit]) -> Result<(), String> {
             return Err("duplicate parameter edit".into());
         }
         let node = project.graph.node_mut(edit.node).ok_or("unknown node")?;
-        let spec = node.kind.spec().inputs.iter().find(|s| s.key == edit.key && s.default.is_some()).ok_or("unknown numeric parameter")?;
-        if !edit.value.is_finite() || edit.value < spec.min || edit.value > spec.max || (spec.integer && edit.value.fract() != 0.0) {
+        let spec = node
+            .kind
+            .spec()
+            .inputs
+            .iter()
+            .find(|s| s.key == edit.key && s.default.is_some())
+            .ok_or("unknown numeric parameter")?;
+        if !edit.value.is_finite()
+            || edit.value < spec.min
+            || edit.value > spec.max
+            || (spec.integer && edit.value.fract() != 0.0)
+        {
             return Err("parameter outside declared range".into());
         }
         node.params.insert(edit.key.clone(), edit.value);
@@ -328,8 +426,14 @@ pub enum ReferenceResolution<T> {
     Ambiguous(Vec<T>),
 }
 
-pub fn resolve_candidates<T: Ord>(candidates: impl IntoIterator<Item = T>) -> ReferenceResolution<T> {
-    let mut unique: Vec<_> = candidates.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+pub fn resolve_candidates<T: Ord>(
+    candidates: impl IntoIterator<Item = T>,
+) -> ReferenceResolution<T> {
+    let mut unique: Vec<_> = candidates
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
     match unique.len() {
         0 => ReferenceResolution::Missing,
         1 => match unique.pop() {
