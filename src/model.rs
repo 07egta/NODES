@@ -576,6 +576,19 @@ pub enum NodeKind {
     CurveExplode,
     RotateDirection,
     ProjectToZ,
+    // Mesh physics and mesh tools (`physics_nodes`), appended.
+    PhysSpringRelax,
+    PhysHang,
+    PhysSoapFilm,
+    PhysDrape,
+    PhysMinimalSurface,
+    MeshLoop,
+    MeshSplitFaces,
+    MeshTaubin,
+    MeshRemesh,
+    MeshFillHoles,
+    MeshThicken,
+    MeshOffset,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -995,6 +1008,18 @@ impl NodeKind {
             Self::CurveExplode,
             Self::RotateDirection,
             Self::ProjectToZ,
+            Self::PhysSpringRelax,
+            Self::PhysHang,
+            Self::PhysSoapFilm,
+            Self::PhysDrape,
+            Self::PhysMinimalSurface,
+            Self::MeshLoop,
+            Self::MeshSplitFaces,
+            Self::MeshTaubin,
+            Self::MeshRemesh,
+            Self::MeshFillHoles,
+            Self::MeshThicken,
+            Self::MeshOffset,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1622,6 +1647,7 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter

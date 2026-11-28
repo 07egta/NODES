@@ -404,6 +404,50 @@ impl GraphCanvas {
         }
     }
 
+    /// Align the selected cards by `edge` (0 = left/top, 1 = centre, 2 = right/bottom) on `axis`
+    /// (0 = horizontal, 1 = vertical), using each card's real size.
+    pub fn align_selected_edge(&self, p: &mut Project, axis: usize, edge: u8) {
+        if axis > 1 || edge > 2 || self.selected.len() < 2 {
+            return;
+        }
+        let size_of = |n: &Node| if axis == 0 { WIDTH } else { height(n) };
+        let cards: Vec<(NodeId, f32)> = p
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| self.selected.contains(&n.id))
+            .map(|n| (n.id, size_of(n)))
+            .collect();
+        if cards.len() < 2 {
+            return;
+        }
+        let at = |p: &Project, id: NodeId| p.graph.node(id).map_or(0., |n| n.position[axis]);
+        let target = match edge {
+            0 => cards
+                .iter()
+                .map(|c| at(p, c.0))
+                .fold(f32::INFINITY, f32::min),
+            2 => cards
+                .iter()
+                .map(|c| at(p, c.0) + c.1)
+                .fold(f32::NEG_INFINITY, f32::max),
+            _ => cards.iter().map(|c| at(p, c.0) + c.1 / 2.).sum::<f32>() / cards.len() as f32,
+        };
+        if !target.is_finite() {
+            return;
+        }
+        for (id, size) in cards {
+            let shift = match edge {
+                0 => 0.,
+                2 => size,
+                _ => size / 2.,
+            };
+            if let Some(node) = p.graph.node_mut(id) {
+                node.position[axis] = (target - shift).clamp(-1e6, 1e6);
+            }
+        }
+    }
+
     /// Equalize the gaps between selected card bounds, rather than their centers.
     pub fn distribute_selected(&self, p: &mut Project, axis: usize) {
         if axis > 1 {
@@ -610,6 +654,15 @@ impl GraphCanvas {
                         continue;
                     }
                     let selected = self.selected.contains(&n.id) || self.selected.contains(from);
+                    // Per-input wire display (Grasshopper: Default / Faint / Hidden).
+                    let display = n
+                        .params
+                        .get(&format!("{}{key}", nodes::data_tree::WIRE_PREFIX))
+                        .copied()
+                        .unwrap_or(0.);
+                    if display == 2. && !selected {
+                        continue;
+                    }
                     let color = if theme::is_melt() {
                         melt::wire_color(src.kind.spec().output, selected)
                     } else if selected {
@@ -621,6 +674,11 @@ impl GraphCanvas {
                         .and_then(|e| e.outputs.get(from))
                         .and_then(|r| r.as_ref().ok())
                         .map(data_view::shape_of);
+                    let color = if display == 1. && !selected {
+                        color.gamma_multiply(0.35)
+                    } else {
+                        color
+                    };
                     wire(&painter, a, b, shape, color, selected, p.zoom);
                     // Hovering the middle of a wire offers a reroute dot at that spot.
                     if self.connecting.is_none()
@@ -1041,8 +1099,15 @@ impl GraphCanvas {
                 {
                     to_connect = self.connecting.take().map(|from| (from, n.id, spec.key));
                 }
-                if pr.secondary_clicked() && linked && !over_map {
-                    to_disconnect = Some((n.id, spec.key));
+                if !over_map {
+                    // Right-click menu, like Grasshopper's parameter menu.
+                    let mut cut = false;
+                    pr.context_menu(|ui| {
+                        cut = port_menu(ui, &mut p.graph.nodes[*node_index], spec.key, linked);
+                    });
+                    if cut {
+                        to_disconnect = Some((n.id, spec.key));
+                    }
                 }
                 pr.on_hover_text(format!(
                     "{} · {}{}{}",
@@ -1783,6 +1848,60 @@ fn dashed_wire_shapes(
         phase = (phase + length).rem_euclid(period);
     }
     shapes
+}
+
+/// Right-click menu of an input port: how the data is handled (Flatten, Graft,
+/// Simplify, Reverse) and how the wire is drawn. Returns `true` to disconnect.
+fn port_menu(ui: &mut egui::Ui, node: &mut Node, key: &str, linked: bool) -> bool {
+    use nodes::data_tree::{PORT_PREFIX, WIRE_PREFIX};
+    let mut cut = false;
+    if nodes::data_tree_nodes::supports_transform(node.kind) {
+        ui.label(theme::small("データの扱い"));
+        let tkey = format!("{PORT_PREFIX}{key}");
+        let current = node.params.get(&tkey).copied().unwrap_or(0.);
+        for (value, label) in [
+            (0., "そのまま"),
+            (1., "Flatten（1本のリストにする）"),
+            (2., "Graft（1個ずつ枝にする）"),
+            (3., "Simplify（共通の枝番号を省く）"),
+            (4., "Reverse（各リストを逆順）"),
+        ] {
+            if ui.selectable_label(current == value, label).clicked() {
+                if value == 0. {
+                    node.params.remove(&tkey);
+                } else {
+                    node.params.insert(tkey.clone(), value);
+                }
+                ui.close();
+            }
+        }
+        ui.separator();
+    }
+    ui.label(theme::small("ワイヤの表示"));
+    let wkey = format!("{WIRE_PREFIX}{key}");
+    let current = node.params.get(&wkey).copied().unwrap_or(0.);
+    for (value, label) in [
+        (0., "標準"),
+        (1., "うっすら（選ぶと濃くなる）"),
+        (2., "非表示（選ぶと見える）"),
+    ] {
+        if ui.selectable_label(current == value, label).clicked() {
+            if value == 0. {
+                node.params.remove(&wkey);
+            } else {
+                node.params.insert(wkey.clone(), value);
+            }
+            ui.close();
+        }
+    }
+    if linked {
+        ui.separator();
+        if ui.button("切断").clicked() {
+            cut = true;
+            ui.close();
+        }
+    }
+    cut
 }
 
 /// A wire styled by the shape of the data flowing through it:
