@@ -110,6 +110,41 @@ enum PendingAction {
     Exit,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WorkspaceMode {
+    Easy,
+    Advanced,
+    Expert,
+}
+
+impl WorkspaceMode {
+    const ALL: [Self; 3] = [Self::Easy, Self::Advanced, Self::Expert];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Easy => "かんたん",
+            Self::Advanced => "標準",
+            Self::Expert => "詳細",
+        }
+    }
+
+    fn panels(self) -> (bool, bool) {
+        match self {
+            Self::Easy => (false, true),
+            Self::Advanced | Self::Expert => (true, true),
+        }
+    }
+}
+
+/// Preview items kept between frames: the viewport would otherwise get a deep copy of every
+/// shown tree each frame and hash it again.
+struct PreviewCache {
+    serial: u64,
+    /// Shown node ids with their selected flag, in display order.
+    key: Vec<(NodeId, bool)>,
+    items: Arc<Vec<PreviewItem>>,
+}
+
 pub struct NodesApp {
     project: Project,
     history: History,
@@ -117,6 +152,10 @@ pub struct NodesApp {
     viewport: Viewport,
     worker: Worker,
     evaluation: Option<Evaluation>,
+    /// Bumped whenever `evaluation` is replaced; keys the preview-item cache.
+    evaluation_serial: u64,
+    /// Preview items of the last frame, reused while nothing they depend on changed.
+    preview_cache: Option<PreviewCache>,
     diagnostics: Option<DiagnosticReport>,
     diagnostics_window: DiagnosticsWindow,
     revision: u64,
@@ -134,6 +173,7 @@ pub struct NodesApp {
     library_filter: u8,
     favorites: BTreeSet<NodeKind>,
     show_library: bool,
+    workspace_mode: WorkspaceMode,
     show_workspace: bool,
     clipboard: Vec<Node>,
     palette_open: bool,
@@ -241,6 +281,8 @@ impl NodesApp {
             viewport: Viewport::default(),
             worker: Worker::new(cc.egui_ctx.clone()),
             evaluation: None,
+            evaluation_serial: 0,
+            preview_cache: None,
             diagnostics: None,
             diagnostics_window: DiagnosticsWindow::default(),
             revision: 0,
@@ -257,6 +299,7 @@ impl NodesApp {
             library_filter: 0,
             favorites: favorites.iter().copied().collect(),
             show_library: true,
+            workspace_mode: WorkspaceMode::Advanced,
             show_workspace: true,
             clipboard: Vec::new(),
             category: "すべて".into(),
@@ -317,6 +360,7 @@ impl NodesApp {
             if result.revision == self.revision {
                 self.result_revision = result.revision;
                 self.evaluation = Some(result.evaluation);
+                self.evaluation_serial = self.evaluation_serial.wrapping_add(1);
                 self.diagnostics = Some(result.diagnostics);
             }
         }
@@ -367,12 +411,12 @@ impl NodesApp {
         collect_export_trees(&self.project.graph, e, &self.canvas.selected)
     }
     /// Pending has no new snapshot; a completed empty/error result is Some([]).
-    fn previews(&self) -> Option<Vec<PreviewItem>> {
+    fn previews(&mut self) -> Option<Arc<Vec<PreviewItem>>> {
         if self.stale() {
             return None;
         }
         let Some(e) = &self.evaluation else {
-            return Some(vec![]);
+            return Some(Arc::new(Vec::new()));
         };
         let ids: Vec<_> = match self.preview_mode {
             1 => self.canvas.selected.iter().copied().collect(),
@@ -400,20 +444,41 @@ impl NodesApp {
                 }
             }
         };
-        Some(
-            ids.into_iter()
-                .filter_map(|id| {
+        let key: Vec<(NodeId, bool)> = ids
+            .into_iter()
+            .map(|id| {
+                (
+                    id,
+                    self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                )
+            })
+            .collect();
+        if let Some(cache) = &self.preview_cache
+            && cache.serial == self.evaluation_serial
+            && cache.key == key
+        {
+            return Some(Arc::clone(&cache.items));
+        }
+        let items: Arc<Vec<PreviewItem>> = Arc::new(
+            key.iter()
+                .filter_map(|&(id, selected)| {
                     e.outputs
                         .get(&id)
                         .and_then(|r| r.as_ref().ok())
                         .map(|tree| PreviewItem {
                             node_id: id,
                             tree: tree.clone(),
-                            selected: self.canvas.selected.contains(&id) || self.preview_mode == 0,
+                            selected,
                         })
                 })
                 .collect(),
-        )
+        );
+        self.preview_cache = Some(PreviewCache {
+            serial: self.evaluation_serial,
+            key,
+            items: Arc::clone(&items),
+        });
+        Some(items)
     }
     fn discard_outdated_preview(&mut self) {
         // An evaluation may finish while the 3D panel is hidden. If another edit
@@ -498,11 +563,14 @@ impl NodesApp {
             self.history = History::default();
             self.suppress_history = true;
             self.canvas.selected.clear();
-            self.canvas.connecting = None;
+            self.canvas.restore_graph(&self.project.graph);
+            self.cage_edit = Default::default();
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
             self.preview_revision = None;
             self.evaluation = None;
+            self.evaluation_serial = self.evaluation_serial.wrapping_add(1);
+            self.preview_cache = None;
             self.diagnostics = None;
             self.queue_compute();
             self.preview_mode = 0;
@@ -644,7 +712,10 @@ impl NodesApp {
                             Err(e) => self.notify(e, true),
                         }
                     }
-                    FileTask::ExportStl | FileTask::ExportObj | FileTask::ExportThreeMf => {
+                    FileTask::ExportStl
+                    | FileTask::ExportObj
+                    | FileTask::ExportPly
+                    | FileTask::ExportThreeMf => {
                         let sources = self.stl_sources();
                         self.stl_export.export_to(&sources, &path);
                         self.flush_stl_notice();
@@ -1111,9 +1182,9 @@ impl NodesApp {
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
-            self.canvas
-                .selected
-                .retain(|id| self.project.graph.node(*id).is_some());
+            self.canvas.restore_graph(&self.project.graph);
+            self.wire_source = None;
+            self.cage_edit = Default::default();
         }
     }
     fn redo(&mut self) {
@@ -1121,6 +1192,9 @@ impl NodesApp {
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
+            self.canvas.restore_graph(&self.project.graph);
+            self.wire_source = None;
+            self.cage_edit = Default::default();
         }
     }
     fn keyboard(&mut self, ctx: &egui::Context) {
@@ -1348,6 +1422,18 @@ impl NodesApp {
                             }
                         });
                         ui.menu_button("表示", |ui| {
+                            ui.label("操作モード");
+                            for mode in WorkspaceMode::ALL {
+                                if ui
+                                    .selectable_label(self.workspace_mode == mode, mode.label())
+                                    .clicked()
+                                {
+                                    self.workspace_mode = mode;
+                                    (self.show_library, self.show_workspace) = mode.panels();
+                                    ui.close();
+                                }
+                            }
+                            ui.separator();
                             ui.checkbox(&mut self.show_library, "ノードライブラリ");
                             ui.checkbox(&mut self.show_workspace, "3D と設定");
                             if ui.button("診断と処理時間").clicked() {
@@ -1915,8 +2001,12 @@ impl NodesApp {
                             }
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
-                                let value = n.params.entry(input.key.into()).or_insert(default);
-                                parameter_editor(ui, value, input);
+                                let mut value = n.params.get(input.key).copied().unwrap_or(default);
+                                let before = value.to_bits();
+                                parameter_editor(ui, &mut value, input);
+                                if value.to_bits() != before {
+                                    n.params.insert(input.key.into(), value);
+                                }
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -2175,7 +2265,7 @@ impl NodesApp {
                         .cage_edit
                         .overlay(&self.project.graph, self.evaluation.as_ref());
                     let picked = if let Some(items) = &items {
-                        let picked = self.viewport.show(ui, items);
+                        let picked = self.viewport.show_shared(ui, items);
                         self.preview_revision = Some(self.result_revision);
                         picked
                     } else {
@@ -2235,6 +2325,21 @@ impl NodesApp {
                     .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new("キャンバス").size(13.).strong());
+                            if self.workspace_mode == WorkspaceMode::Easy {
+                                if ui.small_button("作品例から作る").clicked() {
+                                    self.template_open = true;
+                                }
+                                if ui.small_button("3ステップガイド").clicked() {
+                                    self.tutorial.start();
+                                }
+                            } else if self.workspace_mode == WorkspaceMode::Expert {
+                                if ui.small_button("値を見る").clicked() {
+                                    self.values_open = true;
+                                }
+                                if ui.small_button("処理時間・診断").clicked() {
+                                    self.diagnostics_window.open = true;
+                                }
+                            }
                             if ui
                                 .small_button("＋")
                                 .on_hover_text("ノード追加 · Tab")
@@ -2706,6 +2811,16 @@ impl NodesApp {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
                     self.clipboard.clear();
+                    self.canvas.selected.clear();
+                    self.canvas.restore_graph(&self.project.graph);
+                    self.wire_source = None;
+                    self.palette_open = false;
+                    self.cage_edit = Default::default();
+                    self.history = History::default();
+                    self.viewport = Viewport::default();
+                    self.preview_revision = None;
+                    self.evaluation = None;
+                    self.diagnostics = None;
                     self.recovery = None;
                     self.dirty = true;
                     self.suppress_history = true;
@@ -2828,7 +2943,9 @@ impl eframe::App for NodesApp {
             self.keyboard(ctx);
         }
         self.topbar(ctx);
-        self.shelf_panel(ctx);
+        if self.workspace_mode != WorkspaceMode::Easy {
+            self.shelf_panel(ctx);
+        }
         self.statusbar(ctx);
         if self.show_library && (!self.show_workspace || ctx.available_rect().width() >= 850.) {
             self.library(ctx);
@@ -3293,6 +3410,13 @@ mod viewport_cache_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn workspace_modes_keep_the_preview_accessible() {
+        assert_eq!(WorkspaceMode::Easy.panels(), (false, true));
+        assert_eq!(WorkspaceMode::Advanced.panels(), (true, true));
+        assert_eq!(WorkspaceMode::Expert.panels(), (true, true));
+    }
+
     #[test]
     fn japanese_and_english_search_find_real_nodes() {
         assert!(matches_search(NodeKind::Circle, "円"));

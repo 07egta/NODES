@@ -1,8 +1,9 @@
 use nodes::model::{Mesh, Tree, Value};
 use nodes::persistence;
 use nodes::stl_export::{
-    ExportOptions, OutputFormat, check_bodies, crc32, encode_3mf, gather_meshes, numbered_path,
-    prepare_bodies, repair_meshes, slicer_command, split_bodies, timestamp_jst, write_bodies,
+    ExportOptions, OutputFormat, check_bodies, crc32, encode_3mf, encode_3mf_colored, encode_ply,
+    gather_meshes, numbered_path, prepare_bodies, repair_meshes, slicer_command, split_bodies,
+    timestamp_jst, write_bodies,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -301,4 +302,47 @@ fn options_reject_bad_scale() {
         ..ExportOptions::default()
     };
     assert!(prepare_bodies(&[cube()], &bad).is_err());
+}
+
+#[test]
+fn colored_threemf_names_objects_and_lists_one_color_per_body() {
+    let mut second = cube();
+    for v in &mut second.vertices {
+        v[0] += 50.0;
+    }
+    let bytes = encode_3mf_colored(&[cube(), second]).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("<basematerials id=\"3\">"));
+    assert_eq!(text.matches("<base ").count(), 2);
+    assert!(text.contains("displaycolor=\"#E64B35\""));
+    assert!(text.contains("pid=\"3\" pindex=\"0\""));
+    assert!(text.contains("pid=\"3\" pindex=\"1\""));
+    // The plain writer is unchanged: no colours, no names.
+    let plain = encode_3mf(&[cube()]).unwrap();
+    assert!(!String::from_utf8_lossy(&plain).contains("basematerials"));
+}
+
+#[test]
+fn ply_header_counts_and_binary_size_agree() {
+    let body = cube();
+    let (v, f) = (body.vertices.len(), body.triangles.len());
+    let plain = encode_ply(std::slice::from_ref(&body), false).unwrap();
+    let end = b"end_header\n";
+    let at = plain.windows(end.len()).position(|w| w == end).unwrap() + end.len();
+    let header = String::from_utf8(plain[..at].to_vec()).unwrap();
+    assert!(header.starts_with("ply\nformat binary_little_endian 1.0\n"));
+    assert!(header.contains(&format!("element vertex {v}\n")));
+    assert!(header.contains(&format!("element face {f}\n")));
+    assert!(!header.contains("red"));
+    assert_eq!(plain.len() - at, v * 24 + f * 13);
+    let colored = encode_ply(std::slice::from_ref(&body), true).unwrap();
+    assert!(String::from_utf8_lossy(&colored).contains("property uchar red"));
+    assert!(colored.len() > plain.len());
+}
+
+#[test]
+fn ply_rejects_non_finite_coordinates() {
+    let mut body = cube();
+    body.vertices[0][1] = f64::INFINITY;
+    assert!(encode_ply(&[body], false).is_err());
 }
