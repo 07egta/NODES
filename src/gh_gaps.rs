@@ -30,6 +30,15 @@ pub fn is_kind(kind: NodeKind) -> bool {
             | CurveExplode
             | RotateDirection
             | ProjectToZ
+            | MathGoldenRatio
+            | MathSinc
+            | MathSecant
+            | MathCosecant
+            | MathCotangent
+            | MathReciprocal
+            | MathPow2
+            | MathPow10
+            | GateMajority
     )
 }
 
@@ -207,6 +216,82 @@ pub fn spec(kind: NodeKind) -> Option<&'static NodeSpec> {
             [
                 g("geometry", "形状", DataType::Geometry),
                 n("z", "高さ Z", 0., -BIG, BIG, 0.1)
+            ]
+        ),
+        MathGoldenRatio => node_spec!(
+            "黄金比",
+            "数値",
+            "倍率 × (1 + √5) / 2。設計比率やパターン生成に使います。",
+            "golden ratio phi 黄金比",
+            DataType::Number,
+            [n("factor", "倍率", 1., -BIG, BIG, 0.01)]
+        ),
+        MathSinc => node_spec!(
+            "Sinc 関数",
+            "数値",
+            "sin(x)/x。x=0 の極限は 1。入力はラジアンです。",
+            "sinc sinus cardinalis サインカーディナル",
+            DataType::Number,
+            [n("x", "角度 (rad)", 0., -BIG, BIG, 0.01)]
+        ),
+        MathSecant => node_spec!(
+            "正割",
+            "数値",
+            "1/cos(x)。極の近傍はエラー。入力はラジアンです。",
+            "secant sec 正割",
+            DataType::Number,
+            [n("x", "角度 (rad)", 0., -BIG, BIG, 0.01)]
+        ),
+        MathCosecant => node_spec!(
+            "余割",
+            "数値",
+            "1/sin(x)。極の近傍はエラー。入力はラジアンです。",
+            "cosecant csc 余割",
+            DataType::Number,
+            [n("x", "角度 (rad)", 1., -BIG, BIG, 0.01)]
+        ),
+        MathCotangent => node_spec!(
+            "余接",
+            "数値",
+            "cos(x)/sin(x)。極の近傍はエラー。入力はラジアンです。",
+            "cotangent cot 余接",
+            DataType::Number,
+            [n("x", "角度 (rad)", 1., -BIG, BIG, 0.01)]
+        ),
+        MathReciprocal => node_spec!(
+            "逆数",
+            "数値",
+            "1/x。0 はエラーになります。",
+            "reciprocal one over x 逆数",
+            DataType::Number,
+            [n("x", "値", 2., -BIG, BIG, 0.01)]
+        ),
+        MathPow2 => node_spec!(
+            "2 の累乗",
+            "数値",
+            "2 を入力値の指数で累乗します。有限な結果だけを返します。",
+            "power of 2 exp2 exponential 2 累乗",
+            DataType::Number,
+            [n("x", "指数", 3., -BIG, BIG, 0.01)]
+        ),
+        MathPow10 => node_spec!(
+            "10 の累乗",
+            "数値",
+            "10 を入力値の指数で累乗します。有限な結果だけを返します。",
+            "power of 10 exp10 exponential 10 累乗",
+            DataType::Number,
+            [n("x", "指数", 2., -BIG, BIG, 0.01)]
+        ),
+        GateMajority => node_spec!(
+            "論理 多数決",
+            "数値",
+            "3 入力のうち 2 つ以上が 1 なら 1。すべての入力は 0 または 1。",
+            "gate majority vote boolean logic 多数決 論理",
+            DataType::Number,
+            [
+                i("a", "A (0/1)", 0., 0., 1.),
+                i("b", "B (0/1)", 1., 0., 1.),
+                i("c", "C (0/1)", 1., 0., 1.)
             ]
         ),
         _ => None,
@@ -438,6 +523,37 @@ pub fn run_item(
                 stop,
             )?])
         }
+        MathGoldenRatio => number(x()? * ((1. + 5_f64.sqrt()) * 0.5)),
+        MathSinc => {
+            let v = x()?;
+            number(if v == 0. { 1. } else { v.sin() / v })
+        }
+        MathSecant | MathCosecant | MathCotangent => {
+            let (sin, cos) = x()?.sin_cos();
+            let (numerator, denominator) = match kind {
+                MathSecant => (1., cos),
+                MathCosecant => (1., sin),
+                _ => (cos, sin),
+            };
+            // Match the existing tangent node's explicit pole rejection policy.
+            if denominator.abs() <= 4. * f64::EPSILON {
+                return Err("三角関数の極では未定義です。".into());
+            }
+            number(numerator / denominator)
+        }
+        MathReciprocal => {
+            let v = x()?;
+            if v == 0. {
+                return Err("ゼロでは割れません。".into());
+            }
+            number(v.recip())
+        }
+        MathPow2 => number(x()?.exp2()),
+        MathPow10 => number(10_f64.powf(x()?)),
+        GateMajority => {
+            let (a, b, c) = (bit(x()?)?, bit(y()?)?, bit(num(a, 2)?)?);
+            flag(u8::from(a) + u8::from(b) + u8::from(c) >= 2)
+        }
         _ => Err("このノードは未対応です。".into()),
     }
 }
@@ -484,6 +600,54 @@ mod tests {
         assert!((one(run(NodeKind::MathLn, &nums(&[std::f64::consts::E]))) - 1.).abs() < 1e-12);
         assert!((one(run(NodeKind::MathLog10, &nums(&[1000.]))) - 3.).abs() < 1e-12);
         assert!(run(NodeKind::MathLn, &nums(&[0.])).is_err());
+    }
+
+    #[test]
+    fn omega67_scalar_identities_and_domains() {
+        use NodeKind::*;
+        let phi = one(run(MathGoldenRatio, &nums(&[1.])));
+        assert!((phi * phi - phi - 1.).abs() < 1e-12);
+        assert_eq!(one(run(MathGoldenRatio, &nums(&[0.]))), 0.);
+        assert_eq!(one(run(MathSinc, &nums(&[0.]))), 1.);
+        assert_eq!(one(run(MathSinc, &nums(&[1e-12]))), 1.);
+        let half_pi = std::f64::consts::FRAC_PI_2;
+        let quarter_pi = std::f64::consts::FRAC_PI_4;
+        assert!((one(run(MathSinc, &nums(&[half_pi]))) - half_pi.recip()).abs() < 1e-12);
+        assert!((one(run(MathSecant, &nums(&[quarter_pi]))) - 2_f64.sqrt()).abs() < 1e-12);
+        assert!((one(run(MathCosecant, &nums(&[quarter_pi]))) - 2_f64.sqrt()).abs() < 1e-12);
+        assert!((one(run(MathCotangent, &nums(&[quarter_pi]))) - 1.).abs() < 1e-12);
+        assert!(run(MathSecant, &nums(&[half_pi])).is_err());
+        assert!(run(MathCosecant, &nums(&[0.])).is_err());
+        assert!(run(MathCotangent, &nums(&[std::f64::consts::PI])).is_err());
+        assert_eq!(one(run(MathReciprocal, &nums(&[-4.]))), -0.25);
+        assert!(run(MathReciprocal, &nums(&[-0.])).is_err());
+        assert_eq!(one(run(MathPow2, &nums(&[3.]))), 8.);
+        assert_eq!(one(run(MathPow10, &nums(&[2.]))), 100.);
+        assert_eq!(one(run(MathPow2, &nums(&[-3.]))), 0.125);
+        assert!(run(MathPow2, &nums(&[1024.])).is_err());
+        assert!(run(MathPow10, &nums(&[309.])).is_err());
+    }
+
+    #[test]
+    fn omega67_majority_exhaustive_and_invalid_operands() {
+        for a in 0..=1 {
+            for b in 0..=1 {
+                for c in 0..=1 {
+                    let expected = if a + b + c >= 2 { 1. } else { 0. };
+                    assert_eq!(
+                        one(run(
+                            NodeKind::GateMajority,
+                            &nums(&[f64::from(a), f64::from(b), f64::from(c)])
+                        )),
+                        expected
+                    );
+                }
+            }
+        }
+        for values in [[2., 1., 1.], [1., 2., 1.], [1., 1., 2.]] {
+            assert!(run(NodeKind::GateMajority, &nums(&values)).is_err());
+        }
+        assert!(run_item(NodeKind::MathSinc, &[&Value::Number(0.)], &|| true).is_err());
     }
 
     #[test]
