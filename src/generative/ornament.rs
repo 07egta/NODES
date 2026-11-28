@@ -101,7 +101,11 @@ pub(super) fn spec(kind: NodeKind) -> &'static NodeSpec {
 }
 
 pub(super) fn estimate(kind: NodeKind, a: &[&Value]) -> Result<(usize, usize), String> {
-    let limit = if kind == NodeKind::TruchetPattern { 64 } else { 32 };
+    let limit = if kind == NodeKind::TruchetPattern {
+        64
+    } else {
+        32
+    };
     let nx = count(a, 0, limit)?;
     let ny = count(a, 1, limit)?;
     match kind {
@@ -171,12 +175,7 @@ fn segment(out: &mut Vec<Value>, a: [f64; 3], b: [f64; 3]) -> Result<(), String>
     Ok(())
 }
 
-fn asanoha(
-    nx: usize,
-    ny: usize,
-    s: f64,
-    cancel: &dyn Fn() -> bool,
-) -> Result<Vec<Value>, String> {
+fn asanoha(nx: usize, ny: usize, s: f64, cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     let mut out = Vec::with_capacity(9 * nx * ny + nx + ny);
     for y in 0..=ny {
         cancelled(cancel)?;
@@ -215,7 +214,11 @@ pub(super) fn run_item(
     cancel: &dyn Fn() -> bool,
 ) -> Result<Vec<Value>, String> {
     let (_, items) = estimate(kind, a)?;
-    let limit = if kind == NodeKind::TruchetPattern { 64 } else { 32 };
+    let limit = if kind == NodeKind::TruchetPattern {
+        64
+    } else {
+        32
+    };
     let nx = count(a, 0, limit)?;
     let ny = count(a, 1, limit)?;
     let s = num(a, 2)?;
