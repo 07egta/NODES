@@ -89,10 +89,7 @@ const CATEGORY_GLYPHS: &[(&str, Glyph)] = &[
 const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     (
         NodeKind::ExactTorus,
-        &[
-            Part::Ring([0.5, 0.5, 0.4]),
-            Part::Ring([0.5, 0.5, 0.18]),
-        ],
+        &[Part::Ring([0.5, 0.5, 0.4]), Part::Ring([0.5, 0.5, 0.18])],
     ),
     (
         NodeKind::PhysSpringRelax,
