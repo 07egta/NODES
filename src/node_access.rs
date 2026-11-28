@@ -52,7 +52,7 @@ impl InputAccess {
 pub fn uses_list_access(kind: NodeKind) -> bool {
     matches!(
         kind,
-        NodeKind::Merge | NodeKind::Loft | NodeKind::MeshConstruct
+        NodeKind::Merge | NodeKind::Loft | NodeKind::MeshConstruct | NodeKind::BioSpaceColonization
     ) || crate::gh_nodes::is_list_kind(kind)
         || crate::data_tree_nodes::is_list_kind(kind)
         || crate::math_nodes::is_list_kind(kind)
@@ -74,7 +74,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
     let access = match kind {
         Script | Cluster => Custom,
         ImportMesh => FirstItem,
-        Output | Flatten | Graft => Tree,
+        Output | Reroute | Flatten | Graft => Tree,
         k if crate::gcode_nodes::is_kind(k) => Tree,
         MergeTree | EntwineTree | UnflattenTree => Tree,
         TreeBranch | TreeItem if index == 0 => Tree,

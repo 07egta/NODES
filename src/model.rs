@@ -556,6 +556,26 @@ pub enum NodeKind {
     ExactContinuity,
     ExactCurvatureComb,
     ExactOffsetCurve,
+    /// Reroute dot placed on a wire (passes its input through unchanged), appended.
+    Reroute,
+    // Standard components that were missing (see `gh_gaps.rs`), appended.
+    MathSquareRoot,
+    MathSquare,
+    MathCube,
+    MathCubeRoot,
+    MathLn,
+    MathLog10,
+    GateNand,
+    GateNor,
+    GateXnor,
+    DomainIncludes,
+    PointPolar,
+    PointCylindrical,
+    CurveArea,
+    CurveAreaCentroid,
+    CurveExplode,
+    RotateDirection,
+    ProjectToZ,
     // Mesh physics and mesh tools (`physics_nodes`), appended.
     PhysSpringRelax,
     PhysHang,
@@ -575,6 +595,9 @@ pub enum NodeKind {
     ShippoPattern,
     PowerDiagram2d,
     LloydRelax2d,
+    // BioMorph growth (append-only serialized IDs).
+    BioSpaceColonization,
+    BioCoiledShell,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -976,6 +999,24 @@ impl NodeKind {
             Self::ExactContinuity,
             Self::ExactCurvatureComb,
             Self::ExactOffsetCurve,
+            Self::Reroute,
+            Self::MathSquareRoot,
+            Self::MathSquare,
+            Self::MathCube,
+            Self::MathCubeRoot,
+            Self::MathLn,
+            Self::MathLog10,
+            Self::GateNand,
+            Self::GateNor,
+            Self::GateXnor,
+            Self::DomainIncludes,
+            Self::PointPolar,
+            Self::PointCylindrical,
+            Self::CurveArea,
+            Self::CurveAreaCentroid,
+            Self::CurveExplode,
+            Self::RotateDirection,
+            Self::ProjectToZ,
             Self::PhysSpringRelax,
             Self::PhysHang,
             Self::PhysSoapFilm,
@@ -993,6 +1034,8 @@ impl NodeKind {
             Self::ShippoPattern,
             Self::PowerDiagram2d,
             Self::LloydRelax2d,
+            Self::BioSpaceColonization,
+            Self::BioCoiledShell,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1601,6 +1644,17 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Reroute => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "リルート点",
+                    category: "データ",
+                    description: "接続線の途中に置く小さな点。入力をそのまま出力へ渡し、配線を整理したり曲げたりできます。",
+                    keywords: "reroute dot relay wire anchor リルート 中継 配線 ドット 点",
+                    inputs: &[g("value", "入力", DataType::Any)],
+                    output: DataType::Any,
+                };
+                &SPEC
+            }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
             other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
@@ -1638,6 +1692,8 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::biomorph::spec(other))
+                .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
                 })
@@ -1649,6 +1705,46 @@ impl NodeKind {
     }
 }
 
+/// Reject duplicate serialized map keys instead of silently retaining the last value.
+fn deserialize_unique_map<'de, D, V>(deserializer: D) -> Result<BTreeMap<String, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    V: Deserialize<'de>,
+{
+    struct UniqueMap<V>(std::marker::PhantomData<V>);
+
+    impl<'de, V: Deserialize<'de>> serde::de::Visitor<'de> for UniqueMap<V> {
+        type Value = BTreeMap<String, V>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a map with unique keys")
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut map: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut values = BTreeMap::new();
+            while let Some((key, value)) = map.next_entry::<String, V>()? {
+                match values.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(value);
+                    }
+                    std::collections::btree_map::Entry::Occupied(entry) => {
+                        return Err(serde::de::Error::custom(format_args!(
+                            "duplicate node map key: {}",
+                            entry.key()
+                        )));
+                    }
+                }
+            }
+            Ok(values)
+        }
+    }
+
+    deserializer.deserialize_map(UniqueMap(std::marker::PhantomData))
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Node {
@@ -1656,7 +1752,9 @@ pub struct Node {
     pub kind: NodeKind,
     pub name: String,
     pub position: [f32; 2],
+    #[serde(deserialize_with = "deserialize_unique_map")]
     pub params: BTreeMap<String, f64>,
+    #[serde(deserialize_with = "deserialize_unique_map")]
     pub inputs: BTreeMap<String, NodeId>,
     pub preview: bool,
     /// Script source of a `Script` node. Empty (and not saved) for other nodes.
@@ -1710,7 +1808,7 @@ impl Graph {
                 .filter_map(|s| s.default.map(|v| (s.key.into(), v)))
                 .collect(),
             inputs: BTreeMap::new(),
-            preview: true,
+            preview: kind != NodeKind::Reroute,
             script: if kind == NodeKind::Expression {
                 crate::expr::DEFAULT_EXPRESSION.into()
             } else if kind == NodeKind::PathMapper {

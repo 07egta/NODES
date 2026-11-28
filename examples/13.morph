@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "name": "シンプル花瓶→らせんGコード",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "vase",
+        "name": "花器",
+        "position": [
+          20.0,
+          30.0
+        ],
+        "params": {
+          "amplitude": 0.12,
+          "height": 90.0,
+          "layers": 40.0,
+          "lobes": 6.0,
+          "radius": 30.0,
+          "segments": 72.0,
+          "thickness": 2.4
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "gcode_printer",
+        "name": "プリンタ設定",
+        "position": [
+          20.0,
+          310.0
+        ],
+        "params": {
+          "bed_x": 0.0,
+          "bed_y": 0.0,
+          "bed_z": 0.0,
+          "filament_d": 0.0,
+          "nozzle_d": 0.0,
+          "preset": 0.0
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "gcode_temp",
+        "name": "温度・ファン",
+        "position": [
+          262.0,
+          310.0
+        ],
+        "params": {
+          "bed": 55.0,
+          "fan": 100.0,
+          "fan_from_layer": 2.0,
+          "nozzle": 215.0
+        },
+        "inputs": {
+          "job": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "gcode_slice",
+        "name": "輪切り",
+        "position": [
+          504.0,
+          170.0
+        ],
+        "params": {
+          "layer_height": 0.2,
+          "place": 1.0
+        },
+        "inputs": {
+          "job": 2,
+          "mesh": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "gcode_spiral",
+        "name": "らせん連続Z",
+        "position": [
+          746.0,
+          170.0
+        ],
+        "params": {
+          "bottom_layers": 4.0,
+          "inset": 1.0,
+          "spacing": 1.0
+        },
+        "inputs": {
+          "job": 3
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "gcode_safety",
+        "name": "安全チェック",
+        "position": [
+          988.0,
+          170.0
+        ],
+        "params": {
+          "strict": 0.0
+        },
+        "inputs": {
+          "job": 4
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "gcode_preview",
+        "name": "パスプレビュー",
+        "position": [
+          1230.0,
+          170.0
+        ],
+        "params": {
+          "color_by": 0.0,
+          "show_travel": 0.0
+        },
+        "inputs": {
+          "job": 5
+        },
+        "preview": true
+      },
+      {
+        "id": 7,
+        "kind": "gcode_write",
+        "name": "Gコード書き出し",
+        "position": [
+          1472.0,
+          170.0
+        ],
+        "params": {},
+        "inputs": {
+          "job": 6
+        },
+        "preview": false
+      },
+      {
+        "id": 8,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          262.0,
+          30.0
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 9
+  },
+  "pan": [
+    24.0,
+    80.0
+  ],
+  "zoom": 0.86
+}

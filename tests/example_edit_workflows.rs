@@ -63,6 +63,8 @@ example_cases! {
     (attractor_pattern, "10.morph", 1, "x", 45.0, 8, Mesh, false),
     (pipe_helix_lamp, "11.morph", 0, "radius", 34.0, 2, Mesh, false),
     (gyroid_box, "12.morph", 0, "height", 36.0, 3, Mesh, false),
+    (gcode_spiral_vase, "13.morph", 0, "height", 110.0, 8, Mesh, false),
+    (gcode_clay_bowl, "14.morph", 0, "height", 90.0, 10, Mesh, false),
     (circle_divisions, "curves/11-circle-divisions.morph", 0, "radius", 36.0, 1, Point, false),
     (helix_frames, "curves/12-helix-frames.morph", 0, "radius", 30.0, 2, Point, false),
     (furniture_profile, "curves/13-furniture-profile.morph", 2, "amp", 25.0, 4, Curve, false),
