@@ -65,3 +65,11 @@ SolidCraftの幾何処理など、NODESに必要な内部実装を再利用で�
 - 2026-11-27: 進捗の報告は簡単な日本語で。前置きは最小限にし、作れるものから先に作る。
 - 2026-11-27: Arclet CADは対象外（中止）。
 - 2026-11-28: 操作や仕組みは「Grasshopperと同じ仕組みに似せる」。データ照合・ツリー・入力の右クリック・ワイヤ表示・ショートカットなどはGrasshopperの挙動に近づける（挙動だけを公開情報で調べ、コード・文章・アイコンは写さない）。調査表は [docs/GRASSHOPPER_MECHANICS.md](docs/GRASSHOPPER_MECHANICS.md)。
+
+## OMEGA ∞ 並行開発
+
+- 利用可能な時間内で自律的に調査・実装・検証を継続し、途中成果を専用ブランチとPRに保存する。通常の編集確認は繰り返さず、必須権限は遵守する。
+- [開発調整プロトコル](docs/development/AGENT_COORDINATION.md) に従い、Draft PRで担当・基準main SHA・対象ファイル・依存PR・検証SHA・引き継ぎを宣言する。着手直後と変更範囲拡張前に重複を確認する。
+- `python scripts/omega_coordination.py` で現在のPRと実変更範囲を監査できる。共有文書はロックではない。取得失敗・古いSHA・未検証を成功扱いしない。
+- mainへの最終マージはMISSION 21の単一担当者に委ねる。他のMISSIONは直接マージしない。
+- Rust中心、必要な補助言語のみ許容する最新の実装言語方針を適用する。SolidCraft再利用は出典とライセンスを確認し、Arclet CADは開発対象外とする。
