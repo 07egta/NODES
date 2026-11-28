@@ -391,3 +391,35 @@ fn standard_polygon_area_and_centroid_survive_large_translation() {
         }
     }
 }
+
+#[test]
+fn second_standard_batch_keeps_snake_case_ids_and_evaluates() {
+    for (kind, id) in [
+        (NodeKind::MathIntDivide, "math_int_divide"),
+        (NodeKind::SetFibonacci, "set_fibonacci"),
+        (NodeKind::SetSortByKeys, "set_sort_by_keys"),
+        (NodeKind::PointCullDuplicates, "point_cull_duplicates"),
+        (NodeKind::CurveJoin, "curve_join"),
+        (NodeKind::MoveAway, "move_away"),
+        (NodeKind::MeshSplitParts, "mesh_split_parts"),
+        (NodeKind::DisplayBoundingBox, "display_bounding_box"),
+        (NodeKind::SurfaceBoundary, "surface_boundary"),
+    ] {
+        assert_eq!(node_id(kind), id);
+    }
+    let mut graph = Graph::default();
+    let fib = add(&mut graph, NodeKind::SetFibonacci);
+    set(&mut graph, fib, "count", 6.);
+    let tail = add(&mut graph, NodeKind::SetSplitTail);
+    set(&mut graph, tail, "index", 2.);
+    graph.connect(fib, tail, "list").unwrap();
+    let result = Evaluator::default().evaluate(&graph, &|| false);
+    assert_eq!(
+        numbers(result.outputs[&fib].as_ref().unwrap()),
+        vec![0., 1., 1., 2., 3., 5.]
+    );
+    assert_eq!(
+        numbers(result.outputs[&tail].as_ref().unwrap()),
+        vec![1., 2., 3., 5.]
+    );
+}

@@ -14,6 +14,7 @@ pub mod gcode_nodes;
 pub mod generative;
 pub mod genesis;
 pub mod gh_gaps;
+pub mod gh_gaps2;
 pub mod gh_nodes;
 pub mod ghx;
 pub mod graph_api;

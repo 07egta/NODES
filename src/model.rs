@@ -613,6 +613,34 @@ pub enum NodeKind {
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
+    // More standard components (`gh_gaps2`), appended.
+    MathIntDivide,
+    MathSimilar,
+    MathPi,
+    SetFibonacci,
+    SetSortByKeys,
+    SetSplitHead,
+    SetSplitTail,
+    SetStack,
+    SetSymmetricDifference,
+    SetIsSubset,
+    PointMidpoint,
+    PointCentroid,
+    PointSort,
+    PointCullDuplicates,
+    CurveSimplify,
+    CurveJoin,
+    CurveClose,
+    MoveAway,
+    CenterToOrigin,
+    MeshFaceAreas,
+    MeshFaceCenters,
+    MeshSplitParts,
+    DisplayArrow,
+    DisplayBoundingBox,
+    DisplayAxes,
+    SurfaceCorners,
+    SurfaceBoundary,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1064,6 +1092,33 @@ impl NodeKind {
             Self::ExactTorus,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
+            Self::MathIntDivide,
+            Self::MathSimilar,
+            Self::MathPi,
+            Self::SetFibonacci,
+            Self::SetSortByKeys,
+            Self::SetSplitHead,
+            Self::SetSplitTail,
+            Self::SetStack,
+            Self::SetSymmetricDifference,
+            Self::SetIsSubset,
+            Self::PointMidpoint,
+            Self::PointCentroid,
+            Self::PointSort,
+            Self::PointCullDuplicates,
+            Self::CurveSimplify,
+            Self::CurveJoin,
+            Self::CurveClose,
+            Self::MoveAway,
+            Self::CenterToOrigin,
+            Self::MeshFaceAreas,
+            Self::MeshFaceCenters,
+            Self::MeshSplitParts,
+            Self::DisplayArrow,
+            Self::DisplayBoundingBox,
+            Self::DisplayAxes,
+            Self::SurfaceCorners,
+            Self::SurfaceBoundary,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1727,6 +1782,7 @@ impl NodeKind {
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| crate::biomorph::spec(other))
                 .or_else(|| crate::gh_gaps::spec(other))
+                .or_else(|| crate::gh_gaps2::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
                 })

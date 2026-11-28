@@ -656,6 +656,8 @@ pub(crate) fn evaluate_node(
                 crate::nurbs_nodes::run_list(node.kind, &lists, cancel)?
             } else if crate::nodes_shape::is_list_kind(node.kind) {
                 crate::nodes_shape::run_list(node.kind, &lists, cancel)?
+            } else if crate::gh_gaps2::is_list_kind(node.kind) {
+                crate::gh_gaps2::run_list(node.kind, &lists, cancel)?
             } else if curve_list {
                 crate::curve_nodes::run_list(node.kind, &lists, cancel)?
             } else if list_kind {
@@ -862,6 +864,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         }
         k if crate::curve_nodes::is_curve_kind(k) => crate::curve_nodes::run_item(k, a, cancel),
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
+        k if crate::gh_gaps2::is_item_kind(k) => crate::gh_gaps2::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         GenesisScopes | GenesisScopeIds | GenesisRelief => {

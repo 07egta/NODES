@@ -61,6 +61,7 @@ pub fn uses_list_access(kind: NodeKind) -> bool {
         || crate::nodes_shape::is_list_kind(kind)
         || crate::nurbs_nodes::is_list_kind(kind)
         || crate::physics_nodes::is_list_kind(kind)
+        || crate::gh_gaps2::is_list_kind(kind)
 }
 
 /// Return the actual input-access contract, or None for a nonexistent port.
@@ -115,6 +116,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
         ListItem | CullPattern | CullIndex | ReplaceItems | InsertItems if index == 1 => List,
         ReplaceItems | InsertItems if index == 2 => List,
         MemberIndex if index == 1 => List,
+        SetSortByKeys | SetStack | SetSymmetricDifference | SetIsSubset if index <= 1 => List,
         k if uses_list_access(k) => {
             if index == 0 {
                 List
