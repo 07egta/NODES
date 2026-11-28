@@ -20,6 +20,7 @@ mod blend_vertex;
 #[cfg(test)]
 mod blend_wrong_way_tests;
 mod body;
+pub mod boolean_checked;
 mod boolean_diagnostics;
 mod boolean_guard;
 mod boolean_record;
