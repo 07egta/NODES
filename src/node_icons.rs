@@ -798,6 +798,15 @@ const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
             Part::Line(&[[0.15, 0.15], [0.15, 0.85], [0.85, 0.85]]),
         ],
     ),
+    (
+        NodeKind::Reroute,
+        &[
+            Part::Line(&[[0.08, 0.5], [0.32, 0.5]]),
+            Part::Ring([0.5, 0.5, 0.18]),
+            Part::Dot([0.5, 0.5]),
+            Part::Line(&[[0.68, 0.5], [0.92, 0.5]]),
+        ],
+    ),
     (NodeKind::ImportMesh, IMPORT),
 ];
 
