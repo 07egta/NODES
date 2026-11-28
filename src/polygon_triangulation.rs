@@ -50,14 +50,22 @@ fn intersects(a: Point2, b: Point2, c: Point2, d: Point2) -> bool {
         || (o[2].abs() <= AREA_EPS && within(c, d, a))
         || (o[3].abs() <= AREA_EPS && within(c, d, b))
 }
-fn checkpoint(predicates: &mut usize, stop: &dyn Fn() -> bool) -> Result<(), String> {
+fn checkpoint(
+    predicates: &mut usize,
+    remaining: &mut usize,
+    stop: &dyn Fn() -> bool,
+) -> Result<(), String> {
     if (*predicates).is_multiple_of(512) && stop() {
         return Err("計算を停止しました。".into());
     }
-    *predicates += 1;
-    if *predicates > MAX_PREDICATES {
+    if *predicates >= MAX_PREDICATES {
         return Err("多角形の三角形分割が計算量上限を超えました。面を分割してください。".into());
     }
+    if *remaining == 0 {
+        return Err("OBJ 全体の三角形分割が計算量上限を超えました。ファイルを分割してください。".into());
+    }
+    *predicates += 1;
+    *remaining -= 1;
     Ok(())
 }
 
@@ -66,11 +74,21 @@ fn checkpoint(predicates: &mut usize, stop: &dyn Fn() -> bool) -> Result<(), Str
 /// The final point must not repeat the first. The planarity tolerance is 1e-9
 /// times the largest local coordinate extent; original coordinates are retained.
 pub fn triangulate(points: &[Point], stop: &dyn Fn() -> bool) -> Result<Vec<[usize; 3]>, String> {
+    let mut remaining = MAX_PREDICATES;
+    triangulate_with_budget(points, stop, &mut remaining)
+}
+
+/// Also charge the caller\u0027s shared budget for a sequence of polygons.
+pub(crate) fn triangulate_with_budget(
+    points: &[Point],
+    stop: &dyn Fn() -> bool,
+    remaining: &mut usize,
+) -> Result<Vec<[usize; 3]>, String> {
     if !(3..=MAX_POLYGON_VERTICES).contains(&points.len()) {
         return Err("多角形の頂点数は 3 〜 2048 にしてください。".into());
     }
     let mut work = 0;
-    checkpoint(&mut work, stop)?;
+    checkpoint(&mut work, remaining, stop)?;
     if points
         .iter()
         .flatten()
@@ -135,7 +153,7 @@ pub fn triangulate(points: &[Point], stop: &dyn Fn() -> bool) -> Result<Vec<[usi
             return Err("多角形の隣り合う辺が重なっています。".into());
         }
         for j in i + 1..n {
-            checkpoint(&mut work, stop)?;
+            checkpoint(&mut work, remaining, stop)?;
             let jnext = (j + 1) % n;
             if next != j && jnext != i && intersects(p, q, projected[j], projected[jnext]) {
                 return Err(
@@ -149,7 +167,7 @@ pub fn triangulate(points: &[Point], stop: &dyn Fn() -> bool) -> Result<Vec<[usi
     while ring.len() > 3 {
         let mut ear = None;
         for k in 0..ring.len() {
-            checkpoint(&mut work, stop)?;
+            checkpoint(&mut work, remaining, stop)?;
             let a = ring[(k + ring.len() - 1) % ring.len()];
             let b = ring[k];
             let c = ring[(k + 1) % ring.len()];
@@ -158,7 +176,7 @@ pub fn triangulate(points: &[Point], stop: &dyn Fn() -> bool) -> Result<Vec<[usi
             }
             let mut contains = false;
             for &v in &ring {
-                checkpoint(&mut work, stop)?;
+                checkpoint(&mut work, remaining, stop)?;
                 if v == a || v == b || v == c {
                     continue;
                 }
@@ -186,7 +204,7 @@ pub fn triangulate(points: &[Point], stop: &dyn Fn() -> bool) -> Result<Vec<[usi
     }
     triangles.push([ring[0], ring[1], ring[2]]);
     for &[a, b, c] in &triangles {
-        checkpoint(&mut work, stop)?;
+        checkpoint(&mut work, remaining, stop)?;
         let physical_cross = cross(sub(points[b], points[a]), sub(points[c], points[a]));
         if winding * orient(projected[a], projected[b], projected[c]) <= AREA_EPS
             || dot(physical_cross, physical_cross).sqrt() < MIN_CROSS
