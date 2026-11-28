@@ -96,6 +96,32 @@ impl Key {
     }
 }
 
+// Reuse a dependency revision only when equality is exact. Derived PartialEq
+// treats +0.0 and -0.0 as equal; downstream numeric operations can distinguish
+// them. Geometry payloads are shared and immutable, so pointer identity is
+// sufficient; never perform expensive or approximate deep geometry comparisons.
+fn same_output(a: &Tree, b: &Tree) -> bool {
+    a.branches.len() == b.branches.len()
+        && a.branches.iter().zip(&b.branches).all(|((pa, va), (pb, vb))| {
+            pa == pb
+                && va.len() == vb.len()
+                && va.iter().zip(vb).all(|(a, b)| match (a, b) {
+                    (Value::Number(a), Value::Number(b)) => a.to_bits() == b.to_bits(),
+                    (Value::Point(a), Value::Point(b)) => {
+                        a.iter().zip(b).all(|(a, b)| a.to_bits() == b.to_bits())
+                    }
+                    (Value::Curve(a), Value::Curve(b)) => Arc::ptr_eq(a, b),
+                    (Value::Mesh(a), Value::Mesh(b)) => Arc::ptr_eq(a, b),
+                    (Value::Surface(a), Value::Surface(b)) => Arc::ptr_eq(a, b),
+                    (Value::Solid(a), Value::Solid(b)) => Arc::ptr_eq(a, b),
+                    (Value::Brep(a), Value::Brep(b)) => Arc::ptr_eq(a, b),
+                    (Value::Cage(a), Value::Cage(b)) => Arc::ptr_eq(a, b),
+                    (Value::Gcode(a), Value::Gcode(b)) => Arc::ptr_eq(a, b),
+                    _ => false,
+                })
+        })
+}
+
 struct Cache {
     key: Key,
     revision: u64,
@@ -302,9 +328,25 @@ impl Evaluator {
                 let (result, revision, is_cached, weight) = match (slot.hit, slot.fresh) {
                     (Some((r, rev, weight)), _) => (r, rev, true, weight),
                     (None, Some(r)) => {
-                        self.revision = self.revision.wrapping_add(1).max(1);
                         let weight = r.as_ref().map(Tree::weight).unwrap_or(0);
-                        (r, self.revision, false, weight)
+                        // A changed input does not necessarily change the output (e.g.
+                        // multiplication by zero). Keep the old dependency revision
+                        // when the complete successful result is exactly unchanged.
+                        // Errors, evicted entries and new geometry remain conservative.
+                        let unchanged = self.cache.get(&id).and_then(|old| {
+                            if old.weight != weight {
+                                return None;
+                            }
+                            match (&old.result, &r) {
+                                (Ok(a), Ok(b)) if same_output(a, b) => Some(old.revision),
+                                _ => None,
+                            }
+                        });
+                        let revision = unchanged.unwrap_or_else(|| {
+                            self.revision = self.revision.wrapping_add(1).max(1);
+                            self.revision
+                        });
+                        (r, revision, false, weight)
                     }
                     (None, None) => {
                         out.cancelled = true;

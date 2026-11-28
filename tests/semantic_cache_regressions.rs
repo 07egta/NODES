@@ -61,3 +61,33 @@ fn gcode_start_and_end_text_edits_propagate() {
         assert!(!warm.node_timings[&end].cached);
     }
 }
+
+#[test]
+fn sketch_text_edits_invalidate_geometry_and_recover_from_errors() {
+    let mut graph = Graph::default();
+    let sketch = graph.add(NodeKind::ExactSketch, [0., 0.]).unwrap();
+    let node = graph.node_mut(sketch).unwrap();
+    node.params.insert("mode".into(), 1.);
+    node.script = "line l 0 0 10 0".into();
+
+    let mut evaluator = Evaluator::default();
+    let before = evaluator.evaluate(&graph, &|| false);
+    assert!(before.outputs[&sketch].is_ok());
+    assert_eq!(evaluator.evaluate(&graph, &|| false).cached, 1);
+
+    graph.node_mut(sketch).unwrap().script = "line l 0 0 20 0".into();
+    let after = evaluator.evaluate(&graph, &|| false);
+    let cold = Evaluator::default().evaluate(&graph, &|| false);
+    assert!(after.outputs[&sketch].is_ok());
+    assert_ne!(before.outputs[&sketch], after.outputs[&sketch]);
+    assert_eq!(after.outputs, cold.outputs);
+    assert_eq!((after.computed, after.cached), (1, 0));
+
+    graph.node_mut(sketch).unwrap().script = "invalid command".into();
+    let invalid = evaluator.evaluate(&graph, &|| false);
+    assert!(invalid.outputs[&sketch].is_err());
+    graph.node_mut(sketch).unwrap().script = "line l 0 0 20 0".into();
+    let recovered = evaluator.evaluate(&graph, &|| false);
+    assert_eq!(recovered.outputs, cold.outputs);
+    assert!(recovered.outputs[&sketch].is_ok());
+}
