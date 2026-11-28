@@ -335,7 +335,8 @@ impl ParameterTable {
                 return Err(format!("{}: 許容範囲が無効です。", p.name));
             }
             if let Source::Formula { expression } = &p.source {
-                let formula = compile_formula(expression).map_err(|e| format!("{}: {e}", p.name))?;
+                let formula =
+                    compile_formula(expression).map_err(|e| format!("{}: {e}", p.name))?;
                 formulas.insert(p.name.as_str(), formula);
             }
         }
@@ -432,7 +433,10 @@ impl ParameterTable {
                 return Err(CANCELLED.into());
             }
             if !targets.insert(binding.node_id) {
-                return Err(format!("ノード {} に複数の割り当てがあります。", binding.node_id));
+                return Err(format!(
+                    "ノード {} に複数の割り当てがあります。",
+                    binding.node_id
+                ));
             }
             let value = values
                 .get(&binding.parameter)
@@ -446,7 +450,10 @@ impl ParameterTable {
                 || node.off
                 || node.inputs.contains_key("value")
             {
-                return Err(format!("ノード {} は編集可能な数値ノードではありません。", node.id));
+                return Err(format!(
+                    "ノード {} は編集可能な数値ノードではありません。",
+                    node.id
+                ));
             }
             let spec = node
                 .kind
