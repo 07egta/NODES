@@ -17,6 +17,7 @@ pub enum FileTask {
     Save,
     ExportStl,
     ExportObj,
+    ExportPly,
     ExportGcode,
     ExportThreeMf,
     ExportStep,
@@ -42,6 +43,7 @@ impl FileTask {
             Self::Save => "作品を保存",
             Self::ExportStl => "STL に書き出す",
             Self::ExportObj => "OBJ に書き出す",
+            Self::ExportPly => "PLY に書き出す",
             Self::ExportGcode => "G-code に書き出す",
             Self::ExportThreeMf => "3MF に書き出す",
             Self::ExportStep => "STEP を保存",
@@ -58,6 +60,7 @@ impl FileTask {
             Self::Open | Self::Save => "morph",
             Self::ExportStl | Self::ImportMesh => "stl",
             Self::ExportObj => "obj",
+            Self::ExportPly => "ply",
             Self::ExportGcode => "gcode",
             Self::ExportThreeMf => "3mf",
             Self::ExportStep | Self::ImportStep => "step",
@@ -71,7 +74,10 @@ impl FileTask {
         match self {
             Self::ImportMesh => has_extension(path, "stl") || has_extension(path, "obj"),
             Self::ExportStep | Self::ImportStep => {
-                has_extension(path, "step") || has_extension(path, "stp")
+                has_extension(path, "step")
+                    || has_extension(path, "stp")
+                    || has_extension(path, "iges")
+                    || has_extension(path, "igs")
             }
             other => has_extension(path, other.extension()),
         }
@@ -83,9 +89,10 @@ impl FileTask {
             Self::Open | Self::Save => ".morph",
             Self::ExportStl => ".stl",
             Self::ExportObj => ".obj",
+            Self::ExportPly => ".ply",
             Self::SavePart | Self::LoadPart => ".morphpart",
             Self::ImportMesh => ".stl / .obj",
-            Self::ExportStep | Self::ImportStep => ".step / .stp",
+            Self::ExportStep | Self::ImportStep => ".step / .stp / .iges / .igs",
             Self::ExportGcode => ".gcode",
             Self::ExportThreeMf => ".3mf",
             Self::PickSlicer => ".exe",
@@ -100,6 +107,7 @@ impl FileTask {
             Self::PickSlicer => "選ぶ",
             Self::ExportStl
             | Self::ExportObj
+            | Self::ExportPly
             | Self::ExportGcode
             | Self::ExportThreeMf
             | Self::ExportStep

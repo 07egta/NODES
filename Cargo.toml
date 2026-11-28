@@ -21,10 +21,11 @@ rhai = { version = "=1.27.0", default-features = false, features = ["std", "no_m
 # See docs/SOLIDCRAFT_CHANGES.md and src/kernel_bridge.rs.
 solidcraft-geom = { path = "crates/sc-geom" }
 solidcraft-kernel = { path = "crates/sc-kernel" }
+solidcraft-sketch = { path = "crates/sc-sketch" }
 
 [workspace]
 resolver = "3"
-members = [".", "crates/sc-geom", "crates/sc-kernel"]
+members = [".", "crates/sc-geom", "crates/sc-kernel", "crates/sc-sketch"]
 # Third-party truck crates kept with SolidCraft's local fixes (vendor/README.md); not linted as ours.
 exclude = ["vendor"]
 
@@ -52,6 +53,10 @@ opt-level = 2
 debug-assertions = false
 
 [profile.dev.package.solidcraft-geom]
+opt-level = 2
+debug-assertions = false
+
+[profile.dev.package.solidcraft-sketch]
 opt-level = 2
 debug-assertions = false
 

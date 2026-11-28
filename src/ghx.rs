@@ -795,11 +795,16 @@ impl<W: Write> Write for BoundedWriter<W> {
     }
 }
 
+/// Load and convert a GHX file without writing or evaluating the native project.
+pub fn convert_path(input: &Path) -> Res<Project> {
+    convert(&read_ghx(input)?)
+}
+
 pub fn convert_file(input: &Path, output: &Path) -> Res<()> {
     if !extension(output, "morph") {
         return Err("conversion output must be .morph".into());
     }
-    let project = convert(&read_ghx(input)?)?;
+    let project = convert_path(input)?;
     persistence::save(output, &project)
 }
 
