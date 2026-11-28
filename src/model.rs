@@ -625,6 +625,9 @@ pub enum NodeKind {
     ExactDiagnose,
     SubdTsplinePatch,
     ExactThicken,
+    // OMEGA 82: explicit domain remap and native-domain evaluation.
+    CurveReparameterize,
+    CurveEvaluateDomain,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1088,6 +1091,8 @@ impl NodeKind {
             Self::ExactDiagnose,
             Self::SubdTsplinePatch,
             Self::ExactThicken,
+            Self::CurveReparameterize,
+            Self::CurveEvaluateDomain,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
