@@ -225,6 +225,56 @@ impl NurbsCurve {
     pub fn domain(&self) -> [f64; 2] {
         [self.knots[self.degree], self.knots[self.h.len()]]
     }
+    /// Affinely change the native knot domain without moving homogeneous controls.
+    /// Reject intervals that collapse or materially distort distinct knot spans.
+    /// This is not arc-length parameterization.
+    pub fn reparameterized(&self, start: f64, end: f64) -> R<Self> {
+        let [lo, hi] = self.domain();
+        let old_span = hi - lo;
+        let new_span = end - start;
+        if !start.is_finite() || !end.is_finite() || !new_span.is_finite() || new_span <= 0. {
+            return Err("新しい曲線区間は有限で始点より終点が大きい必要があります。".into());
+        }
+        if [start, end] == [lo, hi] {
+            return Ok(self.clone());
+        }
+        let knots: Vec<_> = self
+            .knots
+            .iter()
+            .map(|&k| {
+                if k == lo {
+                    start
+                } else if k == hi {
+                    end
+                } else {
+                    ((k - lo) / old_span).mul_add(new_span, start)
+                }
+            })
+            .collect();
+        if knots.iter().any(|k| !k.is_finite()) {
+            return Err("ノットの区間変換が有限ではありません。".into());
+        }
+        for (old, new) in self.knots.windows(2).zip(knots.windows(2)) {
+            if old[0] == old[1] {
+                continue;
+            }
+            let a = (old[1] - old[0]) / old_span;
+            let b = (new[1] - new[0]) / new_span;
+            // A large offset or tiny span may destroy local knot spacing even
+            // when the mapped endpoints remain distinct.
+            if !a.is_finite()
+                || !b.is_finite()
+                || a <= 0.
+                || b <= 0.
+                || (b / a - 1.).abs() > 1e-8
+            {
+                return Err("区間変換でノット間隔の精度を維持できません。".into());
+            }
+        }
+        let mut mapped = self.clone();
+        mapped.knots = knots;
+        Ok(mapped)
+    }
     fn homogeneous(&self, t: f64) -> H {
         deboor(self.degree, self.h.len(), &self.knots, t, |j| self.h[j])
     }
@@ -456,6 +506,34 @@ impl CurveGeometry {
             c.periodic()
                 && (self.interval == c.domain() || self.interval == [c.domain()[1], c.domain()[0]])
         })
+    }
+    /// Reparameterize a complete, forward-oriented mathematical NURBS.
+    /// Trimmed/reversed intervals and analytic helices are deliberately rejected
+    /// rather than silently replacing them with a sampled polyline.
+    pub fn reparameterized(&self, start: f64, end: f64) -> R<Self> {
+        let n = self
+            .as_nurbs()
+            .ok_or("区間変更は完全な NURBS 曲線に対応しています。")?;
+        if self.interval != n.domain() {
+            return Err("トリム済み・反転済み曲線の区間変更は未対応です。".into());
+        }
+        Ok(Self::nurbs(n.reparameterized(start, end)?))
+    }
+    /// Evaluate in the oriented native domain. Existing point(t) remains normalized.
+    pub fn point_in_domain(&self, t: f64) -> R<Point3> {
+        let [a, b] = self.interval;
+        check_t(t, a.min(b), a.max(b))?;
+        if t == a {
+            return self.point(0.);
+        }
+        if t == b {
+            return self.point(1.);
+        }
+        let span = b - a;
+        if !span.is_finite() || span == 0. {
+            return Err("曲線の区間が無効です。".into());
+        }
+        self.point((t - a) / span)
     }
     /// Exact rational conic arc from center and two radial axes; sweep radians, <= one turn.
     pub fn arc(center: Point3, x: Point3, y: Point3, start: f64, sweep: f64) -> R<Self> {
