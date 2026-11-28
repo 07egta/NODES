@@ -71,7 +71,21 @@ impl Element {
 
     fn field(&self, name: &str) -> Res<Option<&str>> {
         match self.item(name)? {
-            Some(e) if e.children.is_empty() => Ok(Some(e.text.trim())),
+            Some(e) if e.children.is_empty() => {
+                let expected: &[i32] = match name {
+                    "GUID" | "InstanceGuid" | "Lib" => &[9],
+                    "Name" | "NickName" | "Path" => &[10],
+                    "Hidden" | "Locked" | "ToggleValue" => &[1],
+                    "Count" | "ObjectCount" | "SourceCount" | "ID_Count"
+                    | "InputCount" | "OutputCount" => &[3],
+                    "Min" | "Max" | "Value" | "number" => &[3, 4, 5, 6, 7],
+                    _ => &[],
+                };
+                if !expected.is_empty() {
+                    expect_type(e, expected)?;
+                }
+                Ok(Some(e.text.trim()))
+            }
             Some(_) => Err(format!("expected scalar item {name}")),
             None => Ok(None),
         }
@@ -172,7 +186,140 @@ fn xml_tree(bytes: &[u8]) -> Res<Element> {
     if root.tag != "Archive" {
         return Err("expected a GHX Archive".into());
     }
+    validate_archive_structure(&root)?;
     Ok(root)
+}
+
+// Public GH_IO GH_Types identifiers. Unknown identifiers are retained as opaque
+// XML; a recognized name/code contradiction is never interpreted as data.
+fn type_name(code: i32) -> Option<&'static str> {
+    Some(match code {
+        0 => "unset",
+        1 => "gh_bool",
+        2 => "gh_byte",
+        3 => "gh_int32",
+        4 => "gh_int64",
+        5 => "gh_single",
+        6 => "gh_double",
+        7 => "gh_decimal",
+        8 => "gh_date",
+        9 => "gh_guid",
+        10 => "gh_string",
+        20 => "gh_bytearray",
+        21 => "gh_doublearray",
+        30 => "gh_drawing_point",
+        31 => "gh_drawing_pointf",
+        32 => "gh_drawing_size",
+        33 => "gh_drawing_sizef",
+        34 => "gh_drawing_rectangle",
+        35 => "gh_drawing_rectanglef",
+        36 => "gh_drawing_color",
+        37 => "gh_drawing_bitmap",
+        50 => "gh_point2d",
+        51 => "gh_point3d",
+        52 => "gh_point4d",
+        60 => "gh_interval1d",
+        61 => "gh_interval2d",
+        70 => "gh_line",
+        71 => "gh_boundingbox",
+        72 => "gh_plane",
+        80 => "gh_version",
+        _ => return None,
+    })
+}
+
+fn type_code(e: &Element) -> Res<Option<i32>> {
+    e.attributes
+        .get("type_code")
+        .map(|v| v.parse::<i32>().map_err(|_| "invalid GHX type_code".into()))
+        .transpose()
+}
+
+fn expect_type(e: &Element, expected: &[i32]) -> Res<()> {
+    if let Some(code) = type_code(e)?
+        && !expected.contains(&code)
+    {
+        return Err(format!("unexpected type_code for {}", e.name()));
+    }
+    if let Some(name) = e.attributes.get("type_name")
+        && !expected.iter().any(|&code| type_name(code) == Some(name.as_str()))
+    {
+        return Err(format!("unexpected type_name for {}", e.name()));
+    }
+    // Old synthetic fixtures omit both attributes; do not invent them.
+    Ok(())
+}
+
+fn validate_archive_structure(root: &Element) -> Res<()> {
+    let mut pending = vec![root];
+    while let Some(chunk) = pending.pop() {
+        let mut wrappers = BTreeSet::new();
+        for wrapper in &chunk.children {
+            let item_tag = match wrapper.tag.as_str() {
+                "chunks" => "chunk",
+                "items" => "item",
+                // Unfamiliar extension elements remain opaque in source_xml.
+                _ => continue,
+            };
+            if !wrappers.insert(wrapper.tag.as_str()) {
+                return Err(format!("duplicate {} wrapper", wrapper.tag));
+            }
+            if let Some(count) = wrapper.attributes.get("count")
+                && count.parse::<usize>().ok() != Some(wrapper.children.len())
+            {
+                return Err(format!("inconsistent {} count", wrapper.tag));
+            }
+            let mut keys = BTreeSet::new();
+            for entry in &wrapper.children {
+                if entry.tag != item_tag || entry.name().is_empty() {
+                    return Err(format!("invalid {} entry", wrapper.tag));
+                }
+                // GH_IO names are case-insensitive; negative indices mean unindexed.
+                let index = match entry.attributes.get("index") {
+                    Some(value) => {
+                        let value: i32 = value.parse().map_err(|_| "invalid GHX index")?;
+                        (value >= 0).then_some(value)
+                    }
+                    None => None,
+                };
+                if !keys.insert((entry.name().to_ascii_lowercase(), index)) {
+                    return Err(format!("duplicate GHX identifier {}", entry.name()));
+                }
+                if item_tag == "chunk" {
+                    pending.push(entry);
+                } else if let Some(code) = type_code(entry)?
+                    && let Some(name) = entry.attributes.get("type_name")
+                {
+                    let known_name = (0..=80).any(|v| type_name(v) == Some(name.as_str()));
+                    if (type_name(code).is_some() || known_name)
+                        && type_name(code) != Some(name.as_str())
+                    {
+                        return Err(format!("contradictory GHX type for {}", entry.name()));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn archive_version(root: &Element) -> Res<Option<[u32; 3]>> {
+    let Some(version) = root.item("ArchiveVersion")? else {
+        return Ok(None);
+    };
+    expect_type(version, &[80])?;
+    if version.children.len() != 3 || !version.text.trim().is_empty() {
+        return Err("invalid ArchiveVersion structure".into());
+    }
+    let field = |tag: &str| -> Res<u32> {
+        let e = unique(version.children.iter().filter(|e| e.tag == tag), tag)?
+            .ok_or("missing archive version field")?;
+        if !e.children.is_empty() {
+            return Err("invalid archive version field".into());
+        }
+        e.text.trim().parse().map_err(|_| "invalid archive version number".into())
+    };
+    Ok(Some([field("Major")?, field("Minor")?, field("Revision")?]))
 }
 
 fn guid(s: &str) -> Res<String> {
@@ -216,6 +363,11 @@ fn position(e: &Element) -> Res<Option<[f32; 2]>> {
     let Some(pivot) = attr.item("Pivot")?.or(attr.item("Bounds")?) else {
         return Ok(None);
     };
+    if pivot.name() == "Pivot" {
+        expect_type(pivot, &[30, 31])?;
+    } else {
+        expect_type(pivot, &[34, 35])?;
+    }
     let coord = |tag| -> Res<f32> {
         let v = finite(
             &unique(pivot.children.iter().filter(|v| v.tag == tag), tag)?
@@ -256,6 +408,7 @@ fn refs(e: &Element, name: &str, count_name: &str) -> Res<Vec<String>> {
             if !item.children.is_empty() {
                 return Err("invalid GUID item".into());
             }
+            expect_type(item, &[9])?;
             guid(&item.text)
         })
         .collect()
@@ -268,8 +421,66 @@ pub struct Port {
     pub name: String,
     pub nickname: String,
     pub sources: Vec<String>,
+    // Component type of the parameter, distinct from its instance GUID.
+    pub parameter_type_guid: Option<String>,
+    pub persistent_tree: Option<PersistentTree>,
     // Serialized GHX settings and persistent data; no deserialization into executable values.
     details: Element,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum PersistentTree {
+    Recognized { branches: Vec<PersistentBranch> },
+    Opaque { reason: String },
+}
+
+#[derive(Debug, Serialize)]
+pub struct PersistentBranch {
+    pub path: String,
+    pub item_count: usize,
+}
+
+fn persistent_tree(e: &Element) -> Res<Option<PersistentTree>> {
+    let Some(tree) = e.chunk("PersistentData")? else {
+        return Ok(None);
+    };
+    let parse = || -> Res<Vec<PersistentBranch>> {
+        allowed(tree, &["Count"], &["Branch"])?;
+        let entries = indexed(tree.chunks())?;
+        if tree.required("Count")?.parse::<usize>().ok() != Some(entries.len()) {
+            return Err("inconsistent persistent branch count".into());
+        }
+        let mut branches = Vec::new();
+        let mut paths = BTreeSet::new();
+        for branch in entries {
+            allowed(branch, &["Count", "Path"], &["Item"])?;
+            let path = branch.required("Path")?;
+            let inner = path.strip_prefix('{').and_then(|p| p.strip_suffix('}'))
+                .ok_or("unrecognized persistent path")?;
+            let normalized = inner.split(';').map(|p| {
+                p.parse::<i32>().ok().filter(|&n| n >= 0).ok_or("invalid path index")
+            }).collect::<Result<Vec<_>, _>>()?;
+            if !paths.insert(normalized) {
+                return Err("duplicate persistent branch path".into());
+            }
+            let items = indexed(branch.chunks())?;
+            if branch.required("Count")?.parse::<usize>().ok() != Some(items.len()) {
+                return Err("inconsistent persistent item count".into());
+            }
+            branches.push(PersistentBranch {
+                path: path.into(),
+                item_count: items.len(),
+            });
+        }
+        Ok(branches)
+    };
+    // Raw items are already retained in Port.details, including unknown types
+    // and explicit null-like values. This is a structural summary, not evaluation.
+    Ok(Some(match parse() {
+        Ok(branches) => PersistentTree::Recognized { branches },
+        Err(reason) => PersistentTree::Opaque { reason },
+    }))
 }
 
 fn port(e: &Element, index: Option<usize>) -> Res<Port> {
@@ -279,8 +490,56 @@ fn port(e: &Element, index: Option<usize>) -> Res<Port> {
         name: e.field("Name")?.unwrap_or("").into(),
         nickname: e.field("NickName")?.unwrap_or("").into(),
         sources: refs(e, "Source", "SourceCount")?,
+        parameter_type_guid: None,
+        persistent_tree: persistent_tree(e)?,
         details: e.clone(),
     })
+}
+
+// Parse modern dynamic parameter layouts as well as the historical direct
+// chunks. Mixed or incomplete identities must not produce invented wires.
+fn component_ports(c: &Element) -> Res<(Vec<Port>, Vec<Port>, bool)> {
+    let modern = c.chunk("ParameterData")?;
+    if modern.is_some()
+        && c.chunks().any(|e| matches!(e.name(), "param_input" | "param_output"))
+    {
+        return Err("mixed GHX port layouts".into());
+    }
+    let (parent, input, output) = match modern {
+        Some(data) => (data, "InputParam", "OutputParam"),
+        None => (c, "param_input", "param_output"),
+    };
+    let collect_ports = |tag: &str| -> Res<Vec<Port>> {
+        indexed(parent.chunks().filter(|e| e.name() == tag))?
+            .into_iter()
+            .enumerate()
+            .map(|(i, e)| port(e, Some(i)))
+            .collect()
+    };
+    let mut inputs = collect_ports(input)?;
+    let mut outputs = collect_ports(output)?;
+    if let Some(data) = modern {
+        for (ports, key, count) in [
+            (&mut inputs, "InputId", "InputCount"),
+            (&mut outputs, "OutputId", "OutputCount"),
+        ] {
+            if let Some(value) = data.field(count)?
+                && value.parse::<usize>().ok() != Some(ports.len())
+            {
+                return Err(format!("inconsistent {count}"));
+            }
+            if data.items().any(|item| item.name() == key) {
+                let types = refs(data, key, count)?;
+                if types.len() != ports.len() {
+                    return Err(format!("inconsistent {key} count"));
+                }
+                for (port, type_guid) in ports.iter_mut().zip(types) {
+                    port.parameter_type_guid = Some(type_guid);
+                }
+            }
+        }
+    }
+    Ok((inputs, outputs, modern.is_some()))
 }
 
 #[derive(Debug, Serialize)]
@@ -296,6 +555,7 @@ pub struct Object {
     pub toggle_value: Option<bool>,
     pub panel_text: Option<String>,
     pub group_members: Vec<String>,
+    pub parameter_data_layout: bool,
     pub inputs: Vec<Port>,
     pub outputs: Vec<Port>,
     pub candidate_node: Option<NodeKind>,
@@ -315,6 +575,7 @@ pub struct Connection {
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub format: &'static str,
+    pub archive_version: Option<[u32; 3]>,
     pub objects: Vec<Object>,
     pub connections: Vec<Connection>,
     pub diagnostics: Vec<String>,
@@ -333,6 +594,7 @@ fn candidate(guid: &str) -> Option<NodeKind> {
 
 pub fn inspect(bytes: &[u8]) -> Res<Report> {
     let root = xml_tree(bytes)?;
+    let version = archive_version(&root)?;
     let definition = root.chunk("Definition")?.ok_or("missing Definition")?;
     let direct = definition.chunk("DefinitionObjects")?;
     let nested = match definition.chunk("DefinitionProperties")? {
@@ -358,6 +620,11 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
     allowed(collection, &["ObjectCount"], &["Object"])?;
     let mut objects = Vec::new();
     let mut diagnostics = Vec::new();
+    if let Some(v) = version
+        && v != [0, 2, 2]
+    {
+        diagnostics.push(format!("unverified GHX archive version {}.{}.{}", v[0], v[1], v[2]));
+    }
     for (index, obj) in entries.into_iter().enumerate() {
         let c = obj.chunk("Container")?.ok_or("missing object Container")?;
         let component_guid = guid(obj.required("GUID")?)?;
@@ -368,23 +635,27 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
             .unwrap_or("")
             .to_string();
         let nickname = c.field("NickName")?.unwrap_or("").to_string();
-        let mut inputs: Vec<Port> = indexed(c.chunks().filter(|e| e.name() == "param_input"))?
-            .into_iter()
-            .enumerate()
-            .map(|(i, e)| port(e, Some(i)))
-            .collect::<Res<_>>()?;
-        let mut outputs: Vec<Port> = indexed(c.chunks().filter(|e| e.name() == "param_output"))?
-            .into_iter()
-            .enumerate()
-            .map(|(i, e)| port(e, Some(i)))
-            .collect::<Res<_>>()?;
+        let (mut inputs, mut outputs, parameter_data_layout) = component_ports(c)?;
+        if parameter_data_layout {
+            diagnostics.push(format!(
+                "ParameterData layout on object #{index}; inspection only until parameter type and evaluator equivalence are verified"
+            ));
+        }
         let group_members = refs(c, "ID", "ID_Count")?;
         // Stand-alone parameter objects identify their sources/outputs by their own GUID.
         let direct_sources = refs(c, "Source", "SourceCount")?;
         if !direct_sources.is_empty() {
+            if parameter_data_layout || !inputs.is_empty() || !outputs.is_empty() {
+                return Err("mixed stand-alone and component port sources".into());
+            }
             inputs.push(port(c, None)?);
         }
-        if outputs.is_empty() && name != "Group" {
+        if outputs.is_empty()
+            && !parameter_data_layout
+            && !c.chunks().any(|e| matches!(e.name(), "param_input" | "param_output"))
+            && name != "Group"
+            && (c.item("SourceCount")?.is_some() || component_guid == SLIDER)
+        {
             let mut standalone = port(c, None)?;
             standalone.sources.clear();
             outputs.push(standalone);
@@ -411,6 +682,7 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
             toggle_value: bool_field(c, "ToggleValue")?,
             panel_text: c.item("UserText")?.map(|e| e.text.clone()),
             group_members,
+            parameter_data_layout,
             inputs,
             outputs,
             candidate_node,
@@ -494,6 +766,7 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
     }
     Ok(Report {
         format: "nodes-ghx-inspection-v1",
+        archive_version: version,
         objects,
         connections,
         diagnostics,
@@ -863,16 +1136,94 @@ mod tests {
     #[test]
     fn unexpected_tree_settings_and_multiple_wires_are_not_silently_converted() {
         let text = std::str::from_utf8(SAMPLE).unwrap();
-        let graft = text.replace(
+        let expanded = text.replace(
+            "<chunk name=\"param_input\" index=\"0\"><items count=\"4\">",
+            "<chunk name=\"param_input\" index=\"0\"><items count=\"5\">",
+        );
+        let graft = expanded.replace(
             "<item name=\"Name\">X</item>",
             "<item name=\"Name\">X</item><item name=\"DataMapping\">2</item>",
         );
         assert!(inspect(graft.as_bytes()).is_ok());
         assert!(convert(graft.as_bytes()).is_err());
-        let multi = text.replace("<item name=\"SourceCount\">1</item>",
+        let multi = expanded.replace("<item name=\"SourceCount\">1</item>",
             "<item name=\"SourceCount\">2</item><item name=\"Source\" index=\"1\">11111111-1111-1111-1111-111111111111</item>");
         assert_eq!(inspect(multi.as_bytes()).unwrap().connections.len(), 2);
         assert!(convert(multi.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn archive_version_and_typed_items() {
+        let text = std::str::from_utf8(SAMPLE).unwrap();
+        let versioned = text.replace(
+            "<Archive name=\"Root\">",
+            "<Archive name=\"Root\"><items count=\"1\"><item name=\"ArchiveVersion\" type_name=\"gh_version\" type_code=\"80\"><Major>0</Major><Minor>2</Minor><Revision>2</Revision></item></items>",
+        );
+        assert_eq!(inspect(versioned.as_bytes()).unwrap().archive_version, Some([0, 2, 2]));
+        let future = versioned.replace("<Revision>2</Revision>", "<Revision>99</Revision>");
+        assert!(inspect(future.as_bytes()).is_ok());
+        assert!(convert(future.as_bytes()).is_err());
+        let wrong = text.replace("<item name=\"GUID\">", "<item name=\"GUID\" type_name=\"gh_string\" type_code=\"10\">");
+        assert!(inspect(wrong.as_bytes()).is_err());
+        let contradictory = text.replace("<item name=\"GUID\">", "<item name=\"GUID\" type_name=\"gh_guid\" type_code=\"10\">");
+        assert!(inspect(contradictory.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn modern_ports_preserve_ids_and_wires_without_claiming_conversion() {
+        let text = std::str::from_utf8(SAMPLE).unwrap();
+        let modern = text
+            .replace("<chunks count=\"5\"><chunk name=\"Attributes\">", "<chunks count=\"2\"><chunk name=\"Attributes\">")
+            .replace("<chunk name=\"param_input\" index=\"0\">", "<chunk name=\"ParameterData\"><items count=\"6\"><item name=\"InputCount\">3</item><item name=\"InputId\" index=\"0\">aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa</item><item name=\"InputId\" index=\"1\">aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa</item><item name=\"InputId\" index=\"2\">aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa</item><item name=\"OutputCount\">1</item><item name=\"OutputId\" index=\"0\">bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb</item></items><chunks count=\"4\"><chunk name=\"InputParam\" index=\"0\">")
+            .replace("name=\"param_input\"", "name=\"InputParam\"")
+            .replace("name=\"param_output\"", "name=\"OutputParam\"")
+            .replace("<chunks count=\"0\"></chunks></chunk></chunks></chunk></chunks></chunk></chunks></chunk></chunks></chunk></chunks></Archive>", "<chunks count=\"0\"></chunks></chunk></chunks></chunk></chunks></chunk></chunks></chunk></chunks></chunk></chunks></chunk></chunks></Archive>");
+        let report = inspect(modern.as_bytes()).unwrap();
+        assert!(report.objects[1].parameter_data_layout);
+        assert_eq!(report.objects[1].inputs.len(), 3);
+        assert_eq!(report.objects[1].outputs.len(), 1);
+        assert_eq!(report.objects[1].inputs[0].parameter_type_guid.as_deref(), Some("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        assert_eq!(report.connections[0].source_object, Some(0));
+        assert_eq!(report.connections[0].target_port, Some(0));
+        assert!(convert(modern.as_bytes()).is_err());
+        let bad_count = modern.replace("<item name=\"InputCount\">3</item>", "<item name=\"InputCount\">4</item>");
+        assert!(inspect(bad_count.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn persistent_branch_summary_and_structural_validation() {
+        let report = inspect(SAMPLE).unwrap();
+        match report.objects[1].inputs[1].persistent_tree.as_ref().unwrap() {
+            PersistentTree::Recognized { branches } => {
+                assert_eq!(branches[0].path, "{0}");
+                assert_eq!(branches[0].item_count, 1);
+            }
+            _ => panic!("expected recognized persistent tree"),
+        }
+        let text = std::str::from_utf8(SAMPLE).unwrap();
+        let bad_count = text.replacen("<chunks count=\"1\">", "<chunks count=\"999\">", 1);
+        assert!(inspect(bad_count.as_bytes()).is_err());
+        let duplicate = text.replacen("<items count=\"2\"><item name=\"GUID\">", "<items count=\"3\"><item name=\"guid\">aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa</item><item name=\"GUID\">", 1);
+        assert!(inspect(duplicate.as_bytes()).is_err());
+        let unknown = text.replace("<item name=\"Path\">{0}</item>", "<item name=\"Path\">unrecognized</item>");
+        let report = inspect(unknown.as_bytes()).unwrap();
+        assert!(matches!(report.objects[1].inputs[0].persistent_tree.as_ref(), Some(PersistentTree::Opaque { .. })));
+        assert!(convert(unknown.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn deterministic_mutation_smoke_test() {
+        // No random seed or external fixtures; exercise truncation, arbitrary
+        // bytes and syntax mutations. This is not a coverage-guided fuzz run.
+        for end in (0..SAMPLE.len()).step_by(29) {
+            let _ = inspect(&SAMPLE[..end]);
+        }
+        for i in (0..SAMPLE.len()).step_by(17) {
+            let mut data = SAMPLE.to_vec();
+            data[i] ^= 0xff;
+            let _ = inspect(&data);
+            let _ = convert(&data);
+        }
     }
 
     #[test]
