@@ -3,6 +3,7 @@ mod bio_patterns;
 mod biomorph;
 pub mod cluster;
 pub mod compatibility;
+pub mod compute;
 pub mod data_tree;
 pub mod data_tree_nodes;
 pub mod diagnostics;
