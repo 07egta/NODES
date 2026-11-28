@@ -60,8 +60,13 @@ fn run(graph: &Graph, what: &str) {
     }
     assert!(
         start.elapsed().as_secs() < 60,
-        "{what}: evaluation took {:?}",
-        start.elapsed()
+        "{what}: evaluation took {:?}; nodes: {:?}",
+        start.elapsed(),
+        graph
+            .nodes
+            .iter()
+            .map(|n| (n.id, n.kind, n.params.clone()))
+            .collect::<Vec<_>>()
     );
 }
 
