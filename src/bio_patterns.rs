@@ -18,6 +18,7 @@ const KINDS: &[NodeKind] = &[
     NodeKind::SierpinskiCells,
     NodeKind::ReactionDiffusion,
     NodeKind::PoissonDisk2d,
+    NodeKind::SpurGearProfile,
 ];
 
 pub(crate) fn is_kind(kind: NodeKind) -> bool {
@@ -164,6 +165,18 @@ static REACTION_DIFFUSION: NodeSpec = NodeSpec {
     output: DataType::Point,
 };
 
+static SPUR_GEAR_PROFILE: NodeSpec = NodeSpec {
+    label: "インボリュート歯車輪郭（近似）",
+    category: "曲線",
+    description: "20度の標準平歯車の近似輪郭。歯元は半径方向の簡略接続で、軸穴・転位・歯元フィレット・かみ合い公差は含みません。",
+    keywords: "gear spur gear involute module teeth 歯車 平歯車 インボリュート モジュール 歯数",
+    inputs: &[
+        i("teeth", "歯数", 24., 18., 64.),
+        n("module", "モジュール (mm)", 2., 0.5, 5., 0.1),
+    ],
+    output: DataType::Curve,
+};
+
 static POISSON_DISK2D: NodeSpec = NodeSpec {
     label: "最小間隔ランダム点",
     category: "生成デザイン",
@@ -193,6 +206,7 @@ pub(crate) fn spec(kind: NodeKind) -> &'static NodeSpec {
         SierpinskiCells => &SIERPINSKI_CELLS,
         ReactionDiffusion => &REACTION_DIFFUSION,
         PoissonDisk2d => &POISSON_DISK2D,
+        SpurGearProfile => &SPUR_GEAR_PROFILE,
         _ => unreachable!("not a procedural pattern"),
     }
 }
@@ -226,6 +240,7 @@ pub(crate) fn estimate(kind: NodeKind, args: &[&Value]) -> Result<(usize, usize)
         RoseCurve => (count(args, 2)?, 1),
         SuperformulaCurve | Lissajous3d => (count(args, 5)?, 1),
         TorusKnot => (count(args, 4)?, 1),
+        SpurGearProfile => (24 * count(args, 0)?, 1),
         HilbertCurve => (4usize.pow(count(args, 1)? as u32), 1),
         KochSnowflake => (3 * 4usize.pow(count(args, 1)? as u32), 1),
         SierpinskiCells => {
@@ -413,6 +428,68 @@ fn reaction(args: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Value>, St
     Ok(out)
 }
 
+// Standard full-depth 20-degree external spur gear. Involute flanks are
+// sampled in radius; below the base circle use a radial root connector.
+// Root/tip arcs are sampled too. This is a design blank, not a gear cutter.
+fn spur_gear_profile(
+    teeth: usize,
+    module: f64,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Value, String> {
+    let pressure = 20_f64.to_radians();
+    let pitch_radius = module * teeth as f64 / 2.;
+    let base = pitch_radius * pressure.cos();
+    let root = pitch_radius - 1.25 * module;
+    let tip = pitch_radius + module;
+    let start = root.max(base);
+    let pitch_angle = TAU / teeth as f64;
+    let flank = |radius: f64| {
+        let alpha = (base / radius).clamp(0., 1.).acos();
+        pitch_angle / 4. + pressure.tan() - pressure - (alpha.tan() - alpha)
+    };
+    let start_angle = flank(start);
+    let tip_angle = flank(tip);
+    if !(0. < tip_angle && tip_angle < start_angle && start_angle < pitch_angle / 2.) {
+        return Err("歯車の輪郭が重なります。".into());
+    }
+    let mut points = Vec::with_capacity(24 * teeth);
+    let mut push = |radius: f64, angle: f64| {
+        let (s, c) = angle.sin_cos();
+        points.push([radius * c, radius * s, 0.]);
+    };
+    for tooth in 0..teeth {
+        cancelled(cancel)?;
+        let center = tooth as f64 * pitch_angle;
+        push(root, center - start_angle);
+        if start > root {
+            push(start, center - start_angle);
+        }
+        for step in 1..=6 {
+            let radius = start + (tip - start) * step as f64 / 6.;
+            push(radius, center - flank(radius));
+        }
+        // Left tip point already exists; include right tip exactly once.
+        for step in 1..=3 {
+            push(tip, center - tip_angle + 2. * tip_angle * step as f64 / 3.);
+        }
+        for step in (0..6).rev() {
+            let radius = start + (tip - start) * step as f64 / 6.;
+            push(radius, center + flank(radius));
+        }
+        if start > root {
+            push(root, center + start_angle);
+        }
+        // Intermediate root arc samples; the next tooth supplies its endpoint.
+        for step in 1..3 {
+            push(
+                root,
+                center + start_angle + (pitch_angle - 2. * start_angle) * step as f64 / 3.,
+            );
+        }
+    }
+    curve(points, true)
+}
+
 pub(crate) fn run_item(
     kind: NodeKind,
     args: &[&Value],
@@ -565,8 +642,42 @@ pub(crate) fn run_item(
             }
             Ok(out)
         }
+        SpurGearProfile => Ok(vec![spur_gear_profile(
+            count(args, 0)?,
+            num(args, 1)?,
+            cancel,
+        )?]),
         ReactionDiffusion => reaction(args, cancel),
         PoissonDisk2d => poisson(args, cancel),
         _ => Err("生成デザインの種類が無効です。".into()),
+    }
+}
+
+#[cfg(test)]
+mod reality_gear_tests {
+    use super::*;
+
+    #[test]
+    fn gear_profile_has_expected_tip_root_and_bounded_sampling() {
+        for teeth in [18, 24, 64] {
+            let module = 2.;
+            let value = spur_gear_profile(teeth, module, &|| false).unwrap();
+            let Value::Curve(profile) = value else {
+                panic!("expected a curve");
+            };
+            assert!(profile.closed);
+            assert!(profile.points.len() <= 24 * teeth);
+            let pitch = teeth as f64 * module / 2.;
+            let radii = profile.points.iter().map(|p| p[0].hypot(p[1]));
+            let minimum = radii.clone().fold(f64::INFINITY, f64::min);
+            let maximum = radii.fold(0., f64::max);
+            assert!((minimum - (pitch - 1.25 * module)).abs() < 1e-10);
+            assert!((maximum - (pitch + module)).abs() < 1e-10);
+            for (i, point) in profile.points.iter().enumerate() {
+                let next = profile.points[(i + 1) % profile.points.len()];
+                assert!((point[0] - next[0]).hypot(point[1] - next[1]) > 1e-8);
+            }
+        }
+        assert!(spur_gear_profile(24, 2., &|| true).is_err());
     }
 }

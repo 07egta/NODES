@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "name": "ジェネラティブ彫刻・ねじれ柱",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "rectangle",
+        "name": "平面断面",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 36,
+          "depth": 24
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "extrude",
+        "name": "高さと分割",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "height": 120,
+          "layers": 64
+        },
+        "inputs": {
+          "curve": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "taper",
+        "name": "上部を絞る",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "factor": 0.65
+        },
+        "inputs": {
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "twist",
+        "name": "塔のねじり",
+        "position": [
+          800,
+          30
+        ],
+        "params": {
+          "angle": 80
+        },
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1320,
+          420
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

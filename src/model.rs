@@ -637,6 +637,7 @@ pub enum NodeKind {
     ExactDiagnose,
     SubdTsplinePatch,
     ExactThicken,
+    SpurGearProfile,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1111,6 +1112,7 @@ impl NodeKind {
             Self::ExactDiagnose,
             Self::SubdTsplinePatch,
             Self::ExactThicken,
+            Self::SpurGearProfile,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "name": "Voronoi ランプ・セルパイプ試作",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "populate",
+        "name": "点の生成",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "count": 24,
+          "width": 125,
+          "depth": 72,
+          "height": 0,
+          "seed": 29
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "voronoi2d",
+        "name": "ボロノイセル",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "width": 125,
+          "height": 72
+        },
+        "inputs": {
+          "points": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "cylinder_wrap",
+        "name": "円筒に巻く",
+        "position": [
+          540,
+          30
+        ],
+        "params": {
+          "radius": 19.89436788648692,
+          "width": 125
+        },
+        "inputs": {
+          "curve": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "pipe",
+        "name": "厚み付きパイプ",
+        "position": [
+          800,
+          30
+        ],
+        "params": {
+          "radius": 0.55,
+          "sides": 12,
+          "caps": 1
+        },
+        "inputs": {
+          "curve": 2
+        },
+        "preview": false
+      },
+      {
+        "id": 4,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          1060,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 3
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 5
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

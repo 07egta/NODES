@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "name": "反応拡散・立体ピクセル模型",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "reaction_diffusion",
+        "name": "Gray-Scott 点群",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "side": 24,
+          "spacing": 3,
+          "steps": 50,
+          "feed": 0.035,
+          "kill": 0.06,
+          "threshold": 0.12,
+          "seed": 7
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "box",
+        "name": "独立したピクセル",
+        "position": [
+          20,
+          380
+        ],
+        "params": {
+          "width": 2.2,
+          "depth": 2.2,
+          "height": 2
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "point_array",
+        "name": "点に配置",
+        "position": [
+          280,
+          160
+        ],
+        "params": {},
+        "inputs": {
+          "points": 0,
+          "geometry": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          800,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 2
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 4
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

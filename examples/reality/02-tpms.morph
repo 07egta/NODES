@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "name": "TPMS ジャイロイド試験片",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "gyroid",
+        "name": "TPMS",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "width": 40,
+          "depth": 40,
+          "height": 24,
+          "cell": 12,
+          "thickness": 0.4,
+          "resolution": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          280,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

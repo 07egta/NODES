@@ -109,6 +109,15 @@ pub fn permitted(kind: NodeKind) -> bool {
             | MeshBedFit
             | MeshCompact
             | MeshNonManifold
+            // Bounded, deterministic, in-memory modeling operations used by REALITY.
+            | Pipe
+            | Gyroid
+            | Bend
+            | GridArray3d
+            | ReactionDiffusion
+            | KochSnowflake
+            | TorusKnot
+            | SpurGearProfile
     ) || crate::math_nodes::spec(kind).is_some()
         || crate::curve_nodes::is_curve_kind(kind)
         || crate::surface_nodes::KINDS.contains(&kind)

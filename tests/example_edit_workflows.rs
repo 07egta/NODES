@@ -4,7 +4,7 @@
 //! they are interchange regressions, not evidence of successful physical printing.
 use nodes::{
     engine::{Evaluation, Evaluator},
-    import,
+    graph_api, import,
     model::{DataType, Mesh, NodeId, Tree, Value},
     persistence::{self, Project},
 };
@@ -108,6 +108,21 @@ example_cases! {
     (genesis_facade, "genesis/facade.morph", 1, "tall_height", 20.0, 2, Mesh, false),
     (genesis_sculpture, "genesis/sculpture.morph", 1, "tall_height", 28.0, 2, Mesh, false),
     (exact_curve_array, "omega43-exact-curve-array.morph", 3, "count", 17.0, 10, Number, false),
+    (reality_voronoi_lamp, "reality/01-voronoi-lamp.morph", 3, "radius", 0.70, 4, Mesh, false),
+    (reality_tpms, "reality/02-tpms.morph", 0, "height", 28.0, 1, Mesh, true),
+    (reality_twisted_sculpture, "reality/03-twisted-sculpture.morph", 3, "angle", 105.0, 4, Mesh, true),
+    (reality_modular_shelf, "reality/04-modular-shelf.morph", 1, "dz", 23.0, 6, Mesh, false),
+    (reality_wave_facade, "reality/05-wave-facade.morph", 2, "amplitude", 8.0, 4, Mesh, true),
+    (reality_helix, "reality/06-helix.morph", 0, "height", 105.0, 2, Mesh, true),
+    (reality_spur_gear, "reality/07-spur-gear.morph", 0, "teeth", 26.0, 2, Mesh, true),
+    (reality_organic, "reality/08-organic.morph", 1, "amp", 4.0, 3, Mesh, true),
+    (reality_reaction_diffusion, "reality/09-reaction-diffusion.morph", 0, "spacing", 3.50, 3, Mesh, true),
+    (reality_lattice, "reality/10-lattice.morph", 1, "radius", 0.80, 2, Mesh, true),
+    (reality_fractal, "reality/11-fractal.morph", 0, "depth", 3.0, 2, Mesh, true),
+    (reality_precision_block, "reality/12-precision-block.morph", 1, "x", 12.0, 5, Mesh, true),
+    (reality_curved_chair, "reality/13-curved-chair.morph", 2, "angle", 90.0, 3, Mesh, true),
+    (reality_accessory, "reality/14-accessory.morph", 0, "major", 12.0, 2, Mesh, true),
+    (reality_mathematical_knot, "reality/15-mathematical-knot.morph", 0, "minor", 10.0, 2, Mesh, true),
 }
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(0);
@@ -235,6 +250,9 @@ fn verify_edit_workflow(fixture: Fixture) {
     let mut evaluator = Evaluator::default();
     let original = evaluator.evaluate(&project.graph, &|| false);
     verify_evaluation(&project, &original, fixture, "original");
+    if fixture.path.starts_with("reality/") {
+        verify_reality_build(&project, &original, fixture);
+    }
     let original_value;
     {
         let node = project.graph.node_mut(fixture.edit_node).unwrap();
@@ -305,6 +323,12 @@ fn verify_edit_workflow(fixture: Fixture) {
         "{}: persisted edit changed evaluation",
         fixture.path
     );
+    if fixture.path.starts_with("reality/") {
+        verify_reality_mesh(
+            restored.outputs[&fixture.terminal].as_ref().unwrap(),
+            fixture,
+        );
+    }
     if fixture.stl_roundtrip {
         verify_stl_roundtrip(
             restored.outputs[&fixture.terminal].as_ref().unwrap(),
@@ -327,6 +351,117 @@ fn verify_edit_workflow(fixture: Fixture) {
         "{}: restoring the original parameter did not restore the original model",
         fixture.path
     );
+}
+
+// Recreate each REALITY graph from an empty project through the public restricted
+// API, using the catalog rather than assuming that a saved kind is discoverable.
+fn verify_reality_build(project: &Project, original: &Evaluation, fixture: Fixture) {
+    use graph_api::{Edit, Request};
+    let catalog = graph_api::catalog();
+    let mut edits = Vec::new();
+    for node in &project.graph.nodes {
+        assert!(
+            catalog.nodes.iter().any(|entry| entry.kind == node.kind),
+            "{}: node {:?} is absent from the safe catalog",
+            fixture.path,
+            node.kind
+        );
+        edits.push(Edit::Add {
+            alias: format!("n{}", node.id),
+            kind: node.kind,
+            position: node.position,
+        });
+        for (key, value) in &node.params {
+            edits.push(Edit::Set {
+                node: format!("n{}", node.id),
+                input: key.clone(),
+                value: *value,
+            });
+        }
+    }
+    for node in &project.graph.nodes {
+        for (input, source) in &node.inputs {
+            edits.push(Edit::Connect {
+                from: format!("n{source}"),
+                to: format!("n{}", node.id),
+                input: input.clone(),
+            });
+        }
+    }
+    let rebuilt = graph_api::build(&Request {
+        api_version: graph_api::API_VERSION,
+        edits,
+    })
+    .unwrap_or_else(|error| panic!("{}: new graph: {error}", fixture.path));
+    let evaluated = Evaluator::default().evaluate(&rebuilt.graph, &|| false);
+    verify_evaluation(&rebuilt, &evaluated, fixture, "built from empty project");
+    assert_eq!(
+        evaluated.outputs[&fixture.terminal], original.outputs[&fixture.terminal],
+        "{}: rebuilt graph differs from saved example",
+        fixture.path
+    );
+    verify_reality_mesh(
+        original.outputs[&fixture.terminal].as_ref().unwrap(),
+        fixture,
+    );
+}
+
+fn verify_reality_mesh(tree: &Tree, fixture: Fixture) {
+    let report = persistence::mesh_stats(std::slice::from_ref(tree))
+        .unwrap_or_else(|error| panic!("{}: mesh audit: {error}", fixture.path));
+    assert!(report.triangles > 0 && report.mesh_count > 0);
+    assert_eq!(report.skipped_values, 0);
+    assert!(report.signed_volume_mm3.is_finite());
+    assert!(report.bounds.is_some());
+    eprintln!(
+        "{}: {} triangles, {} meshes, {} open edges, {} nonmanifold edges, {} degenerate",
+        fixture.path,
+        report.triangles,
+        report.mesh_count,
+        report.open_edges,
+        report.non_manifold_edges,
+        report.degenerate_triangles
+    );
+    // Only explicit isolated/closed-solid candidates assert topology. This
+    // cannot detect self intersections, wall thickness or actual printability.
+    if matches!(
+        fixture.path,
+        "reality/03-twisted-sculpture.morph"
+            | "reality/06-helix.morph"
+            | "reality/07-spur-gear.morph"
+            | "reality/09-reaction-diffusion.morph"
+            | "reality/11-fractal.morph"
+            | "reality/12-precision-block.morph"
+            | "reality/13-curved-chair.morph"
+            | "reality/14-accessory.morph"
+            | "reality/15-mathematical-knot.morph"
+    ) {
+        assert!(
+            report.is_closed(),
+            "{}: expected closed topology",
+            fixture.path
+        );
+        assert!(report.signed_volume_mm3.abs() > 0.);
+    }
+    if !fixture.stl_roundtrip {
+        // Known intersecting/touching assembly studies still attempt actual STL
+        // export; never promote a failed export or an overlap into printability.
+        let temporary = TemporaryDirectory::new();
+        let path = temporary.0.join("study.stl");
+        match persistence::export_stl(&path, std::slice::from_ref(tree)) {
+            Ok(export) => {
+                assert_eq!(export.triangles, report.triangles);
+                assert_eq!(
+                    fs::metadata(path).unwrap().len(),
+                    84 + 50 * export.triangles as u64
+                );
+            }
+            Err(error) => {
+                assert!(!path.exists());
+                eprintln!("{}: study export rejected: {error}", fixture.path);
+            }
+        }
+    }
 }
 
 fn triangle_bounds(meshes: &[&Mesh]) -> [[f64; 3]; 2] {
