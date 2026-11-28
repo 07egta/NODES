@@ -100,6 +100,7 @@ pub fn for_input(kind: NodeKind, index: usize) -> Option<InputAccess> {
             }
         }
         SubdCageEdit => Tree,
+        ExactSketch => FirstItem,
         ExactStepExport => Tree,
         PowerDiagram2d if index <= 1 => List,
         CurveWeightedNurbs if index <= 2 => List,

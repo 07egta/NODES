@@ -508,6 +508,19 @@ pub(crate) fn evaluate_node(
         let bytes = crate::nurbs_nodes::step_text(&inputs, cancel)?.len();
         return checked_tree(Tree::single(Value::Number(bytes as f64)), cancel);
     }
+    // 拘束スケッチ: the sketch text is in `script` (see `sketch_nodes`).
+    if node.kind == NodeKind::ExactSketch {
+        let mode = inputs
+            .first()
+            .and_then(|t| t.branches.values().flatten().next())
+            .map(Value::number)
+            .transpose()?
+            .unwrap_or(0.);
+        return checked_tree(
+            crate::sketch_nodes::run(&node.script, mode as usize, cancel)?,
+            cancel,
+        );
+    }
     // ケージ編集: the edit list is in `script` (see `nurbs_nodes::run_cage_edit`).
     if node.kind == NodeKind::SubdCageEdit {
         return checked_tree(
@@ -798,7 +811,11 @@ fn preflight_run(
         k if crate::mathematical_surfaces::is_kind(k) => {
             crate::mathematical_surfaces::estimate(k, args)?
         }
+        k if crate::matter::is_kind(k) => crate::matter::estimate(k, args)?,
         NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
+        NodeKind::OrigamiMiura | NodeKind::OrigamiMiuraCreases => {
+            crate::origami::estimate(kind, args)?
+        }
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::genesis::is_kind(k) => crate::genesis::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
@@ -866,10 +883,12 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::gh_gaps2::is_item_kind(k) => crate::gh_gaps2::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
+        k if crate::matter::is_kind(k) => crate::matter::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
         GenesisScopes | GenesisScopeIds | GenesisRelief => {
             crate::genesis::run_item(kind, a, cancel)
         }
+        OrigamiMiura | OrigamiMiuraCreases => crate::origami::run(kind, a, cancel),
         BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {

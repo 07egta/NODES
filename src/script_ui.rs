@@ -90,7 +90,9 @@ pub fn expression_editor(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) {
     ui.label(RichText::new("式").strong());
     ui.label(theme::small(
         "x・y・z・w は左の入力です。例: sin(x) * 10 + y、(x - 5) ^ 2、max(x, y)。\n\
-         関数: sin cos tan sqrt abs min max floor ceil round ln exp、定数: pi e。角度はラジアンです。",
+         関数: sin cos tan asin acos atan atan2 sinh cosh tanh sqrt cbrt abs hypot \
+         min max floor ceil round ln log2 log10 log1p exp expm1。定数: pi e。角度はラジアンです。\n\
+         clamp(x,lo,hi)・lerp(a,b,t)・smoothstep(x,lo,hi) で形状の変化を制御できます。",
     ));
     let key = egui::Id::new(("expression_buffer", id));
     let (mut buffer, mut base): (String, String) = ui

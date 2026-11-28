@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "name": "回転正方形 — 形態変化",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "number",
+        "name": "初期角",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "value": 5
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "number",
+        "name": "目標角",
+        "position": [
+          20,
+          220
+        ],
+        "params": {
+          "value": 35
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "matter_rotating_squares",
+        "name": "初期形状",
+        "position": [
+          280,
+          30
+        ],
+        "params": {
+          "nx": 6,
+          "ny": 6,
+          "size": 10,
+          "angle": 5,
+          "inset": 0.04,
+          "thickness": 1
+        },
+        "inputs": {
+          "angle": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "matter_rotating_squares",
+        "name": "目標形状",
+        "position": [
+          280,
+          360
+        ],
+        "params": {
+          "nx": 6,
+          "ny": 6,
+          "size": 10,
+          "angle": 35,
+          "inset": 0.04,
+          "thickness": 1
+        },
+        "inputs": {
+          "angle": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "matter_expansion_ratio",
+        "name": "周期伸縮比",
+        "position": [
+          580,
+          30
+        ],
+        "params": {
+          "start": 5,
+          "end": 35
+        },
+        "inputs": {
+          "start": 0,
+          "end": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "matter_plate_contact",
+        "name": "目標姿勢の干渉",
+        "position": [
+          580,
+          220
+        ],
+        "params": {
+          "angle": 35,
+          "inset": 0.04
+        },
+        "inputs": {
+          "angle": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 6,
+        "kind": "matter_inverse_angle",
+        "name": "逆設計",
+        "position": [
+          580,
+          410
+        ],
+        "params": {
+          "start": 5,
+          "ratio": 1.2
+        },
+        "inputs": {
+          "start": 0
+        },
+        "preview": false
+      }
+    ],
+    "next_id": 7
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.75
+}

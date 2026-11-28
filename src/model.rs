@@ -592,6 +592,10 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MatterRotatingSquares,
+    MatterExpansionRatio,
+    MatterPlateContact,
+    MatterInverseAngle,
     // Ornament nodes: append-only serialized identifiers.
     TruchetPattern,
     AsanohaPattern,
@@ -610,6 +614,8 @@ pub enum NodeKind {
     GenesisScopeIds,
     GenesisRelief,
     ExactTorus,
+    OrigamiMiura,
+    OrigamiMiuraCreases,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -641,6 +647,12 @@ pub enum NodeKind {
     DisplayAxes,
     SurfaceCorners,
     SurfaceBoundary,
+    ExactSketch,
+    ExactZebra,
+    ExactDraftAnalysis,
+    ExactDiagnose,
+    SubdTsplinePatch,
+    ExactThicken,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1075,6 +1087,10 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MatterRotatingSquares,
+            Self::MatterExpansionRatio,
+            Self::MatterPlateContact,
+            Self::MatterInverseAngle,
             Self::TruchetPattern,
             Self::AsanohaPattern,
             Self::ShippoPattern,
@@ -1090,6 +1106,8 @@ impl NodeKind {
             Self::GenesisScopeIds,
             Self::GenesisRelief,
             Self::ExactTorus,
+            Self::OrigamiMiura,
+            Self::OrigamiMiuraCreases,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
             Self::MathIntDivide,
@@ -1119,6 +1137,12 @@ impl NodeKind {
             Self::DisplayAxes,
             Self::SurfaceCorners,
             Self::SurfaceBoundary,
+            Self::ExactSketch,
+            Self::ExactZebra,
+            Self::ExactDraftAnalysis,
+            Self::ExactDiagnose,
+            Self::SubdTsplinePatch,
+            Self::ExactThicken,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1727,6 +1751,7 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::OrigamiMiura | Self::OrigamiMiuraCreases => crate::origami::spec(self),
             Self::Reroute => {
                 static SPEC: NodeSpec = NodeSpec {
                     label: "リルート点",
@@ -1746,6 +1771,7 @@ impl NodeKind {
             }
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
+            other if crate::matter::is_kind(other) => crate::matter::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
             other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea
