@@ -1011,7 +1011,13 @@ pub fn match_sheet(
     })?;
     let on_target = edge_point(target, edge, stop)?;
     let body = kernel("曲面のマッチ", stop, || {
-        sk::match_surface(sheet.body(), &[at], target.body(), &[on_target], grade(order))
+        sk::match_surface(
+            sheet.body(),
+            &[at],
+            target.body(),
+            &[on_target],
+            grade(order),
+        )
     })?;
     brep(body, stop)
 }
@@ -1040,7 +1046,11 @@ pub fn trim_by_any_plane(
         Some(body) => brep(body, stop),
         None => Err(format!(
             "平面の{}に残る部分がありません。平面の位置か向きを変えてください。",
-            if keep_normal { "法線側" } else { "反対側" }
+            if keep_normal {
+                "法線側"
+            } else {
+                "反対側"
+            }
         )),
     }
 }
@@ -1071,9 +1081,21 @@ pub fn seam_report(b: &BrepValue, samples: f64, tolerances: [f64; 3], stop: Stop
         count(sk::SeamVerdict::CurvatureJump),
         count(sk::SeamVerdict::Sharp),
         count(sk::SeamVerdict::Gap),
-        report.seams.iter().map(|s| s.gap_mm.value).fold(0., f64::max),
-        report.seams.iter().map(|s| s.normal_angle_deg.value).fold(0., f64::max),
-        report.seams.iter().map(|s| s.curvature_jump_per_mm.value).fold(0., f64::max),
+        report
+            .seams
+            .iter()
+            .map(|s| s.gap_mm.value)
+            .fold(0., f64::max),
+        report
+            .seams
+            .iter()
+            .map(|s| s.normal_angle_deg.value)
+            .fold(0., f64::max),
+        report
+            .seams
+            .iter()
+            .map(|s| s.curvature_jump_per_mm.value)
+            .fold(0., f64::max),
         report.skipped as f64,
         report.unmeasured as f64,
     ])

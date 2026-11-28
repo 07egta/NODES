@@ -473,16 +473,25 @@ fn closed_mesh_volume_is_translation_stable() {
 fn trim_by_any_plane_keeps_the_chosen_side() {
     let b = kb::box_solid(40., 30., 20., &go).unwrap();
     let zs: Vec<f64> = b.preview().vertices.iter().map(|p| p[2]).collect();
-    let (lo, hi) = zs.iter().fold((f64::MAX, f64::MIN), |(l, h), z| (l.min(*z), h.max(*z)));
+    let (lo, hi) = zs
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(l, h), z| (l.min(*z), h.max(*z)));
     let mid = 0.5 * (lo + hi);
-    let top = nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., mid], [0., 0., 1.], true, &go).unwrap();
-    let bottom = nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., mid], [0., 0., 1.], false, &go).unwrap();
+    let top =
+        nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., mid], [0., 0., 1.], true, &go).unwrap();
+    let bottom =
+        nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., mid], [0., 0., 1.], false, &go).unwrap();
     let full = b.volume().unwrap();
     assert!(rel(top.volume().unwrap(), full / 2.) < 1e-6);
     assert!(rel(bottom.volume().unwrap(), full / 2.) < 1e-6);
     // A plane that misses the body leaves nothing on one side: a Japanese error, not a panic.
-    assert!(nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., hi + 5.], [0., 0., 1.], true, &go).is_err());
-    assert!(nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., 0.], [0., 0., 0.], true, &go).is_err());
+    assert!(
+        nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., hi + 5.], [0., 0., 1.], true, &go)
+            .is_err()
+    );
+    assert!(
+        nodes::kernel_ops::trim_by_any_plane(&b, [0., 0., 0.], [0., 0., 0.], true, &go).is_err()
+    );
 }
 
 #[test]
@@ -511,7 +520,12 @@ fn curvature_map_of_a_sphere_has_bands() {
 #[test]
 fn blend_surface_joins_two_boxes() {
     let a = kb::box_solid(20., 20., 20., &go).unwrap();
-    let b = kb::translate(&kb::box_solid(20., 20., 20., &go).unwrap(), [50., 0., 0.], &go).unwrap();
+    let b = kb::translate(
+        &kb::box_solid(20., 20., 20., &go).unwrap(),
+        [50., 0., 0.],
+        &go,
+    )
+    .unwrap();
     let mut made = None;
     'search: for ea in 0..12 {
         for eb in 0..12 {
