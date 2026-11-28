@@ -115,6 +115,7 @@ pub fn permitted(kind: NodeKind) -> bool {
         || (crate::nurbs_nodes::is_kind(kind) && !matches!(kind, ExactStepExport | ExactStepImport))
         || crate::gcode_nodes::is_kind(kind)
         || crate::gh_gaps::is_kind(kind)
+        || crate::matter::is_kind(kind)
         || crate::physics_nodes::is_kind(kind)
         || crate::generative::is_kind(kind)
         || (crate::data_tree_nodes::spec(kind).is_some() && kind != PathMapper)
