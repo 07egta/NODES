@@ -207,3 +207,32 @@ fn typed_signed_zero_survives_both_numeric_editors() {
         }
     }
 }
+
+#[test]
+fn constant_expressions_work_in_both_numeric_editors() {
+    let spec = &NodeKind::Number.spec().inputs[0];
+    for editor in [Editor::Inspector, Editor::CanvasNumber] {
+        for (text, expected) in [
+            ("180/2", 90.0),
+            ("(2+3)*4", 20.0),
+            ("sqrt(81)", 9.0),
+            ("２×３", 6.0),
+            ("1e-6*2", 2e-6),
+        ] {
+            assert_eq!(type_value(editor, spec, 25.0, text), expected);
+        }
+        for text in ["1/0", "sqrt(-1)", "x+2", "0*x", "2+", "NaN"] {
+            assert_eq!(type_value(editor, spec, 25.0, text), 25.0);
+        }
+    }
+}
+
+#[test]
+fn constant_expressions_respect_integer_and_metadata_bounds() {
+    let radius = &NodeKind::Sphere.spec().inputs[0];
+    let segments = &NodeKind::Sphere.spec().inputs[1];
+    for editor in [Editor::Inspector, Editor::CanvasNumber] {
+        assert_eq!(type_value(editor, radius, 25.0, "2000/2+1"), 1000.0);
+        assert_eq!(type_value(editor, segments, 48.0, "99/2"), 50.0);
+    }
+}
