@@ -1,14 +1,16 @@
-//! Mesh file import (STL and OBJ) for the ファイル読み込み node.
+//! Mesh file import (STL, OBJ and limited 3MF) for the ファイル読み込み node.
 //!
 //! The files come from outside the app, so every input is treated as hostile: sizes are
 //! checked before anything is allocated, coordinates must be finite, slices are read with
 //! `get`, and every failure is a Japanese message. Nothing here panics.
 //!
-//! Vertices of both formats are welded by position (quantized to 0.000001 mm), so a closed
+//! STL/OBJ vertices are welded by position (quantized to 0.000001 mm), so a closed
 //! source becomes a closed indexed mesh. STL degenerate triangles are dropped;
 //! invalid or degenerate OBJ polygons are rejected instead of partly imported.
+//! 3MF preserves indexed geometry and converts its declared units to millimetres.
 use crate::engine::{cancelled, cross, length, sub};
 use crate::model::{MAX_TRIANGLES, MAX_VERTICES, Mesh};
+pub use crate::threemf_import::parse_3mf;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -29,7 +31,7 @@ const BAD_FACET: &str = "STL の面ごとの頂点が3個ではありません�
 const TOO_MANY_BYTES: &str = "ファイルが大きすぎます（上限 64 MiB）。";
 
 const NO_FILE: &str =
-    "ファイルが選ばれていません。「ファイルを選ぶ」で STL または OBJ を選んでください。";
+    "ファイルが選ばれていません。「ファイルを選ぶ」で STL・OBJ・3MF を選んでください。";
 const BAD_FORMAT: &str = "STL または OBJ として読めませんでした。ファイルが途中で切れていないか、形式を確認してください。";
 const BAD_NUMBER: &str =
     "座標の数値が正しくありません（NaN・無限大・極端に大きな値は使えません）。";
@@ -41,6 +43,7 @@ const INTERNAL: &str = "読み込み中に内部の整合性エラーが起き�
 pub enum Format {
     Stl,
     Obj,
+    ThreeMf,
 }
 
 /// File format from the extension (case-insensitive). None for other files.
@@ -49,6 +52,7 @@ pub fn format_of(path: &Path) -> Option<Format> {
     match extension.as_str() {
         "stl" => Some(Format::Stl),
         "obj" => Some(Format::Obj),
+        "3mf" => Some(Format::ThreeMf),
         _ => None,
     }
 }
@@ -62,13 +66,13 @@ pub fn source_key(path: &str) -> String {
     }
 }
 
-/// Reads and parses one STL or OBJ file. The size is checked before and after reading.
+/// Reads and parses one STL, OBJ or limited 3MF file. The size is checked before and after reading.
 pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
     if path.is_empty() {
         return Err(NO_FILE.into());
     }
     let format = format_of(Path::new(path))
-        .ok_or("STL または OBJ 以外のファイルは読み込めません。拡張子を確認してください。")?;
+        .ok_or("STL・OBJ・3MF 以外のファイルは読み込めません。拡張子を確認してください。")?;
     cancelled(cancel)?;
     let meta = std::fs::metadata(path).map_err(|_| {
         "ファイルを開けませんでした。移動・削除されていないか確認してください。".to_string()
@@ -99,6 +103,7 @@ pub fn read_file(path: &str, cancel: &dyn Fn() -> bool) -> Result<Mesh, String> 
     match format {
         Format::Stl => parse_stl(&bytes, cancel),
         Format::Obj => parse_obj(&bytes, cancel),
+        Format::ThreeMf => parse_3mf(&bytes, cancel),
     }
 }
 
@@ -110,16 +115,14 @@ fn check_import_size(len: usize) -> Result<(), String> {
 }
 
 /// Parses binary or ASCII STL. A file is binary when its size equals 84 + 50 × count
-/// (whatever its header says); otherwise a file that starts with "solid" is read as ASCII.
+/// (whatever its header says); otherwise try the ASCII STL grammar (including a UTF-8 BOM).
 pub fn parse_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
     check_import_size(bytes.len())?;
     if let Some(count) = binary_stl_count(bytes) {
         return parse_binary_stl(bytes, count, cancel);
     }
-    if bytes.starts_with(b"solid") {
-        return parse_ascii_stl(bytes, cancel);
-    }
-    Err(BAD_FORMAT.into())
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    parse_ascii_stl(bytes, cancel)
 }
 
 /// Triangle count from the binary header, if the file size agrees with it.
@@ -170,41 +173,75 @@ fn read_point(bytes: &[u8], offset: usize) -> Result<[f64; 3], String> {
 }
 
 fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, String> {
-    let text = String::from_utf8_lossy(bytes);
+    #[derive(Clone, Copy)]
+    enum State {
+        Outside,
+        Solid,
+        Facet,
+        Loop,
+        EndFacet,
+    }
+
+    let text = std::str::from_utf8(bytes).map_err(|_| BAD_FORMAT)?;
     let mut builder = Builder::default();
     let mut corners = [[0.0f64; 3]; 3];
     let mut filled = 0usize;
-    let mut ended = false;
+    let mut faces = 0usize;
+    let mut state = State::Outside;
     for (line_no, line) in text.lines().enumerate() {
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
         let mut words = line.split_whitespace();
-        match words.next() {
-            Some("vertex") => {}
-            Some("endsolid") => {
-                ended = true;
-                continue;
+        let Some(keyword) = words.next() else {
+            continue;
+        };
+        state = match (state, keyword) {
+            (State::Outside, "solid") => State::Solid,
+            (State::Solid, "endsolid") => State::Outside,
+            (State::Solid, "facet") if words.next() == Some("normal") => {
+                // Normals are derived from vertices; require the three numeric fields.
+                for _ in 0..3 {
+                    let value = words
+                        .next()
+                        .and_then(|w| w.parse::<f64>().ok())
+                        .ok_or(BAD_FORMAT)?;
+                    if !value.is_finite() {
+                        return Err(BAD_FORMAT.into());
+                    }
+                }
+                if words.next().is_some() {
+                    return Err(BAD_FORMAT.into());
+                }
+                State::Facet
             }
-            // A facet must hold exactly three vertices; never join vertices across facets.
-            Some("endloop" | "endfacet") if filled != 0 => return Err(BAD_FACET.into()),
-            _ => continue,
-        }
-        let point = parse_xyz(words)?;
-        if let Some(slot) = corners.get_mut(filled) {
-            *slot = point;
-        }
-        filled += 1;
-        if filled == 3 {
-            builder.triangle(corners)?;
-            filled = 0;
-        }
+            (State::Facet, "outer") if words.next() == Some("loop") && words.next().is_none() => {
+                filled = 0;
+                State::Loop
+            }
+            (State::Loop, "vertex") => {
+                let point = parse_xyz(words.by_ref())?;
+                if filled >= 3 || words.next().is_some() {
+                    return Err(BAD_FACET.into());
+                }
+                corners[filled] = point;
+                filled += 1;
+                State::Loop
+            }
+            (State::Loop, "endloop") if filled == 3 && words.next().is_none() => State::EndFacet,
+            (State::EndFacet, "endfacet") if words.next().is_none() => {
+                faces += 1;
+                if faces > MAX_TRIANGLES {
+                    return Err(TOO_MANY_TRIANGLES.into());
+                }
+                builder.triangle(corners)?;
+                State::Solid
+            }
+            _ => return Err(BAD_FACET.into()),
+        };
     }
-    if filled != 0 || !ended {
-        return Err(
-            "STL の頂点の数が三角形になりません。ファイルが途中で切れていないか確認してください。"
-                .into(),
-        );
+    if !matches!(state, State::Outside) {
+        return Err(BAD_FORMAT.into());
     }
     builder.finish()
 }

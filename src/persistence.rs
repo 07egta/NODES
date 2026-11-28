@@ -515,9 +515,10 @@ pub fn export_stl(path: &Path, trees: &[Tree]) -> Result<ExportReport, String> {
         file.write_all(&(report.triangles as u32).to_le_bytes())?;
         for mesh in &all_meshes {
             for triangle in &mesh.triangles {
-                let a = mesh.vertices[triangle[0] as usize];
-                let b = mesh.vertices[triangle[1] as usize];
-                let c = mesh.vertices[triangle[2] as usize];
+                // Compute the stored normal from the exact f32 coordinates that
+                // the receiving application will see, not the higher precision source.
+                let [a, b, c] =
+                    triangle.map(|i| mesh.vertices[i as usize].map(|v| f64::from(v as f32)));
                 let n = cross(sub(b, a), sub(c, a));
                 let length = dot(n, n).sqrt();
                 for value in n.map(|v| (v / length) as f32) {

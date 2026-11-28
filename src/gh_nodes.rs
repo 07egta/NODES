@@ -261,8 +261,8 @@ static UNKNOWN: NodeSpec = NodeSpec {
 static IMPORT_MESH: NodeSpec = NodeSpec {
     label: "ファイル読み込み",
     category: "立体",
-    description: "STL・OBJ ファイルの三角形メッシュを読み込みます。「ファイルを選ぶ」か、ウィンドウへのドラッグで指定します。",
-    keywords: "import load file stl obj 読み込み ファイル 取り込み 開く 3Dデータ",
+    description: "STL・OBJ・3MF（単純なメッシュ）の三角形を読み込みます。色・材質は保持しません。「ファイルを選ぶ」か、ウィンドウへのドラッグで指定します。",
+    keywords: "import load file stl obj 3mf 読み込み ファイル 取り込み 開く 3Dデータ",
     inputs: &[
         n("scale", "倍率", 1., 0.01, 1000., 0.01),
         i("center", "XYを原点へ (0:しない 1:する)", 1., 0., 1.),

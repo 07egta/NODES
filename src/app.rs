@@ -1872,7 +1872,7 @@ impl NodesApp {
         } else {
             (
                 FileTask::ImportMesh,
-                "STL または OBJ を選びます。ウィンドウへのドラッグでも読み込めます",
+                "STL・OBJ・3MF（単純なメッシュのみ）。色・材質は保持しません。ドラッグでも読み込めます",
             )
         };
         let file = node.script.as_str();

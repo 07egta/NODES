@@ -240,6 +240,7 @@ fn place_rejects_a_zero_scale() {
 fn file_kind_comes_from_the_extension() {
     assert_eq!(format_of(Path::new("part.STL")), Some(Format::Stl));
     assert_eq!(format_of(Path::new("part.obj")), Some(Format::Obj));
+    assert_eq!(format_of(Path::new("part.3MF")), Some(Format::ThreeMf));
     assert_eq!(format_of(Path::new("work.morph")), None);
 }
 
@@ -276,4 +277,36 @@ fn obj_accepts_inline_comments_on_faces() {
     let text = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3 # triangle\n";
     let mesh = parse_obj(text.as_bytes(), &no_cancel).unwrap();
     assert_eq!(mesh.triangles.len(), 1);
+}
+
+#[test]
+fn ascii_stl_allows_bom_whitespace_and_multiple_solids() {
+    let part = ascii_stl(&cube());
+    let shifted: Vec<Tri> = cube()
+        .into_iter()
+        .map(|tri| {
+            tri.map(|mut p| {
+                p[0] += 3.;
+                p
+            })
+        })
+        .collect();
+    let source = format!("\u{feff}\n  {part}{}", ascii_stl(&shifted));
+    let mesh = parse_stl(source.as_bytes(), &no_cancel).unwrap();
+    assert_eq!(mesh.triangles.len(), 24);
+    assert_eq!(mesh.vertices.len(), 16);
+    assert_closed(&mesh);
+}
+
+#[test]
+fn ascii_stl_rejects_six_vertices_in_one_facet_and_trailing_geometry() {
+    let one = ascii_stl(&cube()[..1]);
+    let bad = one.replacen(
+        "    endloop",
+        "      vertex 0 0 2\n      vertex 1 0 2\n      vertex 0 1 2\n    endloop",
+        1,
+    );
+    assert!(parse_stl(bad.as_bytes(), &no_cancel).is_err());
+    let trailing = format!("{one}vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n");
+    assert!(parse_stl(trailing.as_bytes(), &no_cancel).is_err());
 }
