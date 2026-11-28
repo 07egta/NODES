@@ -10,12 +10,11 @@ fn cage_edit_text_invalidates_cached_geometry() {
     let mut evaluator = Evaluator::default();
     let before = evaluator.evaluate(&graph, &|| false);
     let original = before.outputs[&edit].as_ref().unwrap();
-    graph.node_mut(edit).unwrap().script =
-        nodes::subd::edits_text(&[nodes::subd::EditOp::Move {
-            verts: vec![0],
-            d: [3., 0., 0.],
-            sym: None,
-        }]);
+    graph.node_mut(edit).unwrap().script = nodes::subd::edits_text(&[nodes::subd::EditOp::Move {
+        verts: vec![0],
+        d: [3., 0., 0.],
+        sym: None,
+    }]);
     let after = evaluator.evaluate(&graph, &|| false);
     let cold = Evaluator::default().evaluate(&graph, &|| false);
     assert_eq!(after.outputs, cold.outputs);
