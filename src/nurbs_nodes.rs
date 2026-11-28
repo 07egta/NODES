@@ -68,6 +68,11 @@ pub const KINDS: &[K] = &[
     K::ExactDiagnose,
     K::SubdTsplinePatch,
     K::ExactThicken,
+    K::ExactBlendSurface,
+    K::ExactMatchSurface,
+    K::ExactTrimByPlane,
+    K::ExactSeamReport,
+    K::ExactCurvatureMap,
 ];
 
 pub fn is_kind(kind: K) -> bool {
@@ -379,10 +384,14 @@ pub fn spec(kind: K) -> &'static NodeSpec {
         ),
         K::SubdToBrep => spec!(
             "T-spline → B-rep",
-            "円柱ケージの滑らかな面を厳密な NURBS 面の B-rep にし、上下をふさいで立体にします。",
-            "tspline subd to brep nurbs convert 変換",
+            "ケージの滑らかな面を厳密な NURBS 面の B-rep にします（円柱ケージは上下をふさいで立体に）。箱などのケージは星点（価数 3・5 の点）のまわりが近似なので、「星点まわりの細分」を 1〜2 にすると極限曲面に近づきます（面の数は 1 回で 4 倍）。",
+            "tspline subd to brep nurbs convert 変換 星点",
             Brep,
-            [CAGE, i("cap", "ふさぐ (1=はい)", 1., 0., 1.)]
+            [
+                CAGE,
+                i("cap", "ふさぐ (1=はい)", 1., 0., 1.),
+                i("refine", "星点まわりの細分 (0〜3)", 0., 0., 3.)
+            ]
         ),
         K::SubdToMesh => spec!(
             "SubD → メッシュ",
@@ -591,6 +600,70 @@ pub fn spec(kind: K) -> &'static NodeSpec {
                 i("both", "両側 (1=はい)", 0., 0., 1.)
             ]
         ),
+        K::ExactBlendSurface => spec!(
+            "ブレンド曲面",
+            "2 つの B-rep の縁（稜線番号で指定）を、なめらかな面でつなぎます。0=位置だけ（G0）、1=接線まで（G1）、2=曲率まで（G2）。稜線番号は 0 から数えた番号です。",
+            "blend surface blendsrf ブレンド 曲面 つなぐ g1 g2",
+            Brep,
+            [
+                g("a", "B-rep A", D::Brep),
+                i("edge_a", "A の稜線番号", 0., 0., 100000.),
+                g("b", "B-rep B", D::Brep),
+                i("edge_b", "B の稜線番号", 0., 0., 100000.),
+                i("grade_a", "A 側の連続性 (0〜2)", 1., 0., 2.),
+                i("grade_b", "B 側の連続性 (0〜2)", 1., 0., 2.),
+                n("crown", "ふくらみ", 0., -0.9, 3., 0.1)
+            ]
+        ),
+        K::ExactMatchSurface => spec!(
+            "曲面のマッチ",
+            "開いた面（シート）の縁を動かして、相手の B-rep の稜線に位置・接線・曲率を合わせます。0=G0、1=G1、2=G2。",
+            "match surface matchsrf マッチ 曲面 合わせる 連続",
+            Brep,
+            [
+                g("sheet", "合わせる面（シート）", D::Brep),
+                i("face", "面番号", 0., 0., 100000.),
+                g("target", "相手の B-rep", D::Brep),
+                i("edge", "相手の稜線番号", 0., 0., 100000.),
+                i("grade", "連続性 (0〜2)", 1., 0., 2.)
+            ]
+        ),
+        K::ExactTrimByPlane => spec!(
+            "任意の平面で切る",
+            "B-rep を、点と法線で決めた平面で切り、法線側（または反対側）を残します。切り口は厳密な平面です。",
+            "trim split plane cut 平面 切る 分割 トリム 任意",
+            Brep,
+            [
+                B,
+                n("ox", "平面の点 X", 0., -1e5, 1e5, 1.),
+                n("oy", "平面の点 Y", 0., -1e5, 1e5, 1.),
+                n("oz", "平面の点 Z", 0., -1e5, 1e5, 1.),
+                n("nx", "法線 X", 0., -1., 1., 0.1),
+                n("ny", "法線 Y", 0., -1., 1., 0.1),
+                n("nz", "法線 Z", 1., -1., 1., 0.1),
+                i("keep", "残す側 (1=法線側, 0=反対側)", 1., 0., 1.)
+            ]
+        ),
+        K::ExactSeamReport => spec!(
+            "連続性の解析（面どうし）",
+            "面と面の継ぎ目を、稜線の上で測ります。[継ぎ目の数, なめらか, 曲率に段差, 折れ, 隙間, 最大の隙間 mm, 最大の法線の角度 °, 最大の曲率の差 1/mm, 対象外, 測れなかった]。",
+            "continuity seam analysis g0 g1 g2 連続性 解析 継ぎ目 曲率",
+            Number,
+            [
+                B,
+                i("samples", "稜線ごとの測定点", 17., 3., 257.),
+                n("gap", "隙間の許容 mm", 0.001, 0., 1e3, 0.001),
+                n("angle", "角度の許容 °", 0.5, 0., 180., 0.1),
+                n("curvature", "曲率の許容 1/mm", 0.01, 0., 1e3, 0.001)
+            ]
+        ),
+        K::ExactCurvatureMap => spec!(
+            "曲率の表示（ガウス曲率）",
+            "表示メッシュの角の欠け（角度欠損）からガウス曲率を求め、等しい値の帯をメッシュで出します。帯の境目が曲率の変わり目です（凸・凹・鞍型を見分けられます）。",
+            "curvature gaussian map analysis 曲率 ガウス 解析 表示",
+            Mesh,
+            [B, n("gain", "感度", 4., 0.01, 1e3, 0.1)]
+        ),
         _ => spec!("不明なノード", "不明なノードです。", "unknown", Any, []),
     }
 }
@@ -729,7 +802,11 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
         K::SubdExtrudeFace => {
             out_cage(cage(a, 0)?.extrude_face(num(a, 1)? as usize, num(a, 2)?, stop)?)
         }
-        K::SubdToBrep => out(cage(a, 0)?.to_brep(num(a, 1)? != 0., stop)?),
+        K::SubdToBrep => out(cage(a, 0)?.to_brep_refined(
+            num(a, 1)? != 0.,
+            num(a, 2).unwrap_or(0.).max(0.) as usize,
+            stop,
+        )?),
         K::SubdToMesh => as_mesh(cage(a, 0)?.preview().as_ref().clone(), stop),
         K::ExactTrimPlane => out(ko::trim_by_plane(
             brep(a, 0)?,
@@ -820,6 +897,40 @@ pub fn run(kind: K, a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>,
             .into_iter()
             .map(Value::Number)
             .collect()),
+        K::ExactBlendSurface => out(ko::blend_surface(
+            brep(a, 0)?,
+            num(a, 1)?,
+            brep(a, 2)?,
+            num(a, 3)?,
+            (num(a, 4)?, num(a, 5)?),
+            num(a, 6)?,
+            stop,
+        )?),
+        K::ExactMatchSurface => out(ko::match_sheet(
+            brep(a, 0)?,
+            num(a, 1)?,
+            brep(a, 2)?,
+            num(a, 3)?,
+            num(a, 4)?,
+            stop,
+        )?),
+        K::ExactTrimByPlane => out(ko::trim_by_any_plane(
+            brep(a, 0)?,
+            [num(a, 1)?, num(a, 2)?, num(a, 3)?],
+            [num(a, 4)?, num(a, 5)?, num(a, 6)?],
+            num(a, 7)? != 0.,
+            stop,
+        )?),
+        K::ExactSeamReport => Ok(ko::seam_report(
+            brep(a, 0)?,
+            num(a, 1)?,
+            [num(a, 2)?, num(a, 3)?, num(a, 4)?],
+            stop,
+        )?
+        .into_iter()
+        .map(Value::Number)
+        .collect()),
+        K::ExactCurvatureMap => as_mesh(ko::curvature_map(brep(a, 0)?, num(a, 1)?, stop)?, stop),
         _ => Err("このノードはリスト評価が必要です。".into()),
     }
 }

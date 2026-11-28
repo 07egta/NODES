@@ -506,6 +506,22 @@ impl Cage {
         Self::build(vertices, faces, self.creases.clone(), None, stop)
     }
 
+    /// Like [`Cage::to_brep`], but a general cage is first subdivided `levels` times (Catmull-Clark
+    /// keeps the limit surface). The approximate patches around star points (valence 3, 5, ...)
+    /// shrink with every step, so the gaps in tangent plane there shrink too and the B-rep follows
+    /// the limit surface more closely, at 4x the faces per step. Grid and T-spline cages ignore it.
+    pub fn to_brep_refined(&self, cap: bool, levels: usize, stop: Stop) -> R<BrepValue> {
+        if self.grid.is_some() || self.ts.is_some() || levels == 0 {
+            return self.to_brep(cap, stop);
+        }
+        let mut cage = self.clone();
+        for _ in 0..levels.min(3) {
+            kb_stop(stop)?;
+            cage = cage.subdivide(stop)?;
+        }
+        cage.to_brep(cap, stop)
+    }
+
     /// The exact B-rep of the cage's surface. Grid cages: the bicubic surface as T-spline sheets
     /// (SolidCraft `tspline_sheet`), split in two halves around, sewn, and capped top and bottom
     /// into a closed solid when `cap` is set.
