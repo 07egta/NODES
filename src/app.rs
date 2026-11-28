@@ -2269,7 +2269,8 @@ impl NodesApp {
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(available, h), Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     self.viewport.cage_overlay = if items.is_some() {
-                        self.cage_edit.overlay(&self.project.graph, self.evaluation.as_ref())
+                        self.cage_edit
+                            .overlay(&self.project.graph, self.evaluation.as_ref())
                     } else {
                         None
                     };

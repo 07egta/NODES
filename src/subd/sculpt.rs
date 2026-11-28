@@ -36,9 +36,13 @@ impl Falloff {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BrushAction {
-    Move { delta: P3 },
+    Move {
+        delta: P3,
+    },
     /// One simultaneous, weighted Laplacian step; boundaries and creases stay fixed.
-    Relax { strength: f64 },
+    Relax {
+        strength: f64,
+    },
 }
 
 /// A single reproducible edit; all distances are measured in mm on the input cage.
@@ -82,12 +86,7 @@ impl Ord for Visit {
 
 type Neighbors = Vec<Vec<(usize, f64)>>;
 
-fn distances(
-    neighbors: &Neighbors,
-    seeds: &[usize],
-    radius: f64,
-    stop: Stop,
-) -> R<Vec<f64>> {
+fn distances(neighbors: &Neighbors, seeds: &[usize], radius: f64, stop: Stop) -> R<Vec<f64>> {
     let mut result = vec![f64::INFINITY; neighbors.len()];
     let mut queue = BinaryHeap::new();
     for &vertex in seeds {
@@ -161,7 +160,9 @@ impl Cage {
             return Err("このブラシは通常の SubD・格子ケージ専用です。".into());
         }
         if brush.topology != self.brush_topology_key() {
-            return Err("上流のケージ位相が変わりました。ブラシの編集を戻して選び直してください。".into());
+            return Err(
+                "上流のケージ位相が変わりました。ブラシの編集を戻して選び直してください。".into(),
+            );
         }
         let n = self.vertices.len();
         if brush.seeds.is_empty()
@@ -254,17 +255,13 @@ impl Cage {
                         continue;
                     }
                     let avg = scale(
-                        adj.iter().fold([0.; 3], |sum, &(j, _)| {
-                            add(sum, self.vertices[j])
-                        }),
+                        adj.iter()
+                            .fold([0.; 3], |sum, &(j, _)| add(sum, self.vertices[j])),
                         1. / adj.len() as f64,
                     );
                     add(
                         p,
-                        scale(
-                            [avg[0] - p[0], avg[1] - p[1], avg[2] - p[2]],
-                            w * strength,
-                        ),
+                        scale([avg[0] - p[0], avg[1] - p[1], avg[2] - p[2]], w * strength),
                     )
                 }
             };
@@ -295,12 +292,7 @@ mod tests {
 
     #[test]
     fn connected_distance_does_not_cross_islands() {
-        let neighbors = vec![
-            vec![(1, 2.)],
-            vec![(0, 2.), (2, 3.)],
-            vec![(1, 3.)],
-            vec![],
-        ];
+        let neighbors = vec![vec![(1, 2.)], vec![(0, 2.), (2, 3.)], vec![(1, 3.)], vec![]];
         let d = distances(&neighbors, &[0, 0], 6., &|| false).unwrap();
         assert_eq!(d, vec![0., 2., 5., f64::INFINITY]);
         assert!(distances(&neighbors, &[0], 6., &|| true).is_err());
@@ -357,8 +349,14 @@ mod tests {
         brush.topology = creased.brush_topology_key();
         let relaxed = creased.apply_brush(&brush, &|| false).unwrap();
         let (a, b) = creased.edges()[0];
-        assert_eq!(relaxed.vertices()[a as usize], creased.vertices()[a as usize]);
-        assert_eq!(relaxed.vertices()[b as usize], creased.vertices()[b as usize]);
+        assert_eq!(
+            relaxed.vertices()[a as usize],
+            creased.vertices()[a as usize]
+        );
+        assert_eq!(
+            relaxed.vertices()[b as usize],
+            creased.vertices()[b as usize]
+        );
     }
 
     #[test]
