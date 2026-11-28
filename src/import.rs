@@ -25,6 +25,7 @@ const STL_RECORD_BYTES: usize = 50;
 const CHECK_INTERVAL: usize = 4_096;
 // A per-face limit alone permits expensive work to accumulate over many OBJ faces.
 const MAX_OBJ_PREDICATES: usize = 64_000_000;
+const BAD_FACET: &str = "STL の面ごとの頂点が3個ではありません。";
 const TOO_MANY_BYTES: &str = "ファイルが大きすぎます（上限 64 MiB）。";
 
 const NO_FILE: &str =
@@ -173,13 +174,21 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
     let mut builder = Builder::default();
     let mut corners = [[0.0f64; 3]; 3];
     let mut filled = 0usize;
+    let mut ended = false;
     for (line_no, line) in text.lines().enumerate() {
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
         let mut words = line.split_whitespace();
-        if words.next() != Some("vertex") {
-            continue;
+        match words.next() {
+            Some("vertex") => {}
+            Some("endsolid") => {
+                ended = true;
+                continue;
+            }
+            // A facet must hold exactly three vertices; never join vertices across facets.
+            Some("endloop" | "endfacet") if filled != 0 => return Err(BAD_FACET.into()),
+            _ => continue,
         }
         let point = parse_xyz(words)?;
         if let Some(slot) = corners.get_mut(filled) {
@@ -191,7 +200,7 @@ fn parse_ascii_stl(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<Mesh, Stri
             filled = 0;
         }
     }
-    if filled != 0 {
+    if filled != 0 || !ended {
         return Err(
             "STL の頂点の数が三角形になりません。ファイルが途中で切れていないか確認してください。"
                 .into(),
@@ -221,6 +230,8 @@ fn parse_obj_with_budget(
         if line_no % CHECK_INTERVAL == 0 {
             cancelled(cancel)?;
         }
+        // OBJ allows `#` comments, also after the data on the same line.
+        let line = line.split('#').next().unwrap_or("");
         let mut words = line.split_whitespace();
         match words.next() {
             Some("v") => {
