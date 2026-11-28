@@ -556,6 +556,26 @@ pub enum NodeKind {
     ExactContinuity,
     ExactCurvatureComb,
     ExactOffsetCurve,
+    /// Reroute dot placed on a wire (passes its input through unchanged), appended.
+    Reroute,
+    // Standard components that were missing (see `gh_gaps.rs`), appended.
+    MathSquareRoot,
+    MathSquare,
+    MathCube,
+    MathCubeRoot,
+    MathLn,
+    MathLog10,
+    GateNand,
+    GateNor,
+    GateXnor,
+    DomainIncludes,
+    PointPolar,
+    PointCylindrical,
+    CurveArea,
+    CurveAreaCentroid,
+    CurveExplode,
+    RotateDirection,
+    ProjectToZ,
     // Mesh physics and mesh tools (`physics_nodes`), appended.
     PhysSpringRelax,
     PhysHang,
@@ -970,6 +990,24 @@ impl NodeKind {
             Self::ExactContinuity,
             Self::ExactCurvatureComb,
             Self::ExactOffsetCurve,
+            Self::Reroute,
+            Self::MathSquareRoot,
+            Self::MathSquare,
+            Self::MathCube,
+            Self::MathCubeRoot,
+            Self::MathLn,
+            Self::MathLog10,
+            Self::GateNand,
+            Self::GateNor,
+            Self::GateXnor,
+            Self::DomainIncludes,
+            Self::PointPolar,
+            Self::PointCylindrical,
+            Self::CurveArea,
+            Self::CurveAreaCentroid,
+            Self::CurveExplode,
+            Self::RotateDirection,
+            Self::ProjectToZ,
             Self::PhysSpringRelax,
             Self::PhysHang,
             Self::PhysSoapFilm,
@@ -1590,6 +1628,17 @@ impl NodeKind {
                 };
                 &SPEC
             }
+            Self::Reroute => {
+                static SPEC: NodeSpec = NodeSpec {
+                    label: "リルート点",
+                    category: "データ",
+                    description: "接続線の途中に置く小さな点。入力をそのまま出力へ渡し、配線を整理したり曲げたりできます。",
+                    keywords: "reroute dot relay wire anchor リルート 中継 配線 ドット 点",
+                    inputs: &[g("value", "入力", DataType::Any)],
+                    output: DataType::Any,
+                };
+                &SPEC
+            }
             Self::Script => &crate::script::SCRIPT_SPEC,
             Self::Cluster => &crate::cluster::CLUSTER_SPEC,
             other if crate::curve_nodes::is_curve_kind(other) => crate::curve_nodes::spec(other),
@@ -1627,6 +1676,7 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))
                 })
@@ -1699,7 +1749,7 @@ impl Graph {
                 .filter_map(|s| s.default.map(|v| (s.key.into(), v)))
                 .collect(),
             inputs: BTreeMap::new(),
-            preview: true,
+            preview: kind != NodeKind::Reroute,
             script: if kind == NodeKind::Expression {
                 crate::expr::DEFAULT_EXPRESSION.into()
             } else if kind == NodeKind::PathMapper {

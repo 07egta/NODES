@@ -96,6 +96,8 @@ fn old_examples_still_deserialize() {
         include_str!("../examples/08.morph"),
         include_str!("../examples/09.morph"),
         include_str!("../examples/10.morph"),
+        include_str!("../examples/13.morph"),
+        include_str!("../examples/14.morph"),
     ] {
         let p: Project = serde_json::from_str(s).unwrap();
         p.validate().unwrap();
