@@ -1,0 +1,32 @@
+# Vendored from SolidCraft (MIT OR Apache-2.0, https://github.com/tangency-labs/solidcraft) via the
+# owner's melt3D fork, without text shaping and fonts. Changes: docs/SOLIDCRAFT_CHANGES.md.
+[package]
+name = "solidcraft-sketch"
+description = "SolidCraft sketches: points, curves, constraints, dimensions, the solver and profile detection, vendored into NODES"
+version = "0.26.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.88"
+publish = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+neg_cmp_op_on_partial_ord = "allow"
+
+[features]
+# Opt-in developer instrumentation; normal builds contain no collection or clocks.
+solver-profiling = []
+
+[dependencies]
+solidcraft-geom = { path = "../sc-geom" }
+serde = { version = "1", features = ["derive", "rc"] }
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }

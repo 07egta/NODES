@@ -47,6 +47,7 @@ pub mod project_diff;
 pub mod raster;
 pub mod robust_geometry;
 pub mod script;
+pub mod sketch_nodes;
 pub mod stl_export;
 pub mod subd;
 pub mod templates;

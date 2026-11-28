@@ -159,11 +159,25 @@ impl CageOverlay {
         if ctrl && response.dragged_by(egui::PointerButton::Primary) {
             let d = response.drag_delta();
             let (dx, dy) = (f64::from(d.x) / view.scale, -f64::from(d.y) / view.scale);
-            events.push(CageEvent::Drag([
+            let mut w = [
                 view.right[0] * dx + view.up[0] * dy,
                 view.right[1] * dx + view.up[1] * dy,
                 view.right[2] * dx + view.up[2] * dy,
-            ]));
+            ];
+            // Hold X, Y or Z while dragging to move along that axis only.
+            let axis = response.ctx.input(|i| {
+                [egui::Key::X, egui::Key::Y, egui::Key::Z]
+                    .iter()
+                    .position(|k| i.key_down(*k))
+            });
+            if let Some(a) = axis {
+                for (k, x) in w.iter_mut().enumerate() {
+                    if k != a {
+                        *x = 0.;
+                    }
+                }
+            }
+            events.push(CageEvent::Drag(w));
             used = true;
         }
         if response.drag_stopped() && !self.moving.is_empty() {
@@ -353,7 +367,7 @@ impl CageEdit {
                 };
             }
             ui.label(theme::small(
-                "編集中は、クリックで選択（Shift で追加）、Ctrl＋ドラッグで移動します。",
+                "編集中は、クリックで選択（Shift で追加）、Ctrl＋ドラッグで移動します（X・Y・Z キーを押しながらだとその軸だけ）。",
             ));
             return;
         }
@@ -453,6 +467,18 @@ impl CageEdit {
             }
             if ui.button("折り目を消す").clicked() {
                 self.push(graph, EditOp::Uncrease);
+            }
+            if ui
+                .add_enabled(
+                    self.mode == Mode::Face && !self.selected.is_empty(),
+                    egui::Button::new("局所細分"),
+                )
+                .on_hover_text("T-spline パッチケージで、選んだ面だけ点を増やします")
+                .clicked()
+            {
+                let faces: Vec<usize> = self.selected.iter().copied().collect();
+                self.push(graph, EditOp::Refine { faces });
+                self.selected.clear();
             }
             if ui.button("細分").clicked() {
                 self.push(graph, EditOp::Subdivide);
