@@ -569,6 +569,9 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    MeshBoundaryLoops,
+    MeshIslands,
+    MeshTopologyStats,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -982,6 +985,9 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::MeshBoundaryLoops,
+            Self::MeshIslands,
+            Self::MeshTopologyStats,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1624,7 +1630,10 @@ impl NodeKind {
             | Self::MeshSelfContact
             | Self::MeshThicknessSample
             | Self::MeshCompact
-            | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
+            | Self::MeshNonManifold
+            | Self::MeshBoundaryLoops
+            | Self::MeshIslands
+            | Self::MeshTopologyStats => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
                 .or_else(|| {

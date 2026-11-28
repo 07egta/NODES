@@ -88,6 +88,37 @@ const CATEGORY_GLYPHS: &[(&str, Glyph)] = &[
 /// One icon per node kind. Kinds not listed here fall back to their category.
 const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
     (
+        NodeKind::MeshBoundaryLoops,
+        &[
+            Part::Line(&[
+                [0.15, 0.5],
+                [0.35, 0.18],
+                [0.8, 0.28],
+                [0.85, 0.75],
+                [0.35, 0.85],
+                [0.15, 0.5],
+            ]),
+            Part::Dot([0.35, 0.18]),
+            Part::Dot([0.85, 0.75]),
+        ],
+    ),
+    (
+        NodeKind::MeshIslands,
+        &[
+            Part::Line(&[[0.08, 0.72], [0.27, 0.22], [0.45, 0.72], [0.08, 0.72]]),
+            Part::Line(&[[0.55, 0.72], [0.73, 0.22], [0.92, 0.72], [0.55, 0.72]]),
+        ],
+    ),
+    (
+        NodeKind::MeshTopologyStats,
+        &[
+            Part::Line(&[[0.12, 0.78], [0.5, 0.14], [0.88, 0.78], [0.12, 0.78]]),
+            Part::Dot([0.12, 0.78]),
+            Part::Dot([0.5, 0.14]),
+            Part::Dot([0.88, 0.78]),
+        ],
+    ),
+    (
         NodeKind::PhysSpringRelax,
         &[
             Part::Line(&[

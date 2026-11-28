@@ -8,6 +8,9 @@ use crate::model::*;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
+mod topology_ops;
+pub use topology_ops::{TopologySummary, boundary_loops, split_islands, topology_summary};
+
 type P = [f64; 3];
 type Edge = (u32, u32);
 type Uses = BTreeMap<Edge, Vec<(usize, bool)>>;
@@ -669,6 +672,9 @@ specs! {
     MeshThicknessSample => ("肉厚サンプル推定","面中心から内向き法線に沿った出口距離の最小サンプル値と実サンプル数。真の最小肉厚ではありません。","mesh thickness thin wall sample 肉厚",Number,[M,i("samples","サンプル数",64.,1.,512.)]);
     MeshCompact => ("未使用頂点削除","面が参照しない頂点を削除して面番号を更新します。","mesh compact cull unused vertices 整理",Mesh,[M]);
     MeshNonManifold => ("メッシュ非多様体辺","3枚以上の面が共有する辺を線分で出力（8192本まで）。","mesh non manifold edges 非多様体 辺",Curve,[M]);
+    MeshBoundaryLoops => ("メッシュ境界ループ","向きのそろった多様体メッシュの開境界を、面の向きに沿った閉じたポリラインとして出力。分岐・退化・重複面はエラー。","mesh boundary loops naked edge ring 境界 輪郭",Curve,[M]);
+    MeshIslands => ("メッシュ島分離","共有辺でつながる面を独立したメッシュに分けます。頂点だけの接触は別の島。未使用頂点を除き、Booleanや修復は行いません。","mesh islands connected components shells 分離 連結成分",Mesh,[M]);
+    MeshTopologyStats => ("メッシュ位相統計","頂点数、辺数、面数、孤立頂点数、辺連結の面成分数、境界辺数、全頂点を含むEuler標数、面だけのEuler標数の順に8数値。自己交差や内外は未検査。","mesh topology Euler characteristic components 位相 統計",Number,[M]);
     MeshConstruct => ("メッシュ構築","各枝の点リストと0始まりの三角形番号列（3個ずつ）を使用。","construct mesh from points indices 構築",Mesh,[g("vertices","頂点リスト",DataType::Point),g("faces","面番号リスト",DataType::Number)]);
 }
 pub fn run_list(lists: &[&[Value]], stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
@@ -774,6 +780,46 @@ pub fn run_item(
                 values.push(Value::Point(mul(n, 1. / l)));
             }
             Ok(values)
+        }
+        MeshBoundaryLoops => {
+            let rings = boundary_loops(m, stop)?;
+            count(rings.len())?;
+            let mut values = Vec::with_capacity(rings.len());
+            for (i, ring) in rings.into_iter().enumerate() {
+                tick(i, stop)?;
+                let mut points = Vec::with_capacity(ring.len());
+                for (j, v) in ring.into_iter().enumerate() {
+                    tick(j, stop)?;
+                    points.push(m.vertices[v as usize]);
+                }
+                values.push(Value::Curve(Arc::new(Curve {
+                    points,
+                    closed: true,
+                    geometry: None,
+                })));
+            }
+            Ok(values)
+        }
+        MeshIslands => {
+            let islands = split_islands(m, stop)?;
+            let mut values = Vec::with_capacity(islands.len());
+            for island in islands {
+                values.extend(as_mesh(island, stop)?);
+            }
+            Ok(values)
+        }
+        MeshTopologyStats => {
+            let s = topology_summary(m, stop)?;
+            Ok(numbers([
+                s.vertices as f64,
+                s.edges as f64,
+                s.faces as f64,
+                s.isolated_vertices as f64,
+                s.edge_components as f64,
+                s.boundary_edges as f64,
+                s.euler_all as f64,
+                s.euler_surface as f64,
+            ]))
         }
         MeshEdges | MeshBoundary | MeshNonManifold => {
             let es = topology(m, stop)?;

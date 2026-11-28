@@ -816,124 +816,40 @@ fn smooth_pass(v: &mut [P], f: &[Tri], grid: &TriGrid, stop: Stop) -> Result<(),
 
 // ---------------------------------------------------------------- hole filling
 
-/// Fill boundary loops of up to `max_edges` edges by ear clipping (works for concave holes).
+/// Cap simple planar oriented boundary loops up to the requested size.
+/// Larger loops stay open. Ambiguous or degenerate caps are explicit errors.
+/// This does not certify geometric intersection or decide whether an opening
+/// was intentional; callers should inspect the result.
 pub fn fill_holes(m: &Mesh, max_edges: usize, stop: Stop) -> Result<Mesh, String> {
     raw_check(m, stop)?;
     if !(3..=300).contains(&max_edges) {
         return Err("穴の最大辺数は 3〜300 です。".into());
     }
-    let mut directed: BTreeMap<(u32, u32), usize> = BTreeMap::new();
-    for t in &m.triangles {
-        for k in 0..3 {
-            *directed.entry((t[k], t[(k + 1) % 3])).or_default() += 1;
-        }
-    }
-    let mut next: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
-    for (&(a, b), &n) in &directed {
-        if n == 1 && !directed.contains_key(&(b, a)) {
-            next.entry(a).or_default().push(b);
-        }
-    }
-    let starts: Vec<(u32, u32)> = next
-        .iter()
-        .flat_map(|(&a, bs)| bs.iter().map(move |&b| (a, b)))
-        .collect();
-    let mut visited: BTreeSet<(u32, u32)> = BTreeSet::new();
+    let rings = crate::mesh_fabrication::boundary_loops(m, stop)?;
     let mut out = m.clone();
-    for (k, &(a, b)) in starts.iter().enumerate() {
-        tick(k, stop)?;
-        if visited.contains(&(a, b)) {
-            continue;
-        }
-        visited.insert((a, b));
-        let mut ring = vec![a];
-        let mut cur = b;
-        let mut closed = true;
-        while cur != a {
-            ring.push(cur);
-            let nxt = next
-                .get(&cur)
-                .and_then(|l| l.iter().copied().find(|&x| !visited.contains(&(cur, x))))
-                .or_else(|| {
-                    next.get(&cur)
-                        .and_then(|l| l.iter().copied().find(|&x| x == a))
-                });
-            let Some(nxt) = nxt else {
-                closed = false;
-                break;
-            };
-            visited.insert((cur, nxt));
-            cur = nxt;
-            if ring.len() > max_edges {
-                closed = false;
-                break;
-            }
-        }
-        if !closed || ring.len() < 3 || ring.len() > max_edges {
+    for (i, mut ring) in rings.into_iter().enumerate() {
+        tick(i, stop)?;
+        if ring.len() > max_edges {
             continue;
         }
         ring.reverse();
-        let tris = ear_clip(&ring, &m.vertices);
-        limits(out.vertices.len(), out.triangles.len() + tris.len())?;
-        out.triangles.extend(tris);
+        let indices: Vec<usize> = ring.into_iter().map(|v| v as usize).collect();
+        let caps = crate::polygon_triangulation::triangulate_indexed(&m.vertices, &indices, stop)?;
+        limits(out.vertices.len(), out.triangles.len() + caps.len())?;
+        out.triangles.extend(caps.into_iter().map(|t| t.map(|v| v as u32)));
+    }
+    if out.triangles.len() != m.triangles.len() {
+        let report = crate::mesh_fabrication::audit(&out, stop)?;
+        if report.non_manifold_edges != 0
+            || report.non_manifold_vertices != 0
+            || report.orientation_conflicts != 0
+            || report.duplicate_faces != 0
+            || report.degenerate_faces != 0
+        {
+            return Err("穴埋めで不正な位相が生じました。境界を確認してください。".into());
+        }
     }
     Ok(out)
-}
-fn ear_clip(ring: &[u32], v: &[P]) -> Vec<Tri> {
-    let mut normal = [0.; 3];
-    for k in 0..ring.len() {
-        let (p, q) = (at(v, ring[k]), at(v, ring[(k + 1) % ring.len()]));
-        normal = add(
-            normal,
-            [
-                (p[1] - q[1]) * (p[2] + q[2]),
-                (p[2] - q[2]) * (p[0] + q[0]),
-                (p[0] - q[0]) * (p[1] + q[1]),
-            ],
-        );
-    }
-    let mut idx = ring.to_vec();
-    let mut out = Vec::new();
-    while idx.len() > 3 {
-        let n = idx.len();
-        let mut best: Option<(f64, usize)> = None;
-        for i in 0..n {
-            let (a, b, c) = (idx[(i + n - 1) % n], idx[i], idx[(i + 1) % n]);
-            let (pa, pb, pc) = (at(v, a), at(v, b), at(v, c));
-            let turn = dot(cross(sub(pb, pa), sub(pc, pb)), normal);
-            if turn <= 1e-12 {
-                continue;
-            }
-            let inside = idx.iter().any(|&o| {
-                if o == a || o == b || o == c {
-                    return false;
-                }
-                let p = at(v, o);
-                dot(cross(sub(pb, pa), sub(p, pa)), normal) > 0.
-                    && dot(cross(sub(pc, pb), sub(p, pb)), normal) > 0.
-                    && dot(cross(sub(pa, pc), sub(p, pc)), normal) > 0.
-            });
-            if inside {
-                continue;
-            }
-            let diag = len(sub(pc, pa));
-            if best.is_none_or(|(d, _)| diag < d) {
-                best = Some((diag, i));
-            }
-        }
-        let Some((_, i)) = best else {
-            for j in 1..n - 1 {
-                out.push([idx[0], idx[j], idx[j + 1]]);
-            }
-            return out;
-        };
-        out.push([idx[(i + n - 1) % n], idx[i], idx[(i + 1) % n]]);
-        idx.remove(i);
-    }
-    if let [a, b, c] = idx[..] {
-        out.push([a, b, c]);
-    }
-    out
 }
 
 // ---------------------------------------------------------------- offset and thickening

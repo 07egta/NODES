@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "name": "位相ラボ：穴のある箱",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "box",
+        "name": "箱",
+        "position": [
+          20,
+          20
+        ],
+        "params": {
+          "width": 40,
+          "depth": 40,
+          "height": 40
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "mesh_delete_face",
+        "name": "面を削除",
+        "position": [
+          250,
+          20
+        ],
+        "params": {
+          "index": 2
+        },
+        "inputs": {
+          "mesh": 0
+        },
+        "preview": false
+      },
+      {
+        "id": 2,
+        "kind": "mesh_topology_stats",
+        "name": "Euler標数と成分",
+        "position": [
+          510,
+          20
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 3,
+        "kind": "mesh_boundary_loops",
+        "name": "境界ループ",
+        "position": [
+          510,
+          150
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": true
+      },
+      {
+        "id": 4,
+        "kind": "mesh_islands",
+        "name": "島の分離",
+        "position": [
+          510,
+          280
+        ],
+        "params": {},
+        "inputs": {
+          "mesh": 1
+        },
+        "preview": false
+      },
+      {
+        "id": 5,
+        "kind": "output",
+        "name": "開いた箱",
+        "position": [
+          760,
+          280
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 4
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 6
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}
