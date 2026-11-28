@@ -836,7 +836,8 @@ pub fn fill_holes(m: &Mesh, max_edges: usize, stop: Stop) -> Result<Mesh, String
         let indices: Vec<usize> = ring.into_iter().map(|v| v as usize).collect();
         let caps = crate::polygon_triangulation::triangulate_indexed(&m.vertices, &indices, stop)?;
         limits(out.vertices.len(), out.triangles.len() + caps.len())?;
-        out.triangles.extend(caps.into_iter().map(|t| t.map(|v| v as u32)));
+        out.triangles
+            .extend(caps.into_iter().map(|t| t.map(|v| v as u32)));
     }
     if out.triangles.len() != m.triangles.len() {
         let report = crate::mesh_fabrication::audit(&out, stop)?;

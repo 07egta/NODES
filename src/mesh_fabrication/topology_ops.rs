@@ -59,10 +59,7 @@ fn face_groups(
     Ok((labels, count))
 }
 
-pub fn topology_summary(
-    m: &Mesh,
-    stop: &dyn Fn() -> bool,
-) -> Result<TopologySummary, String> {
+pub fn topology_summary(m: &Mesh, stop: &dyn Fn() -> bool) -> Result<TopologySummary, String> {
     let report = checked_surface(m, stop)?;
     let edges = topology(m, stop)?;
     let (_, edge_components) = face_groups(&edges, m.triangles.len(), stop)?;
