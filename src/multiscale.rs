@@ -34,7 +34,9 @@ impl GradedBcc {
         radii: [f64; 2],
         minimum_diameter: f64,
     ) -> Result<Self, LatticeError> {
-        if extent.iter().any(|v| !v.is_finite() || !(1e-6..=1e6).contains(v))
+        if extent
+            .iter()
+            .any(|v| !v.is_finite() || !(1e-6..=1e6).contains(v))
             || cells.iter().any(|n| n.get() > 1_000_000)
             || !grading.is_finite()
             || grading.abs() > 0.8
@@ -43,13 +45,13 @@ impl GradedBcc {
         {
             return Err(LatticeError::InvalidParameters);
         }
-        let min_pitch = (extent[0] / f64::from(cells[0].get())
-            * (1.0 - grading.abs()))
+        let min_pitch = (extent[0] / f64::from(cells[0].get()) * (1.0 - grading.abs()))
             .min(extent[1] / f64::from(cells[1].get()))
             .min(extent[2] / f64::from(cells[2].get()));
-        if radii.iter().any(|r| {
-            !r.is_finite() || *r < minimum_diameter * 0.5 || *r > min_pitch * 0.5
-        }) {
+        if radii
+            .iter()
+            .any(|r| !r.is_finite() || *r < minimum_diameter * 0.5 || *r > min_pitch * 0.5)
+        {
             return Err(LatticeError::InvalidParameters);
         }
         Ok(Self {
@@ -104,8 +106,7 @@ impl GradedBcc {
         }
         let indices: [u32; 3] = std::array::from_fn(|a| self.containing_cell(a, p[a]));
         let ranges = std::array::from_fn::<_, 3, _>(|a| {
-            indices[a].saturating_sub(1)
-                ..=(indices[a] + 1).min(self.cells[a].get() - 1)
+            indices[a].saturating_sub(1)..=(indices[a] + 1).min(self.cells[a].get() - 1)
         });
         let radius = self.radius(p[0]);
         let mut field = f64::INFINITY;
@@ -113,12 +114,9 @@ impl GradedBcc {
             for y in ranges[1].clone() {
                 for z in ranges[2].clone() {
                     let cell = [x, y, z];
-                    let low: [f64; 3] =
-                        std::array::from_fn(|a| self.boundary(a, cell[a]));
-                    let high: [f64; 3] =
-                        std::array::from_fn(|a| self.boundary(a, cell[a] + 1));
-                    let center: [f64; 3] =
-                        std::array::from_fn(|a| (low[a] + high[a]) * 0.5);
+                    let low: [f64; 3] = std::array::from_fn(|a| self.boundary(a, cell[a]));
+                    let high: [f64; 3] = std::array::from_fn(|a| self.boundary(a, cell[a] + 1));
+                    let center: [f64; 3] = std::array::from_fn(|a| (low[a] + high[a]) * 0.5);
                     for bits in 0..8 {
                         let corner = std::array::from_fn(|a| {
                             if bits & (1 << a) == 0 {
@@ -205,8 +203,7 @@ fn segment_distance(p: [f64; 3], a: [f64; 3], b: [f64; 3]) -> f64 {
     let d: [f64; 3] = std::array::from_fn(|i| b[i] - a[i]);
     let v: [f64; 3] = std::array::from_fn(|i| p[i] - a[i]);
     let length_squared: f64 = d.iter().map(|x| x * x).sum();
-    let t = (d.iter().zip(v).map(|(x, y)| x * y).sum::<f64>() / length_squared)
-        .clamp(0.0, 1.0);
+    let t = (d.iter().zip(v).map(|(x, y)| x * y).sum::<f64>() / length_squared).clamp(0.0, 1.0);
     d.iter()
         .zip(v)
         .map(|(x, y)| (y - t * x).powi(2))
@@ -249,13 +246,19 @@ mod tests {
     #[test]
     fn invalid_and_budgeted() {
         let lattice = sample([0.3, 0.8]);
-        assert_eq!(lattice.field([f64::NAN, 0.0, 0.0]), Err(LatticeError::InvalidPoint));
+        assert_eq!(
+            lattice.field([f64::NAN, 0.0, 0.0]),
+            Err(LatticeError::InvalidPoint)
+        );
         assert!(lattice.field([-1.0, 0.0, 0.0]).unwrap() > 0.0);
         assert!(matches!(
             lattice.estimate_density(nz(u32::MAX), u64::MAX),
             Err(LatticeError::BudgetExceeded)
         ));
-        assert_eq!(lattice.section(2.5, [nz(10); 2], 99), Err(LatticeError::BudgetExceeded));
+        assert_eq!(
+            lattice.section(2.5, [nz(10); 2], 99),
+            Err(LatticeError::BudgetExceeded)
+        );
         assert_eq!(lattice.section(2.5, [nz(10); 2], 100).unwrap().len(), 100);
     }
 }
