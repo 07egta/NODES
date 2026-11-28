@@ -163,8 +163,7 @@ pub(crate) fn atomic_write(
     path: &Path,
     write: impl FnOnce(&mut BufWriter<File>) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    let file_name = path
-        .file_name()
+    path.file_name()
         .ok_or_else(|| "保存先のファイル名を指定してください。".to_string())?;
     if path.is_dir() {
         return Err("フォルダーではなく、ファイル名を指定してください。".into());
@@ -179,9 +178,12 @@ pub(crate) fn atomic_write(
     let mut temporary: Option<(PathBuf, File)> = None;
     for _ in 0..32 {
         let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let mut name = file_name.to_os_string();
-        name.push(format!(".morphlet-{}-{sequence}.tmp", std::process::id()));
-        let candidate = parent.join(name);
+        // Do not append to the destination basename: it may already be at the
+        // filesystem component-length limit. Keep the staging name short.
+        let candidate = parent.join(format!(".morphlet-{}-{sequence}.tmp", std::process::id()));
+        if candidate == path {
+            continue;
+        }
         match OpenOptions::new()
             .write(true)
             .create_new(true)
