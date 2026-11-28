@@ -113,7 +113,9 @@ fn main() {
             3,
             || {
                 for _ in 0..20 {
-                    f.body().edges(0.01).map_err(|e| format!("{e:?}"))?;
+                    f.body()
+                        .edges(kb::tol::chord(f.body().size()))
+                        .map_err(|e| format!("{e:?}"))?;
                 }
                 Ok(())
             },
