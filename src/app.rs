@@ -535,7 +535,8 @@ impl NodesApp {
             self.history = History::default();
             self.suppress_history = true;
             self.canvas.selected.clear();
-            self.canvas.connecting = None;
+            self.canvas.restore_graph(&self.project.graph);
+            self.cage_edit = Default::default();
             self.canvas.fit_requested = true;
             self.viewport = Viewport::default();
             self.preview_revision = None;
@@ -1150,9 +1151,9 @@ impl NodesApp {
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
-            self.canvas
-                .selected
-                .retain(|id| self.project.graph.node(*id).is_some());
+            self.canvas.restore_graph(&self.project.graph);
+            self.wire_source = None;
+            self.cage_edit = Default::default();
         }
     }
     fn redo(&mut self) {
@@ -1160,6 +1161,9 @@ impl NodesApp {
             self.suppress_history = true;
             self.dirty = true;
             self.queue_compute();
+            self.canvas.restore_graph(&self.project.graph);
+            self.wire_source = None;
+            self.cage_edit = Default::default();
         }
     }
     fn keyboard(&mut self, ctx: &egui::Context) {
@@ -1954,8 +1958,12 @@ impl NodesApp {
                             }
                         } else if let (Some(default), false) = (input.default, needs_link) {
                             if let Some(n) = self.project.graph.node_mut(id) {
-                                let value = n.params.entry(input.key.into()).or_insert(default);
-                                parameter_editor(ui, value, input);
+                                let mut value = n.params.get(input.key).copied().unwrap_or(default);
+                                let before = value.to_bits();
+                                parameter_editor(ui, &mut value, input);
+                                if value.to_bits() != before {
+                                    n.params.insert(input.key.into(), value);
+                                }
                             }
                         } else if optional {
                             ui.label(theme::small("つながなくても動きます（任意）"));
@@ -2745,6 +2753,16 @@ impl NodesApp {
                 if ui.button("続きから開く").clicked() {
                     self.project = recovery.clone();
                     self.clipboard.clear();
+                    self.canvas.selected.clear();
+                    self.canvas.restore_graph(&self.project.graph);
+                    self.wire_source = None;
+                    self.palette_open = false;
+                    self.cage_edit = Default::default();
+                    self.history = History::default();
+                    self.viewport = Viewport::default();
+                    self.preview_revision = None;
+                    self.evaluation = None;
+                    self.diagnostics = None;
                     self.recovery = None;
                     self.dirty = true;
                     self.suppress_history = true;

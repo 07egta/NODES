@@ -307,6 +307,19 @@ fn input_pos(n: &Node, index: usize, rect: Rect, pan: [f32; 2], zoom: f32) -> Po
 }
 
 impl GraphCanvas {
+    /// Discard gestures that refer to a previous graph snapshot.
+    pub fn restore_graph(&mut self, graph: &nodes::model::Graph) {
+        self.selected.retain(|id| graph.node(*id).is_some());
+        self.connecting = None;
+        self.dragging = None;
+        self.wire_drag = false;
+        self.box_start = None;
+        self.box_base.clear();
+        self.editing_note = None;
+        self.note_focus = false;
+        self.fit_selection_requested = false;
+    }
+
     pub fn center_for_add(&self, p: &Project) -> [f32; 2] {
         self.last_rect
             .map(|r| to_world(r.center(), r, p.pan, p.zoom))
@@ -1144,13 +1157,14 @@ impl GraphCanvas {
                 {
                     // The first numeric inputs have a track and a direct-entry field.
                     let m = &mut p.graph.nodes[*node_index];
-                    let value = m.params.entry(spec.key.into()).or_insert(default);
+                    let mut value = m.params.get(spec.key).copied().unwrap_or(default);
+                    let before = value.to_bits();
                     let track = Rect::from_min_size(
                         ip + egui::vec2(88., -9.) * p.zoom,
                         egui::vec2(60., 18.) * p.zoom,
                     );
                     let width = 60. * p.zoom;
-                    let slider = crate::app::parameter_slider(value, spec)
+                    let slider = crate::app::parameter_slider(&mut value, spec)
                         .show_value(false)
                         .trailing_fill(true);
                     ui.scope_builder(
@@ -1164,7 +1178,10 @@ impl GraphCanvas {
                         ip + egui::vec2(153., -10.) * p.zoom,
                         egui::vec2(48., 22.) * p.zoom,
                     );
-                    parameter_number(ui, number, n.id, spec, value, p.zoom);
+                    parameter_number(ui, number, n.id, spec, &mut value, p.zoom);
+                    if value.to_bits() != before {
+                        m.params.insert(spec.key.into(), value);
+                    }
                 } else if p.zoom > 0.62
                     && let Some(default) = spec.default
                 {
@@ -1205,8 +1222,12 @@ impl GraphCanvas {
                         );
                     } else {
                         let m = &mut p.graph.nodes[*node_index];
-                        let value = m.params.entry(spec.key.into()).or_insert(default);
-                        parameter_number(ui, vr, n.id, spec, value, p.zoom);
+                        let mut value = m.params.get(spec.key).copied().unwrap_or(default);
+                        let before = value.to_bits();
+                        parameter_number(ui, vr, n.id, spec, &mut value, p.zoom);
+                        if value.to_bits() != before {
+                            m.params.insert(spec.key.into(), value);
+                        }
                     }
                 }
             }
@@ -1966,6 +1987,39 @@ fn bezier(painter: &egui::Painter, a: Pos2, b: Pos2, stroke: Stroke) {
 #[cfg(test)]
 mod premium_tests {
     use super::*;
+
+    #[test]
+    fn restored_graph_discards_transient_gestures_and_invalid_selection() {
+        let mut graph = nodes::model::Graph::default();
+        let kept = graph.add(NodeKind::Number, [0., 0.]).unwrap();
+        let removed = graph.add(NodeKind::Number, [300., 0.]).unwrap();
+        let mut canvas = GraphCanvas {
+            selected: BTreeSet::from([kept, removed]),
+            connecting: Some(removed),
+            dragging: Some(kept),
+            wire_drag: true,
+            box_start: Some(Pos2::ZERO),
+            box_base: BTreeSet::from([removed]),
+            editing_note: Some(0),
+            note_focus: true,
+            fit_selection_requested: true,
+            snap: true,
+            hide_grid: true,
+            ..Default::default()
+        };
+        graph.remove(removed);
+        canvas.restore_graph(&graph);
+        assert_eq!(canvas.selected, BTreeSet::from([kept]));
+        assert!(canvas.connecting.is_none());
+        assert!(canvas.dragging.is_none());
+        assert!(!canvas.wire_drag);
+        assert!(canvas.box_start.is_none());
+        assert!(canvas.box_base.is_empty());
+        assert!(canvas.editing_note.is_none());
+        assert!(!canvas.note_focus);
+        assert!(!canvas.fit_selection_requested);
+        assert!(canvas.snap && canvas.hide_grid);
+    }
 
     #[test]
     fn fit_is_finite_for_narrow_and_large_graphs() {
