@@ -589,6 +589,10 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // GENESIS: append-only stable serialized IDs.
+    GenesisScopes,
+    GenesisScopeIds,
+    GenesisRelief,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1020,6 +1024,9 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::GenesisScopes,
+            Self::GenesisScopeIds,
+            Self::GenesisRelief,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1648,6 +1655,7 @@ impl NodeKind {
             other if crate::nurbs_nodes::is_kind(other) => crate::nurbs_nodes::spec(other),
             other if crate::gcode_nodes::is_kind(other) => crate::gcode_nodes::spec(other),
             other if crate::physics_nodes::is_kind(other) => crate::physics_nodes::spec(other),
+            other if crate::genesis::is_kind(other) => crate::genesis::spec(other),
             Self::MeshArea
             | Self::MeshVolume
             | Self::MeshCenter
