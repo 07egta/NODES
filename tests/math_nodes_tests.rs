@@ -157,7 +157,7 @@ fn graph_error_propagation_and_seed_repeatability() {
             .branches
             .values()
             .flatten()
-            .all(|v| v.number().is_some_and(f64::is_finite))
+            .all(|v| v.number().is_ok_and(f64::is_finite))
     );
     assert_eq!(expected, ev.outputs[&s].as_ref().unwrap());
     g.node_mut(s).unwrap().params.insert("seed".into(), 43.0);
