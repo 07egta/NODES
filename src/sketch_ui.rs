@@ -144,8 +144,8 @@ fn candidates(sk: &Sketch, pos: Vec2, tolerance: f64, grid: Option<f64>) -> Vec<
         add(p.pos, SnapKind::Point(p.id.clone()));
     }
     for c in &sk.curves {
-        if let CurveKind::Line { a, b } = c.kind
-            && let (Some(a), Some(b)) = (sk.point(a), sk.point(b))
+        if let CurveKind::Line { a, b } = &c.kind
+            && let (Some(a), Some(b)) = (sk.point(*a), sk.point(*b))
         {
             add((a + b) * 0.5, SnapKind::Midpoint(c.id.clone()));
         }
@@ -539,7 +539,7 @@ fn visual(ui: &mut egui::Ui, state: &mut Editor) {
         if let Some(curve) = sk.curves.iter().find(|c| c.id == state.selected_curve) {
             let mut command = None;
             ui.horizontal_wrapped(|ui| {
-                match curve.kind {
+                match &curve.kind {
                     CurveKind::Line { .. } => {
                         if ui.button("水平").clicked() { command = Some(format!("horizontal {}", curve.id)); }
                         if ui.button("垂直").clicked() { command = Some(format!("vertical {}", curve.id)); }
@@ -568,7 +568,7 @@ pub fn editor(ui: &mut egui::Ui, graph: &mut Graph, id: NodeId) {
         .unwrap_or_else(|| Editor::new(&node.script));
     // Undo, redo, load and external script edits invalidate every pending pick.
     if state.source != node.script { state = Editor::new(&node.script); }
-    ui.push_id(id, |ui| {
+    ui.push_id(("sketch_editor", id), |ui| {
         ui.add_space(6.);
         ui.label(RichText::new("スケッチ · XY 平面").strong());
         visual(ui, &mut state);
@@ -632,15 +632,15 @@ mod tests {
         assert!(tied[1].ends_with("base.end"));
         assert!(preview(&appended("line base 0 0 10 0", &tied)).is_ok());
         let hits = candidates(&sk, Vec2::new(5., 0.), 0.01, Some(5.));
-        assert!(hits.iter().any(|h| matches!(h.kind, SnapKind::Midpoint(_))));
-        assert!(hits.iter().any(|h| h.kind == SnapKind::Grid));
+        assert!(hits.iter().any(|h| matches!(&h.kind, SnapKind::Midpoint(_))));
+        assert!(hits.iter().any(|h| matches!(&h.kind, SnapKind::Grid)));
     }
 
     #[test]
     fn invalid_visual_edit_never_replaces_script() {
         let mut s = Editor::new("circle c 0 0 5\nradius c 5\n");
         let before = s.source.clone();
-        assert!(!s.commit(appended(&before, &["radius c -1".into()])));
+        assert!(!s.commit(appended(&before, &["radius missing 1".into()])));
         assert_eq!(s.source, before);
         assert_eq!(s.buffer, before);
         assert!(s.message.is_some());
@@ -656,7 +656,7 @@ mod tests {
         let after = edit_dimension(before, 1, 8.).unwrap();
         assert_eq!(after, "circle c 0 0 5\n半径 c 8 # hole\n");
         let (sk, _) = preview(&after).unwrap();
-        assert!(matches!(sk.curves[0].kind, CurveKind::Circle { r, .. } if (r - 8.).abs() < 1e-5));
+        assert!(matches!(&sk.curves[0].kind, CurveKind::Circle { r, .. } if (*r - 8.).abs() < 1e-5));
         assert!(edit_dimension(before, 0, 10.).is_err());
     }
 
