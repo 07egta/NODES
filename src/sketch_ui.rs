@@ -34,18 +34,20 @@ fn preview(text: &str) -> Preview {
 enum Tool {
     Point,
     Line,
+    Polyline,
     Rectangle,
     CenterRectangle,
     Circle,
 }
 impl Tool {
-    const ALL: [Self; 5] = [
-        Self::Point, Self::Line, Self::Rectangle, Self::CenterRectangle, Self::Circle,
+    const ALL: [Self; 6] = [
+        Self::Point, Self::Line, Self::Polyline, Self::Rectangle, Self::CenterRectangle, Self::Circle,
     ];
     fn label(self) -> &'static str {
         match self {
             Self::Point => "点",
             Self::Line => "線",
+            Self::Polyline => "連続線",
             Self::Rectangle => "長方形",
             Self::CenterRectangle => "中心長方形",
             Self::Circle => "円",
@@ -206,7 +208,7 @@ fn make_commands(
     }
     let mut out = Vec::new();
     match tool {
-        Tool::Line => {
+        Tool::Line | Tool::Polyline => {
             out.push(format!("line {id} {} {} {} {}", p.x, p.y, q.x, q.y));
             if persistent {
                 reference(&mut out, &format!("{id}.start"), a);
@@ -360,7 +362,18 @@ impl Editor {
         let Ok((sk, _)) = snapshot.as_ref() else { return; };
         let first = self.first.as_ref().unwrap_or(&snap);
         match make_commands(sk, self.tool, first, self.first.as_ref().map(|_| &snap), self.persistent) {
-            Ok(commands) => { self.commit(appended(&self.source, &commands)); }
+            Ok(commands) => {
+                if self.commit(appended(&self.source, &commands)) && self.tool == Tool::Polyline {
+                    // Use the solved end point, not the unsolved mouse coordinate.
+                    if let Ok((sk, _)) = self.preview.as_ref()
+                        && let Some(curve) = sk.curves.last()
+                        && let Some(i) = sk.resolve_point(&format!("{}.end", curve.id))
+                        && let Some(p) = sk.points.get(i)
+                    {
+                        self.first = Some(Snap { pos: p.pos, kind: SnapKind::Point(p.id.clone()) });
+                    }
+                }
+            }
             Err(error) => self.message = Some(error),
         }
     }
