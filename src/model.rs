@@ -385,6 +385,7 @@ pub enum NodeKind {
     MeshConstruct,
     MeshSelfContact,
     MeshThicknessSample,
+    MeshBedFit,
     MeshCompact,
     MeshNonManifold,
     // Mathematical curve nodes: appended to preserve legacy serde names.
@@ -540,6 +541,8 @@ pub enum NodeKind {
     GcodePreview,
     GcodeEstimate,
     GcodeSafety,
+    GcodeColorChange,
+    GcodeColorGradient,
     // More exact NURBS / SubD nodes (`nurbs_nodes`), appended.
     SubdCageEdit,
     ExactTrimPlane,
@@ -836,6 +839,7 @@ impl NodeKind {
             Self::MeshConstruct,
             Self::MeshSelfContact,
             Self::MeshThicknessSample,
+            Self::MeshBedFit,
             Self::MeshCompact,
             Self::MeshNonManifold,
             Self::CurveLine,
@@ -983,6 +987,8 @@ impl NodeKind {
             Self::GcodePreview,
             Self::GcodeEstimate,
             Self::GcodeSafety,
+            Self::GcodeColorChange,
+            Self::GcodeColorGradient,
             Self::SubdCageEdit,
             Self::ExactTrimPlane,
             Self::ExactFilletVariable,
@@ -1687,6 +1693,7 @@ impl NodeKind {
             | Self::MeshConstruct
             | Self::MeshSelfContact
             | Self::MeshThicknessSample
+            | Self::MeshBedFit
             | Self::MeshCompact
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)

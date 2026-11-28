@@ -823,6 +823,32 @@ const KIND_GLYPHS: &[(NodeKind, Glyph)] = &[
         ],
     ),
     (
+        NodeKind::GcodeColorChange,
+        &[
+            Part::Line(&[[0.12, 0.88], [0.88, 0.88]]),
+            Part::Line(&[[0.12, 0.7], [0.88, 0.7]]),
+            Part::Ring([0.5, 0.34, 0.16]),
+            Part::Dot([0.5, 0.34]),
+        ],
+    ),
+    (
+        NodeKind::GcodeColorGradient,
+        &[
+            Part::Line(&[[0.12, 0.85], [0.88, 0.85]]),
+            Part::Line(&[[0.12, 0.65], [0.66, 0.65]]),
+            Part::Line(&[[0.12, 0.45], [0.44, 0.45]]),
+            Part::Line(&[[0.12, 0.25], [0.22, 0.25]]),
+        ],
+    ),
+    (
+        NodeKind::MeshBedFit,
+        &[
+            Part::Line(&[[0.1, 0.8], [0.9, 0.8]]),
+            Part::Line(&[[0.25, 0.8], [0.25, 0.3], [0.75, 0.3], [0.75, 0.8]]),
+            Part::Line(&[[0.5, 0.12], [0.5, 0.3]]),
+        ],
+    ),
+    (
         NodeKind::Reroute,
         &[
             Part::Line(&[[0.08, 0.5], [0.32, 0.5]]),

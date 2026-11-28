@@ -1485,3 +1485,28 @@ fn hostile_settings_on_new_nodes_are_errors_not_panics() {
         }
     }
 }
+
+#[test]
+fn bed_fit_reports_overflow_per_axis() {
+    let check = |dims: [f64; 3], params: &[(&str, f64)]| {
+        let mut graph = Graph::default();
+        let shape = graph.add(NodeKind::Box, [0., 0.]).unwrap();
+        set(
+            &mut graph,
+            shape,
+            &[("width", dims[0]), ("depth", dims[1]), ("height", dims[2])],
+        );
+        let id = graph.add(NodeKind::MeshBedFit, [0., 0.]).unwrap();
+        set(&mut graph, id, params);
+        graph.connect(shape, id, "mesh").unwrap();
+        numbers_of(&evaluate_one(&graph, id).unwrap())
+    };
+    // Preset 0 is 180 x 180 x 180 mm.
+    assert_eq!(check([40., 40., 40.], &[]), [0., 0., 0., 1.]);
+    assert_eq!(check([250., 40., 200.], &[]), [70., 0., 20., 0.]);
+    // A custom bed replaces the preset value on that axis only.
+    assert_eq!(
+        check([250., 40., 200.], &[("bed_x", 300.)]),
+        [0., 0., 20., 0.]
+    );
+}
