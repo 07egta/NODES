@@ -114,7 +114,10 @@ fn divide(a: I, b: I) -> Option<I> {
     }
     I::new(
         q.iter().copied().fold(f64::INFINITY, f64::min).next_down(),
-        q.iter().copied().fold(f64::NEG_INFINITY, f64::max).next_up(),
+        q.iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max)
+            .next_up(),
     )
 }
 
@@ -123,7 +126,9 @@ fn divide(a: I, b: I) -> Option<I> {
 /// ensure continuity, so interior knots and both outer endpoints are covered.
 fn spans(knots: &[f64], n: usize, p: usize, [lo, hi]: [f64; 2]) -> Option<(usize, usize)> {
     let first = (p..n).find(|&i| knots[i] <= lo && lo < knots[i + 1])?;
-    let last = (p..n).rev().find(|&i| knots[i] < hi && hi <= knots[i + 1])?;
+    let last = (p..n)
+        .rev()
+        .find(|&i| knots[i] < hi && hi <= knots[i + 1])?;
     (first <= last).then_some((first, last))
 }
 
@@ -161,13 +166,7 @@ fn control_hull(s: &NurbsSurface, us: (usize, usize), vs: (usize, usize)) -> [I;
     bounds
 }
 
-fn refine(
-    s: &NurbsSurface,
-    u: [f64; 2],
-    v: [f64; 2],
-    su: usize,
-    sv: usize,
-) -> Option<[I; 3]> {
+fn refine(s: &NurbsSurface, u: [f64; 2], v: [f64; 2], su: usize, sv: usize) -> Option<[I; 3]> {
     let (u, v) = (I::new(u[0], u[1])?, I::new(v[0], v[1])?);
     let mut rows = Vec::with_capacity(s.pu + 1);
     for i in su - s.pu..=su {
@@ -181,7 +180,11 @@ fn refine(
         rows.push(de_boor(row, &s.kv, s.pv, sv, v)?);
     }
     let h = de_boor(rows, &s.ku, s.pu, su, u)?;
-    Some([divide(h[0], h[3])?, divide(h[1], h[3])?, divide(h[2], h[3])?])
+    Some([
+        divide(h[0], h[3])?,
+        divide(h[1], h[3])?,
+        divide(h[2], h[3])?,
+    ])
 }
 
 /// Exact-real enclosure for the represented surface on a closed box.
@@ -195,7 +198,8 @@ fn surface_bounds(s: &NurbsSurface, u: [f64; 2], v: [f64; 2]) -> [I; 3] {
         return control_hull(s, (0, s.nu - 1), (0, s.nv - 1));
     };
     let coarse = control_hull(s, (u0 - s.pu, u1), (v0 - s.pv, v1));
-    if u0 == u1 && v0 == v1
+    if u0 == u1
+        && v0 == v1
         && let Some(tight) = refine(s, u, v, u0, v0)
     {
         return std::array::from_fn(|i| clip(coarse[i], tight[i]).unwrap_or(coarse[i]));
@@ -211,7 +215,12 @@ fn strictly_separated(a: [I; 3], b: [I; 3]) -> bool {
     })
 }
 
-fn record_sample(a: &NurbsSurface, b: &NurbsSurface, cell: ParameterBox, report: &mut SearchReport) {
+fn record_sample(
+    a: &NurbsSurface,
+    b: &NurbsSurface,
+    cell: ParameterBox,
+    report: &mut SearchReport,
+) {
     let [u, v, s, t] = cell.midpoint();
     let (Ok(pa), Ok(pb)) = (a.evaluate_native(u, v), b.evaluate_native(s, t)) else {
         return;
@@ -240,7 +249,10 @@ fn split(
     for (i, k) in knots.iter().enumerate() {
         let [lo, hi] = cell.axes[i];
         let mid = lo + (hi - lo) * 0.5;
-        let at = k.iter().copied().filter(|&x| lo < x && x < hi)
+        let at = k
+            .iter()
+            .copied()
+            .filter(|&x| lo < x && x < hi)
             .min_by(|x, y| (x - mid).abs().total_cmp(&(y - mid).abs()))
             .unwrap_or(mid);
         if lo < at && at < hi {
@@ -274,7 +286,9 @@ pub fn search(
     }
     let [au, av] = a.native_domain();
     let [bu, bv] = b.native_domain();
-    let domain = ParameterBox { axes: [au, av, bu, bv] };
+    let domain = ParameterBox {
+        axes: [au, av, bu, bv],
+    };
     let knots: [&[f64]; 4] = [&a.ku, &a.kv, &b.ku, &b.kv];
     let mut report = SearchReport {
         domain,
@@ -294,9 +308,11 @@ pub fn search(
             None
         };
         if let Some(reason) = interruption {
-            report.unresolved.extend(pending.drain(..).map(|(parameters, _)| {
-                UnresolvedBox { parameters, reason }
-            }));
+            report.unresolved.extend(
+                pending
+                    .drain(..)
+                    .map(|(parameters, _)| UnresolvedBox { parameters, reason }),
+            );
             break;
         }
         let (cell, depth) = pending.pop().expect("nonempty frontier");
@@ -309,9 +325,11 @@ pub fn search(
         if depth == 0 {
             record_sample(a, b, cell, &mut report);
         }
-        let small = cell.axes.iter().zip(domain.axes).all(|([lo, hi], [a, b])| {
-            (hi - lo) / (b - a) <= options.parameter_fraction
-        });
+        let small = cell
+            .axes
+            .iter()
+            .zip(domain.axes)
+            .all(|([lo, hi], [a, b])| (hi - lo) / (b - a) <= options.parameter_fraction);
         let reason = if small {
             UnresolvedReason::ParameterResolution
         } else if depth >= options.max_depth {
@@ -325,7 +343,10 @@ pub fn search(
             UnresolvedReason::FloatingPointResolution
         };
         record_sample(a, b, cell, &mut report);
-        report.unresolved.push(UnresolvedBox { parameters: cell, reason });
+        report.unresolved.push(UnresolvedBox {
+            parameters: cell,
+            reason,
+        });
     }
     Ok(report)
 }
@@ -352,16 +373,27 @@ mod tests {
     }
 
     fn run(a: &NurbsSurface, b: &NurbsSurface) -> SearchReport {
-        search(a, b, SearchOptions {
-            max_boxes: 12_000,
-            parameter_fraction: 1.0 / 32.0,
-            ..SearchOptions::default()
-        }, &|| false).unwrap()
+        search(
+            a,
+            b,
+            SearchOptions {
+                max_boxes: 12_000,
+                parameter_fraction: 1.0 / 32.0,
+                ..SearchOptions::default()
+            },
+            &|| false,
+        )
+        .unwrap()
     }
 
     fn assert_covered(report: &SearchReport, root: [f64; 4]) {
-        assert!(report.unresolved.iter().any(|b| b.parameters.axes.iter()
-            .zip(root).all(|([lo, hi], x)| *lo <= x && x <= *hi)));
+        assert!(report.unresolved.iter().any(|b| {
+            b.parameters
+                .axes
+                .iter()
+                .zip(root)
+                .all(|([lo, hi], x)| *lo <= x && x <= *hi)
+        }));
     }
 
     #[test]
@@ -383,7 +415,12 @@ mod tests {
     fn tiny_closed_loop_has_all_four_known_roots_covered() {
         let d = 1.0 / 1024.0;
         let r = run(&bowl(d), &plane(0.));
-        for (u, v) in [(0.5 + d, 0.5), (0.5 - d, 0.5), (0.5, 0.5 + d), (0.5, 0.5 - d)] {
+        for (u, v) in [
+            (0.5 + d, 0.5),
+            (0.5 - d, 0.5),
+            (0.5, 0.5 + d),
+            (0.5, 0.5 - d),
+        ] {
             assert_covered(&r, [u, v, u, v]);
         }
     }
@@ -391,9 +428,12 @@ mod tests {
     #[test]
     fn branch_and_boundary_roots_are_retained() {
         let saddle = NurbsSurface::bilinear(
-            [0., 0., 0.25], [0., 1., -0.25],
-            [1., 0., -0.25], [1., 1., 0.25],
-        ).unwrap();
+            [0., 0., 0.25],
+            [0., 1., -0.25],
+            [1., 0., -0.25],
+            [1., 1., 0.25],
+        )
+        .unwrap();
         let r = run(&saddle, &plane(0.));
         for (u, v) in [(0.5, 0.5), (0., 0.5), (1., 0.5), (0.5, 0.), (0.5, 1.)] {
             assert_covered(&r, [u, v, u, v]);
@@ -403,11 +443,24 @@ mod tests {
     #[test]
     fn overlap_preserves_frontier_when_budget_expires() {
         let a = plane(0.);
-        let r = search(&a, &a, SearchOptions { max_boxes: 1, ..Default::default() }, &|| false).unwrap();
+        let r = search(
+            &a,
+            &a,
+            SearchOptions {
+                max_boxes: 1,
+                ..Default::default()
+            },
+            &|| false,
+        )
+        .unwrap();
         assert_eq!(r.visited, 1);
         assert_eq!(r.subdivided, 1);
         assert_eq!(r.unresolved.len(), 2);
-        assert!(r.unresolved.iter().all(|b| b.reason == UnresolvedReason::WorkLimit));
+        assert!(
+            r.unresolved
+                .iter()
+                .all(|b| b.reason == UnresolvedReason::WorkLimit)
+        );
         assert_covered(&r, [0.125, 0.875, 0.125, 0.875]);
         assert_covered(&r, [0.875, 0.125, 0.875, 0.125]);
     }
@@ -417,9 +470,13 @@ mod tests {
         let a = plane(0.);
         let r = search(&a, &a, Default::default(), &|| true).unwrap();
         assert_eq!(r.visited, 0);
-        assert_eq!(r.unresolved, vec![UnresolvedBox {
-            parameters: r.domain, reason: UnresolvedReason::Cancelled,
-        }]);
+        assert_eq!(
+            r.unresolved,
+            vec![UnresolvedBox {
+                parameters: r.domain,
+                reason: UnresolvedReason::Cancelled,
+            }]
+        );
         assert!(!r.proven_disjoint());
     }
 
@@ -434,20 +491,28 @@ mod tests {
             }
         }
         let s = NurbsSurface::new(
-            5, 2, 2, 1,
+            5,
+            2,
+            2,
+            1,
             vec![2., 2., 2., 3., 3., 5., 5., 5.],
             vec![-2., -2., 2., 2.],
-            p, vec![1., 2., 0.5, 4., 2., 1., 8., 0.25, 1., 3.],
-        ).unwrap();
+            p,
+            vec![1., 2., 0.5, 4., 2., 1., 8., 0.25, 1., 3.],
+        )
+        .unwrap();
         for u in [[2.75, 3.], [3., 3.25], [2.75, 3.25]] {
             let v = [-0.125, 0.25];
             let bounds = surface_bounds(&s, u, v);
             for i in 0..=4 {
                 for j in 0..=4 {
-                    let p = s.evaluate_native(
-                        u[0] + (u[1] - u[0]) * i as f64 / 4.,
-                        v[0] + (v[1] - v[0]) * j as f64 / 4.,
-                    ).unwrap().point;
+                    let p = s
+                        .evaluate_native(
+                            u[0] + (u[1] - u[0]) * i as f64 / 4.,
+                            v[0] + (v[1] - v[0]) * j as f64 / 4.,
+                        )
+                        .unwrap()
+                        .point;
                     for (b, x) in bounds.iter().zip(p) {
                         let (lo, hi) = b.bounds();
                         // Existing evaluator is floating-point, not an oracle.
@@ -478,9 +543,16 @@ mod tests {
         ] {
             let now = Instant::now();
             let r = run(&a, &b);
-            println!("{name}: elapsed={:?}, visited={}, excluded={}, subdivided={}, unresolved={}, residual={:?}, disjoint={}",
-                now.elapsed(), r.visited, r.excluded, r.subdivided, r.unresolved.len(),
-                r.best_sample.map(|s| s.residual), r.proven_disjoint());
+            println!(
+                "{name}: elapsed={:?}, visited={}, excluded={}, subdivided={}, unresolved={}, residual={:?}, disjoint={}",
+                now.elapsed(),
+                r.visited,
+                r.excluded,
+                r.subdivided,
+                r.unresolved.len(),
+                r.best_sample.map(|s| s.residual),
+                r.proven_disjoint()
+            );
         }
     }
 }
