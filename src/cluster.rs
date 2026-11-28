@@ -61,14 +61,35 @@ pub static CLUSTER_SPEC: NodeSpec = NodeSpec {
     output: DataType::Any,
 };
 
-/// An exposed input: the unconnected input `key` of inner node `node`.
+/// Additional inner input fed by the same exposed slot.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClusterTarget {
+    pub node: NodeId,
+    pub key: String,
+}
+
+/// An exposed input with one or more unconnected inner targets.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClusterPort {
     pub node: NodeId,
     pub key: String,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_targets: Vec<ClusterTarget>,
 }
+
+impl ClusterPort {
+    pub fn targets(&self) -> impl Iterator<Item = (NodeId, &str)> {
+        std::iter::once((self.node, self.key.as_str())).chain(
+            self.additional_targets
+                .iter()
+                .map(|target| (target.node, target.key.as_str())),
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClusterDef {
@@ -229,12 +250,22 @@ fn find(defs: &[ClusterDef], id: u64) -> Option<&ClusterDef> {
     defs.iter().find(|d| d.id == id)
 }
 
-/// Default value of an exposed input if it is a number slot (None for geometry slots).
+/// A disconnected shared slot needs a link unless all targets have the same numeric default.
 pub fn port_default(def: &ClusterDef, port: &ClusterPort) -> Option<f64> {
-    let node = def.graph.node(port.node)?;
-    let spec = node.kind.spec().inputs.iter().find(|s| s.key == port.key)?;
-    let default = spec.default?;
-    Some(node.params.get(&port.key).copied().unwrap_or(default))
+    let default_at = |id, key: &str| {
+        let node = def.graph.node(id)?;
+        let spec = node.kind.spec().inputs.iter().find(|s| s.key == key)?;
+        let default = spec.default?;
+        Some(node.params.get(key).copied().unwrap_or(default))
+    };
+    let default = default_at(port.node, &port.key)?;
+    port.additional_targets
+        .iter()
+        .all(|target| {
+            default_at(target.node, &target.key)
+                .is_some_and(|value| value.to_bits() == default.to_bits())
+        })
+        .then_some(default)
 }
 
 fn eval_cluster_node(
@@ -323,9 +354,8 @@ fn run_def(
         }
         let mut node = original.clone();
         for (k, port) in def.inputs.iter().enumerate() {
-            if port.node == id {
-                node.inputs
-                    .insert(port.key.clone(), VIRTUAL_BASE + k as u64);
+            for (_, key) in port.targets().filter(|(target, _)| *target == id) {
+                node.inputs.insert(key.to_owned(), VIRTUAL_BASE + k as u64);
             }
         }
         let result = match node.kind {
@@ -335,7 +365,12 @@ fn run_def(
             }
             _ => engine::evaluate_node(&node, &local, cancel),
         };
-        let tree = result.map_err(|e| format!("部品「{}」の「{}」: {e}", def.name, node.name))?;
+        let tree = result.map_err(|e| {
+            format!(
+                "部品「{}」(ID {}) の「{}」(ID {}): {e}",
+                def.name, def.id, node.name, id
+            )
+        })?;
         weight = weight.saturating_add(tree.weight());
         if weight > MAX_TOTAL_WEIGHT {
             return Err("まとめノードの中間結果が大きすぎます。".into());
@@ -458,17 +493,18 @@ fn validate_def(def: &ClusterDef) -> Result<(), String> {
     }
     let mut seen = BTreeSet::new();
     for port in &def.inputs {
-        let node = def
-            .graph
-            .node(port.node)
-            .ok_or_else(|| context("公開する入力のノードが見つかりません。".into()))?;
-        let exists = node.kind.spec().inputs.iter().any(|s| s.key == port.key);
-        if !exists
-            || node.inputs.contains_key(&port.key)
-            || !seen.insert((port.node, port.key.clone()))
-            || port.label.len() > 512
-        {
-            return Err(context("公開する入力の指定が正しくありません。".into()));
+        if port.label.len() > 512 {
+            return Err(context("公開する入力の名前が長すぎます。".into()));
+        }
+        for (id, key) in port.targets() {
+            let node = def
+                .graph
+                .node(id)
+                .ok_or_else(|| context("公開する入力のノードが見つかりません。".into()))?;
+            let exists = node.kind.spec().inputs.iter().any(|s| s.key == key);
+            if !exists || node.inputs.contains_key(key) || !seen.insert((id, key)) {
+                return Err(context("公開する入力の指定が正しくありません。".into()));
+            }
         }
     }
     Ok(())
@@ -558,8 +594,8 @@ fn next_def_id(defs: &[ClusterDef]) -> Result<u64, String> {
 ///
 /// * The output is the node that is not used by another selected node (or the only one used
 ///   outside the selection). Other selected nodes must not be used outside the selection.
-/// * Exposed inputs: every input connected from outside or needing a shape connection, plus
-///   unconnected number inputs while there is room (8 in total). Numbers that do not fit stay
+/// * Exposed inputs: one slot per distinct outside source, plus unconnected required inputs
+///   and optional numbers while there is room (8 in total). Numbers that do not fit stay
 ///   inside with their current values.
 pub fn group_nodes(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, String> {
     let backup = graph.clone();
@@ -641,6 +677,7 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
         key: String,
         label: String,
         required: bool,
+        source: Option<NodeId>,
     }
     let mut candidates = Vec::new();
     for id in &set {
@@ -662,26 +699,46 @@ fn group_inner(graph: &mut Graph, ids: &[NodeId], name: &str) -> Result<NodeId, 
                 key: spec.key.to_string(),
                 label: format!("{}・{}", node.name, input_label(graph, node, index, spec)),
                 required,
+                source: node.inputs.get(spec.key).copied(),
             });
         }
     }
-    let required = candidates.iter().filter(|c| c.required).count();
+    let sources: BTreeSet<_> = candidates.iter().filter_map(|c| c.source).collect();
+    let required = sources.len()
+        + candidates
+            .iter()
+            .filter(|c| c.required && c.source.is_none())
+            .count();
     if required > MAX_CLUSTER_INPUTS {
         return Err(format!(
             "外から必要な入力が {required} 個あります。公開できる入力は {MAX_CLUSTER_INPUTS} 個までなので、範囲を小さくしてください。"
         ));
     }
     let mut room = MAX_CLUSTER_INPUTS - required;
-    let mut ports = Vec::new();
+    let mut ports: Vec<ClusterPort> = Vec::new();
+    let mut by_source = BTreeMap::<NodeId, usize>::new();
     for c in candidates {
+        if let Some(source) = c.source
+            && let Some(&index) = by_source.get(&source)
+        {
+            ports[index].additional_targets.push(ClusterTarget {
+                node: c.node,
+                key: c.key,
+            });
+            continue;
+        }
         if c.required || room > 0 {
             if !c.required {
                 room -= 1;
+            }
+            if let Some(source) = c.source {
+                by_source.insert(source, ports.len());
             }
             ports.push(ClusterPort {
                 node: c.node,
                 key: c.key,
                 label: c.label.chars().take(60).collect(),
+                additional_targets: Vec::new(),
             });
         }
     }
