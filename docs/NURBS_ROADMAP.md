@@ -43,9 +43,22 @@ SolidCraft のカーネルはそのまま公開せず、`src/kernel_bridge.rs` �
 
 T-spline の特許については [TSPLINE_PATENTS.md](TSPLINE_PATENTS.md) を参照してください。方針として **SubD（Catmull-Clark）→ NURBS の経路を優先** しています。
 
+## 2026-11-28 の追加（PR #81、`feat/nurbs-2`）
+
+| 分類 | ノード | 中身 |
+|---|---|---|
+| T-spline | T-spline パッチケージ、ケージ編集の「局所細分」 | 双三次の T-spline 面。選んだ面だけを縦横に切り、T 字の接合を入れる（SolidCraft `TSpline::refine`。形は変えない。テストで誤差 1e-9 mm 未満）。動かした後も「T-spline → B-rep」で厳密な NURBS 面になる（T 字の周りは Bézier 要素の面に分け、縫い合わせる） |
+| 立体化 | 厚みをつける | 開いた面に厚みをつけて閉じた立体にする（SolidCraft `thicken`） |
+| スケッチ | 拘束スケッチ | SolidCraft の拘束ソルバー（`crates/sc-sketch`）。1 行 1 命令の文章で書き、解いた結果を厳密な NURBS 曲線で出す |
+| 解析 | ゼブラ、抜き勾配の解析、B-rep 診断（トレランス） | ゼブラは等照線の縞をメッシュで出す。抜き勾配の解析は、角度の足りない面を出す。診断は、閉じているか・開いた辺・メッシュ化に失敗した面などを数値で出す |
+| 入出力 | STEP 書き出し／読み込みで IGES も扱う | 拡張子が .igs / .iges のとき IGES になる |
+| 速さ | B-rep 配列の並列化、実測値（[NURBS_PERFORMANCE.md](NURBS_PERFORMANCE.md)） | |
+| ケージ編集 | Ctrl＋ドラッグ中に X・Y・Z キーを押すと、その軸だけに動く | |
+
 ## 次にやること
 
-1. 拘束付きスケッチ（SolidCraft `crates/sketch` のソルバー）のノード化。sketch crate は文字組版（harfrust・ttf-parser・unicode-bidi）と一体なので、文字部分を切り離して取り込む作業が必要。**今回は未着手**。
+1. 星点（価数 3・5 など）まわりの G1: 今の ACC パッチは C0 なので、接線パッチ（Loop–Schaefer の ACC-2 や Gregory パッチ）で G1 にする。円柱・箱ケージは T-spline パッチへ変換できるようにする。
+1b. ブーリアンと厳密な交線が遅い（円柱 2 本で約 4 秒）。交線だけを求める処理をブーリアンから切り出し、面の組を事前に絞る。
 2. ACC パッチの G1 改良（特異点まわりの接線パッチ）と、折り目を B-rep 変換に反映すること。
 3. 開いた面どうしの厳密交線（今はメッシュ近似）と、NURBS 面どうしの交点を両方の面へ射影し直す処理（今は解析面のみ）。曲線と面の交点も同様。
 4. トリム: 今は水平面で切るだけ。任意の面・曲線での分割とトリム（SolidCraft `split_faces` / `trim`）をノード化。

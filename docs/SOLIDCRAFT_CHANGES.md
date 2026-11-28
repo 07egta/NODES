@@ -19,10 +19,11 @@ NODES の [取り込みコミット `1fe143b`](https://github.com/07egta/NODES/c
 |---|---|---|
 | `crates/sc-geom` | `crates/geom` | NURBS 曲線・曲面、B-spline、T-spline（T-mesh、局所細分、NURBS 抽出）、テッセレーション計画、メッシュ |
 | `crates/sc-kernel` | `crates/kernel` | B-rep 立体、押し出し・回転・ロフト・スイープ、ブーリアン、フィレット・面取り、シェル、STEP 入出力、T-spline シート |
+| `crates/sc-sketch` | `crates/sketch` | 2D スケッチ、拘束ソルバー、寸法、閉じた領域（プロファイル）の検出。文字の組版とフォントは取り除いた（下の表） |
 | `vendor/truck-*`, `vendor/matext4cgmath` | `vendor/` | SolidCraft が修正した truck。変更点は `vendor/README.md`（上流の記録をそのまま保存） |
 
 取り込まなかったもの: `crates/io`（`doc` と cadmpeg に依存するため。STEP は kernel に含まれる）、
-`crates/sketch`（拘束ソルバー。harfrust など文字組版の依存が付くため次の段階で検討）、
+
 UI・描画系（egui 0.36 / wgpu。NODES は egui 0.33 なので一切取り込まない）。
 
 ## 変更一覧
@@ -33,6 +34,16 @@ UI・描画系（egui 0.36 / wgpu。NODES は egui 0.33 なので一切取り込
 | 2026-11-27 | `crates/sc-kernel/Cargo.toml` | dev-dependencies（proptest、truck-meshalgo の `test-hooks`）を削除し、`crates/kernel/tests/` を取り込まない | NODES の CI はルート package のテストのみ実行し、ロックファイルを小さく保つため。カーネル自身の網羅テストは上流で実行される |
 | 2026-11-27 | `crates/sc-*/rustfmt.toml` | SolidCraft の `rustfmt.toml`（max_width 150）を複写 | `cargo fmt --all -- --check` が上流の整形のまま通るように |
 | 2026-11-27 | ルート `Cargo.toml` | `[workspace]`（members: `.`, `crates/sc-geom`, `crates/sc-kernel`、`vendor` を除外）と `[patch.crates-io]` で truck を `vendor/` に差し替え。`solidcraft-*` と truck は debug-assertions 無効 | SolidCraft と同じ構成。truck のデバッグ専用検査は正しい形状（シーム辺・閉じた辺）を拒否するため |
+
+## 2026-11-28 の取り込み: `crates/sc-sketch`
+
+| ファイル | 変更 | 理由 |
+|---|---|---|
+| `crates/sc-sketch/Cargo.toml` | workspace 継承を明示値に。依存から `harfrust`・`ttf-parser`・`unicode-bidi` を外す。example を外す | 文字組版は NODES のスケッチで使わない。依存とフォントファイル（Liberation Sans、OFL）を持ち込まないため |
+| `src/text.rs` | 文字の形状を作る処理を削除し、保存形式に必要な `TextStyle` と `TextAlign` だけを残した | 文字リンクのあるスケッチ JSON も読めるように型は残す |
+| `src/fonts.rs` | 削除 | 同上 |
+| `src/lib.rs` | `fonts` と、文字関係の再公開（`text_geometry` など）を削除。ファイルを分けたテストモジュールの宣言を削除 | 同上。NODES の CI はルートのパッケージだけをテストするため |
+| `src/*_tests.rs`, `src/tests.rs`, `tests/` | 削除。ただし `#[path]` で参照される 5 つのファイル（`decompose_tests.rs`、`link_identity_tests.rs`、`link_side_tests.rs`、`offset_topology_tests.rs`、`redundancy_tests.rs`）は残した | 同上 |
 
 ## ソースコード本体への変更
 

@@ -619,6 +619,12 @@ pub enum NodeKind {
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
+    ExactSketch,
+    ExactZebra,
+    ExactDraftAnalysis,
+    ExactDiagnose,
+    SubdTsplinePatch,
+    ExactThicken,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1076,6 +1082,12 @@ impl NodeKind {
             Self::OrigamiMiuraCreases,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
+            Self::ExactSketch,
+            Self::ExactZebra,
+            Self::ExactDraftAnalysis,
+            Self::ExactDiagnose,
+            Self::SubdTsplinePatch,
+            Self::ExactThicken,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
