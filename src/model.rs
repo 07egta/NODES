@@ -596,6 +596,12 @@ pub enum NodeKind {
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
+    // Ornament nodes: append-only serialized identifiers.
+    TruchetPattern,
+    AsanohaPattern,
+    ShippoPattern,
+    PowerDiagram2d,
+    LloydRelax2d,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1033,6 +1039,11 @@ impl NodeKind {
             Self::MatterInverseAngle,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
+            Self::TruchetPattern,
+            Self::AsanohaPattern,
+            Self::ShippoPattern,
+            Self::PowerDiagram2d,
+            Self::LloydRelax2d,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
