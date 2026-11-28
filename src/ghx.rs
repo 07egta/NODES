@@ -15,6 +15,10 @@ const MAX_ELEMENTS: usize = 100_000;
 const MAX_WIRES: usize = 32_768;
 const SLIDER: &str = "57da07bd-ecab-415d-9d86-af36d7073abc";
 const POINT: &str = "3581f42a-9592-4549-bd6b-1c0fc39d067b";
+const ADD: &str = "a0d62394-a118-422d-abb3-6af115c75b25";
+const OLD_ADD: &str = "d18db32b-7099-4eea-85c4-8ba675ee8ec3";
+const OLD_SUBTRACT: &str = "2c56ab33-c7cc-4129-886c-d5856b714010";
+const OLD_MULTIPLY: &str = "b8963bb1-aa57-476e-a20e-ed6cf635a49c";
 type Res<T> = Result<T, String>;
 
 #[derive(Clone, Debug, Serialize)]
@@ -287,6 +291,7 @@ fn port(e: &Element, index: Option<usize>) -> Res<Port> {
 pub struct Object {
     pub index: usize,
     pub component_guid: String,
+    pub library_guid: Option<String>,
     pub instance_guid: String,
     pub name: String,
     pub nickname: String,
@@ -312,9 +317,22 @@ pub struct Connection {
     pub source_order: usize,
 }
 
+/// Structural inspection counts, not a numerical compatibility certificate.
+#[derive(Debug, Serialize)]
+pub struct Summary {
+    pub objects: usize,
+    pub mapped_candidates: usize,
+    pub unmapped_objects: usize,
+    pub nonzero_library_ids: usize,
+    pub connections: usize,
+    pub resolved_connections: usize,
+    pub unresolved_connections: usize,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub format: &'static str,
+    pub summary: Summary,
     pub objects: Vec<Object>,
     pub connections: Vec<Connection>,
     pub diagnostics: Vec<String>,
@@ -327,7 +345,58 @@ fn candidate(guid: &str) -> Option<NodeKind> {
     match guid {
         SLIDER => Some(NodeKind::Number),
         POINT => Some(NodeKind::Point),
+        ADD | OLD_ADD => Some(NodeKind::Add),
+        OLD_SUBTRACT => Some(NodeKind::Subtract),
+        OLD_MULTIPLY => Some(NodeKind::Multiply),
         _ => None,
+    }
+}
+
+// Both layouts are observed in public GHX examples. Do not guess when mixed.
+fn component_ports(c: &Element) -> Res<(Vec<Port>, Vec<Port>)> {
+    let (parent, input, output) = if let Some(data) = c.chunk("ParameterData")? {
+        if c.chunks()
+            .any(|e| matches!(e.name(), "param_input" | "param_output"))
+        {
+            return Err("mixed GHX port layouts".into());
+        }
+        (data, "InputParam", "OutputParam")
+    } else {
+        (c, "param_input", "param_output")
+    };
+    let collect_ports = |tag| -> Res<Vec<Port>> {
+        indexed(parent.chunks().filter(|e| e.name() == tag))?
+            .into_iter()
+            .enumerate()
+            .map(|(i, e)| port(e, Some(i)))
+            .collect()
+    };
+    let inputs = collect_ports(input)?;
+    let outputs = collect_ports(output)?;
+    if input == "InputParam" {
+        for (key, len) in [("InputCount", inputs.len()), ("OutputCount", outputs.len())] {
+            if let Some(value) = parent.field(key)?
+                && value.parse::<usize>().ok() != Some(len)
+            {
+                return Err(format!("inconsistent {key}"));
+            }
+        }
+    }
+    Ok((inputs, outputs))
+}
+
+fn numeric_source(kind: NodeKind) -> bool {
+    matches!(
+        kind,
+        NodeKind::Number | NodeKind::Add | NodeKind::Subtract | NodeKind::Multiply
+    )
+}
+
+fn input_keys(kind: NodeKind) -> &'static [&'static str] {
+    match kind {
+        NodeKind::Point => &["x", "y", "z"],
+        NodeKind::Add | NodeKind::Subtract | NodeKind::Multiply => &["a", "b"],
+        _ => &[],
     }
 }
 
@@ -361,6 +430,7 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
     for (index, obj) in entries.into_iter().enumerate() {
         let c = obj.chunk("Container")?.ok_or("missing object Container")?;
         let component_guid = guid(obj.required("GUID")?)?;
+        let library_guid = obj.field("Lib")?.map(guid).transpose()?;
         let instance_guid = guid(c.required("InstanceGuid")?)?;
         let name = obj
             .field("Name")?
@@ -368,16 +438,7 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
             .unwrap_or("")
             .to_string();
         let nickname = c.field("NickName")?.unwrap_or("").to_string();
-        let mut inputs: Vec<Port> = indexed(c.chunks().filter(|e| e.name() == "param_input"))?
-            .into_iter()
-            .enumerate()
-            .map(|(i, e)| port(e, Some(i)))
-            .collect::<Res<_>>()?;
-        let mut outputs: Vec<Port> = indexed(c.chunks().filter(|e| e.name() == "param_output"))?
-            .into_iter()
-            .enumerate()
-            .map(|(i, e)| port(e, Some(i)))
-            .collect::<Res<_>>()?;
+        let (mut inputs, mut outputs) = component_ports(c)?;
         let group_members = refs(c, "ID", "ID_Count")?;
         // Stand-alone parameter objects identify their sources/outputs by their own GUID.
         let direct_sources = refs(c, "Source", "SourceCount")?;
@@ -402,6 +463,7 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
         objects.push(Object {
             index,
             component_guid,
+            library_guid,
             instance_guid,
             name,
             nickname,
@@ -492,8 +554,33 @@ pub fn inspect(bytes: &[u8]) -> Res<Report> {
     if seen != objects.len() {
         diagnostics.push("cyclic GHX graph; conversion forbidden".into());
     }
+    let mapped_candidates = objects
+        .iter()
+        .filter(|o| o.candidate_node.is_some())
+        .count();
+    let resolved_connections = connections
+        .iter()
+        .filter(|c| c.source_object.is_some())
+        .count();
+    let summary = Summary {
+        objects: objects.len(),
+        mapped_candidates,
+        unmapped_objects: objects.len() - mapped_candidates,
+        nonzero_library_ids: objects
+            .iter()
+            .filter(|o| {
+                o.library_guid
+                    .as_deref()
+                    .is_some_and(|g| g != "00000000-0000-0000-0000-000000000000")
+            })
+            .count(),
+        connections: connections.len(),
+        resolved_connections,
+        unresolved_connections: connections.len() - resolved_connections,
+    };
     Ok(Report {
         format: "nodes-ghx-inspection-v1",
+        summary,
         objects,
         connections,
         diagnostics,
@@ -548,6 +635,15 @@ fn scalar_default(e: &Element) -> Res<Option<f64>> {
         return Err("non-scalar persistent data".into());
     }
     allowed(items[0], &["number"], &[])?;
+    let number = items[0].item("number")?.ok_or("missing numeric data")?;
+    if let Some(ty) = number.attributes.get("type_name")
+        && !matches!(
+            ty.as_str(),
+            "gh_double" | "gh_single" | "gh_int32" | "gh_int64" | "gh_decimal"
+        )
+    {
+        return Err("persistent data is not a numeric scalar".into());
+    }
     Ok(Some(finite(items[0].required("number")?)?))
 }
 
@@ -574,7 +670,10 @@ fn set_number(graph: &mut Graph, id: NodeId, key: &str, value: f64) -> Res<()> {
 /// Strict, all-or-nothing scalar conversion. Unsupported objects are never dropped or executed.
 /// Inspect first to retain information that cannot be represented by the one-output native graph.
 pub fn convert(bytes: &[u8]) -> Res<Project> {
-    let report = inspect(bytes)?;
+    convert_report(&inspect(bytes)?)
+}
+
+fn convert_report(report: &Report) -> Res<Project> {
     if !report.diagnostics.is_empty() {
         return Err(format!(
             "conversion refused; run --inspect-ghx: {}",
@@ -599,7 +698,7 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
             return Err("external component library is not convertible".into());
         }
         if let Some(attributes) = c.chunk("Attributes")? {
-            allowed(attributes, &["Bounds", "Pivot"], &[])?;
+            allowed(attributes, &["Bounds", "Pivot", "Selected"], &[])?;
         }
         allowed(
             c,
@@ -613,8 +712,29 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
                 "Hidden",
                 "Locked",
             ],
-            &["Attributes", "Slider", "param_input", "param_output"],
+            &[
+                "Attributes",
+                "Slider",
+                "param_input",
+                "param_output",
+                "ParameterData",
+            ],
         )?;
+        if let Some(data) = c.chunk("ParameterData")? {
+            allowed(
+                data,
+                &["InputCount", "OutputCount", "InputId", "OutputId"],
+                &["InputParam", "OutputParam"],
+            )?;
+            for (key, count, len) in [
+                ("InputId", "InputCount", object.inputs.len()),
+                ("OutputId", "OutputCount", object.outputs.len()),
+            ] {
+                if refs(data, key, count)?.len() != len {
+                    return Err("inconsistent ParameterData port types".into());
+                }
+            }
+        }
         if bool_field(c, "Locked")?.unwrap_or(false) {
             return Err("locked node requires manual migration".into());
         }
@@ -631,7 +751,7 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
                 || object.outputs.len() != 1
                 || object.outputs[0].index.is_some()
                 || c.chunks()
-                    .any(|e| e.name() == "param_input" || e.name() == "param_output")
+                    .any(|e| matches!(e.name(), "param_input" | "param_output" | "ParameterData"))
             {
                 return Err("unexpected slider port structure".into());
             }
@@ -657,13 +777,14 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
             }
             set_number(&mut graph, id, "value", value)?;
         } else {
+            let keys = input_keys(kind);
             if c.chunk("Slider")?.is_some()
-                || object.inputs.len() != 3
+                || object.inputs.len() != keys.len()
                 || object.outputs.len() != 1
                 || object.outputs[0].index != Some(0)
                 || !object.outputs[0].sources.is_empty()
             {
-                return Err("unexpected Construct Point port structure".into());
+                return Err("unexpected scalar component port structure".into());
             }
             allowed(
                 &object.outputs[0].details,
@@ -678,12 +799,14 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
                 &["Attributes"],
             )?;
             for (i, p) in object.inputs.iter().enumerate() {
-                if p.index != Some(i)
-                    || p.sources.len() > 1
-                    || (p.name != ["X", "Y", "Z"][i]
-                        && p.name != ["X coordinate", "Y coordinate", "Z coordinate"][i])
-                {
-                    return Err("unsupported point input layout".into());
+                let name_ok = if kind == NodeKind::Point {
+                    p.name == ["X", "Y", "Z"][i]
+                        || p.name == ["X coordinate", "Y coordinate", "Z coordinate"][i]
+                } else {
+                    p.name == ["A", "B"][i]
+                };
+                if p.index != Some(i) || p.sources.len() > 1 || !name_ok {
+                    return Err("unsupported scalar input layout".into());
                 }
                 allowed(
                     &p.details,
@@ -699,9 +822,9 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
                     &["Attributes", "PersistentData"],
                 )?;
                 if let Some(value) = scalar_default(&p.details)? {
-                    set_number(&mut graph, id, ["x", "y", "z"][i], value)?;
+                    set_number(&mut graph, id, keys[i], value)?;
                 } else if p.sources.is_empty() {
-                    return Err("missing explicit scalar point default".into());
+                    return Err("missing explicit scalar default".into());
                 }
             }
         }
@@ -712,19 +835,26 @@ pub fn convert(bytes: &[u8]) -> Res<Project> {
         let target_port = wire
             .target_port
             .ok_or("stand-alone parameter input not convertible")?;
-        if report.objects[wire.target_object].candidate_node != Some(NodeKind::Point)
-            || report.objects[source].candidate_node != Some(NodeKind::Number)
-            || wire.source_port.is_some()
+        let source_kind = report.objects[source]
+            .candidate_node
+            .ok_or("unknown source")?;
+        let target_kind = report.objects[wire.target_object]
+            .candidate_node
+            .ok_or("unknown target")?;
+        let keys = input_keys(target_kind);
+        let expected_port = if source_kind == NodeKind::Number {
+            None
+        } else {
+            Some(0)
+        };
+        if !numeric_source(source_kind)
+            || wire.source_port != expected_port
             || wire.source_order != 0
-            || target_port >= 3
+            || target_port >= keys.len()
         {
             return Err("unsupported wire mapping".into());
         }
-        graph.connect(
-            ids[source],
-            ids[wire.target_object],
-            ["x", "y", "z"][target_port],
-        )?;
+        graph.connect(ids[source], ids[wire.target_object], keys[target_port])?;
     }
     let project = Project::new("Imported GHX (scalar subset)", graph);
     project.validate()?;
@@ -795,6 +925,14 @@ impl<W: Write> Write for BoundedWriter<W> {
     }
 }
 
+/// Parse once and return the inert report even if strict conversion is refused.
+/// A caller must not treat mapped candidates as successfully converted nodes.
+pub fn prepare_import(path: &Path) -> Res<(Report, Res<Project>)> {
+    let report = inspect(&read_ghx(path)?)?;
+    let conversion = convert_report(&report);
+    Ok((report, conversion))
+}
+
 /// Load and convert a GHX file without writing or evaluating the native project.
 pub fn convert_path(input: &Path) -> Res<Project> {
     convert(&read_ghx(input)?)
@@ -834,6 +972,56 @@ mod tests {
     }
 
     #[test]
+    fn modern_parameter_data_numeric_arithmetic() {
+        let sample = include_str!("../examples/interop/scalar-add.ghx");
+        for (guid, expected) in [
+            (ADD, 14.0),
+            (OLD_ADD, 14.0),
+            (OLD_SUBTRACT, 0.0),
+            (OLD_MULTIPLY, 49.0),
+        ] {
+            let xml = sample.replace(ADD, guid);
+            let report = inspect(xml.as_bytes()).unwrap();
+            assert_eq!(report.summary.mapped_candidates, 2);
+            assert_eq!(report.summary.resolved_connections, 2);
+            assert_eq!(report.summary.unmapped_objects, 0);
+            let p = convert(xml.as_bytes()).unwrap();
+            let result = Evaluator::default().evaluate(&p.graph, &|| false);
+            assert_eq!(
+                result.outputs[&p.graph.nodes[1].id]
+                    .as_ref()
+                    .unwrap()
+                    .branches
+                    .values()
+                    .flatten()
+                    .next(),
+                Some(&Value::Number(expected))
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_ambiguous_parameter_data() {
+        let sample = include_str!("../examples/interop/scalar-add.ghx");
+        let mixed = sample.replace(
+            "<chunk name=\"ParameterData\">",
+            "<chunk name=\"param_input\" index=\"0\"/><chunk name=\"ParameterData\">",
+        );
+        assert!(inspect(mixed.as_bytes()).is_err());
+        let wrong_count = sample.replace(
+            "<item name=\"InputCount\">2</item>",
+            "<item name=\"InputCount\">3</item>",
+        );
+        assert!(inspect(wrong_count.as_bytes()).is_err());
+        let bad_types = sample.replace(
+            "name=\"InputId\" index=\"1\"",
+            "name=\"InputId\" index=\"2\"",
+        );
+        assert!(inspect(bad_types.as_bytes()).is_ok());
+        assert!(convert(bad_types.as_bytes()).is_err());
+    }
+
+    #[test]
     fn unsupported_object_preserves_wire_and_source() {
         let xml = std::str::from_utf8(SAMPLE)
             .unwrap()
@@ -842,6 +1030,8 @@ mod tests {
         assert_eq!(report.objects.len(), 2);
         assert_eq!(report.connections.len(), 1);
         assert_eq!(report.source_xml, xml);
+        assert_eq!(report.summary.unmapped_objects, 1);
+        assert_eq!(report.summary.resolved_connections, 1);
         assert!(!report.diagnostics.is_empty());
         assert!(convert(xml.as_bytes()).is_err());
     }
@@ -885,6 +1075,7 @@ mod tests {
         );
         let report = inspect(missing.as_bytes()).unwrap();
         assert_eq!(report.connections[0].source_object, None);
+        assert_eq!(report.summary.unresolved_connections, 1);
         assert!(convert(missing.as_bytes()).is_err());
         let cycle = text.replace(
             "name=\"Source\" index=\"0\">11111111-1111-1111-1111-111111111111",
