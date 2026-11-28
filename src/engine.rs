@@ -842,7 +842,9 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
-        GenesisScopes | GenesisScopeIds | GenesisRelief => crate::genesis::run_item(kind, a, cancel),
+        GenesisScopes | GenesisScopeIds | GenesisRelief => {
+            crate::genesis::run_item(kind, a, cancel)
+        }
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;

@@ -181,7 +181,9 @@ fn leaves(cfg: Grammar, stop: &dyn Fn() -> bool) -> Result<Vec<Scope>, String> {
         }
     }
     if !region_applied {
-        return Err("再生成する領域IDが存在しないか、すでに終端です。親IDを指定してください。".into());
+        return Err(
+            "再生成する領域IDが存在しないか、すでに終端です。親IDを指定してください。".into(),
+        );
     }
     Ok(out)
 }
@@ -224,7 +226,11 @@ fn relief(a: &[&Value], stop: &dyn Fn() -> bool) -> Result<Vec<Value>, String> {
     let key = [x0, y0, x1, y1, z]
         .into_iter()
         .fold(0, |key, v| mix(key ^ v.to_bits()));
-    let height = if sample(seed, key, 3) < weight { tall } else { low };
+    let height = if sample(seed, key, 3) < weight {
+        tall
+    } else {
+        low
+    };
     let mut mesh = crate::engine::box_mesh(
         (x1 - x0) * (1. - 2. * margin),
         (y1 - y0) * (1. - 2. * margin),
@@ -300,18 +306,25 @@ mod tests {
         let a = leaves(config, &|| false).unwrap();
         assert_eq!(a, leaves(config, &|| false).unwrap());
         assert_eq!(a.len(), 32);
-        let area: f64 = a.iter().map(|s| {
-            let [x0, y0, x1, y1] = s.bounds;
-            assert!(x0 >= 0. && y0 >= 0. && x1 <= config.width && y1 <= config.height);
-            assert!(x1 > x0 && y1 > y0);
-            (x1 - x0) * (y1 - y0)
-        }).sum();
+        let area: f64 = a
+            .iter()
+            .map(|s| {
+                let [x0, y0, x1, y1] = s.bounds;
+                assert!(x0 >= 0. && y0 >= 0. && x1 <= config.width && y1 <= config.height);
+                assert!(x1 > x0 && y1 > y0);
+                (x1 - x0) * (y1 - y0)
+            })
+            .sum();
         assert!((area - config.width * config.height).abs() < 1e-8);
         for (i, p) in a.iter().enumerate() {
             for q in &a[i + 1..] {
                 assert_ne!(p.id, q.id);
-                assert!(p.bounds[2] <= q.bounds[0] || q.bounds[2] <= p.bounds[0]
-                    || p.bounds[3] <= q.bounds[1] || q.bounds[3] <= p.bounds[1]);
+                assert!(
+                    p.bounds[2] <= q.bounds[0]
+                        || q.bounds[2] <= p.bounds[0]
+                        || p.bounds[3] <= q.bounds[1]
+                        || q.bounds[3] <= p.bounds[1]
+                );
             }
         }
     }
@@ -323,7 +336,10 @@ mod tests {
         assert_ne!(old, changed);
         assert_eq!(
             old.iter().filter(|s| !under(s.id, 2)).collect::<Vec<_>>(),
-            changed.iter().filter(|s| !under(s.id, 2)).collect::<Vec<_>>()
+            changed
+                .iter()
+                .filter(|s| !under(s.id, 2))
+                .collect::<Vec<_>>()
         );
     }
 
@@ -331,22 +347,54 @@ mod tests {
     fn limits_and_cancel_are_errors() {
         assert!(leaves(Grammar { limit: 1, ..cfg() }, &|| false).is_err());
         assert!(leaves(cfg(), &|| true).is_err());
-        assert!(leaves(Grammar { region: 1024, ..cfg() }, &|| false).is_err());
-        let terminal = leaves(Grammar { minimum: 80., ..cfg() }, &|| false).unwrap();
+        assert!(
+            leaves(
+                Grammar {
+                    region: 1024,
+                    ..cfg()
+                },
+                &|| false
+            )
+            .is_err()
+        );
+        let terminal = leaves(
+            Grammar {
+                minimum: 80.,
+                ..cfg()
+            },
+            &|| false,
+        )
+        .unwrap();
         assert_eq!(terminal.len(), 1);
     }
 
     #[test]
     fn relief_has_closed_positive_volume() {
-        let v = outline(Scope { id: 1, bounds: [0., 0., 20., 10.] });
-        let values = [Value::Number(2.), Value::Number(12.), Value::Number(1.),
-            Value::Number(0.1), Value::Number(7.)];
-        let args = [&v, &values[0], &values[1], &values[2], &values[3], &values[4]];
+        let v = outline(Scope {
+            id: 1,
+            bounds: [0., 0., 20., 10.],
+        });
+        let values = [
+            Value::Number(2.),
+            Value::Number(12.),
+            Value::Number(1.),
+            Value::Number(0.1),
+            Value::Number(7.),
+        ];
+        let args = [
+            &v, &values[0], &values[1], &values[2], &values[3], &values[4],
+        ];
         let out = relief(&args, &|| false).unwrap();
-        let Value::Mesh(m) = &out[0] else { panic!("expected mesh") };
+        let Value::Mesh(m) = &out[0] else {
+            panic!("expected mesh")
+        };
         assert_eq!(m.vertices.len(), 8);
         assert_eq!(m.triangles.len(), 12);
-        assert!(crate::mesh_fabrication::audit(m, &|| false).unwrap().closed_oriented());
+        assert!(
+            crate::mesh_fabrication::audit(m, &|| false)
+                .unwrap()
+                .closed_oriented()
+        );
         let volume = crate::mesh_fabrication::signed_volume(m, &|| false).unwrap();
         assert!((volume - 16. * 8. * 12.).abs() < 1e-8);
     }
