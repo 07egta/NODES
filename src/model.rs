@@ -589,6 +589,7 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    ExactTorus,
     // BioMorph growth (append-only serialized IDs).
     BioSpaceColonization,
     BioCoiledShell,
@@ -1023,6 +1024,7 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::ExactTorus,
             Self::BioSpaceColonization,
             Self::BioCoiledShell,
         ]
