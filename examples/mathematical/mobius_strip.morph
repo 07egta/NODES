@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "メビウスの帯 — ねじれた一面の彫刻",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "mobius_strip",
+        "name": "メビウスの帯",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "radius": 30,
+          "half_width": 8,
+          "u_segments": 96,
+          "v_segments": 16
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}

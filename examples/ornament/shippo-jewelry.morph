@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "name": "七宝つなぎ・装飾線",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "shippo_pattern",
+        "name": "七宝",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "nx": 5,
+          "ny": 5,
+          "size": 12,
+          "ratio": 0.7071067811865476,
+          "segments": 8
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          280,
+          30
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 0.8
+}

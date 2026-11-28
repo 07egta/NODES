@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "カテノイド — 砂時計状の極小曲面",
+  "graph": {
+    "nodes": [
+      {
+        "id": 0,
+        "kind": "catenoid",
+        "name": "カテノイド",
+        "position": [
+          20,
+          30
+        ],
+        "params": {
+          "radius": 20,
+          "extent": 1.2,
+          "u_segments": 64,
+          "v_segments": 32
+        },
+        "inputs": {},
+        "preview": false
+      },
+      {
+        "id": 1,
+        "kind": "output",
+        "name": "出力",
+        "position": [
+          330,
+          70
+        ],
+        "params": {},
+        "inputs": {
+          "geometry": 0
+        },
+        "preview": true
+      }
+    ],
+    "next_id": 2
+  },
+  "pan": [
+    24,
+    80
+  ],
+  "zoom": 1
+}
