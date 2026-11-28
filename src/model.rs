@@ -589,6 +589,9 @@ pub enum NodeKind {
     MeshFillHoles,
     MeshThicken,
     MeshOffset,
+    // BioMorph growth (append-only serialized IDs).
+    BioSpaceColonization,
+    BioCoiledShell,
 }
 impl NodeKind {
     /// Preserve the input keys used by the independent generative-design mission.
@@ -1020,6 +1023,8 @@ impl NodeKind {
             Self::MeshFillHoles,
             Self::MeshThicken,
             Self::MeshOffset,
+            Self::BioSpaceColonization,
+            Self::BioCoiledShell,
         ]
     }
     pub fn spec(self) -> &'static NodeSpec {
@@ -1676,6 +1681,7 @@ impl NodeKind {
             | Self::MeshNonManifold => crate::mesh_fabrication::spec(self),
             other => crate::data_tree_nodes::spec(other)
                 .or_else(|| crate::math_nodes::spec(other))
+                .or_else(|| crate::biomorph::spec(other))
                 .or_else(|| crate::gh_gaps::spec(other))
                 .or_else(|| {
                     crate::generative::is_kind(other).then(|| crate::generative::spec(other))

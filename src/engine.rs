@@ -639,6 +639,13 @@ pub(crate) fn evaluate_node(
                 )?
             } else if crate::math_nodes::is_list_kind(node.kind) {
                 crate::math_nodes::run_list(node.kind, &lists, cancel)?
+            } else if node.kind == NodeKind::BioSpaceColonization {
+                crate::biomorph::run_colonization(
+                    &lists,
+                    (MAX_TOTAL_WEIGHT / 2).saturating_sub(total_weight),
+                    MAX_ITEMS.saturating_sub(total_items),
+                    cancel,
+                )?
             } else if crate::generative::is_list(node.kind) {
                 crate::generative::run_list(node.kind, &lists, cancel)?
             } else if node.kind == NodeKind::MeshConstruct {
@@ -786,6 +793,7 @@ fn preflight_run(
         }
         // Outer and inner copies plus the stitched rim.
         NodeKind::Shell => (shape(args)?.weight().saturating_mul(3), 1),
+        NodeKind::BioCoiledShell => crate::biomorph::estimate_shell(args)?,
         k if crate::generative::is_kind(k) => crate::generative::estimate(k, args)?,
         k if crate::nodes_shape::is_kind(k) => crate::nodes_shape::estimate(k, args)?,
         _ => (0, 1),
@@ -849,6 +857,7 @@ fn run(kind: NodeKind, a: &[&Value], cancel: &dyn Fn() -> bool) -> Result<Vec<Va
         k if crate::gh_gaps::is_kind(k) => crate::gh_gaps::run_item(k, a, cancel),
         k if crate::nurbs_nodes::is_kind(k) => crate::nurbs_nodes::run(k, a, cancel),
         k if crate::physics_nodes::is_item_kind(k) => crate::physics_nodes::run_item(k, a, cancel),
+        BioCoiledShell => crate::biomorph::run_shell(a, cancel),
         Number => Ok(vec![Value::Number(num(a, 0)?)]),
         Add | Multiply | Divide => {
             let x = num(a, 0)?;
