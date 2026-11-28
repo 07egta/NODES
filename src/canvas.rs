@@ -708,12 +708,11 @@ impl GraphCanvas {
                         if pos.distance(mid) < 14. {
                             painter.circle_stroke(mid, 6., Stroke::new(1.4_f32, theme::teal()));
                             painter.circle_filled(mid, 2., theme::teal());
-                            let hit = ui
-                                .interact(
-                                    Rect::from_center_size(mid, egui::vec2(18., 18.)),
-                                    Id::new(("wire_dot", n.id, key.as_str())),
-                                    Sense::click(),
-                                );
+                            let hit = ui.interact(
+                                Rect::from_center_size(mid, egui::vec2(18., 18.)),
+                                Id::new(("wire_dot", n.id, key.as_str())),
+                                Sense::click(),
+                            );
                             hit.context_menu(|ui| {
                                 if ui.button("値のプローブを固定").clicked() {
                                     self.probe_source = Some(*from);
@@ -1278,7 +1277,11 @@ impl GraphCanvas {
                 });
             }
             or.on_hover_ui(|ui| {
-                ui.label(format!("{}の出力 · {}", n.name, n.kind.spec().output.label()));
+                ui.label(format!(
+                    "{}の出力 · {}",
+                    n.name,
+                    n.kind.spec().output.label()
+                ));
                 show_probe_result(ui, evaluation, stale, n.id);
                 ui.label(theme::small("右クリックでプローブを固定"));
             });
@@ -1778,13 +1781,7 @@ impl GraphCanvas {
     }
 }
 
-/// First `max` characters of `text`, with an ellipsis when cut.
-fn show_probe_result(
-    ui: &mut egui::Ui,
-    evaluation: Option<&Evaluation>,
-    stale: bool,
-    id: NodeId,
-) {
+fn show_probe_result(ui: &mut egui::Ui, evaluation: Option<&Evaluation>, stale: bool, id: NodeId) {
     if stale {
         ui.label(theme::small("更新中 · 最新の値を待っています"));
         return;
@@ -1800,6 +1797,7 @@ fn show_probe_result(
     }
 }
 
+/// First `max` characters of `text`, with an ellipsis when cut.
 fn short(text: &str, max: usize) -> String {
     let mut out: String = text.chars().take(max).collect();
     if text.chars().nth(max).is_some() {
